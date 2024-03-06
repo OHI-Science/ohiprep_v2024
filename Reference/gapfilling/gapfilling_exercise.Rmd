@@ -1,0 +1,57 @@
+---
+title: "Gapfilling Exercise"
+output: html_document
+---
+
+GOAL: Learn how/why NOT gapfilling data can introduce bias!
+
+The following is a (totally fake) dataset used to calculate an index. It is comprised of 3 indicators: A,B, and C.Notice that indicator C has quite a bit of missing data. We are going to explore whether we should gapfill these data.
+
+```{r}
+
+gf <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohiprep_v2022/gh-pages/Reference/gapfilling/gf_explore.csv")
+
+```
+
+The overall index is calculated as the average of indicators A, B, and C.
+Try calculating the index without gapfilling the missing data. Explore the results by plotting. Do you see any evidence of bias?
+
+```{r}
+
+gf2 <- gf %>%
+  rowwise() %>%
+  mutate(index_no_gf = mean(c(indicatorA, indicatorB, indicatorC), na.rm=TRUE),
+         missing_data = ifelse(is.na(indicatorC), 1, 0))
+
+
+```
+
+Explore whether indicator C is corrlated with ecoregion.
+
+```{r}
+
+
+```
+
+Gapfill missing data using the ecoregion mean of indicator C for the country's respective ecoregion. Explore the results. Does this seem like a reasonable approach?
+
+```{r}
+
+gf2 <- gf %>%
+  rowwise() %>%
+  mutate(index_no_gf = mean(c(indicatorA, indicatorB, indicatorC), na.rm=TRUE),
+         missing_data = ifelse(is.na(indicatorC), 1, 0),
+         indicatorC_gf = ifelse(is.na(indicatorC) & ecoregion == "A", 
+                                mean(gf$indicatorC[gf$ecoregion=="A"], na.rm=TRUE),
+                                indicatorC)) %>%
+  mutate(indicatorC_gf = ifelse(is.na(indicatorC_gf),
+                                mean(gf$indicatorC[gf$ecoregion=="B"], na.rm=TRUE),
+                                indicatorC_gf)) %>%
+  mutate(index = mean(c(indicatorA, indicatorB, indicatorC_gf), na.rm=TRUE))
+  
+
+
+```
+
+
+Does the uncertainty associated with gapfilling (using ecoregion mean) seem like it will be higher for region A or B? What are the potential concerns of gapfilling? Can you think of any ways to improve this approach to gapfilling?

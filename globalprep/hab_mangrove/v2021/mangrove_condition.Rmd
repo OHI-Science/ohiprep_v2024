@@ -1,0 +1,263 @@
+---
+title: 'OHI 2021: Mangrove condition'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+
+## Updates from previous assessment
+Using a new dataset from global mangrove watch for the extent, and since all regions which have extent need a condition, we are going to gapfill the new regions that have been added to the mangrove extent data. 
+
+***
+## Data Source 
+
+**Reference**: United Nations, 2007. The world’s mangroves 1980-2005. FAO Forestry Paper 153.
+
+**Description**: "The world’s mangroves 1980–2005 was prepared in collaboration with mangrove specialists throughout the world and was cofunded by the International Tropical Timber Organization (ITTO). It builds on a 1980 assessment by FAO and the United Nations Environment Programme (UNEP), on the FAO Global Forest Resources Assessment 2000 (FRA 2000) and 2005 (FRA 2005), and on an extensive literature search and communication with mangrove and forest resources assessment specialists."
+
+**Time range**: 1980 - 2005
+
+
+***
+# Methods
+
+First we need to download the raw data from the [FAO forestry paper](http://www.fao.org/3/a1427e/a1427e00.htm) (for some reason this has never been done before, and we can't find the raw data on mazu), and calculate the health. 
+
+The health will be calculated as followed: 
+"Mangrove condition was defined as the current cover divided by reference cover. FAO mangrove area data was provided on a country basis for 1980, 1990, 2000, and 2005. Current condition is based on 2005 cover, and reference condition is based on the 1980 cover."
+
+Then for those countries which have extent data, but no health data, we will gapfill based on georegion. 
+
+
+## Setup
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE, eval = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_mangrove/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_wcmc <- file.path(file.path(dir_M, 'git-annex/globalprep/_raw_data/wcmc_mangrove'))
+dir_fao_mangrove <- file.path(dir_M, "git-annex/globalprep/_raw_data/FAO_mangrove")
+region_data()
+
+```
+
+Read in mangrove condition data and wrangle for years 2005 and 1980
+```{r, eval = FALSE}
+fao_mangrove_raw <- read_csv(file.path(dir_fao_mangrove, "FAO_mangrove_data.csv"))
+
+fao_mangrove_wrangle <- fao_mangrove_raw %>%
+  dplyr::select(country, year_1980_ha, year_2005_ha, continent) %>%
+  mutate(year_1980_ha = str_replace(year_1980_ha, " ", "")) %>%
+  mutate(year_1980_ha = str_replace(year_1980_ha, " ", "")) %>%
+  mutate(year_2005_ha = str_replace(year_2005_ha, " ", "")) %>%
+  mutate(year_2005_ha = str_replace(year_2005_ha, " ", "")) %>%
+  mutate(year_2005_ha = str_replace(year_2005_ha, ":", "")) %>%
+  mutate(year_1980_ha = as.numeric(year_1980_ha), 
+         year_2005_ha = as.numeric(year_2005_ha)) %>% 
+  mutate(health = year_2005_ha/year_1980_ha) %>% # divide the 2005 extent by the 1980 extent 
+  mutate(health = ifelse(health > 1, 1, health))
+
+## now we need to match these region names to our rgn_ids 
+fao_mangrove_rgns <- fao_mangrove_wrangle %>%
+  left_join(rgns_eez, by = c("country" = "rgn_name"))
+
+## which ones are NA's for rgn_id 
+rgn_NA <- fao_mangrove_rgns %>%
+  filter(is.na(rgn_id))
+
+rgn_NA$country
+
+## Now we need to fix these...
+ # "Guam" - this goes with northern mariana islands - take average health score? 
+ # "Kiribati" - this is split into 3 regions - Line islands, Phoenix islands, Gilbert islands               
+ # "Northern Mariana Islands" - this goes with Guam - take average health score?     
+ # "Timor-Leste" - has two regions - East Timor, Oecussi Ambeno - both have mangrove extent - I would guess apply the same health score to both? 
+ # "Guadeloupe" - guadeloupe and martinique is one region - take average health score?                      
+ # "Martinique" - guadeloupe and martinique is one region - take average health score?         
+ # "Netherlands Antilles" - give this score to these regions - Saba, Sint Eustatius, Sint Maarten, Bonaire, Curacao
+ # "Puerto Rico" - same as US virgin islands - take average health score?                      
+ # "US Virgin Islands" - same as puerto rico - take average health score?   
+
+## filter out these regions so that we can fix them, and rbind back
+fao_mangrove_rgns_no_NA <- fao_mangrove_rgns %>%
+  dplyr::filter(!is.na(rgn_id))
+
+
+## lets fix guam and northern mariana islands... sum the hectares for both regioins and get a total health score
+fao_mangrove_guam_nmi <- fao_mangrove_wrangle %>%
+  dplyr::filter(country %in% c("Guam", "Northern Mariana Islands")) %>%
+  group_by(continent) %>%
+  summarise(year_1980_ha = sum(year_1980_ha),
+            year_2005_ha = sum(year_2005_ha)) %>%
+  ungroup() %>%
+  mutate(country = "Northern Mariana Islands and Guam", 
+         health = year_2005_ha/year_1980_ha)
+
+
+## lets fix Kiribati... give Line islands, Phoenix islands, Gilbert islands the kiribati health score
+fao_kiribati <- fao_mangrove_wrangle %>%
+  dplyr::filter(country == "Kiribati")
+
+fao_kiribati_fix <- data.frame(country = c("Line Islands (Kiribati)", "Phoenix Islands (Kiribati)", "Gilbert Islands (Kiribati)"), year_1980_ha = fao_kiribati$year_1980_ha, year_2005_ha = fao_kiribati$year_2005_ha, continent = fao_kiribati$continent, health = fao_kiribati$health)
+
+## lets fix Timor-Leste.. give East Timor and Oecussi Ambeno the Timor-Leste score
+fao_timor_leste <- fao_mangrove_wrangle %>%
+  dplyr::filter(country == "Timor-Leste")
+
+fao_timor_leste_fix <- data.frame(country = c("East Timor", "Oecussi Ambeno"), year_1980_ha = fao_timor_leste$year_1980_ha, year_2005_ha = fao_timor_leste$year_2005_ha, continent = fao_timor_leste$continent, health = fao_timor_leste$health)
+
+## lets fix Guadeloupe and Martinique... sum the hectares for both regions and get a total health score
+fao_mangrove_guad_mart <- fao_mangrove_wrangle %>%
+  dplyr::filter(country %in% c("Guadeloupe", "Martinique")) %>%
+  group_by(continent) %>%
+  summarise(year_1980_ha = sum(year_1980_ha),
+            year_2005_ha = sum(year_2005_ha)) %>%
+  ungroup() %>%
+  mutate(country = "Guadeloupe and Martinique", 
+         health = year_2005_ha/year_1980_ha)
+
+## Lets fix "Netherlands Antilles" - give this score to these regions - Saba, Sint Eustatius, Sint Maarten, Bonaire, Curacao
+fao_netherlands_antilles <- fao_mangrove_wrangle %>%
+  dplyr::filter(country == "Netherlands Antilles")
+
+fao_netherlands_antilles_fix <- data.frame(country = c("Saba", "Sint Eustatius", "Sint Maarten", "Bonaire", "Curacao"), year_1980_ha = fao_netherlands_antilles$year_1980_ha, year_2005_ha = fao_netherlands_antilles$year_2005_ha, continent = fao_netherlands_antilles$continent, health = fao_netherlands_antilles$health)
+
+## lets fix PR and US VI... sum the hectares for both regions and get a total health score
+fao_mangrove_pr_usvi <- fao_mangrove_wrangle %>%
+  dplyr::filter(country %in% c("Puerto Rico", "US Virgin Islands")) %>%
+  group_by(continent) %>%
+  summarise(year_1980_ha = sum(year_1980_ha),
+            year_2005_ha = sum(year_2005_ha)) %>%
+  ungroup() %>%
+  mutate(country = "Puerto Rico and Virgin Islands of the United States", 
+         health = year_2005_ha/year_1980_ha)
+
+
+## Join all of the fixed regions together 
+fao_fixed_rgns <- rbind(fao_mangrove_guam_nmi, fao_mangrove_guad_mart, fao_mangrove_pr_usvi, fao_timor_leste_fix, fao_netherlands_antilles_fix, fao_kiribati_fix) %>%
+  left_join(rgns_eez, by = c("country" = "rgn_name"))
+
+## Now Join that with our total health dataset
+fao_mangrove_rgns_fixed <- fao_mangrove_rgns_no_NA %>%
+  rbind(fao_fixed_rgns) %>%
+  filter(!is.na(year_1980_ha)) %>% # Filter out any of the NA data... not sure why it is included in the tables
+  mutate(habitat = "mangrove") %>% 
+  dplyr::select(rgn_id, habitat, health) %>%
+  mutate(health = ifelse(health > 1, 1, health))
+
+write.csv(fao_mangrove_rgns_fixed, file.path(dir_git, "int/habitat_health_mangrove_all_raw.csv"), row.names = FALSE)
+```
+
+Now match the health data to the extent data, and gapfill any missing health data by georegion. This will also exclude any regions that have health data but no extent data
+
+```{r, eval = FALSE}
+health <- read_csv(file.path(dir_git, "int/habitat_health_mangrove_all_raw.csv"))
+
+## read in georegions data
+regions <- read.csv(file.path(here('globalprep/supplementary_information/v2018/rgn_georegions_wide_2013b.csv')))
+
+## read in extent data
+all <- read.csv(file.path(here("globalprep/hab_mangrove/v2021/int/habitat_extent_mangrove_2016.csv")))
+
+
+all <- all %>%
+  filter(km2 > 0) %>%
+  filter(rgn_id < 255)
+
+setdiff(all$rgn_id, health$rgn_id) # mangrove extent data but no health score # [1] 14 26
+
+# 14 - Taiwan 
+# 26 - Andaman and Nicobar
+# neither are represented in the Health data... this will need to be gapfilled 
+
+
+setdiff(health$rgn_id, all$rgn_id) 
+#  151  10 154  19 161 100  64  98 118 250 124 108 121 119 127  13 248 249 220 244 148 157 212
+## these are almost all small islands that are not represented in the GMW data... i think it is ok. Many of these were not represented in the old health or extent data either, so it doesn't really matter 
+
+
+tmp <- all %>%      #eliminates the regions with health scores but no mangroves
+  left_join(health)  
+
+
+tmp  <- tmp %>%
+  left_join(regions) %>%
+  group_by(r2) %>%
+  mutate(avg_health_r2 = mean(health, na.rm=TRUE)) %>%
+  ungroup() %>%
+  group_by(r1) %>%
+  mutate(avg_health_r1 = mean(health, na.rm=TRUE)) %>%
+  ungroup() %>%
+  mutate(health2 = ifelse(is.na(health), avg_health_r2, health)) %>%
+  mutate(health3 = ifelse(is.na(health2), avg_health_r1, health2)) %>%
+  mutate(habitat = "mangrove") %>%
+  mutate(gap_fill = ifelse(is.na(health), "r2_gap_fill", NA)) %>%
+  mutate(gap_fill = ifelse(is.na(health) & is.na(avg_health_r2), "r1_gap_fill", gap_fill)) %>%
+  mutate(gap_fill = ifelse(is.na(gap_fill), 0, gap_fill)) %>%
+  dplyr::select(rgn_id, habitat, gap_fill, health=health3)
+summary(tmp)
+
+### save summary of gap-filling:
+health_gaps <- tmp %>%
+  mutate(variable = "health") %>%
+  dplyr::select(rgn_id, habitat, variable, gap_fill)
+write.csv(health_gaps, 'globalprep/hab_mangrove/v2021/data/health_gap_fill.csv', row.names=FALSE)
+
+### save health data:
+health <- tmp %>%
+  dplyr::select(rgn_id, habitat, health) %>%
+  mutate(year = 2021)
+write.csv(health, 'globalprep/hab_mangrove/v2021/data/habitat_health_mangrove_updated.csv', row.names=FALSE)
+
+```
+
+Datacheck: compare to old health data
+
+```{r, eval = FALSE}
+old_health <- read_csv(file.path(here("globalprep/hab_mangrove/v2015/data/habitat_health_mangrove_updated.csv")))
+
+compare_habitat_health <- health %>%
+  filter(rgn_id <= 250) %>%
+  left_join(old_health, by = "rgn_id") %>%
+  mutate(difference = health.x - health.y) %>%
+  left_join(rgns_eez)
+
+test <- compare_habitat_health %>%
+  filter(is.na(health.y)) ## we gained 4 regions 
+
+ggplot(compare_habitat_health, aes(x = health.y, y = health.x)) +
+  geom_point() +
+  geom_abline() +
+  labs(title = "mangrove Habitat version old (v2015) vs new (v2021)", x = "old health", y=  "new health") +
+  theme_bw()
+
+```
+
+
+

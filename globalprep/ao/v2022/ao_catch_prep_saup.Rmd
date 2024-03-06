@@ -1,0 +1,273 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - Artisanal Opportunities, Preparing non-industrial catch data for BBmsy calculations"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+This script takes the SAUP 2022 catch data and creates 1 data layer:
+
+1. An average non-industrial catch dataset used to weight B/Bmsy values in the fisheries model. For this dataset, the catch is assigned to FAO and OHI regions.
+
+**IMPORTANT NOTE: the fisheries subgoal data preps will need to be run first before this can be completed. That is where the RAM stock status dataprep and the fisheries catch download occurs.**
+
+## Updates from previous assessment
+
+v2022 - Added new year of data (2019)
+
+***
+
+# Data Source
+
+**Reference**: Pauly D., Zeller D., Palomares M.L.D. (Editors), 2020. Sea Around Us Concepts, Design and Data (seaaroundus.org).
+
+**Downloaded**: September 27, 2022
+
+**Description**: Tons per year and SAUP region with information on sector type, industry type, fishing entitity, reporting status and taxonomic information. 
+
+**Time range**: 1950 - 2019
+
+**Format**: CSV
+
+**Additional Information**: [Methods](http://www.seaaroundus.org/sea-around-us-methods-index/)
+
+***
+
+## Setup
+
+Note: the same data was used to prepare fisheries subgoal scores. We will be using the prepped annual catch csv file prepared in the mazu fis/ folder. This means that fis will need to be run before this. 
+
+
+``` {r setup, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'figs/',message = FALSE, warning = FALSE, echo = TRUE, eval=FALSE)
+```
+
+```{r, eval=FALSE}
+## Libraries
+library(readr)
+library(dplyr)
+library(parallel)
+library(purrr)
+library(stringr)
+library(tidyr)
+library(foreach)
+library(here)
+library(sf)
+library(tidyverse)
+library(readxl)
+
+setwd(here::here("globalprep/ao/v2022"))
+source('../../../workflow/R/common.R')
+
+## Paths for data
+fis_path = file.path(dir_M,"git-annex/globalprep/fis/v2022/int") # filepath to fisheries path
+```
+
+***
+
+# Load Data 
+
+## Non-Industrial Catch
+
+The SAUP data is separated into commercial, recreational, subsistence, and artisanal fishing. We will only grab the artisanal and subsistence catch for Artisanal Opportunities. 
+
+
+Look at catch data
+```{r, eval=FALSE}
+
+
+## read in the catch data
+catch <- read.csv(file.path(fis_path, "stock_catch_by_rgn_taxa.csv"))
+sort(unique(catch$rgn_id))
+
+
+
+```
+
+# Aggregate Nonindustrial catch
+
+Aggregate catch per OHI region and FAO area. This catch will be used twice. 
+
+(1) The catch is used to weight scores per region. For this we need to use catch records, including those not reported at the species level. See note below.
+
+(2) The catch data at species level is used to calculate stock status (BBmsy) per stock (remember that our definition of a stock is a species caught within a single FAO area).
+
+
+Note:  Save IUU and Reported only (`CatchTotal`) as the catch sum. 
+
+**NonIndustrial Catch**
+```{r, eval=FALSE}
+
+
+    
+output_df <- catch %>% 
+    dplyr::filter(discard_id != 1) %>% # filter out discards
+    dplyr::filter(other_id != 1) %>% # filter out catch not used for humans
+    dplyr::select(year, rgn_id, fao_rgn, TaxonName, CommonName, human_use_id, fishing_sector, tons, stock_id, TaxonKey) %>%
+    dplyr::filter(fishing_sector %in% c("Subsistence", "Artisanal")) %>% 
+    dplyr::group_by(year, rgn_id, fao_rgn, TaxonName, CommonName, stock_id, TaxonKey) %>%
+    dplyr::summarise(tons = sum(tons)) %>% 
+    dplyr::ungroup()
+
+write.csv(output_df, file = file.path(dir_M,'git-annex/globalprep/ao/v2022/int/ao_stock_catch_by_rgn_taxa.csv'), row.names=FALSE)
+
+test <- output_df %>%
+  group_by(year) %>%
+  summarise(sum = sum(tons)) # looks good
+```
+
+
+## Data Check
+
+Take a look at catch data with missing ohi and fao regions in **stock_catch_by_rgn_taxa**. These have taxon key matches, but no ohi or fao regions assigned to them. 
+```{r, eval=FALSE}
+region_data()
+
+df <- read_csv(file.path(dir_M,'git-annex/globalprep/ao/v2022/int/ao_stock_catch_by_rgn_taxa.csv')) %>%
+  left_join(rgns_eez)
+
+# they all have ohi or fao regions; however there are only 197 regions with artisanal or subsistence catch in the SAUP data.
+
+length(unique(df$rgn_id))
+unique(df$year)
+```
+
+***
+
+***
+
+# Prep data for mean catch 
+
+## Wrangle
+
+Mean catch data is used to weight the B/Bmsy values in the fishery subgoal.
+
+```{r mean catch, eval=F}
+
+file <- file.path(dir_M,'git-annex/globalprep/ao/v2022/int/ao_stock_catch_by_rgn_taxa.csv')
+
+catch <- read_csv(file) %>%
+  rename(common = CommonName, fao_id = fao_rgn, species=TaxonName)
+
+summary(catch)
+
+
+## filter out non ohi eez regions 
+catch <- catch %>%
+  filter(!is.na(rgn_id)) %>%
+  filter(!is.na(fao_id)) %>%
+  filter(rgn_id <= 250) %>%
+  filter(rgn_id != 213)
+
+
+## calculate total annual catch for each stock
+catch <- catch %>%
+  dplyr::select(year, rgn_id, fao_id, stock_id, TaxonKey, tons) %>%
+  group_by(rgn_id, fao_id, TaxonKey, stock_id, year) %>%
+  summarize(catch = sum(tons)) %>%
+  ungroup()
+
+ 
+# missing <- c("Belgium", "Latvia", "Estonia", "Kerguelen Islands", "Faeroe Islands", "Iceland", "Finland", "Poland", "Lithuania", "Sweden")
+# 
+# test <- catch %>%
+#   left_join(rgns_eez) %>%
+#   filter(rgn_name %in% missing)
+# sort(unique(test$rgn_name))
+# sort(missing)
+
+```
+
+Take a look at a few stocks.
+```{r, eval=FALSE}
+
+data.frame(dplyr::filter(catch, stock_id == "Marine_fishes_not_identified-57" & rgn_id==1))
+
+```
+
+## Fill in Zeros
+For years with no reported catch, add zero values (after first reported catch)
+
+```{r, eval=FALSE}
+
+## these data have no zero catch values, so add years with no reported catch to data table:
+catch_zeros <- catch %>%
+  spread(year, catch) %>%
+  data.frame() %>%
+  gather("year", "catch", num_range("X", min(catch$year):max(catch$year))) %>%
+  mutate(year = as.numeric(gsub("X", "", year))) %>%
+  mutate(catch = ifelse(is.na(catch), 0, catch))
+
+## this part eliminates the zero catch values prior to the first reported non-zero catch   
+catch_zeros <- catch_zeros %>%
+  group_by(fao_id, TaxonKey, stock_id, rgn_id) %>%
+  arrange(year) %>%
+  mutate(cum_catch = cumsum(catch)) %>%
+  filter(cum_catch > 0) %>%
+  dplyr::select(-cum_catch) %>%
+  ungroup()
+
+```
+
+## Calculate Mean Catch
+Calculate mean catch for ohi regions (using data from 1980 onward). These data are used to weight the RAM b/bmsy values.
+
+```{r, eval=FALSE}
+
+mean_catch <- catch_zeros %>%
+  filter(year >= 1980) %>%
+  group_by(rgn_id, fao_id, TaxonKey, stock_id) %>%
+  mutate(mean_catch = mean(catch, na.rm=TRUE)) %>% # mean catch for each stock (in a specific ohi-fao region)
+  filter(mean_catch != 0)  %>%      ## some stocks have no reported catch for time period
+  ungroup()
+
+
+
+```
+
+Check out the data
+```{r, eval=FALSE}
+
+data.frame(filter(mean_catch, stock_id == "Marine_fishes_not_identified-57" & rgn_id==1)) # includes finfishes (100139) and other marine fishes (100039)
+```
+
+## Toolbox formatting and save
+
+```{r, eval=FALSE}
+options(scipen = 999) # to prevent taxonkey from turning into scientific notation
+
+mean_catch_toolbox <- mean_catch %>%
+  mutate(stock_id_taxonkey = paste(stock_id, TaxonKey, sep="_")) %>%
+  dplyr::select(rgn_id, stock_id_taxonkey, year, mean_catch) %>%
+  filter(year >= 2001) %>%  # filter to include only analysis years
+  data.frame()
+
+write.csv(mean_catch_toolbox, "intermediate/mean_catch.csv", row.names=FALSE) ## save the total mean catch csv for reference if needed
+
+
+length(unique(mean_catch_toolbox$rgn_id)) # only 196 regions... We will gapfill the missing regions...
+
+old <- read.csv("../v2021/intermediate/mean_catch.csv")
+
+length(unique(old$rgn_id)) # only 196 regions
+
+```
+
+
+
+***

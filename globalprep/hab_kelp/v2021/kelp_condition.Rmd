@@ -1,0 +1,147 @@
+---
+title: 'OHI 2021: Kelp condition'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+This script generates the health condition of kelp for each OHI region for the latest year of data. We do this by applying a 2% decrease to kelp globally for 50 years, and calculate the condition based on our extent data. 
+
+
+## Updates from previous assessment
+This is an entirely new layer for the 2021 assessment! 
+
+***
+## Data Source 
+
+**Reference**: Wernberg, T., Krumhansl, K., Filbee-Dexter, K., Pedersen, M.F., 2019. Status and Trends for the World’s Kelp Forests, in: World Seas: An Environmental Evaluation. Elsevier, pp. 57–78. https://doi.org/10.1016/B978-0-12-805052-1.00003-6
+
+**Description**: "In the past half century, threats to kelp forests have increased in number and severity, leading to a global decline of kelp abundances of ~2% per year."
+
+**Time range**: 2019
+
+
+***
+# Methods
+
+
+## Setup
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE, eval = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_kelp/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_wcmc <- file.path(file.path(dir_M, 'git-annex/globalprep/_raw_data/wcmc_kelp'))
+dir_kelp <- file.path(dir_wcmc, "d2020/UniAuk-004-ModelledDistributionKelpBiome")
+ohi_rasters() # call the region zones raster
+regions_shape()
+region_data()
+
+land_ocean <- raster("/home/shares/ohi/git-annex/globalprep/spatial/v2017/regions_land_ocean.tif")
+
+land_ocean
+```
+
+
+## Methods 
+
+Calculate a global average condition based on a 2% loss per year. 
+
+Paper: https://www.researchgate.net/publication/327606143_Status_and_Trends_for_the_World's_Kelp_Forests#:~:text=Kelps%20exhibit%20a%20great%20diversity,of%20~2%25%20per%20year.
+
+Excerpt: "In the past half century, threats to kelp forests have increased in number and severity, leading to a global decline of kelp abundances of ~2% per year."
+
+
+To do this, we will calculate the estimated loss based on a 2% loss per year using a compound interest formula and the total global extent we have extracted from [this paper](https://www.sciencedirect.com/science/article/pii/S0006320720308739).
+
+
+Any regions that have a negative trend will receive the condition calculated here. Any those that have stable or increasing trends will receive a condition of 1. 
+
+```{r, eval = FALSE}
+
+## read in extent data
+
+kelp_extent <- read_csv(file.path(dir_git, "data/habitat_extent_kelp.csv"))
+
+sum(kelp_extent$km2) # 1394773 km2 total
+
+## interest rate condition calculation
+
+p = 1394773 # current balance of kelp extent km2 (2020)
+
+r = 0.02 #interest rate (gaining 2% per year, since we are trying to figure out how much extent there would be 50 years ago)
+
+n = 1 #yearly 
+
+t = 50 # 50 years 
+
+p*(1 + (r/n))**(n*t) # 3754154 # This is how much you should gain over 50 years 
+
+## so 50 years ago there would be
+3754154 + 1394773 # 5148927 km2 of global extent
+
+## Now lets calculate the decline from 50 years ago extent 
+
+p = 5148927 #initial balance of kelp extent km2 (from 50 years ago, calculated above)
+
+r = -0.02 #interest rate (losing 2% per year)
+
+n = 1 #yearly 
+
+t = 50 # 50 years 
+
+p*(1 + (r/n))**(n*t) # 1875083 # This is how much you should lose over 50 years 
+
+
+5148927 - 1875083 # 3273844 # this is what would be remaining
+ 
+(3273844)/(5148927) # 0.6358303 condition
+
+
+## Based on this, we will assign a condition of 0.64 to all countries with a negative trend. 
+
+
+## read in trend data 
+
+kelp_trend <- read_csv(file.path(dir_git, "data/habitat_trend_kelp.csv"))
+
+## assign conditions
+kelp_condition <- kelp_trend %>%
+  mutate(health = ifelse(trend < 0, 0.64, 1)) %>%
+  dplyr::select(-trend)
+
+kelp_condition_gf <- kelp_condition %>%
+  mutate(gap_fill = ifelse(health == 0.64, "global value", "none")) %>%
+  dplyr::select(-health)
+
+write.csv(kelp_condition, file.path(dir_git, "data/habitat_health_kelp.csv"), row.names = FALSE)
+write.csv(kelp_condition_gf, file.path(dir_git, "data/health_kelp_gf.csv"), row.names = FALSE)
+
+```
+
+

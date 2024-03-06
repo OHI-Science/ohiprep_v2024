@@ -1,0 +1,116 @@
+---
+title: 'OHI 2022 - Land based nutrient plume exploration '
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../workflow/templates/ohi_hdr.html' 
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+[REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2020/globalprep/cw_nutrient_o_chem/v2020/plume_output_exploration.html)
+
+
+# Summary
+This document is used to explore the output of the plume modeling done for this data layer.  
+
+## The following data are used:
+
+* 
+
+
+
+## Initial set-up code
+
+```{r setup, eval = FALSE}
+library(tidyverse)
+library(raster)
+library(sf)
+library(mapview)
+library(janitor)
+library(here)
+
+
+source(here('workflow/R/common.R'))
+
+ww_raw_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/raw"
+ww_intermediate_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/interim"
+prs_int_dir <- "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/int"
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022")
+
+```
+
+**Take a look at the output from the full plume model**
+ - We need to check this to see if the model ran on all of the basin_id
+ - It looks like the model did not write rasters for everything. I think this is due to very small effluent values. 
+ - Check the plumes that were run, and see if the ones with really small values are included. 
+ 
+```{r, eval = FALSE}
+test_plumes <- list.files("/home/sgclawson/grassdata/location/PERMANENT/cats", pattern = "plume_effluent")
+test_plumes
+
+
+## now read in total shp file
+
+files_shp <- list.files(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/int/pourpoints/"), pattern = "shp", full = TRUE)
+
+ws_pp_zonal_all_fix <- st_read(files_shp[1])   %>%
+  mutate(row_num = row_number()) 
+
+test_ws <- ws_pp_zonal_all_fix %>%
+  filter(effluent !=0)
+sum(test_ws$effluent) # 16198472
+
+
+head(test_ws)
+
+plumes_names <- unique(test_ws$basin_id)
+
+plumes_names
+
+test_plumes <- gsub("plume_effluent_", "", test_plumes)
+
+missing_plumes <- setdiff(plumes_names, test_plumes) # missing 217 plumes 
+
+missing_plumes
+
+
+check_2 <- ws_pp_zonal_all_fix %>%
+  filter(basin_id %in% missing_plumes)
+
+sum(check_2$effluent) # 2382.453 the missing plumes only represent this many tonnes
+
+
+test <- raster("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/output/N_plume/pourpoints_crop_manure_leached_volt_N_2005_joined.tif")
+cellStats(test, "sum") # 16083871
+
+16198472 - 16083871 # 114601 so we lose that much in tonnes... but much of that is probably excluded from the plume model anyways. 
+
+plot(log(test+1))
+
+N_effluent_log <- raster::calc(test, fun = function(x){log(x + 1)})
+plot(N_effluent_log)
+
+test <- raster::select(N_effluent_log)
+plot(test)
+
+
+
+
+```
+
+
+
+
+
+

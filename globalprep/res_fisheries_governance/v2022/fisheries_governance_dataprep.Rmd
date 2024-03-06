@@ -1,0 +1,376 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - Fisheries Governance (Resilience)"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html' 
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+This document outlines the process for developing linear models to gapfill [Minderoo Global Fishing Index](https://www.minderoo.org/global-fishing-index/) `governance capacity` scores to use as a resilience layer for the 2022-2023 global assessments. 
+
+# Data Sources
+
+## Minderoo Global Fishing Index
+
+The `governance capacity` data characterizes the development of a country's fisheries governance system on a continuum from zero to 12, based on each country's `assessment score` and balance across the [`Governance Conceptual Framework`](https://cdn.minderoo.org/content/uploads/2021/11/19141814/20211112-global-fishing-index-2021-conceptual-framework.pdf). This data lags by ~3 years, and is updated every ~3 years.
+
+The `assessment score` rages from 0-100 and is based on a region's performance across 6 dimensions of fisheries governance and weights each of these dimensions unequally, based on survey responses from fisheries experts:
+
+Dimension | Definition | Weight
+----------|------------|-------
+Policy and objectives | Assesses a country's fisheries policy foundation and governance and management objectives | 22%
+Management capacity | Assesses a country's fisheries policy foundation and governance and management objectives | 14%
+Information availability and monitoring | Assesses the range, quality and resolution of the fisheries information available to inform management decisions | 16%
+Level and control of access to fisheries resources | Assesses the extent of fishing access granted to various fleets and the tools used to regulate access across these fleets | 15%
+Compliance management system | Assesses the strength of a country's fisheries compliance and enforcement program | 17%
+Stakeholder engagement and participation | Assesses the capacity of stakeholders, including fishers and fish processors, governmental and non-governmental organisations, research institutions and local communities, to meaningfully participate in fisheries governance and management processes | 16%
+
+For more information about these variables and how they are calculated, see the following:\
+- [Methodology](https://www.minderoo.org/global-fishing-index/methodology/)\
+- [Technical Documentation](https://cdn.minderoo.org/content/uploads/2021/11/05140059/20220505-global-fishing-index-2021-technical-methods.pdf#page=13)\
+- [Indicator Codebook](https://cdn.minderoo.org/content/uploads/2021/11/19141816/20211112-global-fishing-index-2021-indicator-codebook.pdf)
+
+**Method:** Local download of zip folder of 5 `.xlsx` files. For fisheries governance data, the file of interest is `Global_Fishing_Index_2021_Data_for_Download_V1.1.xlsx` with different sheets for the data and metadata.
+
+This data will be updated in 2024.
+
+**Source information:** https://www.minderoo.org/global-fishing-index/results/map/ --> Download the Data 
+
+**Date downloaded:** 30 June 2022
+
+**Time range**: late 2019 - early 2020 for governance assessments data ([source](https://www.minderoo.org/global-fishing-index/faqs/))
+
+**Native data resolution**: country scores
+
+**Format**:  Excel file
+
+***
+
+## Gross Domestic Product adjusted Per Capita by Purchasing Power Parity (ppppcgdp)
+
+This data is used for gapfilling the `governance capacity` data.
+
+PPP GDP is gross domestic product converted to international dollars using purchasing power parity rates. An international dollar has the same purchasing power over GDP as the U.S. dollar has in the United States. GDP at purchaser's prices is the sum of gross value added by all resident producers in the economy plus any product taxes and minus any subsidies not included in the value of the products. It is calculated without making deductions for depreciation of fabricated assets or for depletion and degradation of natural resources. Data are in constant international dollars based on the 2011 ICP round.
+
+**Method:** Data is available directly to R through the WDI package, but since it is also used for the `Artisinal Opportunities need` layer, the data can be pulled directly from that folder. 
+
+**Source information:** http://data.worldbank.org/indicator/NY.GDP.PCAP.PP.KD or `ohiprep_v[version_year]/globalprep/ao/[version_year]/output/wb_gdppcppp_rescaled.csv`
+
+**Time range**: 1990-2021
+
+**Native data resolution**: country scores
+
+**Format**:  CSV file
+
+***
+
+## UN georegions
+
+`UNgeorgn()` loads a dataframe from `common.R` with UN geopolitical designations, and is commonly used in OHI to gapfill missing data. The distinct regions are derived from the [United Nations Statistics Division](https://unstats.un.org/unsd/methodology/m49/). Each region is assigned four labels with increasing granularity/specificity:\
+- r0_label = World (1 level)\
+- r1_label = continental regions (7 levels: Oceania, Asia, Africa, Europe, Southern Islands, Latin America and the Caribbean, and Americas)\
+- r2_label = georegions (22 levels for subregions and intermediary regions)
+
+# Updates from previous assessment
+
+The data source used for this resilience layer was updated in 2022, which was the first update to this layer since the 2019 assessment. This is an new method for establishing resilience values that is similar to the methods used in 2019 with [Fisheries Management Index](https://oursharedseas.com/2019-update/fisheries/#highchart-fisheries-fmindex) data in place of the `governance capacity` data, and [Social Progress Index](http://www.socialprogress.org/) data in place of [Gross Domestic Product]() data for gapfilling.
+
+# Initial set-up code
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(ohicore)
+library(here)
+library(plotly)
+library(psych) # for correlation testing
+source('https://raw.githubusercontent.com/OHI-Science/ohiprep_v2019/gh-pages/workflow/R/common.R')
+
+version_year = "v2022"
+# most recent data for 2022 scenario year is 2019, Minderoo will update governance data again in 2024
+recent_data_yr <- 2019
+```
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+# governance variables
+gov_data <- read_excel(here(paste0("globalprep/res_fmi/", version_year, "/raw/Global_Fishing_Index_2021_Data_for_Download_V1.1.xlsx")), sheet = 3, col_names = FALSE) %>% 
+  row_to_names(row_number = 1) %>%
+  row_to_names(row_number = 1) %>% 
+  clean_names() %>% 
+  mutate(year = c("2019")) # add year 2019 to every row since this data was all from 2019 (and some from the start of 2020, but the metadata does not clairfy which ovsrevations are from which year so we will assume all are 2019)
+gov_data$year <- as.numeric(gov_data$year)
+
+# load variable descriptions
+gov_key <- read_excel(here(paste0("globalprep/res_fmi/", version_year, "/raw/Global_Fishing_Index_2021_Data_for_Download_V1.1.xlsx")), sheet = 2)    
+```
+
+# Add OHI regions to governance capacity data
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+# clean country names 
+# duplicate "Bonaire, Sint Eustatius and Saba": split into 3 rows each with the same data
+caribbean_split <- gov_data %>% 
+  filter(country == "Bonaire, Sint Eustatius and Saba") %>% 
+  tidyr::separate_rows(country, sep = ", ") %>% 
+  tidyr::separate_rows(country, sep = " and ")
+
+# must separate Taiwan from "(province of China) in this way because gsub() and str_repalce_all() do not to the trick for this one:
+taiwan_split <- gov_data %>% 
+  filter(country == "Taiwan (Province of China)") %>% 
+  tidyr::separate_rows(country, sep = " ") %>% 
+  filter(country == "Taiwan")
+
+gov_data <- rbind(gov_data, caribbean_split) %>%
+  #rbind(kiribati_split) %>%
+  rbind(taiwan_split) %>% 
+  filter(!country %in% c("Bonaire, Sint Eustatius and Saba", "Taiwan (Province of China)"))
+
+gov_data$country <- gsub(pattern = "Côte d’Ivoire", replacement = "Ivory Coast", x = gov_data$country)
+gov_data$country <- gsub("Federated States of Micronesia", "Micronesia", gov_data$country)
+gov_data$country <- gsub("Islamic Republic of Iran", "Iran", gov_data$country)
+gov_data$country <- gsub("Turks and Caicos Island", "Turks and Caicos Islands", gov_data$country)
+
+gov_data <- gov_data %>% 
+  name_2_rgn(fld_name = 'country',
+             flds_unique = c('rgn_id', 'rgn_name'))
+```
+
+# Rescale governance capacity data to range 0-1
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+gov_data$governance_capacity <- as.numeric(gov_data$governance_capacity)
+# rescale the governance capacity values between 0-1: (x-min(x))/(max(x)-min(x))
+gov_data <- gov_data %>% 
+  mutate(gov_capacity = (governance_capacity - min(governance_capacity))/(max(governance_capacity) - min(governance_capacity))) %>% 
+  select(rgn_id, rgn_name, gov_capacity, year)
+```
+
+# Join fisheries governance data with GDP data and UN georegion data to create best fit gapfill model
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+# read in rescaled GDP data (values range between 0-1 and capped at 95th quantile)
+gdp <- read.csv(here(paste0("globalprep/ao/", version_year, "/output/wb_gdppcppp_rescaled.csv")))
+
+# join governance capacity data to GDP data
+gov_gdp <- gov_data %>% 
+  left_join(gdp, by = c("rgn_id", "year")) %>% 
+  rename(gdp = value)
+
+# Load UN georegion data 
+georegions <- UNgeorgn() %>%
+  select(rgn_id, rgn_name = rgn_label, r2_label) # r1_label
+
+gov_gdp_georegions <- gov_gdp %>%
+  left_join(georegions, by = c("rgn_id","rgn_name")) %>%
+  select(rgn_id, rgn_name, gov_capacity, gdp, r2_label, year) # r1_label
+
+# return rows that contain NA in any column
+gov_gdp_georegions[rowSums(is.na(gov_gdp_georegions)) > 0, ] # Kiribati has NA for r2_label because in UNgeoregion(), Kiriati is split into Line Islands (Kiribati), Phoenix Islands (Kiribati), and Gilbert Islands (Kiribati), but Kiribati is the correct OHI region name
+
+# fill Kiribati row with correct r2_label (extracted from subset island labels)
+gov_gdp_georegions <- gov_gdp_georegions %>%
+  mutate(r2_label = ifelse(is.na(r2_label), "Micronesia", r2_label))
+
+# regress gov & gdp with r2 georegion lables - that was the highest r2 of all models tried, see issue #188: https://github.com/OHI-Science/globalfellows-issues/issues/188
+gov_gdp_r2_mod <- lm(gov_capacity ~ gdp + r2_label, data = gov_gdp_georegions)
+summary(gov_gdp_r2_mod)
+# adj r2: 0.4128
+
+# calculate AIC & BIC values 
+round(AIC(gov_gdp_r2_mod), 3)
+round(BIC(gov_gdp_r2_mod), 3)
+```
+
+# Make predictions with the best fit model and compare to observed values
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+# Create array of predicted progress score values 
+gov_gdp_r2_pred <- gov_gdp_georegions %>%
+  dplyr::group_by(rgn_id) %>%
+  dplyr::do({ 
+    gov_r2_pred <- predict(gov_gdp_r2_mod, newdata =.[c('r2_label', 'gdp')]) 
+    data.frame(., gov_r2_pred) # do() loop applies the model fitting and prediction to each country group
+  }) %>% 
+  dplyr::ungroup()
+
+# Plot predicted vs actual values for governance capacity
+ggplotly(ggplot(gov_gdp_r2_pred, aes(x = gov_capacity, y = gov_r2_pred, labels = rgn_name)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  labs(x = "Observed Governance Capacity",
+      y = "Predicted Governance Capacity",
+      title = "Observed vs Predicted Governance Capacity: GDP + r2 georegions model"))
+```
+
+# Check how comprehensive the GDP data is for all 220 OHI regions before using GDP data to gapfill for governance capacity
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+# GDP data for all 220 OHI regions for 2019:
+gdp_geo_2019 <- UNgeorgn %>%
+  # Reunion is a part of the French Republic
+  mutate(rgn_label = ifelse(str_detect(rgn_label, "R_union"), "Reunion", rgn_label)) %>%
+  rename(rgn_name = rgn_label) %>%
+  left_join(gdp, by = "rgn_id") %>% 
+  rename(gdp = value) %>% 
+  filter(year == recent_data_yr) 
+
+# check which countries have NA gdp
+na_gdp <- gdp_geo_2019[rowSums(is.na(gdp_geo_2019)) > 0, ]
+na_gdp # 20 regions
+
+# check that the 20 regions are those within low_pop()
+low_pop()
+setdiff(low_pop$rgn_id, na_gdp$rgn_id) # only rgn_id 38 is present in low_pop but not na_gdp which is fine because this region has pop = 3000, so we remove it later!
+
+# r2_label exploration: obtain mean GDP of each r2_label group
+gdp_r2_2019_mean <- gdp_geo_2019 %>%
+  group_by(r2_label) %>%
+  summarize(gdp_mean_r2 = mean(gdp, na.rm = TRUE))
+# it's ok that the southern islands mean value is NaN because ALL the GDP values for those regions are deliberately set to NA because their population is less than 3000
+
+# check how many NA values are present in each r2_label group
+na_georegions_r2 <- gdp_geo_2019[rowSums(is.na(gdp_geo_2019)) > 0, ] %>%
+  group_by(r2_label) %>%
+  summarize(count = n())
+# 20 countries are missing 2019 data with other countries within r2_label from 2019, this aligns with the 20 countries that were assigned NA for GDP in the GDP data processing
+```
+
+# Create gapfill dataframe
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+# rejoin georegions, gov_data, & gdp from scratch so we can get GDP numbers for countries regardless if they were present in gov_data
+gov_gf <- UNgeorgn %>%
+  mutate(rgn_label = ifelse(str_detect(rgn_label, "R_union"), "Reunion", rgn_label)) %>% # Reunion is a part of the French Republic
+  rename(rgn_name = rgn_label) %>%
+  left_join(gdp, by = "rgn_id") %>% # need to join GDP before gov_data because GDP contains more OHI regions that gov_data & we are using left joins
+  rename(gdp = value) %>%
+  left_join(gov_data, by = c("rgn_id", "rgn_name", "year")) %>%
+  filter(year == recent_data_yr) %>% # filter by 2019 for GDP data because the gov_capacity data is 2019 only
+  select(-c(rgn_name, r0_label))
+```
+
+# Generate gapfilled governance capacity values using GDP and r2_labels
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+# create predictions with the model in a more complicated fashion because some r2 categories may have no data (because GDP data was set to NA for small population regions), so this returns an NA for these regions
+# sapply() creates an array object, we need an array rather than a list object (which would be the output of lapply())
+gov_gf$gov_pred_gdp_r2 <- sapply(1:nrow(gov_gf),
+                             function(i) # use all columns in each respective row to feed into the model to generate a gov_capacity prediction
+                               tryCatch(predict(gov_gdp_r2_mod, gov_gf[i,]), error = function(e) NA)) 
+
+# count how many GDP values were filled in by the first gapfill model:
+gdp_r2_gapfilled <- gov_gf %>% 
+  filter(is.na(gov_capacity) & !is.na(gov_pred_gdp_r2))
+paste0(nrow(gdp_r2_gapfilled), " regions' governance capacity were gapfilled by the model GDP + r2_label.")
+
+# ensure that the only remaining NA values are those of the low_pop regions:
+remaining_na <- gov_gf %>% filter(is.na(gov_pred_gdp_r2))
+setdiff(remaining_na$rgn_id, low_pop$rgn_id) # 0 regions that still have NA values are not low_pop regions
+```
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+# final data and gapfilling recordkeeping
+gov_gf <- gov_gf %>%
+  # if there is no existing value for gov_capacity, put a 1 to identify that it is gapfilled:
+  dplyr::mutate(gapfilled = ifelse(is.na(gov_capacity), "1", 0)) %>%
+  # if there is no existing value for gov_capacity & there is a prediction from the model using GDP & r2_label, record that model as the gapfill method: 
+  dplyr::mutate(method = ifelse(is.na(gov_capacity) & !is.na(gov_pred_gdp_r2), "GDP + UN_geopolitical region r2", NA)) %>%
+  # actually use the model to fill in those missing gov_capacity values
+  dplyr::mutate(gov_capacity = ifelse(is.na(gov_capacity), gov_pred_gdp_r2, gov_capacity)) %>% 
+  # drop gov_pred_r2 column because we just used those values to populate 57 values in the gov_capacity data
+  dplyr::select(-gov_pred_gdp_r2)
+
+# make sure all low/no population regions are NA
+low_pop <- low_pop %>%
+  filter(est_population < 3000 | is.na(est_population)) # filter out regions that have populations > 3000 and keep NA values 
+
+gov_gf_low_pop <- gov_gf %>% dplyr::filter(rgn_id %in% low_pop$rgn_id)
+summary(gov_gf_low_pop) # there should be 20 NA's in the gdp and gov_capacity in the summary because 20 regions have <3000 pop
+
+# ensure all other regions have a governance capacity value
+gov_gf_with_pop <- gov_gf %>% dplyr::filter(!rgn_id %in% low_pop$rgn_id)
+summary(gov_gf_with_pop) # there should be no NA's recorded in the summary for the gdp and gov_capacity columns
+
+# correct gapfilling info to low pop regions - they have a 1 currently, but they were not actually gapfilled!
+gov_gf <- gov_gf %>%
+  mutate(gapfilled = ifelse(rgn_id %in% low_pop$rgn_id, 0, gapfilled)) %>%
+  mutate(method = ifelse(rgn_id %in% low_pop$rgn_id, NA, method))
+
+# format final data
+gov_final <- gov_gf %>% select(rgn_id, year, gov_capacity)
+dim(gov_final) # all 220 regions represented
+summary(gov_final) # 20 NA values
+write_csv(gov_final, here(paste0("globalprep/res_fmi/", version_year, "/output/fisheries_governance_res.csv")))
+
+# save dataframe with gapfilled information
+gov_gf_final <- gov_gf %>% select(rgn_id, year, gapfilled, method)
+write_csv(gov_gf_final, here(paste0("globalprep/res_fmi/", version_year, "/output/fisheries_governance_res_gf.csv")))
+```
+
+# Compare FMI scores from 2019 OHI assessment to governance capacity scores
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+# join FMI data with gov_data
+fmi <- read_csv(here("globalprep/res_fmi/v2019/output/fmi_res.csv")) %>% select(-year, fmi = value)
+gov <- read_csv(here(paste0("globalprep/res_fmi/", version_year, "/output/fisheries_governance_res.csv"))) %>% select(-year)
+fmi_gov <- full_join(fmi, gov, by = "rgn_id")
+
+fmi_gov_tidy <- fmi_gov %>% 
+  pivot_longer(cols = c(gov_capacity, fmi))
+
+# assign all regions to an object so we can make vertical lines on graph to visually pair scores from different sources by region
+rgns <- unique(fmi_gov_tidy$rgn_id)
+fmi_gov_gapfilled_compare <- ggplot(fmi_gov_tidy, aes(rgn_id, value, color = name)) +
+  geom_point(size = 4) +
+  labs(title = "Gapfilled FMI values & Gapfilled Minderoo Governance Capacity values",
+         x = "Region ID",
+         y = "Fisheries Governance Score",
+         color = "Data Source") +
+  geom_vline(xintercept = rgns, alpha = 0.5)
+
+# save to enlarge to the desired dimensions:
+#ggsave(filename = "fmi_gov_gapfilled.png", path = here("globalprep/res_fmi/v2022/output/"), height = 7, width = 25)
+ 
+# calculate average regional difference between data sources
+fmi_gov <- fmi_gov %>%
+  mutate(diff = abs(fmi - gov_capacity))
+paste0("The average difference in fisheries governance scores between the two data sources is ", round(mean(fmi_gov$diff, na.rm = TRUE), 2))
+```
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+plot(fmi_gov$gov_capacity, fmi_gov$fmi,
+     xlab = "Governance Capacity",
+     ylab = "FMI Score",
+     main = "Governance Capacity vs FMI")
+abline(0,1, col = "red")
+```
+
+
+
+
+
+
+
+
+
+
+
+

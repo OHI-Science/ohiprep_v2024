@@ -1,0 +1,397 @@
+---
+title: 'OHI 2020: Coral Harvest Pressure'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+[REFERENCE RMD FILE: http://ohi-science.org/ohiprep_v2020/globalprep/np/v2020/np_dataprep.html]
+
+# Summary
+This analysis converts FAO commodities data into data layers used to calculate OHI 2020 global coral harvest pressure.
+
+# Updates from previous assessment
+This was previously not included in OHI global.
+New year of FAO data (1976-2017).  
+
+***
+
+# Data Source
+
+**Reference**:      
+    http://www.fao.org/fishery/statistics/software/fishstatj/en#downlApp
+    App release date: July 2019 
+FAO raw commodities quantity 1976_2017
+FAO raw commodities value 1976_2017
+FAO metadata found [here](http://www.fao.org/fishery/statistics/global-commodities-production/en)
+
+**Downloaded**: May 3 2020
+
+**Description**:  Quantity (tonnes) and value (USD) of raw commodities (Exports only) for each country, taxa, year.  The FAO data is subset to include commodities in these categories: shells, corals, ornamental fish, fish oil, seaweed and plants, sponges (see: raw/commodities2products.csv for details).
+
+**Time range**: 1976-2017
+
+***
+  
+# Methods
+```{r setup, warning=FALSE, message=FALSE}
+
+knitr::opts_chunk$set(eval=FALSE)
+
+## load libraries, set directories
+library(ohicore)  #devtools::install_github('ohi-science/ohicore@dev')
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(zoo)  
+library(ggplot2)
+library(here)
+library(tidyverse)
+library(plotly)
+
+
+## Load FAO-specific user-defined functions
+source(here('workflow/R/fao_fxn.R')) # function for cleaning FAO files
+source(here('workflow/R/common.R')) # directory locations
+source(here('globalprep/np/v2020/R/np_fxn.R'))
+
+```
+
+# Import Raw Data: FAO Commodities
+
+Simultaneously read and process FAO commodities value and quantity data.
+```{r, eval = FALSE}
+
+## NOTE: This can be run as a loop, but the "value" and "quant" datasets need to be run individually to make sure
+##  there are no problems (after this check, they can be looped for efficiency)
+
+## describe where the raw data are located:
+dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2020')
+
+## list files included in d2020 folder (value and quant datasets)
+files <- list.files(dir_fao_data, pattern=glob2rx('*.csv'), full.names=TRUE)
+
+## To compare to old data:
+# dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2018')
+# files <- list.files(dir_fao_data, pattern=glob2rx('*.csv'), full.names=T)
+
+## loop
+for (f in files){ # f = files[2]
+  cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
+  
+  
+  d <- read.csv(f, check.names=FALSE, strip.white=TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
+  # checks names syntactically, strips leading and trailing whitespace, prevents conversion of characters to factors 
+  
+  ## Specifies that units are tonnes if we are reading in the Commodities Quantity data csv, and usd if we are reading in the Commodities Value data csv
+  units <- c('tonnes','usd')[str_detect(f, c('quant','value'))] # detect unit name using lowercase American English
+
+  ## gather into long format and clean up FAO-specific data foibles
+  ## warning: attributes are not identical across measure variables; they will be dropped: this is fine
+  m <- d %>% 
+    rename(country   = `Country (Country)`,
+           commodity = `Commodity (Commodity)`,
+           trade     = `Trade flow (Trade flow)`) %>%
+    gather(year, value, -country, -commodity, -trade, -Unit)
+  
+  ## Include only the "Exports" data:
+  m <- m %>%
+    filter(trade == "Exports")
+
+  m <- m %>%
+    fao_clean_data() %>%  # swaps out FAO-specific codes. NOTE: optional parameter 'sub_0_0' can be passed to control how a '0 0' code is interpreted.
+    select(-trade, -Unit) %>% # eliminate 'trade' column
+  arrange(country, commodity, is.na(value), year)
+
+  
+  ## Products join: attach product categories from com2prod, and
+  ##   filter out all entries that do not match a product category.
+  ## Note: commodity_lookup is user-defined function to compare 
+  ##   commodities in data vs commodities in lookup table
+  
+  ## load lookup for converting commodities to products
+  com2prod <- read.csv(here('globalprep/prs_coral_harvest/v2020/raw/commodities2products.csv'), na.strings='')
+  
+  ## version used in 2019:
+  ##    read.csv(here('globalprep/np/v2019/raw/commodities2products.csv'), na.strings='')
+  ## version used in 2018:
+  ##    com2prod <- read.csv('raw/commodities2products.csv', na.strings='')
+  ## version used in 2015: use when testing....
+  ##    com2prod <- read.csv('../v2014_test/commodities2products.csv', na.strings='')
+    
+  ## Check the current commodity-to-product lookup table.  If necessary, make changes to     "raw/commodities2products.csv"
+  np_commodity_lookup(m, com2prod)
+    
+  ## inner_join will attach product names to matching commodities according to
+  ##    lookup table 'com2prod', and eliminate all commodities that do not appear in the lookup table.
+  m <- m %>%
+      inner_join(com2prod, by='commodity')
+    
+    
+  ## Special case: user-defined function deals with 
+  ##   breaking up Antilles into separate reported rgns
+  m <- np_split_antilles(m)
+    
+  ## Some changes to region names that aren't working in name_2_rgn()
+  m <- m %>%
+    mutate(country = ifelse(country == "Côte d'Ivoire", "Ivory Coast", country)) %>%
+    mutate(country = ifelse(country == "C<f4>te d'Ivoire	", "Ivory Coast", country)) %>%
+    mutate(country = ifelse(country == "C\xf4te d'Ivoire", "Ivory Coast", country)) %>%
+    mutate(country = ifelse(country == "Cura<e7>ao","Curacao", country)) %>%
+    mutate(country = ifelse(country == "Curaçao","Curacao", country)) %>%
+    mutate(country = ifelse(country == "Cura\xe7ao","Curacao", country)) %>%
+    mutate(country = ifelse(country == "R\xe9union", "Reunion", country)) %>% 
+    mutate(country = ifelse(country == "Réunion", "Reunion", country)) %>% 
+    mutate(country = ifelse(country == "R<e9>union", "Reunion", country)) %>% 
+    filter(country != "Azerbaijan") # landlocked, but not being removed by name_2_rgn?
+               
+    
+  m_rgn <- name_2_rgn(df_in = m,
+                      fld_name='country', 
+                      flds_unique=c('commodity', 'product', 'year'))
+    
+# v2020 duplicates: China, Hong Kong SAR, Macao SAR, Guadeloupe, Serbia and Montenegro, etc - these are addressed below in the group_by/summarize pipe  
+  
+  ## combine composite regions
+  ## When summarizing the dataset, this function provides a modified way to sum the value column while maintaining NA values when both variables are NA (rather than turning to zero values). The function will sum non-NA values normally.
+  sum_function <- function(x) {
+    if (sum(is.na(x)) == length(x)) 
+      return(NA)
+    return(sum(x, na.rm = T))}
+  
+  m_rgn <- m_rgn %>%
+    group_by(rgn_id, rgn_name, commodity, product, year) %>%
+    summarize(value = sum_function(value)) %>%
+    ungroup()
+
+  ## units: rename value field to units based on filename
+  names(m_rgn)[names(m_rgn) == 'value'] <- units  
+  
+  ## output to .csv - should create two csvs (tonnes.csv and usd.csv)
+  harvest_out <- sprintf(here('globalprep/prs_coral_harvest/v2020/int/%s.csv'), units)
+  write.csv(m_rgn, harvest_out, row.names = FALSE, na = '')
+}
+
+```
+
+# Data Wrangle
+
+Combining the quantity and value data and a bit of cleaning to remove data prior to first reporting year for coral commodities and regions. 
+```{r, eval = FALSE}
+
+## Read in quant dataset from intermediate folder
+h_tonnes <- read.csv(here('globalprep/prs_coral_harvest/v2020/int/tonnes.csv'))
+
+## Read in value dataset from intermediate folder
+h_usd <- read.csv(here('globalprep/prs_coral_harvest/v2020/int/usd.csv'))
+
+## concatenates h_tonnes and h_usd data
+## h includes rgn_name, rgn_id, commodity, product, year, tonnes, usd.
+h <- h_usd %>%
+    full_join(h_tonnes, by=c('rgn_name', 'rgn_id', 'commodity', 'product', 'year')) %>%
+    mutate(commodity = as.character(commodity)) %>%
+    arrange(rgn_id, product, commodity, year) %>%
+    dplyr::filter(product == "corals") ##filter for our commodities of interest
+
+## clips out years prior to first reporting year, for each commodity per region
+h <- h %>% np_harvest_preclip()
+
+```
+
+# Gapfilling 
+
+Summary of gapfilling that is performed:
+
+  * Zero-fill: for observations with NAs for both values (tonnes & usd), fill both as zero. Also cross-fills zeros where one value is zero, other is NA.
+  * Regression fill, first pass: Where enough non-zero paired observations exist at the country level, use country-level data to create regression models (tonnes ~ usd and vice versa) for gapfilling.  About 25% success. 
+  * Regression fill, second pass: Where pass 1 failed, and enough non-zero paired observations exist at georegional level, use georegional-level data to create regression models (tonnes ~ usd + year, and vice versa) for gapfilling.  About 90% success. 
+ * Regression fill third pass: Where passes 1 and 2 failed, use global-scale data to create  regression models (tonnes ~ usd + year, and vice versa) for gapfilling.  100% success.
+ * End-fill:  For years where NAs still exist in final year, carry forward data from prior year (after other gapfilling techniques).
+
+```{r, eval = FALSE}  
+
+h <- h %>% np_harvest_gapflag()
+## Adds flag for required gap-filling, based upon NAs in data. 
+## NOTE: Does not perform any gap-filling.
+## At this point, h includes: 
+##    rgn_name   rgn_id   commodity   product   year   tonnes   usd   gapfill
+## 'gapfill' will be in (zerofill, endfill, tbd, none)
+
+data_check <- h %>% np_datacheck()
+## for each commodity within each region, creates (but doesn't save...) summary info:
+##   num_years:        the length of the data series for this commodity in this region
+##   usd_unique_nz:    (or 'tns') number of unique non-zero values for usd or tonnes 
+##   usd_na & tns_na:  number of NA occurrences
+##   paired_obs:       number of non-zero paired observations
+##   usd_unique_pairs: (or 'tns') within set of paired observations, count of unique usd and tonnes
+##   unique_pairs:     lesser of usd_unique_pairs and tns_unique_pairs
+##   count_no_data:    number of paired NAs - years with no value reported
+
+h <- h %>% np_zerofill()
+## for post-reporting years with NA for both tonnes and USD, fill zero - 
+##    assumes that non-reporting indicates zero harvest to report.
+## Also cross-fills zeros where one side is 0, other is NA (not flagged as gapfill)
+
+h <- h %>% np_lowdata_filter()
+## Exclude commodities (within a region) that have few non-zero data points.
+## Optional parameter with default: nonzero_h_yr_min = 4
+## NOTE: This filter has consequences for the regression, but also has meaning in terms of 
+##    not inflicting a penalty on regions trying, and then stopping, an experimental harvest.
+
+## Melanie's script to add a georegional ID tag based on country keys and IDs.
+h <- h %>%
+  add_georegion_id()
+
+h <- h %>% np_regr_fill(years_back = 10, vars = 'td', scope = 'rgn_id')
+h <- h %>% np_regr_fill(vars = 'tdy', scope = 'georgn_id')
+h <- h %>% np_regr_fill(vars = 'tdy', scope = 'global')
+## np_regr_fill() is a generalized regression gapfill function. Parameters (with defaults):
+## * years_back=50 (int):     This determines how far back in the time series to include within the regression.
+## * min_paired_obs=4 (int):  This determines how many paired observations are required to attempt a regression.
+## * scope = 'rgn_id' (str):  ('rgn_id', 'georgn_id', 'global') Determines grouping scale for regression.
+## * vars = 'tdy' (str):      ('td', 'tdy') Determines model: (tonnes ~ usd) or (tonnes ~ usd + year) [and vice versa]
+
+h <- h %>% np_end_fill()
+## For final year of data, if both usd and tonnes originally reported as NA, pull forward
+##    values for usd and tonnes from the previous year.  This should happen after regression fill.
+
+h_comm <- h
+## Store commodity-level data, before moving on to the product-level smoothing.
+
+## Output gapfilling report to .csv files.
+## Very few usd gapfilling, and none in recent years (data used to weight contributions), so will ignore this: gapfill=="r2_u_gr"
+h_gap <- h %>%
+  mutate(gapfill = ifelse(gapfill == "r2_u_gr", "none", gapfill)) %>%   # focusing only on tonnes gapfilling
+  select(rgn_id, commodity, product, year, gapfill)
+
+write.csv(h_gap, 'output/prs_coral_gf.csv', row.names = FALSE, na = '')
+
+```
+
+# Final Data Wranglng
+
+## Summarize values
+
+Summarize each product per country per year, e.g., all corals in Albania in 2011. And, do some error checking.
+```{r, eval = FALSE}
+
+h_prod <- h_comm %>%
+  group_by(rgn_name, rgn_id, product, year) %>%
+  summarize(tonnes = sum(tonnes, na.rm = TRUE), 
+            usd = sum(usd, na.rm = TRUE))
+          
+## Error-checking and table exports to see if there are duplicates
+stopifnot(sum(duplicated(h_prod[ , c('rgn_id', 'product', 'year')])) == 0)
+```
+
+## Quick Data Check
+
+Look at wide format with all commmodities and product subtotal (where commodity column value is "Z_TOTAL"), compared with the input data prior to summing.
+
+```{r, eval = FALSE}
+
+h_x_tonnes <- h_comm %>% 
+  bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
+  select(rgn_name, rgn_id, commodity, product, year, tonnes) %>%
+  arrange(rgn_name, product, commodity, year) %>%
+  spread(year, tonnes)
+
+h_x_usd <- h_comm %>% 
+  bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
+  select(rgn_name, rgn_id, commodity, product, year, usd) %>%
+  arrange(rgn_name, product, commodity, year) %>%
+  spread(year, usd)
+
+## Check a random country and commodity
+australia <- h_x_usd %>% filter(product == "ornamentals", rgn_name == "France") 
+australia
+
+## Can open up in Excel to compare subtotals per country-product-year
+write.csv(h_x_tonnes, 'int/coral_harvest_tonnes_wide.csv', row.names = FALSE, na = 'NA')
+write.csv(h_x_usd,    'int/coral_harvest_usd_wide.csv',    row.names = FALSE, na = 'NA')
+
+```
+
+
+## Calculate Rolling Averages
+Determine rolling averages for tonnes and USD in order to determine peak values.  This is based upon total harvests by product group, not individual commodity.  
+
+```{r, eval = FALSE}
+
+# Find max year in the summarized data table
+year_max <- max(h_prod$year)
+
+roll_prod <- h_prod %>%
+  arrange(rgn_id, product, year) %>%
+  group_by(rgn_id, product) %>%
+  mutate(
+      tonnes_rollmean = rollapply(tonnes, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE),
+      usd_rollmean    = rollapply(   usd, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE)) %>%
+  rename(
+      tonnes_orig = tonnes, # prevent overwriting of reported and gapfilled values
+      usd_orig    = usd) %>% # prevent overwriting of reported and gapfilled values
+  mutate(
+      tonnes = ifelse(!is.na(tonnes_rollmean), tonnes_rollmean, tonnes_orig),
+      usd    = ifelse(!is.na(usd_rollmean),    usd_rollmean,    usd_orig)) %>%
+  select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
+
+write.csv(roll_prod, "int/tonnes_coral_harvest.csv", row.names = FALSE)
+```
+
+## Calculate pressure score
+ - Divide the harvest by the area of coral and take the 95th quantile of harvest 
+ - Anything above the 95th quantile recieves a pressure score of 1, otherwise what it was before. 
+ - Multiply the pressure score by the health score to get the final pressure score.
+```{r, eval = FALSE}
+## read in production harvest data 
+roll_prod <- read_csv("int/tonnes_coral_harvest.csv")
+
+## read in coral extent 
+coral_ext <- read_csv("../../hab_coral/v2020/data/habitat_extent_coral_updated.csv") %>%
+  dplyr::select(-habitat, -year)
+
+## read in coral health data 
+coral_health <- read_csv("../../hab_coral/v2012/data/habitat_health_coral_updated.csv") %>%
+  dplyr::select(-habitat, -year)
+
+# join together with the coral harvest data 
+coral_harvest <- roll_prod %>%
+  left_join(coral_ext, by = "rgn_id") %>%
+  left_join(coral_health, by = "rgn_id")
+
+coral_harvest <- coral_harvest %>%
+  mutate(intensity = tonnes/km2)
+
+ref = quantile(coral_harvest$intensity, prob = 0.95, na.rm = TRUE) ## find the 95th quantile for a reference point
+
+coral_harvest <- coral_harvest %>%
+  mutate(pressure_no_health = ifelse(intensity > ref, 1, intensity/ref)) %>%
+  mutate(pressure_health = pressure_no_health*health) %>% ## calculate the pressure score
+  filter(!is.na(pressure_health)) %>%
+  dplyr::select(rgn_id, year, pressure_score = pressure_health)
+
+# test <- coral_harvest %>%
+#   filter(is.na(km2))
+# 
+# unique(test$rgn_id)
+```
+
+## Save data layer
+```{r, eval = FALSE}
+write.csv(coral_harvest, "output/prs_coral_harvest.csv")
+```
+
+

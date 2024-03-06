@@ -1,0 +1,88 @@
+---
+title: "Gapfilling Exercise"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+GOAL: Learn how/why NOT gapfilling data can introduce bias!
+
+The following is a (totally fake) dataset used to calculate an index. It is comprised of 3 indicators: A,B, and C.Notice that indicator C has quite a bit of missing data. We are going to explore whether we should gapfill these data.
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+gf <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohiprep_v2022/gh-pages/Reference/gapfilling/gf_explore.csv")
+
+```
+
+The overall index is calculated as the average of indicators A, B, and C. Try calculating the index without gapfilling the missing data. Explore the results by plotting. Do you see any evidence of bias?
+
+**You can see that the scores are overall higher for countries with NA values, a. It appears that that particularly ecoregion A has significantly higher index scores when there is missing data.**
+
+```{r}
+
+gf2 <- gf %>%
+  rowwise() %>%
+  mutate(index_no_gf = mean(c(indicatorA, indicatorB, indicatorC), na.rm=TRUE),
+         missing_data = ifelse(is.na(indicatorC), 1, 0))
+
+
+ggplot(data = gf2) + geom_histogram(aes(x = index_no_gf, col = ecoregion)) + facet_wrap(~missing_data)
+
+ggplot(data = gf2) +geom_boxplot(aes(y = index_no_gf, col = ecoregion)) + facet_wrap(~missing_data)
+
+```
+
+Explore whether indicator C is corrlated with ecoregion.
+
+**Indicator C appears to be correlation with ecoregion. On average ecoregionB has a value 4.5848 higher than for indicator C**
+
+```{r}
+
+model <- lm(indicatorC ~ecoregion, data =gf2)
+
+summary(model)
+
+```
+
+Gapfill missing data using the ecoregion mean of indicator C for the country's respective ecoregion. Explore the results. Does this seem like a reasonable approach?
+
+**This is somewhat reasonable given that ecoregion is highly correlated with indicator c. However, it does seem a little bit broad, since we are filling in the same value for all of the missing values for indicator C.**
+
+```{r}
+
+gf2 <- gf %>%
+  rowwise() %>%
+  mutate(index_no_gf = mean(c(indicatorA, indicatorB, indicatorC), na.rm=TRUE),
+         missing_data = ifelse(is.na(indicatorC), 1, 0),
+         indicatorC_gf = ifelse(is.na(indicatorC) & ecoregion == "A", 
+                                mean(gf$indicatorC[gf$ecoregion=="A"], na.rm=TRUE),
+                                indicatorC)) %>%
+  mutate(indicatorC_gf = ifelse(is.na(indicatorC_gf),
+                                mean(gf$indicatorC[gf$ecoregion=="B"], na.rm=TRUE),
+                                indicatorC_gf)) %>%
+  mutate(index = mean(c(indicatorA, indicatorB, indicatorC_gf), na.rm=TRUE))
+  
+
+
+```
+
+Does the uncertainty associated with gapfilling (using ecoregion mean) seem like it will be higher for region A or B? What are the potential concerns of gapfilling? Can you think of any ways to improve this approach to gapfilling?
+
+**A higher percentage of the countries have missing for ecoregion B, indicating that uncertainty might be higher for this region. However it also appears that indicator A has a wider range f values, which could increase uncertainty for this region.**
+
+```{r}
+
+gf2 %>%
+  group_by(ecoregion, missing_data) %>% 
+  summarise(count = n()) %>%
+  pivot_wider(names_from = missing_data, values_from = count) %>% 
+  rename(none_missing_count = `0`, missing_count =`1`) %>% 
+  mutate(percent_missing = missing_count/(missing_count + none_missing_count))
+
+#look at a boxplot of region scores
+ggplot(data = gf2) +geom_boxplot(aes(y = indicatorC)) + facet_wrap(~ecoregion)
+
+```

@@ -1,0 +1,420 @@
+---
+title: "OHI 2022: Food Provision/Fisheries, Identify FAO and OHI regions for RAM stocks"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
+```
+
+## Summary
+
+Generates a dataset describing the OHI and FAO major fishing regions that correspond to each stock's range.  This combines last year's dataset of stock-spatial information from RAM v4.491 database and Christopher M. Free's spatial work at Rutgers as well as newly added stocks from RAM v4.495 with manually assigned ohi and fao region ids. Dataset only contains stocks with B/Bmsy data.
+
+## Updates for 2022
+
+We didn't need to update this because the RAM data did not change for v2022.
+
+## Setup
+
+```{r}
+
+## Libraries
+library(dplyr)
+library(tidyr)
+library(readr)
+library(sf)
+library(ggplot2)
+library(stringr)
+library(here) 
+setwd(here::here("globalprep","fis","v2022"))
+
+source('../../../workflow/R/common.R')
+
+```
+
+## Identify Newly Added Stocks
+
+Compare stocks found in previous version of RAM data to new data to see what additional stocks have been added.
+
+Old Stocks: Used `timeseries` table, because in RAM v3.80, this table only contained single assessment for each unique stock. Now we use `timeseries_values_view, since v4.44 (assessment year 2019). 
+```{r}
+
+## old stocks
+load(file.path(dir_M, "git-annex/globalprep/_raw_data/RAM/d2020/RAMLDB v4.491/DB Files With Assessment Data/R Data/DBdata[asmt][v4.491].RData"))
+
+ram_bmsy_old <- timeseries_values_views %>%
+dplyr::select(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SSBdivSSBmgt) %>%
+  mutate(ram_bmsy = 
+           ifelse(!is.na(TBdivTBmsy), TBdivTBmsy, SSBdivSSBmsy)) %>%
+  mutate(ram_bmsy =
+           ifelse(is.na(TBdivTBmsy) & is.na(SSBdivSSBmsy), TBdivTBmgt, ram_bmsy)) %>%
+  mutate(ram_bmsy = 
+           ifelse(is.na(TBdivTBmsy) & is.na(SSBdivSSBmsy) & is.na(TBdivTBmgt), SSBdivSSBmgt, ram_bmsy)) %>%
+  dplyr::filter(year > 1979) %>%
+  filter(!is.na(ram_bmsy)) %>%
+  dplyr::select(stockid, stocklong, year, ram_bmsy)
+
+## check number of unique entries
+old_stockid <- unique(ram_bmsy_old$stockid) # 443 unique entries
+
+```
+
+New Stocks: Used `timeseries_values_views` table, because in RAM v4.44, this is the table that contains the most recent assessment for each unique stock. The `timeseries` table has all assessments conducted so there are multiple `assessid` per unique `stockid`.
+```{r}
+## new stocks
+load(file.path(dir_M, "git-annex/globalprep/_raw_data/RAM/d2021/RAMLDB v4.495/R Data/DBdata[asmt][v4.495].RData"))
+
+ram_bmsy <- timeseries_values_views %>%
+dplyr::select(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SSBdivSSBmgt) %>%
+  mutate(ram_bmsy = 
+           ifelse(!is.na(TBdivTBmsy), TBdivTBmsy, SSBdivSSBmsy)) %>%
+  mutate(ram_bmsy =
+           ifelse(is.na(TBdivTBmsy) & is.na(SSBdivSSBmsy), TBdivTBmgt, ram_bmsy)) %>%
+  mutate(ram_bmsy = 
+           ifelse(is.na(TBdivTBmsy) & is.na(SSBdivSSBmsy) & is.na(TBdivTBmgt), SSBdivSSBmgt, ram_bmsy)) %>% 
+  filter(!is.na(ram_bmsy)) %>% 
+  dplyr::filter(year > 1979) %>%
+  dplyr::select(stockid, stocklong, year, ram_bmsy)
+
+## check number of unique entries
+new_stockid <- unique(ram_bmsy$stockid) # 488 unique entries
+```
+
+
+### Investigate Differences
+There were 51 stocks included in the new data but not the old data.
+These include: 
+
+ [1] "ANCHOCWACIV-BEN"   "ANCHOCWAGAB-AGO"   "AWOLF5YZ"          "BHAKECWAAGO"       "BOCACCSPCOAST"     "BONGACWAGAB-COD"  
+ [7] "CHMACKCWAGAB-AGO"  "CHMACKCWAGNB-LBR"  "COD1F-XIV"         "COD3Pn4RS"         "COD4X5Yb"          "EBASSVIIIab"      
+[13] "ECSOLESASC"        "GKCRABAIES"        "GKCRABAIWS"        "GRSNAPGM"          "HAKESPPSAF"        "HERR4RFA"         
+[19] "HERR4RSP"          "HERR4TFA"          "HERR4TSP"          "MACK5YCHATT"       "MACKNWATLSA3-4"    "MSARDCWACIV-BEN"  
+[25] "PATCODARGS"        "PCOD5ABCD"         "REDDEEPI-II"       "REXSOLEGA"         "RROCKLOBSTERCRA1"  "RROCKLOBSTERCRA2" 
+[31] "RROCKLOBSTERCRA4"  "RROCKLOBSTERCRA7"  "RROCKLOBSTERCRA8"  "RSARDCWACIV-BEN"   "RSROCKBCWN"        "RSROCKBCWS"       
+[37] "SARDINCWAGAB-AGO"  "SARDINCWAGNB-LBR"  "SARDNWAZC"         "SARDVIIIabd"       "SCADSPPCWAGNB-LBR" "SFMAKONPAC"       
+[43] "SOLECWAAGO"        "SOLECWAGNB-GIN"    "THRSHARNPAC"       "TURIV"             "WHITVIIbce-k"      "WINFLOUN4T"       
+[49] "WPOLLBCWN"         "WPOLLBCWS"         "WROCKBCW"    
+
+There were 6 stocks present in the old data but not the new.
+These include:
+
+* "COD1f-XIV" "PCODHS"    "SARDINWA"  "SARDWAZC"  "SPRATNS"   "WHITVIIek"
+
+
+ - PCODHS changed to PCOD5ABCD
+ - COD1f-XIV changed to COD1F-XIV
+ - WHITVIIek changed to WHITVIIbce-k
+
+
+```{r}
+
+## find newly added stocks, when using timeseries_values_views
+newStocks <- setdiff(new_stockid, old_stockid) # there are 51 new stocks
+unusedStocks <- setdiff(old_stockid, new_stockid) # these are no longer included in the RAM data, will be deleted
+
+# v2021: See the mispelling for COD1F-XIV vs COD1f-XIV. This is ok. We will just use the new spelling and assign the fao-ohi regions again. 
+```
+
+
+Subset for just the additional stocks in RAM v4.491 data
+```{r}
+
+ram_bmsy_new <- ram_bmsy %>% 
+  filter(stockid %in% newStocks) 
+
+id_new <- ram_bmsy_new %>% 
+  select(stockid, stocklong) %>% 
+  distinct()
+
+```
+
+
+## Add Stock Info to Old RAM_fao_ohi_rgns
+
+Each stock needs the corresponding ohi and fao regions associated with its range. Make sure there are no duplicates here
+
+```{r}
+## Grab last year's fao-ohi-assessid data table
+## (we need to get the stock id from the old RAM data)
+RAM_fao_ohi_rgns <- read.csv("../v2020/int/RAM_fao_ohi_rgns_final.csv") 
+
+
+RAM_fao_ohi_rgns_fix <- RAM_fao_ohi_rgns %>%
+  distinct() %>% ## fixes any duplicates. Now lets check for mispellings or other errors 
+  group_by(rgn_id, fao_id, stockid) %>%
+  dplyr::mutate(dupe = n()>1) %>% # find the rest of the duplicates 
+  ungroup()
+  
+ #filter for duplicates
+dupes <- RAM_fao_ohi_rgns_fix %>%
+filter(dupe == "TRUE") # 0 good
+
+dupes$stockid #these are our problem duplicates: 0
+
+## fix the dupes 
+dupes_fix <- dupes %>%
+  filter(!is.na(RAM_area_m2))
+
+##filter out dupes from RAM_fao_ohi_rgns_fix and add fixed dupes back in
+#RAM_fao_ohi_rgns_fix_final 
+
+RAM_rgns_old <- RAM_fao_ohi_rgns_fix %>%
+  filter(dupe == "FALSE") %>%
+  rbind(dupes_fix) %>%
+  select(-dupe) ## now we have fixed the duplicate problem (if there was one...). 
+
+```
+
+
+## remove stocks that are no longer in the RAM data
+(but were in the previous version)
+
+```{r}
+filter(RAM_rgns_old, stockid %in% unusedStocks) # quick check
+
+RAM_rgns_old <- RAM_rgns_old %>%
+  filter(!(stockid %in% unusedStocks))
+```
+
+## Combine New and Old Stock Data
+
+Essentially adds new stocks to the bottom of the old stocks data table.  The regions of the new stocks are blank at this point. 
+```{r}
+
+## Make sure these new species aren't in the old data
+setdiff(id_new$stockid, RAM_rgns_old$stockid)
+
+
+RAM_rgns_new <- RAM_rgns_old %>% 
+  full_join(id_new, by = c("stockid","stocklong")) ## added the 51 new stocks.
+
+
+```
+
+## Fill Region IDs for New Stocks
+
+Here we need to figure out what ohi region id and FAO region id each of the new stocks fall in (there are 51 new stocks for v2021). 
+
+1. Filter for all of the new stocks (all those with NA rgn and fao ids)
+2. Join with the "stock" and "area" dataset, which contain more information on the distribution of each stock
+3. For those stocks that are not labelled as multinational, we will assume that they only fall in the FAO and ISO3Cs that are attached to those stocks. Then we will join with our OHI regions dataset by ISO3C to get the OHI region ids. 
+4. For those that are labelled as "multinational" we will have to figure the regions out through google and other means (see below and the code for a complete description)
+
+
+Investigate what FAO/OHI region each stock belongs to: 
+* Primarily used www.fishsource.org to find stock distribution information (just search the stocklong name and usually something will come up. 
+* For cross referencing with ICES sub-region codes, use these maps: https://www.researchgate.net/figure/Stock-units-defined-by-ICES-for-white-anglerfish-southern-stock-in-Divisions-VIIIc-and_fig1_31198841 and http://gis.ices.dk/sf/
+* Referenced F_CODE/FAO_AREAS (filtered for MAJOR in F_LEVEL) in ohi_fao_rgns shapefile (fis/v2017/int) from mazu (can use other map visuals to identify stock extent). 
+* FAO major fishing areas (fao_id): https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg
+
+Some regions have more than 1 `fao_id` or `rgn_id` (e.g. Alaska skate Bering Sea and Aleutian Islands,	Kamchatka flounder Bering Sea and Aleutian Islands have `fao_id` 61 and 67).
+
+
+```{r}
+## v2021: We will manually add the FAO and OHI regions for all of the NA stocks here. 
+
+## join with stock and area
+# first we join our stocks that have NAs in FAO id and rgn id (there should be 51 in v2021) to the "stock" and "area" dataframes that were loaded from the RAM database
+
+RAM_nas <- RAM_rgns_new %>%
+  filter(is.na(fao_id)) %>% 
+  left_join(stock) %>%
+  left_join(area)
+
+
+## filter for not multinational - we will use what is notated
+# Now we will filter for those stocks that have country not labeled as "multinational".. we will assume that the FAO id and country names are the true ranges for these stocks. Then we will wrangle to have the appropriate OHI rgn_id
+
+region_data()
+
+RAM_na_non_multi <- RAM_nas %>%
+  dplyr::select(-rgn_id) %>%
+  filter(country != "multinational") %>%
+  mutate(fao_id = primary_FAOarea) %>%
+  left_join(rgns_eez, by = c("ISO3_code" = "eez_iso3")) %>%
+  dplyr::select(rgn_id, fao_id, RAM_area_m2, stockid, stocklong) %>%
+  mutate(fao_id = as.double(fao_id)) # great, this only leaves 20 stocks that we need to fill in now! 
+  
+
+
+## filter for multinational and determine what FAO ids they deserve
+
+RAM_na_multi <- RAM_nas %>%
+  filter(country == "multinational")
+
+unique(RAM_na_multi$region)
+
+# we have three larger areas that require manual data entry
+# "West Africa"    "Europe non EU"  "European Union"
+
+####### Start with Europe
+
+#### We know from the RAM excel sheet "Stock Changes History" that these stocks used to be named something else. So we will look at last years "RAM_fao_ohi_rgns" to figure out the ohi region ids for these two stocks
+
+# COD1f-XIV changed to COD1F-XIV rgn_id 145
+# WHITVIIek changed to WHITVIIbce-k rgn_id 179, 180, 181, 227, 228, 262
+
+
+####  now lets google each stocklong individually to figure out what OHI regions they are in
+
+# European seabass ICES 8ab - indicates it is in ICES 8ab regions... https://www.ices.dk/sites/pub/Publication%20Reports/Advice/2020/2020/bss.27.8ab.pdf shows that France (179), Belgium (59), Netherlands (177), Spain (182), and the UK (180) fished it in 2019
+# Deepwater redfish northeast arctic - also known as the "beaked redfish" https://www.fishsource.org/stock_page/1729 - shows that Norway (223), Spain (182), and Russia (73) fish this 
+# Sardine ICES 8abd - https://www.ices.dk/sites/pub/Publication%20Reports/Advice/2019/2019/pil.27.8abd.pdf indicates it is caught by France (179), Spain (182), Netherlands (177), Ireland (181), UK (180), Denmark (175), Germany (176), and Lithuania (189)
+# Turbot North Sea - https://www.fishsource.org/fishery_page/4954 - indicates fished by UK (180) and Netherlands (177)
+
+ram_fao_by_areaname_multinational_europe <- RAM_na_multi %>%
+  dplyr::filter(region %in% c("Europe non EU", "European Union")) %>%
+  distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %>% # these are all just general rules, taken from an emLAB project: https://github.com/emlab-ucsb/sustain-sci-subsidy-reform-paper/blob/master/data/lookup-tables/assign_fao_areas_to_ram_v4.491.Rmd
+  mutate(areaname_fao_area = case_when(areaname == "Azores" ~ "27;34", # crosses both
+                                       areaname == "NAFO 1F and ICES 14" ~ "21;27", # crosses both
+                                       areaname == "ICES 5-12-14 and NAFO Subareas 1-2 (deep)" ~ "21;27",
+                                       areaname == "ICES 5-12-14 and NAFO Subareas 1-2 (shallow)" ~ "21;27",
+                                       areaname == "Azores Grounds" ~ "27;34",
+                                       areaname == "Mid-Atlantic Ridge" ~ "27", # check on this one
+                                       TRUE ~ "27")) %>% # Otherwise we assume it's 27 %>%
+ mutate(ohi_rgn = case_when(
+   stockid == "WHITVIIbce-k" ~ "179;180;181;227;228;262",
+   stockid == "COD1F-XIV" ~ "145", 
+   stockid == "EBASSVIIIab" ~ "179;59;177;182;180",
+   stockid == "REDDEEPI-II" ~ "223;182;73", 
+   stockid == "SARDVIIIabd" ~ "179;182;177;181;180;175;176;189", 
+   stockid == "TURIV" ~ "180;177"
+ )) %>%
+  separate_rows(c(ohi_rgn, areaname_fao_area), sep = ";", convert = TRUE) %>%
+  dplyr::select("rgn_id" = "ohi_rgn", "fao_id" = "areaname_fao_area", RAM_area_m2, stockid, stocklong)
+
+
+####### Now lets do Africa 
+
+# assign fao id and rgn_id based on context clues from the areaname
+
+# Central West Africa Cote Divoire-Benin - assume countries from Ivory coast to benin - Ivory Coast (195), Ghana (106), Togo (98), Benin (99) - FAO id 34
+# Central West Africa Gabon-Angola - assume countries from Gabon to angola - Gabon (198), Republic of the congo (100), Dem republic of congo (199), Angola (200) - FAO id 34 and 47
+# Central West Africa Angola - assume just angola - Angola (200) - FAO id 47
+# Central West Africa Gabon-Congo DR - assume countries from Gabon to congo DR - Gabon (198), Republic of the congo (100), Dem republic of congo (199) - FAO id 34
+# Central West Africa Guinea Bissau-Guinea - assume countries from Guinea Bissau to Guinea - Guinea (194), Guinea Bissau (193) - FAO id 34
+# Central West Africa Guinea Bissau-Liberia - assume countries from guinea bissau to libera - Guinea Bissau (193), Guinea (194), Sierra Leone (96), Liberia (97) - FAO id 34
+# North West Africa Zone C - can't find any info, so we will assume Morroco based on primary_country - FAO id 34
+
+
+ram_fao_areaname_multinational_west_africa <- RAM_na_multi %>%
+  dplyr::filter(region %in% c("West Africa")) %>%
+  distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %>%
+  mutate(areaname_fao_area = case_when(areaname == "Central West Africa Cote Divoire-Benin" ~ "34", # assuming coast along ivory coast and benin
+                                       areaname == "Central West Africa Gabon-Angola" ~ "34;47", # assume coast from gabon to angola
+                                       areaname == "Central West Africa Angola" ~ "47", # assume just angola
+                                       areaname == "Central West Africa Gabon-Congo DR" ~ "34", # assume gabon and Dem congo
+                                       areaname == "Central West Africa Guinea Bissau-Guinea" ~ "34",
+                                       areaname == "Central West Africa Guinea Bissau-Liberia" ~ "34", 
+                                       areaname == "North West Africa Zone C" ~ "34")) %>%
+  # now assign ohi rgn_id based on the same logic as above...
+  mutate(ohi_rgn = case_when(areaname == "Central West Africa Cote Divoire-Benin" ~ "195;106;98;99", # assuming coast along ivory coast and benin
+                                       areaname == "Central West Africa Gabon-Angola" ~ "198;100;199;200", # assume coast from gabon to angola
+                                       areaname == "Central West Africa Angola" ~ "200", # assume just angola
+                                       areaname == "Central West Africa Gabon-Congo DR" ~ "198;100;199", # assume gabon and Dem congo
+                                       areaname == "Central West Africa Guinea Bissau-Guinea" ~ "194;193",
+                                       areaname == "Central West Africa Guinea Bissau-Liberia" ~ "193;194;96;97", 
+                                       areaname == "North West Africa Zone C" ~ "62")) %>%
+  dplyr::select(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) %>%
+  separate_rows(ohi_rgn,  sep = ";", convert = TRUE) %>%
+  separate_rows(areaname_fao_area, sep = ";", convert = TRUE) %>%
+  dplyr::select("rgn_id" = "ohi_rgn", "fao_id" = "areaname_fao_area", RAM_area_m2, stockid, stocklong)
+
+
+## Join them all together 
+
+RAM_na_all <- rbind(RAM_na_non_multi, ram_fao_by_areaname_multinational_europe, ram_fao_areaname_multinational_west_africa) ## now all of the NA ones have rgn_id and fao_id! 
+
+summary(RAM_na_all)
+```
+
+## Tidy Final Datatable
+
+
+### Fix Incorrect FAO-OHI Matches
+
+Each row must have both an FAO id and a rgn id. Fix duplicate/incorrect fao-ohi matches by using ohi_fao_rgns spatial file
+```{r}
+
+## Spatial file with fao and ohi regions, F_CODE is the FAO id
+fao_ohi <- st_read(dsn = file.path(dir_M, "git-annex/globalprep/fis/v2017/int"),
+                   layer = "ohi_fao_rgns")
+st_geometry(fao_ohi) <- NULL # removes geometry
+
+fao_ohi_id <- fao_ohi %>%
+  select(rgn_id, fao_id = F_CODE) %>% 
+  arrange(rgn_id) %>% 
+  mutate(fao_id = as.numeric(as.character(fao_id))) %>% 
+  mutate(rgn_id = as.numeric(as.character(rgn_id))) %>% 
+  distinct()
+
+## Filter for correct fao-ohi pairs in the RAM regions table 
+RAM_rgns_new_final <- fao_ohi_id %>% 
+  left_join(RAM_na_all, by = c("rgn_id", "fao_id")) %>% 
+  filter(!is.na(stockid)) %>% # keep matches only
+ arrange(stocklong, fao_id)
+
+
+```
+
+Compare with unfiltered RAM regions table to check on fao-ohi pairs that were dropped
+```{r}
+## Number of unique stocks after joining
+nrow(RAM_rgns_new_final) #112
+## Number of unique stocks before joining
+RAM_temp <- RAM_na_all %>% select(rgn_id, fao_id, stockid, stocklong) %>% distinct() %>% arrange(stocklong, fao_id)
+nrow(RAM_temp) #113
+
+## add identifier for the two RAM table versions
+RAM_temp$idtemp <- 1:nrow(RAM_temp)
+RAM_rgns_new_final$idtemp2 <- 1:nrow(RAM_rgns_new_final)
+
+## view the ohi-fao pairs that would be removed
+combine <- RAM_temp %>% 
+  full_join(RAM_rgns_new_final, by = c("rgn_id", "fao_id", "stockid", "stocklong")) %>% 
+  filter(is.na(idtemp2)) ## we lost 1 here... This is ok though
+
+```
+
+Tidy up RAM data table.  After the final check (located below), I hand added some new regions for some of the stocks. 
+```{r}
+
+write.csv(RAM_rgns_new_final, "int/RAM_new_stocks.csv", row.names=FALSE)
+## check that there are still 9 unique stock ids
+length(unique(RAM_rgns_new_final$stockid)) # 50 makes sense
+
+```
+
+### Combine with full dataset
+
+Combine newly added stocks with ohi and fao region information to the old stock data table. Make sure there are no NAs!
+```{r, eval=FALSE}
+
+
+RAM_final <- bind_rows(read_csv(file.path("int/RAM_new_stocks.csv"))) %>% 
+  select(-idtemp2)
+
+RAM_fao_ohi_rgn_final <- RAM_rgns_old %>% 
+  full_join(RAM_final, by = c("rgn_id", "fao_id", "stockid", "stocklong")) %>%
+  select(-RAM_area_m2.y, RAM_area_m2 = RAM_area_m2.x) 
+ 
+
+write.csv(RAM_fao_ohi_rgn_final, "int/RAM_fao_ohi_rgns_final.csv", row.names=FALSE)
+```
+

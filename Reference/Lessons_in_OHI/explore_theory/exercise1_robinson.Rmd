@@ -1,0 +1,439 @@
+---
+title: "Philosophy and models of the Ocean Health Index"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
+---
+
+```{r}
+library(tidyverse)
+library(stringr)
+```
+
+Work together to answer these questions.
+
+All the information you need should be in the OHI Methods
+[document](https://raw.githack.com/OHI-Science/ohi-global/published/documents/methods/Supplement.html#2_the_theory_of_ohi).
+
+I will be around to answer any questions...so don't hesitate to get
+clarification, extra guidance, or request hints!
+
+### OHI score models and data
+
+1.  What is the difference between a goal's "status" and "score"?
+
+<br> **The status represents the current status of the goal, the score
+is an average of both the current status and the predicted future
+status. Predicted future status incorporates resilience, pressures and
+trend.** <br>
+
+2.  If a region's food provision goal has the following values, what
+    would its food provision score be?
+
+Predicted future status: 80
+
+Current status: 60
+
+<br> **The food provision score would be 70.** <br>
+
+3.  Given the following data, what would this region's Index score be?
+
+    **The index score would be 63**
+
+4.  
+
+| Goal/subgoal                      | Abbreviation | Score |
+|-----------------------------------|--------------|-------|
+| Artisanal Fishing Opportunity     | AO           | 90    |
+| Habitat                           | HAB          | 50    |
+| Species Condition                 | SPP          | 30    |
+| Carbon Storage                    | CS           | 20    |
+| Clean Waters                      | CW           | 95    |
+| Coastal Livelihoods and Economies | LE           | 60    |
+| Coastal Protection                | CP           | 80    |
+| Food Provision                    | FP           | 85    |
+| Natural Products                  | NP           | 100   |
+| Sense of Place                    | SP           | 10    |
+| Tourism and Recreation            | TR           | 50    |
+
+NOTE: The abbreviations for subgoals have 3 letters and goals have 2
+letters.
+
+<br> <br>
+
+```{r}
+#subgoals 
+SPP <- 30
+HAB <- 50
+
+
+#Goals
+A0 <- 90
+CS <-20
+CW <- 95
+LE <- 60
+CP <- 80
+FP <- 85
+NP <- 100
+SP <- 10
+TR <- 50
+BD <- ((SPP + HAB))/2
+
+
+index <- mean(c(A0, CS, CW, LE, CP, FP, NP,SP,TR, BD))
+index
+```
+
+```{r}
+# read in the score data
+scores <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv")
+
+#double checking that the sub-goals are averaged to find the main goal 
+scores %>% 
+  filter(
+    goal %in% c("SPP", "HAB", "BD")
+    & region_id == 1 &
+      dimension %in% c("score"))
+
+
+(90.8 +75.1)/2
+
+#confirming that the index score for a region is the mean of all scores
+
+#find the mean for each year 
+scores %>% 
+  filter(region_id == 1 & str_length(goal) < 3 &
+      dimension %in% c("score")) %>% group_by(year) %>% summarize(mean(score))
+
+
+#filter to the index scores
+scores %>% 
+  filter(region_id == 1 & goal == "Index" &
+      dimension %in% c("score"))
+
+```
+
+4.  Fill in the missing values.
+
+NOTE: Pressure and resilience must be multiplied by 0.01. Trend and
+status are not modified.
+
+| Dimension               | Scenario 1 | Scenario 2 |
+|-------------------------|------------|------------|
+| Score                   | 71         | 78         |
+| Current status          | 75         | 75         |
+| Predicted future status | 68         | 80         |
+| Trend                   | 0.10       | 0.10       |
+| Pressure                | 100        | 50         |
+| Resilience              | 50         | 50         |
+
+QUESTION: How did a pressure change from 100 to 50 affect the final
+score? Was this a larger or smaller effect than you would have
+expected?\
+
+**This affect seems reasonable. We know that pressure has a smaller
+effect than trend, which didn't change, but it it did have a noticeable
+impact on the score.**
+
+future status equation:
+
+$x_f = [1 + BT + (1- B) (r-p)]x$
+
+$B = 0.67$
+
+```{r}
+#calculate the score
+(1+ (.67 * .1) + (1 -.67) + ((50 *.01) - (100*.01))) * 75
+
+#check in the data 
+#this does not match up as expected
+scores %>% 
+  filter(region_id == 1 & goal == "CW") %>%
+  filter(year == 2020)
+
+(1 + (0.67 * -.09) + (1-.67) * ((92.3*.01)-(42.4*.01))) *73.6
+
+```
+
+<br> <br>
+
+### Humans as part of the ecosystem
+
+<br> 5. To calculate the Fishery subgoal, we:
+
+a.  Obtain B/Bmsy scores for each stock that is harvested. B/Bmsy is
+    defined as: the ratio of observed biomass to the biomass that would
+    provide maximum sustainable yield. When B/BMSY = 1, then biomass
+    equals BMSY. If B/BMSY falls below 1, biomass is too low to provide
+    maximum sustainable yield. For example, if B/BMSY = 0.5, then
+    biomass is only 50% of that needed for maximum sustainable yield.
+    (from:
+    <http://www.catchshareindicators.org/wp-content/uploads/2013/12/NE_Biomass_Feb-2014.pdf>)
+
+b.  Convert B/Bmsy into a stock status score that ranges from 0-1, with
+    one reflecting a perfect score. The relationship between B/Bmsy
+    values and stock status scores looks like this:
+
+![](figures/fis_methods.png)
+
+c.  Take some sort of average of the stock status scores within each
+    region (for the global we use a geometric mean weighted by catch).
+
+QUESTION: B/Bmsy scores greater than 1 indicate the stock is doing well,
+but is underharvested! Given this, do you think we should penalize
+underharvesting? Why? Do you have any ideas for how we could account for
+underharvesting without unduly penalizing regions that are trying to let
+stocks recover?
+
+**As mentioned above, under harvesting may be intentional, and even due
+to conservation or sustainability measures put into place. Because of
+by-catch and other factors, there can be environmental consequences from
+fishing that aren't directly related to the stock status of the target
+species. Also considering IUU fishing, it's possible that the amount of
+biomass being fished is higher than what is reported in the data, which
+complicates this question. I think in order to assess whether or not a
+score should be penalized for under harvesting, you would need to get
+into the reason behind the under utilization reported, which is
+difficult to do at a global level analysis.**
+
+<br> <br>
+
+### Gapfilling
+
+6.  Imagine you are calculating OHI scores for 10 regions. The data you
+    can find for an economic variable that is used to calculate the
+    status of one of the goals looks like this:
+
+| rgn_id | data |
+|--------|------|
+| 1      | 72   |
+| 2      | 74   |
+| 3      | 80   |
+| 4      | 70   |
+| 5      | NA   |
+| 6      | NA   |
+| 7      | 71   |
+| 8      | 75   |
+| 9      | 76   |
+| 10     | 76   |
+
+QUESTION: Should the missing values (NA is a missing value in R) remain
+missing? If so, why?
+
+Or, should you try to estimate the missing values? If so, how might you
+go about estimating them? <br>
+
+**The values should only remain missing if that particular layer is not
+relevant for the region. The gaps could be filled using a variety of
+methods, depending on what was most appropriate in this particular case.
+We could average the values from the regions that are most similar, use
+interpolation, or use a variety of other models to estimate the missing
+values.**
+
+<br>
+
+### Goal status and trend
+
+<br>
+
+7.  Read the methods section for the Lasting Special Places subgoal:
+    hhttps://oceanhealthindex.org/images/htmls/Supplement.html#692_Lasting_special_places\_(subgoal_of_sense_of_place))
+
+The information in this section describes how status and trend are
+calculated for this goal, it also includes the data used to calculate
+the pressure and resilience dimensions.
+
+QUESTION: What is the reference point for this subgoal?
+
+**The reference point is that 30% of the coastline qualifies as a
+special place. This assumes that a country is unlikely to preserve their
+entire EEZ.**
+
+Explore the links to the pressures and resilience data layers.
+
+Follow this link to the functions.R file in ohi-global:
+<https://github.com/OHI-Science/ohi-global/blob/draft/eez/conf/functions.R>
+
+Find the Lasting Special Places function. See if you can reconcile the
+model described in the Methods with the code. (NOTE: Just aim for a
+large picture overview...at this point you do not need to understand
+every step....or even most of this)
+
+<br>
+
+**The function appears to be following the equation given in the
+methods.**
+
+<br>
+
+8.  The trend for the Tourism and Recreation goal for the United States
+    is -0.15. Describe what this means.
+
+**This means that over the past five years, the average yearly change in
+status (multiplied by 5) and then scaled between -1 and 1, for this goal
+is -.15. The value is scaled by dividing by the initial status value
+used.**
+
+8.  
+
+9.  
+
+10. 
+
+11. 
+
+12. 
+
+<br> <br>
+
+9.  We are going to walk through a trend calculation. If R is installed
+    on your computer, follow along.
+
+Status data for a region's Tourism and Recreation goal:
+
+| Year | Status |
+|------|--------|
+| 2010 | 72     |
+| 2011 | 71     |
+| 2012 | 72     |
+| 2013 | 73     |
+| 2014 | 77     |
+| 2015 | 80     |
+| 2016 | 82     |
+
+*STEP 1* Estimate the average change per year using a linear regression
+model
+
+![](figures/trend_lm.jpg)
+
+The 0.027 value is the slope estimate, which is the average change in
+status per year estimated by the linear model.
+
+*STEP 2* Obtain proportional change by dividing the slope estimate by
+the earliest status value used in the linear model:
+
+`0.027/0.72 = 0.0375`
+
+There has been nearly a 4% increase in status per year.
+
+*STEP 3* The goal is to predict the change in 5 years, so we multiply
+the yearly proportional change by 5:
+
+`0.0375 * 5 = 0.1875`
+
+Status is predicted to increase about 19% in 5 years.
+
+In 2021, status is predicted to be (ignoring pressure/resilience
+dimensions): 82 \* (1 + 0.1875) = 97
+
+QUESTION: What assumptions are we making by using this formulation of
+trend to calculate the likely future status?
+
+**We are assuming that trend is linear, and we are only looking at a
+short time frame. We don't fully understand the driving factors behind
+the trend, or that the trend is due to the same processes during a given
+year.**
+
+QUESTION: Can you think of any scenarios when we would not use 5 years
+of data to estimate trend?
+
+<br> **When limited data do not allow for this. For example for the salt
+marsh data in the habitat sub-goal, all regions are assigned trend for
+this layer due to 2% historical global loss. This relates to the fact
+that most loss is less recent.**<br>
+
+### Goal pressure and resilience
+
+<br>
+
+10. The pressure dimension plays a relatively small role in goal scores
+    (see figure 4.1), but it takes a lot of effort to prepare the data!
+
+The final pressure dimension is calculated for each region and goal
+using a function from the ohicore package. The function requires several
+pieces of information:
+
+a.  A data layer for each pressure layer describing the magnitude of the
+    pressure on a scale of 0-1. For example, here is the sea surface
+    temperature pressure layer (low pressures are good and high
+    pressures are bad):
+    <https://github.com/OHI-Science/ohiprep_v2023/blob/gh-pages/globalprep/prs_sst/v2022/output/sst_updated.csv>
+
+b.  Classifying the pressure category for each data layer. The pressure
+    dimension is based on two types of pressures: Ecological and Social
+    (Figure 4.2). The ecological pressures are broken into 5 categories
+    (pollution, alien species, habitat destruction, fishing, and climate
+    change). Each pressure data layer is assigned to a category in this
+    file:
+    <https://github.com/OHI-Science/ohi-global/blob/draft/eez/conf/pressure_categories.csv>
+
+QUESTION: How many climate change pressures are there?
+
+**There appear to be four.**
+
+c.  Pressure x goal weighting. Pressures have little or no effect on
+    some goals, but huge effects on others. The relationship between the
+    goals and the pressure variables is described here:
+    <https://github.com/OHI-Science/ohi-global/blob/draft/eez/conf/pressures_matrix.csv>
+
+QUESTION: Which pressure layers affect the FIS subgoal? How many
+regulatory pressure layers are there? How many social layers are there?
+Which is more important: Ecological or Social pressures?
+
+**The FIS subgoal is affected by po_chemicals, po_nutrients, sp_alien,
+sp_genetic, hb_subtidal_sb and hb_subtidal_hb for ecological layers. It
+is also impacted by ss_wgi and ss_spi which are social.** **Habitat
+destruction and fishing pressure which are ecological pressures appear
+to be weighted heavily.** **There are 6 regulatory layers affecting this
+goal (listed under resilience).**
+
+QUESTION: Some goals, like Coastal Protection, have multiple "elements".
+Why?
+
+**Different data layers that are incorporated have different pressures
+impacting them. Allows for different elements in different habitats.**
+
+NOTE: It is convention to add a superscript to the pressure name that
+describes its category: \* po=pollution \* hd=habitat destruction \*
+sp=alien species \* fp=fishing pressure \* cc=climate change
+
+<br> <br>
+
+11. Similar to the pressures dimension, resilience plays a relatively
+    small role in goal scores (see figure 4.1) but still takes a lot of
+    effort.
+
+The final pressure dimension is calculated for each region and goal
+using a function from the ohicore package. The function requires several
+pieces of information:
+
+a.  A data layer for each pressure layer describing the magnitude of the
+    pressure on a scale of 0-1. For example, here is the Social Progress
+    Index layer (low resilience is bad and high resilience is good):
+    <https://github.com/OHI-Science/ohiprep_v2023/blob/gh-pages/globalprep/prs_res_spi/v2022/output/spi_res.csv>
+
+b.  The resilience dimension includes two major categories: Ecological
+    and Social (Figure 4.3). Ecological resilience has two
+    subcategories: Ecosystem and Regulatory. Regulatory is comprised of
+    the same 5 subcomponents as the Ecological *pressures*: pollution,
+    alien species, habitat destruction, fishing, and climate change.
+    There is also a "goal" specific subcomponent. Each resilience data
+    layer is assigned to a category in this file:
+    <https://github.com/OHI-Science/ohi-global/blob/draft/eez/conf/resilience_categories.csv>
+
+c.  The relationship between goals and resilience is described here:
+    <https://github.com/OHI-Science/ohi-global/blob/draft/eez/conf/resilience_matrix.csv>
+    <br> <br>
+
+### Data layers
+
+<br>
+
+12. Explore table 7.0.1 in the methods.
+
+    **This table provides an overview of all the data layers used in the
+    analysis.**
+
+<br> <br>

@@ -1,0 +1,141 @@
+---
+title: 'OHI 2021: Coral condition'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+Coral condition was calculated using current condition data divided by reference condition. We used condition data from percent live coral cover from 12,634 surveys from 1975-2006 (Bruno and Selig 2007, Schutte et al. 2010). When multiple data points were available for the same site and year, we averaged these data, and also averaged the site data to calculate a per country per year average. However, data were missing for several countries and some countries did not have data for the reference or current year time periods or had only 1-2 surveys. Because coral cover can be highly temporally and spatially dynamic, having only a few surveys that may have been motivated by different reasons (i.e., documenting a pristine or an impacted habitat) can bias results. To calculate condition we used fitted values from a linear trend of all data per country, which was more robust to data poor situations and allowed us to take advantage of periods of intense sampling that did not always include both current and reference years. Then, we created a fitted linear model of all these data points from 1975-2010, provided that 2 or more points are in 1980-1995 and 2 or more points are in 2000-2010. We defined the ‘current’ condition (health) as the mean of the predicted values for 2008-2010, and the reference condition as the mean of the predicted values for 1985-1987. Where country data were not available, we used an average from adjacent EEZs weighted by habitat area, or a georegional average weighted by habitat area, based on countries within the same ocean basin (Figure 7.1).
+
+
+## Updates from previous assessment
+Using a new dataset for the global distribution of coral reefs, so we are going to gapfill the condition of the new regions that have been added to the coral extent data. 
+
+
+## Setup
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_coral/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_wcmc <- file.path(file.path(dir_M, 'git-annex/globalprep/_raw_data/wcmc_coral'))
+region_data()
+
+dir_git_old  <- file.path('~/github/ohiprep_v2021', "globalprep/hab_coral/v2012")
+```
+
+Now match the old health data to the extent data, and gapfill any missing health data with georegion averages. This will also exclude any regions that have health data but no extent data. 
+
+
+```{r, eval = FALSE}
+health <- read_csv(file.path(dir_git_old, "data/habitat_health_coral_updated.csv"))
+
+health_old_gf <- read_csv(file.path(dir_git_old, "data/health_coral_gf.csv")) %>%
+  left_join(rgns_eez)
+
+## read in georegions data
+regions <- read.csv(file.path(here('globalprep/supplementary_information/v2018/rgn_georegions_wide_2013b.csv')))
+
+## read in extent data
+all <- read.csv(file.path(here("globalprep/hab_coral/v2021/data/habitat_extent_coral_updated.csv")))
+
+all_old <- read.csv(file.path(here("globalprep/hab_coral/v2012/data/habitat_extent_coral_updated.csv")))
+
+
+all <- all %>%
+  filter(km2 > 0) %>%
+  filter(rgn_id < 255) %>%
+  dplyr::select(-year)
+
+setdiff(all$rgn_id, health$rgn_id) # coral extent data but no health score # [1] 79 136
+
+
+setdiff(health$rgn_id, all$rgn_id) # have health but no extent... two are small islands. One is new zealand. New Zealand does not have a coral reef.. so probably not a big deal. 
+# [1]   3  90 162
+
+
+## We will give rgn 79 (israel), the same score as Egypt (214), since it is adjacent. (health = 0.9845383)
+## we will give rgn 136 (Guatemala), the same score as Belize (164), since it is adjacent (health = 0.01995085)
+
+tmp <- all %>%      #eliminates the regions with health scores but no coral
+  left_join(health) %>%
+  mutate(health = case_when(
+    rgn_id == 79 ~ 0.9845383,
+    rgn_id == 136 ~ 0.01995085,
+    TRUE ~ health
+  ))
+
+
+### save summary of gap-filling:
+old_gaps <- read.csv(file.path(here("globalprep/hab_coral/v2012/data/health_coral_gf.csv")))
+
+
+health_gaps <- tmp %>%
+  left_join(old_gaps, by = c("rgn_id", "habitat")) %>%
+  mutate(gap_fill = case_when(rgn_id %in% c(79, 136) ~ "adjacent", 
+                              rgn_id %in% c(107, 121, 149) ~ "0",
+                              TRUE ~ gap_fill)) %>%
+  full_join(rgns_eez) %>% 
+    dplyr::select(rgn_id, habitat, variable, gap_fill) %>%
+    mutate(variable = "health") %>%
+  mutate(habitat = "coral", 
+         year = 2012) 
+write.csv(health_gaps, 'globalprep/hab_coral/v2021/data/health_coral_gf.csv', row.names=FALSE)
+
+### save health data:
+health <- tmp %>%
+  dplyr::select(rgn_id, habitat, health) %>%
+  mutate(year = 2021)
+write.csv(health, 'globalprep/hab_coral/v2021/data/habitat_health_coral_updated.csv', row.names=FALSE)
+
+```
+
+Datacheck: compare to old health data
+
+```{r, eval = FALSE}
+old_health <- read_csv(file.path(here("globalprep/hab_coral/v2012/data/habitat_health_coral_updated.csv")))
+
+compare_habitat_health <- health %>%
+  filter(rgn_id <= 250) %>%
+  left_join(old_health, by = "rgn_id") %>%
+  mutate(difference = health.x - health.y) %>%
+  left_join(rgns_eez)
+
+test <- compare_habitat_health %>%
+  filter(is.na(health.y)) ## we gained 2 regions with health data
+
+ggplot(compare_habitat_health, aes(x = health.y, y = health.x)) +
+  geom_point() +
+  geom_abline() +
+  labs(title = "mangrove Habitat version old (v2015) vs new (v2021)", x = "old health", y=  "new health") +
+  theme_bw()
+
+```
+
+
+

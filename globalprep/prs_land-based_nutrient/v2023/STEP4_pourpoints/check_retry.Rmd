@@ -1,0 +1,90 @@
+---
+title: 'OHI 2021 - Check retry run'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../workflow/templates/ohi_hdr.html' 
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Initial set-up code
+
+```{r setup, eval = FALSE}
+library(tidyverse)
+library(raster)
+library(sf)
+library(mapview)
+library(janitor)
+library(here)
+library(parallel)
+library(doParallel)
+# install.packages("nngeo")
+library(nngeo)
+
+
+source(here('workflow/R/common.R'))
+
+ww_raw_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/raw"
+ww_intermediate_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/interim"
+prs_int_dir <- "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int"
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+
+
+```
+
+## 1. Correct the global pourpoints file so that it will not be masked out of the plume model
+
+NOTE: for v2022, you can likely skip step 1 of this script and move directly to step 2. 
+
+Create list of missing pourpoints 
+
+```{r}
+## read in input file
+pp_2019_all <- st_read(file.path(prs_int_dir, "pourpoints/pourpoints_crop_manure_leached_volt_N_2019.shp"))
+
+sum(pp_2019_all$effluent) # 16914573
+
+old_ocean_rast <- raster("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int/ocean_masks/ocean_mask_1km.tif")
+
+old_ocean_rast
+
+new_ocean_rast <- raster("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/raw/ocean_mask.tif")
+
+new_ocean_rast
+
+# read in plumed file 
+test <- raster("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/ocean_rast_retry/N_plume/pourpoints_crop_manure_leached_volt_N_2019_joined.tif")
+cellStats(test, "sum", na.rm = TRUE) # 16798460
+
+16914573 - 16798460 # 116113
+
+fils_retry <- data.frame(x = list.files("/home/sgclawson/plumes/output1/", pattern="tif$", full.names = FALSE, recursive = TRUE))
+
+pourpoint_names_files <- data.frame(fils = sub('.*plume_effluent_', '', fils_retry$x))
+
+pourpoint_names <- data.frame(basin_id = sub('.tif', '', pourpoint_names_files$fils)) %>%
+  mutate(basin_id = as.character(basin_id)) %>%
+  dplyr::filter(str_detect(basin_id, "subsets", negate = TRUE))
+
+not_included <- c(setdiff(pp_2019_all$basin_id, pourpoint_names$basin_id)) # so there were 217 pourpoints not included
+
+c(setdiff(pourpoint_names$basin_id, pp_2019_all$basin_id)) # should be 0 
+
+## filter input file for those not included 
+excluded_pps <- pp_2019_all %>%
+  filter(basin_id %in% not_included)
+
+sum(excluded_pps$effluent) # 2470.856
+```
+

@@ -1,0 +1,433 @@
+---
+title: "OHI 2021: Natural Products, Preparing catch and B/Bmsy data for forage fish species"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+[REFERENCE RMD FILE: http://ohi-science.org/ohiprep_v2021/globalprep/np/v2021/STEP1c_np_fishfeed_prep.html]
+
+# Summary
+
+This script takes the SAUP 2021 catch data, a list of fish oil/fish meal (FOFM) species, and B/Bmsy estimates to calculate a score for FOFM species per OHI region. The FIS data prep will need to be completed prior to this data prep.  
+
+## Updates from previous assessment
+
+Deleted the underharvest penalty for the FOFM bbmsy scores (and for FIS and AO bbmsy). Updated fisheries and RAM data.
+
+***
+
+# Data Source
+
+**Reference**: Pauly D., Zeller D., Palomares M.L.D. (Editors), 2020. Sea Around Us Concepts, Design and Data (seaaroundus.org).
+
+**Downloaded**: August 24, 2021
+
+**Description**: Tons per year and SAUP region with information on sector type, industry type, fishing entitity, reporting status and taxonomic information. 
+
+**Time range**: 1950 - 2018
+
+**Format**: CSV
+
+**Additional Information**: [Methods](http://www.seaaroundus.org/sea-around-us-methods-index/)
+
+
+**Reference**: Froehlich, H.E., Jacobsen, N.S., Essington, T.E., Clavelle, T., and Halpern, B.S. (2018). Avoiding the ecological limits of forage fish for fed aquaculture. Nature Sustainability 1, 298.
+
+**Downloaded**: July 7, 2020. Obtained from Melanie Frazier (NCEAS). 
+
+**Description**:  List of FOFM species from Watson v3 data. 
+
+**Native data resolution**:   
+
+**Format**:  CSV format
+
+
+**Reference**: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.495
+
+**Downloaded**: 06/03/2021
+
+**Description**: B/Bmsy value by stock and year (other data, which we do not use, are also available in the database)
+
+**Native data resolution**: stock (fish stock, species and region specific)
+
+**Time range**: 1950 - 2018
+
+**Format**: CSV format 
+
+**Additional Information**: We use the finalized b/bmsy layer from OHI-global for this data prep. We do not actually read in the raw RAM data here. 
+
+
+***
+
+## Setup
+
+```{r setup, warning=FALSE, message=FALSE}
+
+knitr::opts_chunk$set(eval=FALSE)
+
+library(here)
+library(tidyverse)
+source(here('workflow/R/common.R'))
+setwd(here())
+
+```
+
+**Steps to this**
+
+1. Subset the forage fish catch stocks for each region/year (keep FAO and OHI rgn ids)
+2. Multiply by 0.70 to reflect the amount going to feed/oils
+3. Join with the final B/Bmsy layer used in the FIS model
+4. Convert the B/Bmsy values to scores (this is done in functions.R)
+5. Apply the underharvest penalty
+6. Take a catch weighted average of B/Bmsy scores for each region/year.
+
+# Step 1 
+
+## Create a master list of forage species
+
+This forage fish list is based on the older Watson fisheries data. Basically, the code takes the list from Froehlich et al. (2018) and then cross references it with the SAUP taxa data and identifies some extra SAUP taxa that appeared to be fish oil/fish meal (FOFM) fish.
+
+The following is a list from:
+Froehlich, H.E., Jacobsen, N.S., Essington, T.E., Clavelle, T., and Halpern, B.S. (2018). Avoiding the ecological limits of forage fish for fed aquaculture. Nature Sustainability 1, 298.
+
+They identify 238 forage fish species which account for >99% of forage fish catches in 2012.
+
+~31 million tons per year of captured forage fish (since 1980).
+
+Get the list of forage fish used for FOFM:
+
+```{r, eval=FALSE}
+
+## Read in Froehlich list of forage fish species
+forage <- read_csv(file.path(here(), "globalprep/np/v2021/raw/msleckman.61.1-CatchMSY_Nis_FAOAreas.csv"))
+sort(unique(forage$Species)) #238 forage fish groups listed
+
+saup_taxonkey <- read.csv(file.path(here(), "globalprep/fis/v2021/int/taxon_key_v2021.csv"))
+  
+## Combined list:
+foragefish_list <- data.frame(forage_fish = sort(unique(c(unique(forage$Species), saup_taxonkey$TaxonName[saup_taxonkey$forage_fish %in% 1]))))
+
+foragefish_list <- data.frame(forage_fish = sort(unique(forage$Species)))
+
+foragefish_list <- foragefish_list %>%
+  mutate(forage_fish = case_when(
+    forage_fish == "Ammodytes spp" ~ "Ammodytes",
+    forage_fish == "Clupea pallasii" ~ "Clupea pallasii pallasii",
+    forage_fish == "Clupeoidei" ~ "Clupeoids", 
+    forage_fish == "Decapterus spp" ~ "Decapterus", 
+    forage_fish == "Diplodus argenteus" ~ "Diplodus argenteus argenteus",
+    forage_fish == "Etrumeus teres" ~ "Etrumeus sadina",
+    forage_fish == "Gadiculus argenteus" ~ "Gadiculus argenteus thori",
+    forage_fish == "Gymnocephalus cernuus" ~ "Gymnocephalus cernua",
+    forage_fish == "Mullus barbatus" ~ "Mullus barbatus barbatus",
+    forage_fish == "Patagonotothen brevicauda" ~ "Patagonotothen brevicauda brevicauda",
+    forage_fish == "Rioraja agassizi" ~ "Rioraja agassizii",
+    forage_fish == "Sardinella spp" ~ "Sardinella", 
+    forage_fish == "Trachurus spp" ~ "Trachurus",
+    TRUE ~ forage_fish
+  )) %>% # fix some name issues in the forage fish list to match the names in SAUP 
+  left_join(saup_taxonkey, by = c("forage_fish" = "TaxonName")) %>% 
+   mutate(inSAUP = ifelse(is.na(TaxonKey), NA, "yes")) ## Now only 9 missing spp.. this is good enough! Note: some of the species that are listed as in the SAUP data, are actually not in the SAUP data. This is because this forage fish list was originally derived from the Watson data, and there are some Watson species which are not in the SAUP data. This is not a problem.
+
+write.csv(foragefish_list, here("globalprep/np/v2021/int/master_taxa_list_SAUP.csv"), row.names=FALSE)
+
+```
+
+## Read in v2021 catch data 
+```{r}
+file <- file.path(dir_M,'git-annex/globalprep/fis/v2021/int/stock_catch_by_rgn_taxa.csv')
+
+catch <- read.csv(file) %>%
+  rename(common = CommonName, fao_id = fao_rgn, species=TaxonName)
+
+summary(catch)
+
+
+## filter out non ohi eez regions if there are any
+catch <- catch %>%
+  filter(!is.na(rgn_id)) %>%
+  filter(!is.na(fao_id)) %>%
+  filter(rgn_id <= 250) %>%
+  filter(rgn_id != 213)
+
+```
+
+## Subset the v2021 catch data for our forage fish species 
+
+```{r}
+## need to get TaxonKey's for each species to join with catch
+
+foragefish_list <- read.csv(here("globalprep/np/v2021/int/master_taxa_list_SAUP.csv"))
+
+missing_spp <- foragefish_list %>%
+  filter(is.na(TaxonKey))
+
+# test <- catch %>%
+#   filter(str_detect(paste(missing_spp$forage_fish, collapse = "|"), species)) # just make sure the NA species are actually not in the SAUP data 
+# sort(unique(test$species)) # no full matches.. 
+
+
+forage_fish_taxa_list <- foragefish_list %>%
+  left_join(catch, by = c("forage_fish" = "species", "TaxonKey")) %>%
+  dplyr::select(forage_fish, inSAUP, TaxonKey) %>%
+  unique() %>%
+  mutate(inSAUP = ifelse(
+   is.na(TaxonKey), NA, inSAUP))
+
+## save a list of species not in SAUP data for bookkeeping
+forage_fish_no_saup <- forage_fish_taxa_list %>%
+  filter(is.na(TaxonKey)) 
+
+write.csv(forage_fish_no_saup, file.path(here(), "globalprep/np/v2021/int/forage_fish_not_in_SAUP.csv"), row.names = FALSE)
+
+
+## now join with catch data set 
+catch_fishfeed <- catch %>%
+  left_join(forage_fish_taxa_list, by = c("TaxonKey")) %>%
+  dplyr::filter(!is.na(forage_fish))
+
+write.csv(catch_fishfeed, file.path(here(), "globalprep/np/v2021/int/saup_catch_forage_fish.csv"), row.names = FALSE)
+
+test <- catch_fishfeed %>%
+  group_by(year) %>%
+  summarise(sum = sum(tons)) ## looks good.. ~30 million per year
+```
+
+# Step 2 
+
+## Multiply by 0.90 to reflect the amount going to feed/oils, and not the amount going to human consumption (that is accounted for in food provision)
+
+Justification from the [Froelich et al. 2018](https://www.nature.com/articles/s41893-018-0077-1#Sec11): "Currently, it is estimated about 10% of forage fish enter the human diet directly, but the notoriously tiny-boned fish are labour intensive (thus expensive) to process for human consumption, are the foundation of several industries and thus jobs (creating inertia to change) and are not the preferred fish type for most people."
+
+```{r}
+catch_fishfeed <- read_csv(file.path(here(),"globalprep/np/v2021/int/saup_catch_forage_fish.csv"))
+
+catch_non_human <- catch_fishfeed %>% 
+  mutate(tons_non_human = tons*0.9)
+
+catch_non_human <- catch_non_human %>%
+  dplyr::select(year, rgn_id, fao_id, stock_id, TaxonKey, tons_non_human) %>%
+  group_by(rgn_id, fao_id, TaxonKey, stock_id, year) %>%
+  summarize(catch_non_human = sum(tons_non_human)) %>%
+  ungroup()
+
+test <- catch_non_human %>%
+  group_by(year) %>%
+  summarise(sum = sum(catch_non_human)) # looks good ~30 mil per year
+  
+## these data have no zero catch values, so add years with no reported catch to data table:
+catch_zeros <- catch_non_human %>%
+  spread(year, catch_non_human) %>%
+  data.frame() %>%
+  gather("year", "catch_non_human", num_range("X", min(catch_non_human$year):max(catch_non_human$year))) %>%
+  mutate(year = as.numeric(gsub("X", "", year))) %>%
+  mutate(catch_non_human = ifelse(is.na(catch_non_human), 0, catch_non_human))
+
+## this part eliminates the zero catch values prior to the first reported non-zero catch   
+catch_zeros <- catch_zeros %>%
+  group_by(fao_id, TaxonKey, stock_id, rgn_id) %>%
+  arrange(year) %>%
+  mutate(cum_catch = cumsum(catch_non_human)) %>%
+  filter(cum_catch > 0) %>%
+  dplyr::select(-cum_catch) %>%
+  ungroup()
+
+# Calculate mean catch for ohi regions (using data from 1980 onward). These data are used to weight the RAM b/bmsy values 
+mean_catch <- catch_zeros %>%
+  filter(year >= 1980) %>%
+  group_by(rgn_id, fao_id, TaxonKey, stock_id) %>%
+  mutate(mean_catch_non_human = mean(catch_non_human, na.rm=TRUE)) %>% # mean catch for each stock (in a specific ohi-fao region)
+  filter(mean_catch_non_human != 0)  %>%      ## some stocks have no reported catch for time period
+  ungroup()
+
+options(scipen = 999) # to prevent taxonkey from turning into scientific notation
+
+mean_catch_FOFM <- mean_catch %>%
+  mutate(stock_id_taxonkey = paste(stock_id, TaxonKey, sep="_")) %>%
+  dplyr::select(rgn_id, stock_id_taxonkey, year, catch_non_human) %>%
+  filter(year >= 2001) %>%  # filter to include only analysis years
+  data.frame() %>%
+  rename(catch = catch_non_human)
+
+write.csv(mean_catch_FOFM,  file.path(here(), "globalprep/np/v2021/int/mean_catch_FOFM.csv"), row.names = FALSE)
+```
+
+# Steps 3/4/5/6
+
+## Join with the final B/Bmsy layer from the fis model, convert the B/Bmsy values to scores (this is done in functions.R for FIS subgoal, but we do it in the dataprep for NP), apply the underharvest penalty, and take a catch weighted average of B/Bmsy scores for each region/year.
+
+```{r}
+fis_bbmsy <- read_csv(file.path(here(), "globalprep/fis/v2021/output/fis_bbmsy.csv"))
+
+fis_bbmsy_gf <- read.csv(file.path(here(), "globalprep/fis/v2021/output/fis_bbmsy_gf.csv"))
+
+catch_FOFM <- read_csv(file.path(here(), "globalprep/np/v2021/int/mean_catch_FOFM.csv")) 
+
+
+b <- fis_bbmsy %>%
+  dplyr::mutate(bbmsy = ifelse(bbmsy > 1 , 1, bbmsy)) # no underharvest penalty anymore! 
+
+c <- catch_FOFM %>%
+    dplyr::mutate(stock_id_taxonkey = as.character(stock_id_taxonkey)) %>%
+    dplyr::mutate(taxon_key = sub('.*_', '', stock_id_taxonkey)) %>%
+    dplyr::mutate(stock_id = sub('_[^_]*$', '', stock_id_taxonkey)) %>%
+    dplyr::mutate(catch = as.numeric(catch)) %>%
+    dplyr::mutate(year = as.numeric(as.character(year))) %>%
+    dplyr::mutate(region_id = as.numeric(as.character(rgn_id))) %>%
+    dplyr::mutate(taxon_key = as.numeric(as.character(taxon_key))) %>%
+    dplyr::select(region_id, year, stock_id, taxon_key, catch)
+
+
+b <- b %>%
+    dplyr::mutate(bbmsy = as.numeric(bbmsy)) %>%
+    dplyr::mutate(region_id = as.numeric(as.character(rgn_id))) %>%
+    dplyr::mutate(year = as.numeric(as.character(year))) %>%
+    dplyr::mutate(stock_id = as.character(stock_id))
+  
+
+####
+  #  Calculate scores for Bbmsy values
+  ####
+  #  *************NOTE *****************************
+  #  These values can be altered
+  #  ***********************************************
+
+## The upper limit can be deleted, since we already cap pedscores at 1 anyways. We still want to keep the lower buffer.
+
+  alpha <- 0.5
+  beta <- 0.25
+  lowerBuffer <- 0.95
+  upperBuffer <- 1.05
+  
+  b$score = ifelse(
+    b$bbmsy < lowerBuffer,
+    b$bbmsy,
+    ifelse (b$bbmsy >= lowerBuffer &
+              b$bbmsy <= upperBuffer, 1, NA)
+  )
+  b$score = ifelse(!is.na(b$score),
+                   b$score,
+                   ifelse(
+                     1 - alpha * (b$bbmsy - upperBuffer) > beta,
+                     1 - alpha * (b$bbmsy - upperBuffer),
+                     beta
+                   ))
+  
+  
+  ####
+  # Merge the b/bmsy data with catch data
+  ####
+  data_fis <- c %>%
+    dplyr::left_join(b, by = c('region_id' = 'rgn_id', 'stock_id', 'year')) %>%
+    dplyr::select(rgn_id = region_id, stock_id, year, taxon_key, catch, bbmsy, score)
+  
+  
+  ###
+  #  Estimate scores for taxa without b/bmsy values
+  # Mean score of other fish in the region is the starting point
+  # Then a penalty is applied based on the level the taxa are reported at
+  ###
+  
+  ## this takes the mean score within each region and year
+  data_fis_gf <- data_fis %>%
+    dplyr::group_by(rgn_id, year) %>%
+    dplyr::mutate(mean_score = mean(score, na.rm = TRUE)) %>%
+    dplyr::ungroup()
+  
+  ## this takes the mean score across all regions within a year
+  # (when no stocks have scores within a region)
+  data_fis_gf <- data_fis_gf %>%
+    dplyr::group_by(year) %>%
+    dplyr::mutate(mean_score_global = mean(score, na.rm = TRUE)) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(mean_score = ifelse(is.na(mean_score), mean_score_global, mean_score)) %>%
+    dplyr::select(-mean_score_global)
+  
+   #  *************NOTE *****************************
+  #  In some cases, it may make sense to alter the
+  #  penalty for not identifying fisheries catch data to
+  #  species level.
+  #  ***********************************************
+  
+ penaltyTable <- data.frame(TaxonPenaltyCode = 1:6,
+                             penalty = c(0.1, 0.25, 0.5, 0.8, 0.9, 1))
+  
+  data_fis_gf <- data_fis_gf %>%
+    dplyr::mutate(TaxonPenaltyCode = as.numeric(substring(taxon_key, 1, 1))) %>%
+    dplyr::left_join(penaltyTable, by = 'TaxonPenaltyCode') %>%
+    dplyr::mutate(score_gf = mean_score * penalty) %>%
+    dplyr::mutate(method = ifelse(is.na(score), "Mean gapfilled", NA)) %>%
+    dplyr::mutate(gapfilled = ifelse(is.na(score), 1, 0)) %>%
+    dplyr::mutate(score = ifelse(is.na(score), score_gf, score))
+  
+  
+  gap_fill_data <- data_fis_gf %>%
+    dplyr::select(rgn_id,
+           stock_id,
+           taxon_key,
+           year,
+           catch,
+           score,
+           gapfilled,
+           method) 
+  
+  write.csv(gap_fill_data, here('globalprep/np/v2021/output/NP_bbmsy_summary_gf.csv'), row.names = FALSE)
+  
+  score_data <- data_fis_gf %>%
+    dplyr::select(rgn_id, stock_id, year, catch, score)
+  
+   ###
+  # Calculate status for each region
+  ###
+
+  ## Take a catch weighted average of B/Bmsy scores for each region/year.
+
+  score_data <- score_data %>%
+    dplyr::group_by(year, rgn_id) %>%
+    dplyr::mutate(SumCatch = sum(catch)) %>%
+    dplyr::ungroup()  
+  
+  score_data <- score_data %>%
+    dplyr::group_by(rgn_id, year) %>%
+    dplyr::summarize(score = weighted.mean(score, catch)) %>%
+    dplyr::ungroup() 
+
+summary(score_data)
+
+write.csv(score_data, here('globalprep/np/v2021/output/np_fofm_scores.csv'), row.names = FALSE)
+
+
+old <- read_csv(here('globalprep/np/v2021/archive/np_fofm_scores.csv')) 
+summary(old)
+
+new <- read_csv(here('globalprep/np/v2021/output/np_fofm_scores.csv'))
+
+
+# old_prod_weights <- read_csv("../v2020/output/np_product_weights.csv")
+
+# prod_weights <- read_csv("output/np_product_weights.csv")
+
+check <- new %>%
+  rename("new_score" = "score") %>%
+  left_join(old, by = c("rgn_id", "year")) %>%
+  mutate(diff = new_score - score) %>%
+  filter(year == 2017)
+
+plot(check$new_score, check$score)
+abline(0,1, col="red")
+
+```

@@ -1,0 +1,140 @@
+---
+title: 'OHI 2021: Kelp extent'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+This script generates the extent of kelp for each OHI region for the latest year of data. We do this using polygon data. We extract the area of each polygon per each ohi region using our combined land and eez raster. 
+
+
+## Updates from previous assessment
+This is an entirely new layer for the 2021 assessment! 
+
+***
+## Data Source 
+
+**Reference**: Jayathilake, D.R.M., Costello, M.J., 2020. A modelled global distribution of the kelp biome. Biological Conservation 252, 108815. https://doi.org/10.1016/j.biocon.2020.108815
+
+
+**Downloaded**: 04/28/2021 
+
+**Description**:  
+This is a MaxEnt model map of the global distribution of the
+Laminarian kelp biome. This was modelled using 44,265 cleaned
+primary occurrence records from the Global Biodiversity
+Information Facility (GBIF), and the Ocean Biodiversity
+Information System (OBIS) and 13 environmental var
+
+https://data.unep-wcmc.org/pdfs/49/A_Modelled_Global_Distribution_of_the_Kelp_Biome_metadata.pdf?1609770367
+
+
+**Time range**: 1900 - 2020 
+
+
+***
+# Methods
+
+
+## Setup
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE, eval = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_kelp/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_wcmc <- file.path(file.path(dir_M, 'git-annex/globalprep/_raw_data/wcmc_kelp'))
+dir_kelp <- file.path(dir_wcmc, "d2020/UniAuk-004-ModelledDistributionKelpBiome")
+ohi_rasters() # call the region zones raster
+regions_shape()
+region_data()
+
+land_ocean <- raster("/home/shares/ohi/git-annex/globalprep/spatial/v2017/regions_land_ocean.tif")
+
+land_ocean
+```
+
+Read in kelp data and explore
+```{r, eval = FALSE}
+
+kelp_shp <- st_read(file.path(dir_kelp, "01_Data/Kelp UNEP.shp"))
+
+mapview(head(kelp_shp))
+
+```
+
+
+Match the data to OHI regions 
+
+```{r, eval = FALSE}
+  
+kelp_moll <- st_transform(kelp_shp, crs = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+
+fasterize_py <- fasterize::fasterize(kelp_moll, raster = land_ocean, 
+                                     field = NULL) # all polygons given value of 1
+
+fasterize_py
+plot(fasterize_py)
+
+print(cellStats(fasterize_py, "sum", na.rm=TRUE)*0.934478877011218970**2) # 1,403,760 km2 - paper says 1,469,900 km2 
+sum(kelp_moll$Shape_Area) # 1.469908e+12 - we are losing about 60000 km2... this seems reasonable though. 
+
+writeRaster(fasterize_py, filename = file.path(dir_M, "/git-annex/globalprep/hab_kelp/v2021/int/py_kelp_rast.tif"), overwrite=TRUE) 
+
+
+# Calculate zonal stats with zones raster and new combined kelp. Convert to km^2 and save int/output files*
+
+zonal_sums_combined <- raster::zonal(fasterize_py, 
+                                     land_ocean,
+                                     fun = "sum",
+                                     na.rm = TRUE,
+                                     progress="text") #sum all kelp cells for each ohi zone
+zonal_sums_combined_df <- data.frame(zonal_sums_combined)
+
+zonal_sums_km2 <- zonal_sums_combined_df %>%
+  mutate(year = 2020, habitat = "kelp",
+         km2 = (0.934478877011218970**2*sum)) %>% #one cell is equal to ~0.93 km
+  rename("rgn_id" = "zone") %>%
+  dplyr::select(-sum) %>% 
+  filter(rgn_id <= 250)
+
+print(sum(zonal_sums_km2$km2)) # 1394773
+
+
+write.csv(zonal_sums_km2, file.path(here("globalprep/hab_kelp/v2021/data/habitat_extent_kelp.csv")), row.names = FALSE)
+
+## make gapfilling file
+
+kelp_extent_gf <- read_csv(file.path(dir_git, "data/habitat_extent_kelp.csv")) %>%
+  mutate(variable = "extent") %>%
+  dplyr::select(-km2, -year) %>%
+  mutate(gap_fill = 0)
+
+write.csv(kelp_extent_gf, file.path(dir_git, "data/extent_kelp_gf.csv"), row.names = FALSE)
+```
+
+

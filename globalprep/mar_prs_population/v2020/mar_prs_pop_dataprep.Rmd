@@ -1,0 +1,490 @@
+---
+title: 'OHI 2020 - Mariculture Population Pressure Layers'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+[REFERENCE RMD FILE](https://ohi-science.org/ohiprep_v2020/globalprep/mar_prs_population/v2020/mar_prs_pop_dataprep.html)
+
+
+# Summary
+
+This document describes the steps for obtaining and wrangling the data used to calculate the mariculture population pressure subdimension for the 2020 global assessment. The general data preparation calculations are summarized [here](http://ohi-science.org/ohi-global/layers.html#inland_coastal_population). For context and explanation see the mariculture (subgoal of food provision) [model summary](http://ohi-science.org/ohi-global/goals.html#food_provision:_mariculture).
+
+# Updates from previous assessment
+New UN population data were updated for v2020. CIESIN data were not updated.
+
+***
+
+# Data Sources
+
+## Gridded Population of the World (v4.11) by CIESE and CIAT
+
+**Reference**: http://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11/data-download
+
+Center for International Earth Science Information Network - CIESIN - Columbia University. 2018. Gridded Population of the World, Version 4 (GPWv4): Population Density Adjusted to Match 2015 Revision UN WPP Country Totals, Revision 11. Palisades, NY: NASA Socioeconomic Data and Applications Center (SEDAC). https://doi.org/10.7927/H4F47M65. Accessed 17 April 2019
+
+**Downloaded**: 17 April 2019
+
+**Description**:
+The Gridded Population of the World, Version 4 (GPWv4): Population Density Adjusted to Match 2015 Revision of UN WPP Country Totals, Revision 11 consists of estimates of human population density (number of persons per square kilometer) based on counts consistent with national censuses and population registers with respect to relative spatial distribution, but adjusted to match the 2015 Revision of the United Nation's World Population Prospects (UN WPP) country totals, for the years 2000, 2005, 2011, 2015, and 2020. A proportional allocation gridding algorithm, utilizing approximately 13.5 million national and sub-national administrative units, was used to assign UN WPP-adjusted population counts to 30 arc-second grid cells. The density rasters were created by dividing the UN WPP-adjusted population count raster for a given target year by the land area raster.  Documentation for gridded population of the world is located [here](http://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11/docs).
+
+**Native data resolution**: 30 arc-seconds
+
+**Time range**: 2000-2020
+
+**Format**: GeoTiff
+
+## UN Population
+
+UN population data is used in this data prep routine to check population counts; spatially distributed counts derived from the gridded world population are aggregated by region and checked against the UN population estimates.
+
+**Reference**: https://esa.un.org/unpd/wpp/
+
+**Downloaded**: 26 June 2020
+
+**Description**: Population (in thousands) for countries.
+
+**Native data resolution**: Country scores
+
+**Time range**: 1950-2020
+
+**Format**: Excel file
+
+**Data cleaning process**: Values from the "ESTIMATES" tab of "WPP2019_POP_F01_1_TOTAL_POPULATION_BOTH_SEXES.xlsx" were copied for all countries and years (1950-2020) and pasted into new "UN_pop_clean_v2020.csv".
+
+***
+
+# Setup
+
+Load all relevant libraries including parallel processing packages
+```{r setup, message=FALSE, warning=FALSE, verbose=FALSE, eval=FALSE}
+
+## Set options for all chunks in code
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width = 6, fig.height = 4, fig.path = "figs/")
+
+## Load packages, installing them first where necessary
+pkg <- c("raster", "rgdal", "sp", "sf", "fasterize", "tidyverse", "foreach", "parallel","doParallel")
+new_pkg <- pkg[!(pkg %in% installed.packages())]
+if (length(new_pkg)){install.packages(new_pkg)}
+if (!("ohicore" %in% installed.packages())){devtools::install_github("ohi-science/ohicore")}
+
+library(ohicore)
+
+## Spatial libraries
+library(raster)
+library(rgdal)
+library(sp)
+library(sf)
+library(fasterize)
+
+## Data wrangling libraries
+library(tidyverse)
+library(here)
+library(plotly)
+
+## Parallel processing libraries
+library(parallel)
+library(foreach)
+library(doParallel)
+
+```
+
+Define frequently used pathnames. Change scenario and data years in file pathnames code chunk to reflect the most recent data (d) and current assessment year (v).
+```{r file paths, eval=FALSE}
+
+## Source common and spatial common files
+source('http://ohi-science.org/ohiprep_v2020/workflow/R/common.R')
+
+## Update these!
+scenario_yr <- "v2020" # change to reflect assessment year!
+data_yr_gpw <- "d2019" # change to reflect year of most recently downloaded Gridded Population of the World (GPW) data! (no change for v2020)
+data_yr_un_pop <- "d2020" # change to reflect year of most recently downloaded UN population data! (updated for v2020)
+
+## Define commonly used file paths (matched to what we did in ico_data_prep.Rmd)
+dir_server <- file.path(dir_M, "git-annex/globalprep/_raw_data")
+dir_github <- here("/globalprep/mar_prs_population", scenario_yr)
+
+## Checking to see if there is a README in the mar_prs_pop and mar_prs_pop/v20?? folders - all goal prep files will need a README!
+if(!file.exists(file.path(dir_github, 'README.md'))) {
+  warning(sprintf('No README detected in %s', dir_github))
+}
+if(!file.exists(file.path(dirname(dir_github), 'README.md'))) {
+  warning(sprintf('No README detected in %s', file.path(dirname(dir_github))))
+}
+
+```
+
+## Import Raw Data
+
+```{r import raw data, eval=FALSE}
+
+## Read in the raw density data to be reprojected and resampled
+raw <- list.files(file.path(dir_server, sprintf("CIESEandCIAT_population/%s", data_yr_gpw)),
+                  full.names = TRUE, pattern = "\\.tif$",
+                  recursive = TRUE)
+raw <- raw[grep("density", raw)] # keep only the files that include the word "density"
+raw # check that this looks correct; can double check with the folder on Mazu server folder
+
+ohi_rasters() # loads rasters
+# eez_raster <- zones # sourced from ohi_rasters()
+
+## Import raw, cleaned UN population data to be wrangled then used to confirm gpw-derived spatial population
+pop <- read.csv(file.path(dir_server, 
+                          sprintf("UnitedNations_population/%s/UN_pop_clean_v2020.csv", data_yr_un_pop)), # change year if updated
+                strip.white = TRUE, stringsAsFactors = FALSE)
+
+```
+
+# Methods and Calculations
+
+## Reproject and Resample
+
+Gridded world population densities from CIESE and CIAT are projected into the World Mollweide coordinate reference system and resampled using nearest neighbor method to match the ocean raster which is sourced from spatial_commons.R and has 934.4789 x 934.4789 meter resolution.
+
+```{r manipulate spatial data, eval=FALSE}
+
+## Resample resolution and CRS of population data, convert year to numeric, project rasters and save human_density_year_mol.tifs to server with these updates
+# Use temporary file path name (_tmp.tif) so that R isn't trying to load and write the same file within the loop - MAKE SURE TO DELETE THESE FILES AFTER THE LOOP IS COMPLETE! 
+# Set up a loop to go through raw data frame, convert to a mollweide CRS:
+
+cl <- makeCluster(5) # 5 clusters for 5 files being targeted
+registerDoParallel(cl)
+foreach(i = raw, .packages = c("raster", "rgdal", "stringr")) %dopar% {
+#  i = raw[1] # send this down alone and check to see which file it calls; see if there are any errors in file naming
+  yr <- as.numeric(as.character(str_sub(i, -17, -14))) # counts backwards by character in file name to grab the year digits
+  raster::raster(i) %>% # read in file path to raster
+    raster::projectRaster(crs = crs(ocean), res = res(ocean), over = TRUE, method = "ngb", # convert large grids to small grids using nearest neighbor method
+                          filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_density_%s_mol_tmp.tif", scenario_yr, yr)), # write to the server because the files are so large
+                          overwrite = TRUE, progress = "text")
+  
+raster::raster(file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_density_%s_mol_tmp.tif", scenario_yr, yr))) %>% 
+  raster::resample(ocean, method = 'ngb', overwrite = TRUE, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_density_%s_mol.tif", scenario_yr, yr)))
+} 
+
+# This takes a while to run: ~30-45 min; will generate some warnings
+
+# Read in the created resampled raster and make sure it matches the eez_25mi_inland raster (projection and extents)
+
+stopCluster(cl)
+closeAllConnections()
+
+```
+
+## Interpolate between Years
+
+GWPv4 data is for years 2005, 2010, 2015, and 2020. Data for missing years must be generated by interpolation.
+
+```{r functions for interpolation, eval=FALSE}
+
+## Define and apply function to calculate yearly change in population density
+files <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2020/int"), pattern = "human_density_\\d{4}_mol.tif$", full = TRUE)
+
+## Create function for average yearly change
+yearly_diff <- function(year_min, year_max, density_files = files){
+  rast_diff <- stack(density_files[grep(year_max, density_files)], density_files[grep(year_min, density_files)]) %>%
+    overlay(fun = function(x, y){(x - y)/5},
+            filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/yearly_change_%s_to_%s.tif", scenario_yr, year_min, year_max)),
+            overwrite = TRUE)
+}
+
+
+## Create four rasters for each set of data
+yearly_diff(year_min = 2000, year_max = 2005) # this should save 2001, 2002, 2003, etc to estimate intervening years using a linear model - check to make sure it's being saved in the Mazu directory properly
+yearly_diff(year_min = 2005, year_max = 2010)
+yearly_diff(year_min = 2010, year_max = 2015)
+yearly_diff(year_min = 2015, year_max = 2020) # this last one wouldn't run; copied the tif from v2019 since it's the same data
+
+
+## Define and apply function to interpolate population densities for years between years in dataset
+# Apply the difference to each year, overwrite as new rasters
+# Can double check this by running just one (i = 1)
+yearly_interpolate <- function(year, start_raster, yearly_change){
+    for(i in 1:4){
+      # i = 1 send this down to see what the loop produces when i=1 
+      raster::overlay(raster::raster(start_raster), raster::raster(yearly_change), fun = function(x, y){(x + i*y)},
+              filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_density_%s_mol.tif", scenario_yr, (year+i))),
+              overwrite = TRUE)
+    }
+}
+
+
+## Interpolate missing years
+files <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2020/int"), pattern = ".tif$", full = TRUE)
+
+for(i in c(2000, 2005, 2010, 2015)) {
+  yearly_interpolate(i, start_raster = files[grep(sprintf("density_%s_mol",i), files)],
+                     yearly_change = files[grep(sprintf("change_%s_to_%s", i, i+5), files)])
+}
+
+# If getting a "Cannot create a RasterLayer object from this file" error after running this loop, check that previously-created _tmp.tif files have been deleted from the mazu directory
+
+# Check a random raster from the mazu directory
+density_2018 <- raster(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2020/int/human_density_2018_mol.tif"))
+plot(density_2018)
+
+```
+
+## Convert Density to Population Counts
+
+Density data are converted to population by multiplying density times the area of the cell (934.4789 x 934.4789m) and converting to square km from square meters, to get people per square km. GWPv4 provides both densities and population counts. However, we derive population counts from density because the density data is independent of raster scale, so we can reproject/resample and it will still be correct. Change the scale using count data, and it is necessary to correct by dividing by cell area otherwise the values become meaningless; it is easier to just start with density.
+
+```{r convert density data to population count, eval=FALSE}
+
+den_raster <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2020/int"), pattern = "density_\\d{4}_mol.tif$", full = TRUE)
+den_raster # check to make sure this looks correct; should only have human_density tif files for each interpolated year
+
+cl <- makeCluster(5)
+registerDoParallel(cl)
+
+foreach(i = den_raster, .packages = c("raster", "rgdal", "stringr")) %dopar% {
+  # i = den_raster[1] - does i generate the 2000 raster?
+  nm <- basename(i)
+  yr <- stringr::str_sub(nm, -12, -9) # pulls out the year from the file name
+  cat(nm)
+  tmp <- raster::raster(i) # reads in raster
+  raster::calc(tmp, fun = function(x){x * (934.4789 * 934.4789 * 0.000001)}, # convert to m2 from km2
+       filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/v2020/int/human_count_%s_mol.tif", yr)),
+       overwrite=TRUE) # writes a human count raster to the intermediate folder
+}
+stopCluster(cl)
+closeAllConnections()
+
+```
+
+## Load EEZ + 25-mile Inland Raster
+
+```{r create eez + 25-mile inland raster, eval=FALSE}
+
+# No longer using shape files, raster only
+
+# Raster
+eez_25mi_inland <- raster(file.path(dir_M, "git-annex/globalprep/spatial/v2019/ocean_plus25mile_inland.tif")) # last updated v2019
+
+## Make sure that the layers make sense!
+plot(eez_25mi_inland) # will appear to only feature the Antarctic ocean; can check that gray area actually has data. Because we don't include this region in the OHI, the raster has CCAMLR IDs for points in this region, which appear to have high region ID values.
+click(eez_25mi_inland)
+# Click on gray areas on the map and region IDs will pop up - the data are there! 
+
+# Want to make sure we're including 10km inland - zoom in on smaller region using zoom()
+zoom(eez_25mi_inland)
+# Once you select a small area to zoom in on, you can layer the outline of the land and EEZ boundaries to make sure the EEZ goes 10km inland:
+regions_shape()
+plot(regions[1], color = NA, add = TRUE)
+
+```
+
+
+## Append or Extract by OHI Regions
+
+Stack rasters of population counts for each year, sum within regions (using eez_25mi_inland) for each year, and save this as `coastal_pop_zonal_sums.csv` in the intermediate folder. Gather this into long format dataframe, and save as `output/mar_pop_25mi.csv`.
+
+```{r extract population data from all population layers, eval=FALSE}
+
+pop_rasters <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2020/int"), pattern = "count_\\d{4}_mol.tif$", full = TRUE) # should list all the human_count files in folder
+
+pop_stack <- raster::stack(pop_rasters) # stack human_count rasters 2000-2020
+
+coastal_pop <- raster::zonal(pop_stack, eez_25mi_inland, fun="sum", progress="text") # sum within zones (regions as specified by eez_25mi_inland)
+
+coastal_pop <- as.data.frame(coastal_pop)
+
+write_csv(coastal_pop, file.path(here("globalprep/mar_prs_population/v2020/int/coastal_pop_zonal_sums.csv"))) # do we need to save this as intermediate data?
+
+## Organize data to have a population sum for each region and each year
+coastal_pop2 <- data.frame(coastal_pop) %>%
+  tidyr::gather("year", "coastal_pop_25mi", -1) %>%
+  dplyr::select(rgn_id = zone, year = year, popsum = coastal_pop_25mi) %>%
+  dplyr::mutate(year = as.numeric(substring(year, 13, 16))) %>% # extract numeric portion of year_####
+  dplyr::filter(rgn_id <= 250)
+
+write_csv(coastal_pop2, file.path(here("globalprep/mar_prs_population/v2020/output/mar_pop_25mi.csv")))
+
+```
+
+## Calculate Area of 25mi Inland Buffers
+
+```{r calculate area and mar. pressure, eval=FALSE}
+
+# Load in data calculated in spatial folder 
+area <- read_csv(here("globalprep/spatial/v2019/output/area_km2_25mi_inland.csv")) # last updated v2019
+
+```
+
+## Calculate Mariculture Population Pressure
+
+```{r calculate mar. population pressure, eval=FALSE}
+
+## Rescale organized coastal population data
+pop_rescaled <- coastal_pop2 %>%
+  left_join(area, by="rgn_id") %>%
+  mutate(density = popsum/area_km2) %>%
+  mutate(ln_density = log(density + 1)) %>%
+  mutate(scalar = max(ln_density, na.rm = TRUE)) %>%
+  mutate(dens_rescaled = ln_density/scalar) %>%
+  mutate(dens_rescaled = ifelse(dens_rescaled > 1, 1, dens_rescaled))
+
+filter(pop_rescaled, is.na(area_km2)) # no NA values for the area column (Antarctica not included)
+
+pressure_data <- pop_rescaled %>%
+  dplyr::select(rgn_id, year, pressure_score = dens_rescaled)
+
+write_csv(pressure_data, file.path(here("globalprep/mar_prs_population/v2020/output/prs_pop_density.csv")))
+
+```
+
+## Gapfilling
+
+No gapfilling was completed as part of this data prep methodology. Datasets are saved with "_gf" appended just to indicate they are finalized versions.
+
+```{r save prs_pop_density and mar_pop_25mi layers, eval=FALSE}
+
+prs <- read.csv("globalprep/mar_prs_population/v2020/output/prs_pop_density.csv") %>%
+  dplyr::mutate(pressure_score = 0)
+
+write.csv(prs, "globalprep/mar_prs_population/v2020/output/prs_pop_density_gf.csv", row.names = FALSE)
+
+mar <- read.csv("globalprep/mar_prs_population/v2020/output/mar_pop_25mi.csv") %>%
+  dplyr::mutate(popsum = 0)
+
+write.csv(mar, "globalprep/mar_prs_population/v2020/output/mar_pop_25mi_gf.csv", row.names = FALSE)
+
+```
+
+## Data Checks and/or Meta-Analysis
+
+### Create `UN_population.csv` for Data-checking
+
+```{r create un_population.csv, eval=FALSE}
+
+pop_gather <- pop %>%
+  tidyr::gather("year", "population", starts_with("X")) %>%
+  dplyr::mutate(population = gsub(" ", "", population)) %>%
+  dplyr::mutate(year = gsub("X", "", year)) %>%
+  dplyr::mutate(population = as.numeric(as.character(population)) * 1000)
+
+## Ignore Jersey and Guernsey (Channel Islands) for now
+pop_gather_rename <- pop_gather %>%
+  dplyr::mutate(country = ifelse(str_detect(country,"C\\Ste d'Ivoire"), "Cote d'Ivoire", country)) %>%
+  dplyr::mutate(country = ifelse(str_detect(country,"R\\Sunion"), "Reunion", country)) %>%
+  dplyr::mutate(country = ifelse(str_detect(country,"Cura\\Sao"), "Curacao", country)) %>%
+  dplyr::mutate(country = ifelse(country=="China, Taiwan Province of China", "Taiwan", country)) %>%
+  dplyr::mutate(country = ifelse(country=="Dem. People's Republic of Korea", "North Korea", country))
+  
+## Organize the data into regions used in OHI, and save
+pop_rgn <- name_2_rgn(df_in = pop_gather_rename, 
+                      fld_name='country', 
+                      flds_unique=c('year'))
+
+pop_rgn <- pop_rgn %>%
+  dplyr::group_by(rgn_id, year) %>%
+  dplyr::summarize(population = sum(population)) %>%
+  data.frame()
+
+write.csv(pop_rgn, "globalprep/mar_prs_population/v2020/output/UN_population.csv", row.names = FALSE)
+
+```
+
+### Compare `UN_population` with Calculated Count
+
+```{r check full calculated population against latest UN population data, eval=FALSE}
+
+compare_yr <- 2015 # doing below functions for comparison between raster and UN population data for 2015
+
+## Sum counts regionally for the scenario year
+pop_rast <- raster(file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, compare_yr)))
+zones <- raster(file.path(dir_M, "git-annex/globalprep/spatial/v2017/regions_land_ocean.tif")) # pulling from 2017 server data
+pop_counts <- zonal(pop_rast, zones, fun = "sum", na.rm = TRUE, progress="text")
+
+pop_UN <- pop_rgn %>%
+  dplyr::filter(year == compare_yr) %>%
+  dplyr::select(rgn_id, pop_UN = population)
+
+## Join filtered UN population and summed calculated counts
+compare_pop <- data.frame(pop_counts) %>%
+  dplyr::select(rgn_id = zone, pop_rast = sum) %>%
+  dplyr::left_join(pop_UN, by="rgn_id") %>% 
+  filter(!is.na(pop_UN))
+
+## Check plot - investigate outliers (post to issue first)
+pop_compare_plot <- ggplot(compare_pop) +
+  geom_point(aes(pop_rast, pop_UN, label = rgn_id), alpha = .6) +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(x = sprintf('Calculated Population %s', compare_yr),
+       y = sprintf('UN Population %s', compare_yr),
+       title = 'Population Comparison')
+ggplotly(pop_compare_plot)
+
+## Plot log values of same comparison
+pop_compare_log <- ggplot(compare_pop) +
+  geom_point(aes(log(pop_rast), log(pop_UN), label = rgn_id), alpha = .6) +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(x = sprintf('Log of Calculated Population %s', compare_yr),
+       y = sprintf('Log of UN Population %s', compare_yr),
+       title = 'Population Comparison (log values)')
+ggplotly(pop_compare_log)
+
+```
+
+### Compare to Previous Year
+
+```{r comparison, eval=FALSE}
+
+prev_scen_yr <- paste0("v", as.numeric(substr(scenario_yr, 2, 5)) -1)
+
+old <-  read_csv(here('globalprep/mar_prs_population/v2019/output/mar_pop_25mi.csv')) %>% 
+  dplyr::select(rgn_id, year, popsum_old=popsum)
+
+tmp <- coastal_pop2 %>%
+  dplyr::left_join(old, by=c("rgn_id", "year"))
+
+years_compare_plot <- ggplot(tmp) +
+  geom_point(aes(log(popsum), log(popsum_old), label = rgn_id), alpha = .6) +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(x = sprintf('Log of Calculated Population %s', scenario_yr),
+       y = sprintf('Log of Calculated Population %s', prev_scen_yr),
+       title = 'Population comparison between assessments')
+ggplotly(years_compare_plot)
+
+```
+
+```{r check_areas, eval=FALSE}
+
+## Compare area with that calculated in previous year (should look very similar)
+
+# v2018: old_area <- read.csv(paste0(prev_scen_yr, "/rgn_area_inland25mi.csv")) %>%
+old_area <- read_csv(here('globalprep/mar_prs_population/v2019/int/area_km2_25mi.csv')) %>%
+  rename(old_area_km2 = area_km2) %>%
+  dplyr::mutate(old_area_km2 = round(old_area_km2)) %>%
+  dplyr::left_join(area, by = "rgn_id")
+
+area_compare_plot <- ggplot(old_area) +
+  geom_point(aes(area_km2, old_area_km2, label = rgn_id), alpha = .6) +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(x = sprintf('%s Area (km2)', scenario_yr),
+       y = sprintf('%s Area (km2)', prev_scen_yr),
+       title = 'Area Calculation Comparison')
+ggplotly(area_compare_plot)
+
+
+summary(old_area)
+
+```
+
+
+
+***

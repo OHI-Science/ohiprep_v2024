@@ -1,0 +1,159 @@
+---
+title: "OHI 2022: Excess nutrients from manure"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Summary 
+Creates rasters for all livestock system of 1) amount of N excreted in manure and 2) amount of P excreted in manure.
+
+## Data
+
+ - Animal farm location tifs from NCEAS Global Food project. 
+ - N/P excretion from FAOSTAT
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(here)
+library(stringr)
+library(janitor)
+
+# source(here("_workflow/common.R"))
+# source(here("_workflow/common_spatial.R"))
+
+source(here('workflow/R/common.R'))
+
+region_data()
+
+
+
+nutrient_d2021_anx <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/FAOSTAT/manure_nutrient/d2021/")
+git_manure <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP2_manure")
+git_crop <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP1_crop")
+location_tifs_path <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/halpern_food_systems/d2021/animal_farm/location_tifs")
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+
+source(here(git_crop, "R/common_spatial.R")) # read in necessary spatial files 
+
+un <- read_csv(here("globalprep/spatial/v2021/UNSD_Methodology.csv")) %>% 
+  dplyr::select(iso3c, Global_Name, Region_Name, Sub_region_Name, Intermediate_Region_Name)
+
+
+n_exc <- read_csv(here(git_manure, "int/excretion_rate_gf.csv")) %>% 
+  dplyr::select(-country)
+
+
+# From Food Systems project: "applied an animal system specific N:P conversion calculated from Sheldrick et al. 2001."
+# So this dataset is from Sheldrick et al. 2001. 
+n_to_p <- read.csv(here::here(git_manure, "raw/N_P_cf.csv")) %>% 
+  dplyr::select(animal, product, cf_gf) %>% 
+  unique()
+
+```
+
+
+
+```{r}
+## We will use the animal farm location tifs from the Global food systems project (Halpern et al. 2021; in review)
+files <- list.files(location_tifs_path, full.names = TRUE)
+
+files_buf <- files[str_detect(files, "buff")]
+years <- c(2005:2019)
+
+for(file in files){
+  for(yr in years){
+  
+#  file <- files[1]
+    # yr = 2005
+    
+  animal_name <- str_split(str_split(file, pattern = "/")[[1]][12], pattern = "_")[[1]][1]
+  system_name <- str_split(str_split(file, pattern = "/")[[1]][12], pattern = "_")[[1]][2]
+  product_name <- str_split(str_split(file, pattern = "/")[[1]][12], pattern = "_")[[1]][3]
+  product_name <- str_remove(product_name, ".tif")
+  
+  ## Nitrogen excretion rasters
+  test <- n_exc %>%
+    filter(product == product_name)
+  
+    n_exc_rast <- n_exc %>%
+      filter(animal == animal_name & product == product_name, year == yr) %>% 
+      right_join(food_rgns_xy) %>%
+      dplyr::select(x,y, tonnes_N_head) %>% 
+      rasterFromXYZ(crs = food_crs)
+  
+  rast <- raster(file)
+  
+  n_raster <- rast*n_exc_rast
+  
+  ## Phosphorous excretion rasters
+  n_to_p_cf <- n_to_p %>%
+    filter(animal == animal_name & product == product_name)  %>% 
+    pull(cf_gf)
+
+  p_raster <- calc(n_raster, fun=function(x){x*n_to_p_cf})
+  
+ # plot(log(1+p_raster))
+  
+  raster::writeRaster(n_raster,
+                      file.path(paste(prep, "animal_farm_int/N_from_excretion_manure/", animal_name, "_", system_name, "_", product_name, "_N_excretion_", yr, ".tif", sep = "")),
+                      format = "GTiff",
+                      overwrite = TRUE)
+    
+  raster::writeRaster(p_raster,
+                      file.path(paste(prep, "animal_farm_int/P_from_excretion_manure/", animal_name, "_", system_name, "_", product_name, "_P_excretion_", yr, ".tif", sep = "")),
+                      format = "GTiff",
+                      overwrite = TRUE)
+  }
+}
+
+```
+
+
+Spot check some rasters
+
+```{r}
+
+## couple Ns
+
+N_1 <- raster(file.path(paste(prep,"/animal_farm_int/N_from_excretion_manure/cows_grassland_meat_N_excretion_2017.tif", sep = "")))
+N_2 <- raster(file.path(paste(prep,"/animal_farm_int/N_from_excretion_manure/chickens_industrial_meat_N_excretion_2017.tif", sep = "")))
+N_3 <- raster(file.path(paste(prep,"/animal_farm_int/N_from_excretion_manure/sheep_mixed_milk_N_excretion_2017.tif", sep = "")))
+
+## couple Ps
+P_1 <- raster(file.path(paste(prep,"/animal_farm_int/P_from_excretion_manure/buffaloes_grassland_meat_P_excretion_2017.tif", sep = "")))
+P_2 <- raster(file.path(paste(prep,"/animal_farm_int/P_from_excretion_manure/chickens_industrial_meat_P_excretion_2017.tif", sep = "")))
+P_3 <- raster(file.path(paste(prep, "/animal_farm_int/P_from_excretion_manure/sheep_mixed_milk_P_excretion_2017.tif", sep = "")))
+
+par(mar=c(1,1,1,1))
+plot(log(1+N_1))
+plot(log(1+N_2))
+plot(log(1+N_3))
+
+
+plot(log(1+P_1))
+plot(log(1+P_2))
+plot(log(1+P_3))
+
+# all look good
+
+```
+
+
+
+

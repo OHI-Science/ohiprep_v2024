@@ -1,0 +1,397 @@
+---
+title: "Untitled"
+author: "Gage Clawson"
+date: "5/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(rredlist)
+library(tidyverse)
+library(dplyr)
+library(rgdal)
+library(raster)
+library(here)
+library(ggridges)
+library(ggplot2)
+library(stringr)
+source(here('workflow/R/common.R'))
+
+goal     <- 'spp'
+scenario <- 'v2020'
+
+dir_goal <- here('globalprep', goal, scenario)
+
+### goal specific folders and info
+dir_anx  <- file.path(dir_M, 'git-annex/globalprep')
+dir_setup   <- file.path(dir_goal, '_setup')
+dir_goal_anx <- file.path(dir_anx, goal, scenario, 'spp_risk_dists')
+dir_goal_anx_countries <- file.path(dir_anx, goal, scenario, 'spp_countries')
+
+source(file.path(dir_setup, 'common_fxns.R'))
+```
+
+```{r}
+
+## get past assessments with rl_history
+species_list <- c(22694927, 12392)
+
+#test <- rl_history(name ="Sula leucogaster", key = api_key)
+
+spp_hist_temp <- rl_history(id = 12392, key = api_key) # get a species history
+
+spp_hist_temp2 <- data.frame(cbind(id = spp_hist_temp$name, spp_hist_temp$result)) #combine into one dataset 
+  
+    cat_lookup <- read_csv(file.path(dir_setup, 'raw', 'risk_code_lookup.csv')) # read in the category look up so that old category naming conventions will match todays 
+
+    spp_past_df <- spp_hist_temp2 %>%
+    left_join(cat_lookup, by = c('code', 'category')) %>%
+    rename(iucn_sid = id,
+           old_cat  = code,
+           cat_txt  = category,
+           cat_ts   = code_current) #rename stuff and get scores 
+    
+pop_cat <- data.frame(cat_ts       = c("LC", "NT", "VU", "EN", "CR", "EX", "NE", "DD"), 
+                        cat_ts_score = c( 0.0,  0.2,  0.4,  0.6,  0.8,  1.0,  NA,   NA)) ## define scores again
+  
+    
+  spp_past_df1 <- spp_past_df %>% 
+    left_join(pop_cat, by = 'cat_ts') %>%
+    filter(!is.na(cat_ts_score) & !is.na(year)) %>%
+    arrange(iucn_sid, year) %>%
+    dplyr::select(iucn_sid, year, cat_ts, cat_ts_score) %>%
+    mutate(iucn_version = api_version)
+  
+  
+
+## get narratives 
+  
+  spp_narr_temp <- rl_narrative(id = 12392, key = api_key) # get a species poptrend 
+
+spp_narr_temp2 <- data.frame(cbind(id = spp_narr_temp$name, spp_narr_temp$result)) %>% #combine into one dataset 
+  dplyr::select(iucn_sid = id, pop_trend = populationtrend)
+  
+
+
+cat_trend <- spp_narr_temp2 %>%
+  left_join(spp_past_df1, by = "iucn_sid") %>%
+   group_by(iucn_sid) %>%
+  mutate(n_assess = n()) %>%
+  ungroup()
+
+cat_trend$year <- as.numeric(cat_trend$year)
+  
+lm_trend <- cat_trend %>%
+  filter(n_assess >= 2) %>%
+  group_by(iucn_sid) %>%
+  do(calc_trend = lm( cat_ts_score ~ year, data = .)[['coefficients']][['year']]) %>%
+  mutate(calc_trend = round(calc_trend, 5))
+
+trend <- cat_trend %>%
+  filter(n_assess > 1) %>%
+  group_by(iucn_sid) %>%
+  summarize(years  = paste(year, collapse = ', '),
+            cat_ts = paste(cat_ts, collapse = ', '),
+            scores = paste(cat_ts_score, collapse = ', '),
+            pop_trend_desc = first(pop_trend)) %>%
+  ungroup() %>%
+  left_join(lm_trend, by = c('iucn_sid'))
+
+
+trend_2 <- trend %>%
+  filter(!is.na(pop_trend_desc)) %>%
+  mutate(pop_trend = case_when(pop_trend_desc == 'decreasing' ~ -1,
+                               pop_trend_desc == 'increasing' ~  1,
+                               pop_trend_desc == 'stable'     ~  0,
+                               TRUE                           ~ NA_real_))
+  ### NOTE: here we're coding the trend in *population* not risk.
+trend_regr <- lm(calc_trend ~ pop_trend, data = trend_2)
+trend_coeffs <- summary(trend_regr)
+
+
+
+### manual values from linear regression:
+
+slope <- trend_coeffs$coefficients[1] %>% round(5)
+trend_score_lookup <- c('decreasing' = -slope, 'stable' = 0, 'increasing' = slope)
+trend <- trend_2 %>%
+  dplyr::select(iucn_sid, calc_trend) %>%
+  distinct()
+
+trend_df <- spp_narr_temp2 %>%
+  left_join(spp_past_df1, by = c('iucn_sid')) %>%
+  distinct() %>%
+  left_join(trend, by = c('iucn_sid')) %>%
+  mutate(trend_score  = ifelse(is.na(calc_trend), trend_score_lookup[pop_trend], calc_trend),
+         trend_source = case_when(!is.na(calc_trend)  ~ 'lm', 
+                                  !is.na(trend_score) ~ 'regr',
+                                  TRUE ~ NA_character_)) %>%
+  dplyr::select(iucn_sid,  pop_trend, trend_score, trend_source) %>%
+  distinct()
+```
+
+
+
+get all species from iucn 
+```{r}
+rl_sp_count(key = api_key)
+
+out <- rl_sp(all = TRUE, key = api_key)
+all_df <- do.call(rbind, lapply(out, "[[", "result"))
+
+all_df_comp <- all_df %>%
+  dplyr::select(-infra_rank, -infra_name) %>%
+    dplyr::rename(iucn_sid = taxonid, sciname = scientific_name) %>%
+    setNames(names(.) %>%
+               stringr::str_replace('_name', ''))
+
+write.csv(all_df_comp, file.path(dir_goal,"raw_test/spp_list_iucn.csv"))
+```
+
+get all species habitats from iucn
+todo: add api_error column and grab the error
+
+```{r}
+spp_ids_all <- all_df_comp %>%
+    .$iucn_sid
+
+  n_chunks <- ceiling(unique(spp_ids_all))
+
+for(i in spp_ids_all){
+  #i = 43
+  
+  chunk_file <- file.path(dir_goal, 'tmp', 
+                    sprintf('spp_habs_chunk_%s.csv', 
+                            i))
+  
+  if(!file.exists(chunk_file)) {
+    
+     cat_msg('Getting habitat info for species ', i, ' to ', max(spp_ids_all))
+    
+spp_hab_tmp <- rl_habitats(id = i, key = api_key)
+  
+spp_hab_tmp_2 <- data.frame(cbind(id = spp_hab_tmp$id, spp_hab_tmp$result)) %>%
+  mutate(param_id = ifelse(is.na(id), i, id))
+
+cat_msg('... found ', nrow(spp_hab_tmp_2), ' habitat rows for these species')
+
+write_csv(spp_hab_tmp_2, chunk_file)
+  
+}else {
+   cat_msg('Chunk file ', chunk_file, ' already exists; skipping these spp')
+      
+}
+}
+
+
+```
+
+
+Get US Minor Outlying Islands species 
+```{r}
+## get a dataframe of all iucn redlist species
+out <- rl_sp(all = TRUE, key = api_key)
+all_df <- do.call(rbind, lapply(out, "[[", "result"))
+
+all_df_comp <- all_df %>%
+  dplyr::select(-infra_rank, -infra_name) %>%
+    dplyr::rename(iucn_sid = taxonid, sciname = scientific_name) %>%
+    setNames(names(.) %>%
+               stringr::str_replace('_name', ''))
+
+library(ohicore)
+spp_country_url <- 'http://apiv3.iucnredlist.org/api/v3/country/getspecies/id/%s?token=%s'
+# 
+# /api/v3/country/getspecies/:country?token='YOUR TOKEN'
+
+rl_countries(key = api_key)
+#UM is United States Minor Outlying Islands country code
+spp_um <- rl_sp_country('UM', key = api_key)$result %>%
+  mutate(country_code = "UM", country = "Palmyra Atoll") %>%
+  rename("iucn_sid" = "taxonid")
+
+# join with all_df_comp to get the kingdom,phylum,order, etc
+spp_pal <- all_df_comp %>%
+  inner_join(spp_um, by = c("iucn_sid", "category")) %>%
+  dplyr::select(-scientific_name)
+
+#list of iconic species for palmyra
+ico <- c("Sula leucogaster", "Sula dactylatra", "Sula sula", "Anous minutus", "Anous stolidus",
+          "Fregata minor", "Onychoprion fuscata", "Numenius tahitiensis", "Pluvialis fulva",
+          "Heteroscelus incanus", "Arenaria interpres", "Tursiops aduncus", "Stenella longirostris",
+          "Chelonia mydas", "Eretmochelys imbricata", "Tridacna gigas", "Birgus latro")
+
+# Filter the UM spp data for Palmyra iconic spp 
+pal_ico <- spp_pal %>% 
+  filter(sciname %in% ico) %>% # 11 matching the ico spp list
+dplyr::select(-country, -country_code, -subspecies, -rank, -subpopulation)
+
+## Figure out which ones didn't match
+setdiff(ico, pal_ico$sciname)
+
+#make vector of those that didn't match
+ico_not_listed <- c("Onychoprion fuscata", "Heteroscelus incanus", "Tursiops aduncus", "Eretmochelys imbricata", "Tridacna gigas", "Birgus latro")
+
+## filter overall species list for those that didnt match
+pal_ico_not_listed <- all_df_comp %>%
+  filter(sciname %in% ico_not_listed) ## now only 2 not matched! 
+
+#Join this with pal_ico
+pal_ico_new <-
+  rbind(pal_ico_not_listed, pal_ico)
+  
+
+
+rl_threats(name = "Tursiops aduncus", key = api_key)
+```
+
+
+```{r}
+## Load packages and other important things 
+library(rredlist)
+library(tidyverse)
+library(dplyr)
+library(rgdal)
+library(raster)
+library(here)
+library(ggridges)
+library(ggplot2)
+library(stringr)
+library(plyr)
+
+source(here('workflow/R/common.R'))
+
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+tet_pop_trends <- read_csv("raw_test/3_iucn_population_trends.csv") 
+
+tet_species_vec <- tet_pop_trends$sciname
+
+
+## get past assessments with rl_history
+
+hist <- list()
+
+## This for loop breaks sometimes, so just re run it and itll continue where it left off (because of the if statement I added)
+for(i in tet_species_vec){
+#i = "Sula leucogaster"
+  
+if(i %!in% names(hist)){
+
+      cat_msg('Getting species history information for this species:  ', i)
+
+  
+spp_hist_temp <- rl_history(name = i, key = api_key) # get a species history
+
+spp_hist_temp2 <- data.frame(cbind(sciname = spp_hist_temp$name, spp_hist_temp$result)) #combine into one dataset 
+hist[[i]] <- spp_hist_temp2
+
+} else {
+    cat_msg('File of API species history exists in list, skipping this: \n  ', i)
+
+} 
+}
+
+spp_hist <- ldply(hist, rbind)
+
+
+    cat_lookup <- read_csv(file.path(dir_setup, 'raw', 'risk_code_lookup.csv')) # read in the category look up so that old category naming conventions will match todays. This is in ohiprep_v2020/globalprep/spp/v2020/setup/raw folder
+
+    spp_past_df <- spp_hist %>%
+    left_join(cat_lookup, by = c('code', 'category')) %>%
+    dplyr::rename(
+           old_cat  = code,
+           cat_txt  = category,
+           cat_ts   = code_current) #rename stuff and get scores 
+    
+pop_cat <- data.frame(cat_ts       = c("LC", "NT", "VU", "EN", "CR", "EX", "NE", "DD"), 
+                        cat_ts_score = c( 0.0,  0.2,  0.4,  0.6,  0.8,  1.0,  NA,   NA)) ## define scores again
+  
+    
+  spp_past_df1 <- spp_past_df %>% 
+    left_join(pop_cat, by = 'cat_ts') %>%
+    filter(!is.na(cat_ts_score) & !is.na(year)) %>%
+    arrange(sciname, year) %>%
+    dplyr::select(sciname, year, cat_ts, cat_ts_score) %>%
+    mutate(iucn_version = api_version)
+  
+  
+
+## get narratives -- not necessary since you've already done this 
+#   narr <- list()
+#   
+#   
+# for(i in species_list){
+#   spp_narr_temp <- rl_narrative(id = i, key = api_key) # get a species poptrend 
+# 
+# spp_narr_temp2 <- data.frame(cbind(id = spp_narr_temp$name, spp_narr_temp$result)) %>% #combine into one dataset 
+#   dplyr::select(iucn_sid = id, pop_trend = populationtrend)
+#   
+# narr[[i]] <- spp_narr_temp2
+# }
+# 
+#   spp_narr <- ldply(narr, rbind)
+
+tet_pop_trends <- read_csv("raw_test/3_iucn_population_trends.csv") %>%
+  dplyr::rename(pop_trend = trend) ## read in population trends grabbed from IUCN 
+
+  
+cat_trend <- tet_pop_trends %>%
+  left_join(spp_past_df1, by = "sciname") %>%
+   group_by(sciname) %>%
+  dplyr::mutate(n_assess = n()) %>%
+  ungroup()
+
+cat_trend$year <- as.numeric(cat_trend$year)
+  
+lm_trend <- cat_trend %>%
+  filter(n_assess >= 2) %>%
+  group_by(sciname) %>%
+  do(calc_trend = lm(cat_ts_score ~ year, data = .)[['coefficients']][['year']]) %>%
+  mutate(calc_trend = as.numeric(calc_trend)) %>%
+  mutate(calc_trend = round(calc_trend, 5)) ## Run a linear regression to get trend based on historical assessments 
+
+trend <- cat_trend %>%
+  dplyr::filter(n_assess > 1) %>%
+  dplyr::group_by(sciname) %>%
+  dplyr::summarize(years  = paste(year, collapse = ', '),
+            cat_ts = paste(cat_ts, collapse = ', '),
+            scores = paste(cat_ts_score, collapse = ', '),
+            pop_trend_desc = first(pop_trend)) %>%
+  ungroup() %>%
+  left_join(lm_trend, by = c('sciname'))
+
+
+trend_2 <- trend %>%
+  filter(!is.na(pop_trend_desc)) %>%
+  mutate(pop_trend = case_when(pop_trend_desc == 'Decreasing' ~ -1,
+                               pop_trend_desc == 'Increasing' ~  1,
+                               pop_trend_desc == 'Stable'     ~  0,
+                               TRUE                           ~ NA_real_))
+  ### NOTE: here we're coding the trend in *population* not risk. This tells us the regression coeffs based on the population trends grabbed from iucn (increasing, decreasing, unknown)
+trend_regr <- lm(calc_trend ~ pop_trend, data = trend_2)
+trend_coeffs <- summary(trend_regr)
+
+
+
+### manual values from linear regression:
+
+slope <- trend_coeffs$coefficients[1] %>% round(5)
+trend_score_lookup <- c('Decreasing' = -slope, 'stable' = 0, 'Increasing' = slope)
+trend <- trend_2 %>%
+  dplyr::select(sciname, calc_trend) %>%
+  distinct()
+
+trend_df <- tet_pop_trends %>%
+  left_join(spp_past_df1, by = c('sciname')) %>%
+  distinct() %>%
+  left_join(trend, by = c('sciname')) %>%
+  mutate(trend_score  = ifelse(is.na(calc_trend), trend_score_lookup[pop_trend], calc_trend),
+         trend_source = case_when(!is.na(calc_trend)  ~ 'lm', 
+                                  !is.na(trend_score) ~ 'regr',
+                                  TRUE ~ NA_character_)) %>%
+  dplyr::select(sciname,  pop_trend, trend_score, trend_source) %>%
+  distinct() ## this is our final trend data set 
+```

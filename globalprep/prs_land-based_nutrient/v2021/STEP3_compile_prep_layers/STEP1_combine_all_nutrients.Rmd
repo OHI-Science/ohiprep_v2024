@@ -1,0 +1,386 @@
+---
+title: "OHI 2021: Combine nutrient rasters"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Summary
+Grab all the relevant nutrient files and compile into a couple of summarized per year files, for manure and crops 
+
+ - Total P applied per year for manure 
+    - only leaching files
+ - Total P applied per year for crops 
+    - only leaching files
+ - Total P for crops and manure 
+   - only leaching files
+   
+ - Total N for manure 
+    - volatized files together
+    - Leaching files together
+ - Total N for crops 
+    - volatized files together
+    - Leaching files together
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(here)
+library(raster)
+library(readr)
+library(tidyverse)
+library(doParallel)
+
+nutrient_d2021_anx <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/FAOSTAT/manure_nutrient/d2021/")
+git_manure <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP2_manure")
+location_tifs_path <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/halpern_food_systems/d2021/animal_farm/location_tifs")
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+git_crop <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP1_crop")
+git_compile <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP3_compile_prep_layers")
+
+
+source(here(git_crop, "R/common_spatial.R")) # read in necessary spatial files 
+
+```
+
+
+Combine and save the appropriate files so that we have yearly volatilized rasters and yearly leaching files per each nutrient.
+ - make sure to run through this this with one nutrient and one year first... i.e. specify `nutrient <- "N"` and `yr <- 2005` and run line by line so you make sure to understand what is happening.
+```{r}
+
+years <- as.character(c(2005:2019))
+
+# nutrients <- c("N", "P")
+nutrients <- c("N")
+
+
+for(yr in years){
+  
+  for(nutrient in nutrients){
+    
+ 
+  # yr <- "2005"
+  # nutrient <- "N"
+
+    if(nutrient == "N"){
+      
+    
+  n_leach_manure <- list.files(file.path(prep, "animal_farm_int/STEP7_total_N_leaching"), pattern = yr, full = TRUE) # list leached manure files
+  
+  n_volt_manure <- list.files(file.path(prep, "animal_farm_int/STEP7_total_N_volatizing"), pattern = yr, full = TRUE) # list volatilized manure files
+  
+  crop_pat <- paste0(".+leached_N_", yr)
+ 
+  leach_crop <- list.files(file.path(prep, "crop_predatalayers"), pattern = crop_pat, full = TRUE) # list leach crop files
+
+  crop_pat_volt <- paste0(".+volatilized_N_", yr)
+  volt_crop <- list.files(file.path(prep, "crop_predatalayers"), pattern = crop_pat_volt, full = TRUE) # list leach crop volatilized files
+
+  
+  ## Now save a file for just crops leached N
+    all_nutrients_stack <- stack(leach_crop) 
+
+    rasterOptions(todisk = FALSE)
+
+ ## try with parallel processing 8 cores.. this will speed it up significantly. 10 cores is a lot though, so if you NOT are running it overnight, maybe decrease to 6-8 cores (don't wanna hog cores during the workday).
+
+ raster::beginCluster(n = 8)
+
+ parallel_sum <- raster::clusterR(all_nutrients_stack, fun = calc,
+                            args = list(fun = sum, na.rm = TRUE))
+
+endCluster()
+
+
+dis_rast_area <- raster(file.path(prs_int_dir, "disagg_raster_area.tif"))
+
+
+    names(parallel_sum) <- "tonnes_N"
+    parallel_sum[is.na(parallel_sum)] <- 0
+
+
+       png(filename=file.path(paste0(git_compile, "/plot_check/crops_leached/", "tonnes_N_", yr, ".png")))
+        plot(log(1+ parallel_sum), main = paste0(yr))
+         dev.off()
+
+      print(cellStats(parallel_sum, "sum")) #
+
+
+  raster::writeRaster(parallel_sum, file.path(prep,  "crop_stressors_yearly", paste0("crop_leached_nutrient_N_", yr, ".tif", sep = "")), format = "GTiff", overwrite = TRUE)
+
+
+
+  ## Now save a file for just manure leached N
+    all_nutrients_stack <- stack(n_leach_manure)
+
+    rasterOptions(todisk = FALSE)
+
+ ## try with parallel processing 8 cores.. this will speed it up significantly. 10 cores is a lot though, so if you NOT are running it overnight, maybe decrease to 6-8 cores (don't wanna hog cores during the workday).
+
+ raster::beginCluster(n = 8)
+
+ parallel_sum <- raster::clusterR(all_nutrients_stack, fun = calc,
+                            args = list(fun = sum, na.rm = TRUE))
+
+endCluster()
+
+
+    names(parallel_sum) <- "tonnes_N"
+    parallel_sum[is.na(parallel_sum)] <- 0
+
+
+       png(filename=file.path(paste0(git_compile, "/plot_check/manure_leached/", "tonnes_N_", yr, ".png")))
+        plot(log(1+ parallel_sum), main = paste0(yr))
+         dev.off()
+
+      print(cellStats(parallel_sum, "sum")) #
+
+
+  raster::writeRaster(parallel_sum, file.path(prep,  "manure_stressors_yearly", paste0("manure_leached_nutrient_N_", yr, ".tif", sep = "")), format = "GTiff", overwrite = TRUE)
+  
+  
+    ## Now save a file for manure volatized N
+    all_nutrients_stack <- stack(c(n_volt_manure))
+  
+    rasterOptions(todisk = FALSE) 
+ 
+ ## try with parallel processing 8 cores.. this will speed it up significantly. 10 cores is a lot though, so if you NOT are running it overnight, maybe decrease to 6-8 cores (don't wanna hog cores during the workday). 
+  
+ raster::beginCluster(n = 8)
+
+ parallel_sum <- raster::clusterR(all_nutrients_stack, fun = calc,
+                            args = list(fun = sum, na.rm = TRUE))
+
+endCluster()
+  
+
+    names(parallel_sum) <- "tonnes_N"
+    parallel_sum[is.na(parallel_sum)] <- 0
+    
+    
+       png(filename=file.path(paste0(git_compile, "/plot_check/manure_volt/", "tonnes_N_", yr, ".png")))
+        plot(log(1+ parallel_sum), main = paste0(yr))
+         dev.off()
+         
+      print(cellStats(parallel_sum, "sum")) # 
+    
+  
+  raster::writeRaster(parallel_sum, file.path(prep,  "manure_stressors_yearly", paste0("manure_volt_nutrient_N_", yr, ".tif", sep = "")), format = "GTiff", overwrite = TRUE)
+  
+  
+      ## Now save a file for crops volatized N
+    all_nutrients_stack <- stack(c(volt_crop))
+  
+    rasterOptions(todisk = FALSE) 
+ 
+ ## try with parallel processing 8 cores.. this will speed it up significantly. 10 cores is a lot though, so if you NOT are running it overnight, maybe decrease to 6-8 cores (don't wanna hog cores during the workday). 
+  
+ raster::beginCluster(n = 8)
+
+ parallel_sum <- raster::clusterR(all_nutrients_stack, fun = calc,
+                            args = list(fun = sum, na.rm = TRUE))
+
+endCluster()
+  
+  
+ # stack_sum <- calc(all_nutrients_stack, sum, na.rm = TRUE)
+
+    names(parallel_sum) <- "tonnes_N"
+    parallel_sum[is.na(parallel_sum)] <- 0
+    
+    
+       png(filename=file.path(paste0(git_compile, "/plot_check/crops_volt/", "tonnes_N_", yr, ".png")))
+        plot(log(1+ parallel_sum), main = paste0(yr))
+         dev.off()
+         
+      print(cellStats(parallel_sum, "sum")) # 
+    
+  
+  raster::writeRaster(parallel_sum, file.path(prep,  "crop_stressors_yearly", paste0("crop_volt_nutrient_N_", yr, ".tif", sep = "")), format = "GTiff", overwrite = TRUE)
+  
+  
+    }else{
+      
+   #   nutrient = "P"
+  p_leach_manure <- list.files(file.path(prep, "animal_farm_int/STEP2_P_leach/"), pattern = yr, full = TRUE)
+
+  fert_pat <- paste0(".+leached_P_", yr)
+  
+  p_leach_fertilizer_grassland <-  list.files(file.path(prep, "animal_farm_int/grassland_nutrient_pollution"), pattern = fert_pat, full = TRUE)
+  
+  crop_pat <- paste0(".+leached_P_", yr)
+ 
+  leach_crop <- list.files(file.path(prep, "crop_predatalayers"), pattern = crop_pat, full = TRUE)
+  
+    ## Do only crop leaching P  
+  all_nutrients_stack <- stack(leach_crop)
+  
+
+    rasterOptions(todisk = FALSE) 
+ 
+ ## try with parallel processing 10 cores.. this will speed it up significantly. 10 cores is a lot though, so if you NOT are running it overnight, maybe decrease to 6-8 cores (don't wanna hog cores during the workday). 
+  
+ raster::beginCluster(n = 8)
+
+ parallel_sum <- raster::clusterR(all_nutrients_stack, fun = calc,
+                            args = list(fun = sum, na.rm = TRUE))
+
+endCluster()
+  
+  
+    names(parallel_sum) <- "tonnes_P"
+    parallel_sum[is.na(parallel_sum)] <- 0
+    
+    
+       png(filename=file.path(paste0(git_compile, "/plot_check/crops_leached/", "tonnes_P_", yr, ".png")))
+        plot(log(1+ parallel_sum), main = paste0(yr))
+         dev.off()
+         
+      print(cellStats(parallel_sum, "sum")) # 
+    
+  
+  raster::writeRaster(parallel_sum, file.path(prep,  "crop_stressors_yearly", paste0("crop_leached_nutrient_P_", yr, ".tif", sep = "")), format = "GTiff", overwrite = TRUE)
+  
+  
+  
+      ## Do only manure leaching P  
+  all_nutrients_stack <- stack(c(p_leach_manure, p_leach_fertilizer_grassland))
+  
+
+    rasterOptions(todisk = FALSE) 
+ 
+ ## try with parallel processing 10 cores.. this will speed it up significantly. 10 cores is a lot though, so if you NOT are running it overnight, maybe decrease to 6-8 cores (don't wanna hog cores during the workday). 
+  
+ raster::beginCluster(n = 8)
+
+ parallel_sum <- raster::clusterR(all_nutrients_stack, fun = calc,
+                            args = list(fun = sum, na.rm = TRUE))
+
+endCluster()
+  
+  
+    names(parallel_sum) <- "tonnes_P"
+    parallel_sum[is.na(parallel_sum)] <- 0
+    
+    
+       png(filename=file.path(paste0(git_compile, "/plot_check/manure_leached/", "tonnes_P_", yr, ".png")))
+        plot(log(1+ parallel_sum), main = paste0(yr))
+         dev.off()
+         
+      print(cellStats(parallel_sum, "sum")) # 
+    
+  
+  raster::writeRaster(parallel_sum, file.path(prep,  "manure_stressors_yearly", paste0("manure_leached_nutrient_P_", yr, ".tif", sep = "")), format = "GTiff", overwrite = TRUE)
+
+    }
+  
+  }
+}
+
+
+```
+
+
+Calculate total nutrient application per year for manure and crops and save to dataframes (for checking).
+
+```{r}
+
+## Read manure leaching and volt N nutrient layers and manure leaching P nutrient layers and create a dataframe columns year, nutrient, total nutrient sum
+
+
+years <- as.character(c(2005:2019))
+manure_total_nutrients_df <- data.frame(year = NA, nutrient = NA, nutrient_sum = NA)
+
+
+
+for(yr in years){
+
+  # yr <- 2005
+
+  list_files <- list.files(file.path(prep, "animal_farm_int/N_from_excretion_manure"), full = TRUE, pattern = paste0(yr))
+
+global_N_total <- sum(stack(lapply(list_files, raster)), na.rm = TRUE)
+total_exc_N <- cellStats(global_N_total, stat = 'sum', na.rm = TRUE) # 190397192
+
+N_df <- data.frame(year = yr, nutrient = "N", nutrient_sum = total_exc_N)
+
+  list_files_P <- list.files(file.path(prep, "animal_farm_int/P_from_excretion_manure"), full = TRUE, pattern = paste0(yr))
+global_P_total <- sum(stack(lapply(list_files_P, raster)), na.rm = TRUE)
+total_exc_P <- cellStats(global_P_total, stat = 'sum', na.rm = TRUE) # 40600526
+
+
+P_df <- data.frame(year = yr, nutrient = "P", nutrient_sum = total_exc_P)
+
+
+manure_total_nutrients_df <- rbind(manure_total_nutrients_df, N_df, P_df)
+
+}
+
+manure_total_nutrients_df <- manure_total_nutrients_df %>%
+  filter(!is.na(nutrient_sum)) %>%
+  mutate(type = "manure")
+write.csv(manure_total_nutrients_df, file.path(git_compile, "int/manure_nutrient_by_year.csv"), row.names = FALSE)
+
+
+
+## read all crop application layers to estimate total N and total P applied
+
+sum_df <- data.frame(year = NA, nutrient = NA, nutrient_sum = NA)
+
+years <- as.character(c(2011:2019))
+
+registerDoParallel(cores = 5)
+
+foreach(yr = years) %dopar% {
+
+# yr = 2011
+
+N_pat <- paste0(".+application_N_", yr)
+    
+total_N <- 
+  list.files(file.path(prep, "/crop_int", fsep = ""), pattern = N_pat, full.names = TRUE) %>% 
+  .[!grepl(c("toba|teas|cof|othr"), .)] %>% 
+  stack() %>% 
+  stackApply(., 1, fun = "sum") %>% 
+  cellStats(., "sum")
+
+P_pat <- paste0(".+application_P2O5_", yr)
+
+total_P <- 
+  list.files(file.path(prep, "/crop_int", fsep = ""), pattern = P_pat, full.names = TRUE) %>% 
+  .[!grepl(c("toba|teas|cof|othr"), .)] %>% 
+  stack() %>% 
+  stackApply(., 1, fun = "sum") %>% 
+  cellStats(., "sum")
+
+total_P <- total_P/2.29 
+
+sum_df_P <- data.frame(year = yr, nutrient = "P", nutrient_sum = total_P)
+
+sum_df_N <- data.frame(year = yr, nutrient = "N", nutrient_sum = total_N)
+
+sum_df <- rbind(sum_df_P, sum_df_N, sum_df)
+
+}
+
+sum_df <- sum_df %>%
+  dplyr::filter(!is.na(nutrient_sum))
+
+write.csv(sum_df, file.path(git_compile, "int/crop_nutrient_by_year.csv"), row.names = FALSE)
+
+```
+
+

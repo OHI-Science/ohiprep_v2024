@@ -1,0 +1,141 @@
+---
+title: 'OHI 2021: Coral trend'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+Coral trend was calculated using condition data from 1975-2006 (Bruno and Selig 2007, Schutte et al. 2010).
+
+
+## Updates from previous assessment
+Using a new dataset for the global distribution of coral reefs for the extent, so we are going to gapfill the trend of the new regions that have been added to the coral extent data. 
+
+
+## Setup
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_coral/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_wcmc <- file.path(file.path(dir_M, 'git-annex/globalprep/_raw_data/wcmc_coral'))
+region_data()
+
+dir_git_old  <- file.path('~/github/ohiprep_v2021', "globalprep/hab_coral/v2012")
+```
+
+Now match the old trend data to the extent data, and gapfill any missing trend data with georegion averages. This will also exclude any regions that have trend data but no extent data. 
+
+
+```{r, eval = FALSE}
+trend <- read_csv(file.path(dir_git_old, "data/habitat_trend_coral_updated.csv"))
+
+## read in georegions data
+regions <- read.csv(file.path(here('globalprep/supplementary_information/v2018/rgn_georegions_wide_2013b.csv')))
+
+## read in extent data
+all <- read.csv(file.path(here("globalprep/hab_coral/v2021/data/habitat_extent_coral_updated.csv")))
+
+all_old <- read.csv(file.path(here("globalprep/hab_coral/v2012/data/habitat_extent_coral_updated.csv")))
+
+
+all <- all %>%
+  filter(km2 > 0) %>%
+  filter(rgn_id < 255) %>%
+  dplyr::select(-year)
+
+setdiff(all$rgn_id, trend$rgn_id) # coral extent data but no trend score # 6  10  11  12  28  38  44  45  46  48  49  50  51  54  79 107 114 119 125 137 146 148 149 150 155 157 159 190 191 204 212 231 237 136
+
+
+setdiff(trend$rgn_id, all$rgn_id) # have trend but no extent... two are small islands. One is new zealand. New Zealand does not have a coral reef.. so probably not a big deal. 
+# [1]   3  90 162
+
+
+tmp <- all %>%      #eliminates the regions with health scores but no mangroves
+  left_join(trend)
+
+
+tmp  <- tmp %>%
+  left_join(regions) %>%
+  group_by(r2) %>%
+  mutate(avg_trend_r2 = mean(trend, na.rm=TRUE)) %>%
+  ungroup() %>%
+  group_by(r1) %>%
+  mutate(avg_trend_r1 = mean(trend, na.rm=TRUE)) %>%
+  ungroup() %>%
+  mutate(trend2 = ifelse(is.na(trend), avg_trend_r2, trend)) %>%
+  mutate(trend3 = ifelse(is.na(trend2), avg_health_r1, trend2)) %>%
+  mutate(gap_fill = ifelse(is.na(trend), "georegion", NA)) %>%
+  mutate(gap_fill = ifelse(is.na(trend) & is.na(avg_trend_r2), "georegion", gap_fill)) %>%
+  mutate(gap_fill = ifelse(is.na(gap_fill), 0, gap_fill)) %>%
+  dplyr::select(rgn_id, habitat, gap_fill, trend=trend3)
+summary(tmp)
+
+### save summary of gap-filling:
+old_gaps <- read.csv(file.path(here("globalprep/hab_coral/v2012/data/trend_coral_gf.csv")))
+
+
+trend_gaps <- tmp %>%
+  left_join(old_gaps, by = c("rgn_id", "habitat")) %>%
+  mutate(gap_fill = ifelse(gap_fill.x != 0, gap_fill.x, gap_fill.y)) %>%
+  mutate(gap_fill = ifelse(is.na(gap_fill), 0, gap_fill)) %>%
+  full_join(rgns_eez) %>% 
+  dplyr::select(rgn_id, habitat, variable, gap_fill) %>%
+  mutate(variable = "trend") %>%
+  mutate(habitat = "coral")
+write.csv(trend_gaps, 'globalprep/hab_coral/v2021/data/trend_coral_gf.csv', row.names=FALSE)
+
+### save health data:
+trend <- tmp %>%
+  dplyr::select(rgn_id, habitat, trend) %>%
+  mutate(year = 2021)
+write.csv(trend, 'globalprep/hab_coral/v2021/data/habitat_trend_coral_updated.csv', row.names=FALSE)
+
+```
+
+Datacheck: compare to old health data
+
+```{r, eval = FALSE}
+old_trend <- read_csv(file.path(here("globalprep/hab_coral/v2012/data/habitat_trend_coral_updated.csv")))
+
+compare_habitat_trend <- trend %>%
+  filter(rgn_id <= 250) %>%
+  left_join(old_trend, by = "rgn_id") %>%
+  mutate(difference = trend.x - trend.y) %>%
+  left_join(rgns_eez)
+
+test <- compare_habitat_trend %>%
+  filter(is.na(trend.y)) ## we gained 34 regions with trend data
+
+ggplot(compare_habitat_trend, aes(x = trend.y, y = trend.x)) +
+  geom_point() +
+  geom_abline() +
+  labs(title = "mangrove Habitat version old (v2015) vs new (v2021)", x = "old trend", y=  "new trend") +
+  theme_bw()
+
+```

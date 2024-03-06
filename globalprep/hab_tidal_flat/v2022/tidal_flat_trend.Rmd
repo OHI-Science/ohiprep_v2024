@@ -1,0 +1,235 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - tidal flat trend"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This script generates the tidal flat trend for each OHI region. 
+
+# Updates from previous assessment
+
+2022 - Completely new!
+
+## Future improvements
+
+This layer was troublesome due to the large differences in the first time step and the last, as well as large variation in extent values within certain countries. We opted to go with a regional average from 2001 to 2013 to calculate trend, and applied these values to all regions. This helped smooth out the large variation in the data, but it may be best to rethink this calculation.  
+
+***
+
+# Data Source 
+
+**Reference**: Murray, N.J., Phinn, S.R., DeWitt, M., Ferrari, R., Johnston, R., Lyons, M.B., Clinton, N., Thau, D. & Fuller, R.A. (2019) The global distribution and trajectory of tidal flats. Nature, 565, 222-225.
+
+**Downloaded**: 2022-07-26
+
+**Description**:  
+The Murray Global Intertidal Change Dataset contains global maps of tidal flat ecosystems produced via a supervised classification of 707,528 Landsat Archive images. Each pixel was classified into tidal flat, permanent water or other with reference to a globally distributed set of training data.
+
+The classification was implemented along the entire global coastline between 60° North and 60° South from 1 January 1984 to 31 December 2016. The image collection consists consists of a time-series of 11 global maps of tidal flats at 30m pixel resolution for set time-periods (1984−1986; 1987−1989; 1990−1992; 1993−1995; 1996−1998; 1999−2001; 2002−2004; 2005−2007; 2008−2010; 2011−2013; 2014−2016)
+
+This product depicts tidal flat ecosystems around the global coastline.
+
+Pixels classified as tidal flat in the analysis represent several types of tidal flat ecosystems, including unconsolidated fine-grain sediments (tidal mudflats), unconsolidated coarse-grain sediments (tidal sand flats), and consolidated sediments, organic material or rocks (wide tidal rock-platforms), while excluding spectral signatures indicating the presence of vegetation dominated intertidal ecosystems such as mangroves and vegetated marshes. The analysis aimed to identify pixels that are subject to regular tidal inundation, and therefore may also include other intertidal systems where intertidal dynamics are observable.
+
+**Time range**: 1984-2016
+
+**Download link**: https://www.intertidal.app/download/direct-download (download done in `tidal_flat_extent.Rmd`)
+
+**Variables**:
+
+- tidal flat extent, measured in km$^2$
+
+***
+
+# Methods
+
+## Overview
+
+1. Load the tidal flat extent data
+
+2. Model the trend
+
+3. Project 5 years past the last time step.
+
+4. Save the results
+
+5. Check the data for anomalies. 
+
+## Setup
+
+``` {r setup, eval = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, eval = FALSE, echo = TRUE)
+
+if (!require(librarian)){install.packages("librarian")}
+
+librarian::shelf(
+  tidyverse,
+  here,
+  janitor,
+  plotly,
+  broom,
+  scales
+) 
+
+### directory paths and relevant files
+current_year <- 2022
+version_year <- paste0("v", current_year)
+dir_here  <- here::here('globalprep', 'hab_tidal_flat', version_year)
+source(here::here('workflow', 'R', 'common.R'))
+```
+
+## Load data
+
+Load the regions data.
+
+```{r eval = FALSE}
+rgns <- ohicore::rgn_master %>% 
+  dplyr::filter(rgn_typ == "eez") %>% 
+  dplyr::select(rgn_id = rgn_id_2013, rgn_name = rgn_nam_2013) %>% 
+  dplyr::distinct() 
+
+geo_rgns <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohiprep/master/globalprep/spatial/v2017/output/georegion_labels.csv")
+```
+
+Load the tidal flat extent data.
+
+```{r eval = FALSE}
+tidal_flat_extent <- here::here(dir_here, "output", "tidal_flat_extent.csv") %>%
+  readr::read_csv(col_types = cols()) %>% 
+  dplyr::left_join(geo_rgns) %>% 
+  dplyr::filter(rgn_id != 213)
+
+tf_ext_2001 <- tidal_flat_extent %>% 
+  dplyr::group_by(r2_label) %>% 
+  dplyr::filter(year == 2001) %>% 
+  dplyr::summarise(km2 = mean(km2, na.rm = T))
+
+tf_ext_na <- tidal_flat_extent %>% 
+  dplyr::group_by(rgn_id) %>% 
+  dplyr::summarise(km2 = sum(km2))
+
+# tf_ext_2004 <- tidal_flat_extent %>% 
+#   dplyr::group_by(r2_label) %>% 
+#   dplyr::filter(year == 2004) %>% 
+#   dplyr::summarise(km2 = mean(km2))
+```
+
+## Model the trend
+
+Use a nested dataframe and `purrr::map` to model the trend for the most recent 5 time steps. Then we unnest the model and apply it to project 5 years past the last time step. 
+
+First do the trend for 2013.
+
+```{r eval = FALSE}
+trend_function <- function(df) {
+  lm(km2 ~ year, data = df, na.action = na.omit) %>% 
+    broom::tidy()
+}
+
+tidal_flat_trend_2013 <- tidal_flat_extent %>%
+  dplyr::filter(year >= 2001, year <= 2013) %>% 
+  dplyr::group_by(r2_label, habitat) %>%
+  tidyr::nest() %>% 
+  dplyr::mutate(model = purrr::map(data, trend_function)) %>% 
+  tidyr::unnest(cols = c(model)) %>% 
+  dplyr::filter(term == "year") %>% 
+  dplyr::left_join(tf_ext_2001) %>% 
+  dplyr::mutate(trend = (estimate / km2) * 5) %>% 
+  dplyr::select(r2_label, data, habitat, trend) %>% 
+  tidyr::unnest(cols = c(data)) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::mutate(year = 2013, trend = ifelse(is.nan(trend), NA, trend)) %>% 
+  dplyr::select(rgn_id, year, habitat, trend) %>% 
+  dplyr::distinct()
+```
+
+Now do the trend for 2016. 
+
+After evaluating the results, we opted to use the 2013 trend values as they are far more stable than the 2016 values. This is due to 2016 having much higher estimates for many countries and at the global scale. 
+
+```{r eval = FALSE}
+# tidal_flat_trend_2016 <- tidal_flat_extent %>%
+#   dplyr::filter(year >= 2004) %>% 
+#   dplyr::group_by(r2_label, habitat) %>%
+#   tidyr::nest() %>% 
+#   dplyr::mutate(model = purrr::map(data, trend_function)) %>% 
+#   tidyr::unnest(cols = c(model)) %>% 
+#   dplyr::filter(term == "year") %>% 
+#   dplyr::left_join(tf_ext_2004) %>% 
+#   dplyr::mutate(trend = (estimate / km2) * 5, year = 2016) %>% 
+#   dplyr::select(r2_label, data, year, habitat, trend) %>% 
+#   tidyr::unnest() %>% 
+#   dplyr::ungroup() %>% 
+#   dplyr::select(rgn_id, year = year1, habitat, trend) %>% 
+#   dplyr::distinct()
+```
+
+## Write the results
+
+```{r eval = FALSE}
+tidal_flat_trend <- rbind(
+  tidal_flat_trend_2013
+  # , tidal_flat_trend_2016
+  ) %>% 
+  dplyr::left_join(tf_ext_na) %>% 
+  dplyr::mutate(trend = ifelse(is.na(km2), NA, trend)) %>% 
+  dplyr::select(rgn_id, year, habitat, trend)
+
+readr::write_csv(tidal_flat_trend, here::here(dir_here, "output", "tidal_flat_trend.csv"))
+```
+
+## Data checks
+
+Check the top growing extents. 
+
+```{r eval = FALSE}
+growing_extents <- tidal_flat_trend %>% 
+  slice_max(n = 10, order_by = trend)
+```
+
+Check the top decreasing extents. 
+
+```{r eval = FALSE}
+decreasing_extents <- tidal_flat_trend %>% 
+  slice_min(n = 10, order_by = trend)
+```
+
+Check the distribution of tidal flat trends.
+
+```{r eval = FALSE}
+tidal_flat_trend %>% 
+  dplyr::filter(trend != 0) %>% 
+  ggplot(aes(x = trend)) + 
+  geom_density()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

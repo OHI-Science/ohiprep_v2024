@@ -1,0 +1,464 @@
+---
+title: "OHI 2022 - Map nutrient leaching fro grassland fertilizer application"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+# Script objective
+Map nutrient leaching for grassland fertilizer applications.
+
+# Preamble
+```{r setup, include = FALSE}
+# getting packages we want
+library(here)
+library(janitor)
+library(furrr)
+library(readxl)
+library(tidyverse)
+library(vroom)
+library(doParallel)
+library("future")
+library(terra)
+
+# Import food_rgns xy df
+food_rgns_xy <-
+  read.csv(file.path("/home/shares/ohi/git-annex/globalprep/spatial/v2021/food_rgns_xy.csv")) %>%
+  dplyr::select(x, y, iso3c)
+
+food_crs <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
+
+
+source(here('workflow/R/common.R'))
+
+source(here('globalprep/prs_land-based_nutrient/v2022/STEP1_crop/R/common_spatial.R'))
+
+crop_nutrient <- file.path(here(), "globalprep/prs_land-based_nutrient/v2022")
+
+region_data()
+
+food_rgns <- read_csv(here("globalprep/spatial/v2021/food_rgns.csv"), col_types = "cdc") # this won't be updated ever
+
+nutrient_d2021_anx <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/FAOSTAT/crop_nutrient/d2022")
+
+halpern_raw <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/halpern_food_systems/d2021")
+
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/")
+``` 
+
+# Withdrawal of N
+
+Make a raster that describes proportion withdrawal by plants (Table V, NUE values, Bouwman et al. 2005). NOTE: When NUE > 1, use proportion 1. Multiply this raster by the tonnes N applied. Save this raster in dataprep. Check: The sum of the entire raster should be somewhere around 50% of total global fertilizer application.
+
+```{r}
+N_withdrawal_raster <- 
+  vroom(file.path(crop_nutrient, "STEP1_crop/raw/bouwman_2005_tbl5.csv"))[,c(1,4)] %>% 
+  mutate(NUE = if_else(NUE >= 100, 1, NUE / 100)) %>% 
+  left_join(food_rgns_xy, ., by = "iso3c") %>% 
+  dplyr::select(x, y, NUE) %>% 
+  rasterFromXYZ(crs = food_crs)
+plot(N_withdrawal_raster)
+```
+
+# Volatilization of N as NH3
+Make a raster that describes proportion of N lost to volatilization as NH3. This is based on Table 4 of Bouwman et al. 2002. Ultimately, I decided the best bet is to add the grassland, flooded rice, and crops to get the average values based on how the fertilizer is regionally applied (so this will be slightly different from what you created already). I have done the calculations in the attached spreadsheet (this column will create the raster: prop_NH3-N total). Multiply this raster by the tonnes N applied. Save this raster in the predata folder (people will want this one). Check: The sum of the entire raster should be somewhere around 14% of total global fertilizer application.
+
+```{r}
+N_volatilized_raster <- 
+  vroom(file.path(crop_nutrient, "STEP1_crop/raw/bouwman_2002_tbl4_grasslands.csv")) %>%
+  dplyr::select(prop_nh3_total_grasslands, iso3c) %>% 
+  left_join(food_rgns_xy, ., by = "iso3c") %>% 
+  dplyr::select(x, y, prop_nh3_total_grasslands) %>% 
+  rasterFromXYZ(crs = food_crs)
+plot(N_volatilized_raster)
+```
+
+# Map excess fertilizer applications  (similar to FAO estimates for manure)
+
+```{r}
+nutrient_application <- function(this_grazing_animal, this_nutrient, this_year) {
+
+  # import grazing animal rasters
+  grazing_animal_raster <- 
+    raster(file.path(prep,
+                     "animal_farm_int/grassland_fertilizer_application/",
+                     str_extract(this_grazing_animal, ".+?(?=_)"), 
+                     "_grassland_", 
+                     str_extract(this_grazing_animal, "(?<=grassland_).*$"),
+                     "_nutrient_application_",
+                     this_nutrient,
+                     "_",
+                     this_year,
+                     ".tif",
+                     fsep = ""))
+
+
+  if (this_nutrient == "N") {
+  
+  # Withdrawal of N
+  
+  N_withdrawal_raster_outcome <-
+    overlay(N_withdrawal_raster,
+            grazing_animal_raster,
+            fun = function(r1, r2){
+              
+              r1[is.na(r1)] <- 0
+              r2[is.na(r2)] <- 0
+              
+              r1 * r2
+              
+            })
+  
+    writeRaster(N_withdrawal_raster_outcome,
+                file.path(prep,
+                          "animal_farm_int/grassland_nutrient_pollution/",
+                          str_extract(this_grazing_animal, ".+?(?=_)"), 
+                          "_grassland_", 
+                          str_extract(this_grazing_animal, "(?<=grassland_).*$"),
+                          "_withdrawal_N_",
+                          this_year,
+                          ".tif", 
+                          fsep = ""), 
+                format = "GTiff", 
+                overwrite = TRUE)
+  
+  # Volatilization of N as NH3
+  
+    N_volatilized_raster_outcome <- 
+      overlay(N_volatilized_raster,
+              grazing_animal_raster,
+              fun = function(r1, r2){
+                
+                r1[is.na(r1)] <- 0
+                r2[is.na(r2)] <- 0
+                
+                r1 * r2
+              }) 
+      
+      writeRaster(N_volatilized_raster_outcome,
+                  file.path(prep,
+                            "animal_farm_int/grassland_nutrient_pollution/",
+                            str_extract(this_grazing_animal, ".+?(?=_)"), 
+                            "_grassland_", 
+                            str_extract(this_grazing_animal, "(?<=grassland_).*$"),
+                            "_volatilized_N_",
+                            this_year,
+                            ".tif", 
+                            fsep = ""), 
+                  format = "GTiff", 
+                  overwrite = TRUE) 
+    
+    # Denitrification, N2 and N20 emissions
+    ## We are ignoring NO emissions, which are about 0.7% of N application.
+    ## Multiply the tonnes applied raster by 0.01 and then by 10.2 to get the 
+    ## amount of N lost to denitrification. 
+    
+    N_denitrification_raster <- 
+      grazing_animal_raster *
+      0.01 *
+      10.2
+        
+    writeRaster(N_denitrification_raster,
+                file.path(prep,
+                          "animal_farm_int/grassland_nutrient_pollution/",
+                          str_extract(this_grazing_animal, ".+?(?=_)"), 
+                          "_grassland_", 
+                          str_extract(this_grazing_animal, "(?<=grassland_).*$"),
+                          "_denitrification_N_",
+                          this_year,
+                          ".tif", 
+                          fsep = ""), 
+                format = "GTiff", 
+                overwrite = TRUE)
+      
+   # Leaching/runoff
+   ## Sum the tonnes N rasters for: withdrawal, volatilization, and denitrification.
+   ## Leaching/runoff: Tonnes applied minus N - (withdrawal + volatilization + denitrification)
+   ## NOTE: when leaching/runoff < 0, make 0
+   ## Save this raster in predata folder. Report on global average of leaching/runoff
+      
+   N_leaching <- 
+      overlay(grazing_animal_raster,
+              N_withdrawal_raster_outcome,
+              N_volatilized_raster_outcome,
+              N_denitrification_raster,
+              fun = function(applied,
+                             withdrawn,
+                             volatilized,
+                             denitrified) { 
+                
+                leached <- applied - (withdrawn + volatilized + denitrified)
+                leached[leached < 0] <- 0
+                return(leached)
+                
+                })
+
+    writeRaster(N_leaching,
+                file.path(prep, 
+                          "animal_farm_int/grassland_nutrient_pollution/",
+                          str_extract(this_grazing_animal, ".+?(?=_)"), 
+                          "_grassland_", 
+                          str_extract(this_grazing_animal, "(?<=grassland_).*$"),
+                          "_leached_N_",
+                          this_year,
+                          fsep = ""), 
+                format = "GTiff", 
+                overwrite = TRUE)
+    
+  } else if (this_nutrient == "P2O5") {
+    
+    leaching_raster_P <-
+      grazing_animal_raster /
+      2.29 * # Convert to P
+      0.065 # Leaching proportion
+      
+  leaching_raster_P[is.na(leaching_raster_P)] <- 0
+
+  writeRaster(leaching_raster_P,
+              file.path(prep, 
+                        "animal_farm_int/grassland_nutrient_pollution/",
+                          str_extract(this_grazing_animal, ".+?(?=_)"), 
+                          "_grassland_", 
+                          str_extract(this_grazing_animal, "(?<=grassland_).*$"),
+                        "_leached_P_",
+                        this_year,
+                        fsep = ""),
+              format = "GTiff",
+              overwrite = TRUE)
+  }
+}
+
+plan(multisession, workers = 12)
+options <- furrr_options(seed = 54232)
+
+grazer_list <- 
+  list.files(file.path(prep, "animal_farm_int/grassland_fertilizer_application"),
+           pattern = ".(N|P2O5)*.tif$") %>% 
+  str_extract(., pattern = ".+?((meat|milk))") %>% 
+  unique()
+
+distinct_vars <- 
+  expand_grid(grazer_list = grazer_list,
+            nutrient = c("N", "P2O5"),
+            year = 2005:2020)
+
+
+future_pmap(list(distinct_vars$grazer_list,
+            distinct_vars$nutrient,
+            distinct_vars$year),
+            .f = nutrient_application,
+            .options = options)
+```
+
+-------------------------------------------------------------------------------
+
+# Data check
+```{r}
+## check 2017
+
+
+total_N <- 
+  list.files(file.path(prep,
+                     "animal_farm_int/grassland_fertilizer_application/",
+                     fsep = ""),
+             pattern = "_N_2017",
+             full.names = TRUE) %>% 
+  rast() %>% 
+  tapp(., 1, fun = "sum") %>% 
+  global(., "sum", na.rm = TRUE)
+
+withdrawn_N <- 
+  list.files(file.path(prep,
+                     "animal_farm_int/grassland_nutrient_pollution",
+                     fsep = ""),
+             pattern = "withdrawal_N_2017",
+             full.names = TRUE) %>% 
+  rast() %>% 
+  tapp(., 1, fun = "sum") %>% 
+  global(., "sum", na.rm = TRUE)
+
+withdrawn_N / total_N #  0.5775261
+total_N/withdrawn_N # 0.4474883
+
+# NH3 volatilization
+volatilized_N <- 
+  list.files(file.path(prep,
+                     "animal_farm_int/grassland_nutrient_pollution",
+                     fsep = ""),
+             pattern = "volatilized_N_2017",
+             full.names = TRUE) %>%  
+  rast() %>% 
+  tapp(., 1, fun = "sum") %>% 
+  global(., "sum")
+
+volatilized_N / total_N # 0.1686965 should be approx 14% of total N
+
+# Denitrification, N2 and N20 emissions
+denitrification_N <- 
+  list.files(file.path(prep,
+                     "animal_farm_int/grassland_nutrient_pollution",
+                     fsep = ""),
+             pattern = "denitrification_N_2017",
+             full.names = TRUE) %>% 
+  rast() %>% 
+  tapp(., 1, fun = "sum") %>% 
+  global(., "sum", na.rm = TRUE)
+
+denitrification_N / total_N # should be approx 10% of total N; 0.102
+
+leached_N <- 
+  list.files(file.path(prep,
+                       "animal_farm_int/grassland_nutrient_pollution",
+                       fsep = ""),
+             pattern = "leached_N_2017",
+             full.names = TRUE) %>% 
+  rast() %>% 
+  tapp(., 1, fun = "sum") %>% 
+  global(., fun = "sum", na.rm = TRUE)
+
+(leached_N + P_leached + volatilized_N) / total_N
+leached_N 
+total_N - (withdrawn_N + volatilized_N + denitrification_N)
+leached_N / total_N
+
+# Check P
+P_leached <- 
+  list.files(file.path(prep, "animal_farm_int/grassland_nutrient_pollution"),
+             pattern = "_leached_P_2017",
+             full.names = TRUE) %>% 
+  rast()  %>% 
+  tapp(., 1, fun = "sum") %>% 
+  global(., fun = "sum", na.rm = TRUE)
+           
+total_P <- 
+  list.files(file.path(prep,
+                     "animal_farm_int/grassland_fertilizer_application",
+                     fsep = ""),
+             pattern = "P2O5_2017",
+             full.names = TRUE) %>% 
+  rast() %>% 
+  tapp(., 1, fun = "sum") %>% 
+  global(., fun = "sum", na.rm = TRUE)
+
+(total_P / 2.29) * 0.065
+P_leached / total_P
+P_leached / ((total_P / 2.29) * 0.065 )
+```
+
+# Nutrient pollution per animal per year
+```{r}
+run_fun <- function(val, this_year) {
+
+  
+leached_N <- 
+  list.files(file.path(prep, "animal_farm_int/grassland_nutrient_pollution"),
+           pattern = paste(val, ".*_leached_N_", this_year, sep = ""),
+           full.names = TRUE) %>% 
+  rast() %>% 
+  global(., fun = "sum", na.rm = TRUE)
+leached_N  
+
+P_leached <- 
+  list.files(file.path(prep, "animal_farm_int/grassland_nutrient_pollution"),
+           pattern = paste(val, ".*_leached_P_", this_year, sep = ""),
+           full.names = TRUE) %>% 
+  rast() %>% 
+  global(., fun = "sum", na.rm = TRUE)
+P_leached
+
+volatilized_N <- 
+  list.files(file.path(prep, "animal_farm_int/grassland_nutrient_pollution"),
+           pattern = paste(val, ".*volatilized_N_", this_year, sep = ""),
+           full.names = TRUE) %>% 
+  rast() %>% 
+  global(., fun = "sum", na.rm = TRUE)
+volatilized_N
+
+total_applied <- 
+  list.files(file.path(prep, "animal_farm_int/grassland_fertilizer_application",
+                       fsep = ""),
+             pattern = paste(val, ".*_(N|P2O5)_", this_year, ".tif", sep = ""),
+           full.names = TRUE) %>% 
+  rast() %>% 
+  tapp(., 1, fun = "sum") %>% 
+  global(., "sum", na.rm = TRUE)
+total_applied
+
+leached_N + P_leached + volatilized_N
+}
+
+
+distinct_vars <- 
+  expand_grid(grazer_list = grazer_list,
+            year = 2005:2020)
+
+map2(distinct_vars$grazer_list, distinct_vars$year, run_fun) # looks pretty consistent increase year over year
+```
+
+# Nutrient pollution per animal per year
+```{r}
+run_fun2 <- function(val, this_year) {
+
+  
+withdrawn_N <- 
+  list.files(file.path(prep, "animal_farm_int/grassland_nutrient_pollution"),
+           pattern = paste(val, ".*withdrawal_N_", this_year, sep = ""),
+           full.names = TRUE) %>% 
+  rast() %>% 
+  global(., fun = "sum", na.rm = TRUE)
+withdrawn_N  
+
+denitrification_N <- 
+  list.files(file.path(prep, "animal_farm_int/grassland_nutrient_pollution"),
+           pattern = paste(val, ".*denitrification_N_", this_year, sep = ""),
+           full.names = TRUE) %>% 
+  rast() %>% 
+  global(., fun = "sum", na.rm = TRUE)
+denitrification_N
+
+volatilized_N <- 
+  list.files(file.path(prep, "animal_farm_int/grassland_nutrient_pollution"),
+           pattern = paste(val, ".*volatilized_N_", this_year, sep = ""),
+           full.names = TRUE) %>% 
+  rast() %>% 
+  global(., fun = "sum", na.rm = TRUE)
+volatilized_N
+
+total_N <- 
+  list.files(file.path(prep, "animal_farm_int/grassland_fertilizer_application",
+                       fsep = ""),
+             pattern = paste(val, ".*_N_", this_year, sep = ""),
+           full.names = TRUE) %>% 
+  rast() %>% 
+  tapp(., 1, fun = "sum") %>% 
+  global(., "sum", na.rm = TRUE)
+
+
+1- ((withdrawn_N + volatilized_N + denitrification_N) / total_N)
+}
+
+# map(grazer_list, run_fun2)
+
+
+distinct_vars <- 
+  expand_grid(grazer_list = grazer_list,
+            year = 2005:2020)
+
+map2(distinct_vars$grazer_list, distinct_vars$year, run_fun2) # ~20-40% each time 
+```
+

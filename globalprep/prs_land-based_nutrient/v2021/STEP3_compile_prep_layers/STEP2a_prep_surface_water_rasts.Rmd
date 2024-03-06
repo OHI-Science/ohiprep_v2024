@@ -1,0 +1,170 @@
+---
+title: "OHI 2021: Prep surface water and river rasters"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Summary
+
+Create rasters which describe: 
+ - Areas within 1km of surface waters (rivers and lakes) and within 1km of the coast. This will be used to multiply by our leaching estimates. Taken from the [Tuholske et al 2021; Wastewater project](https://github.com/OHI-Science/wastewater)
+ - Proportion of area within cells that are surface waters and 1km away from the coast. This will be used to multiply by our volatilization estimates. Taken from the [food systems project](https://github.com/OHI-Science/food_systems)
+
+```{r setup, include=FALSE}
+library("here"); library("sf"); library("fasterize"); library(raster)
+
+source(here(git_crop, "R/common_spatial.R")) # read in necessary spatial files 
+
+nutrient_d2021_anx <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/FAOSTAT/manure_nutrient/d2021/")
+git_manure <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP2_manure")
+location_tifs_path <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/halpern_food_systems/d2021/animal_farm/location_tifs")
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+git_crop <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP1_crop")
+git_compile <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP3_compile_prep_layers")
+```
+
+
+# Reproject surface water raster
+```{r}
+# this is the surface water raster used in the global wastewater project
+surface_water_rast <- raster(file.path("/home/shares/ohi/git-annex/land-based/wastewater/data/interim/riv_15s_coastlines.tif"))
+plot(surface_water_rast)
+# take a closer look at a coastline.. looks good
+test <- raster::select(surface_water_rast)
+plot(test)
+unique(surface_water_rast)
+
+## need to reproject raster to match our nutrient rasters crs and extent
+
+## project surface water to nutrient crs...
+new_crs <- "+proj=longlat +datum=WGS84 +no_defs"
+
+new_raster <- raster::raster(nrows = 2160, ncols=4320, xmn = -180, xmx = 180, ymn = -90, ymx = 90, crs = new_crs)
+
+raster::beginCluster(n = 8) # not sure this actually does anything
+sw_reproj <-  projectRaster(surface_water_rast, new_raster, crs = new_crs, method = 'ngb') 
+endCluster()
+
+
+plot(sw_reproj)
+test <- raster::select(sw_reproj)
+plot(test) ## seems like it worked..
+
+
+# save reprojected surface water rast
+writeRaster(sw_reproj, file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/surface_water_reproj.tif"))
+```
+
+
+# Create proportional area river raster 
+
+We have taken this layer from the [global food project](https://github.com/OHI-Science/food_systems). Methods are described below. 
+
+Key reference: 
+Lehner, B., Grill G. (2013). Global river hydrography and network routing: 
+baseline data and new approaches to study the world’s large river systems. 
+Hydrological Processes 27(15): 2171-2186.
+
+# Method:
+- Original sf has river area in hectares.
+- Convert values to square kilometres
+- Divide river area by basin area to calculate the proportion of river per basin area.
+- Fasterize using food_raster.tif disaggregated at 15 arc-seconds resolution using factorial of 20.
+- Check shows 367,502 km2 river area calculated from shapefile vs. 366,297 km2 from raster.
+- Aggregate raster to 5 arc-minutes resolution using factorial of 20.
+- Check shows 370,557 vs. 367,502 km2. A 0.8% difference.
+- At this point, the numbers are fine and we are confident that we have mapped river area accurately. The sum total of 370,000km2 of river area is roughly in the region we expect, though a paper from Science (2018) found that river area was about double this surface area.
+
+[Dataprep RMD](https://github.com/OHI-Science/food_systems/blob/master/fisheries/freshwater/disturbance/fresh_fisheries_disturbance_final.Rmd)
+
+Instead of recreating the layer here, we will just poach it from the other project. To create what we need however, we will need to:
+
+ - Divide the raster layer by 0.3. 
+   - This is done because they multiplied the river area by 0.3 to estimate freshwater fisheries disturbance. 
+ - Now that we have the river area per cell in km2, we need to divide by the km2 area to create a proportional river area estimate per cell and we will also add a 1km to coast layer as well, where any area that is 1km away from the coast will recieve a proportional value of 1, which will later be used to multiply against volatilization rasters. 
+ 
+```{r}
+river_area <- raster(file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/halpern_food_systems/d2021/freshwater_fisheries/freshwater_fish_fisheries_meat_disturbance.tif"))/0.3
+
+cellStats(river_area, "sum") # 370771
+plot(log(river_area+1))
+test <- raster::select(log(river_area + 1))
+plot(test)
+## looks good, and its in the resolution that we want!! 
+
+# Now we need to divide by the area of river area
+river_area_rescale <- river_area/raster::area(river_area)
+plot(river_area_rescale)
+test <- raster::select(river_area_rescale)
+plot(test)
+
+cellStats(river_area_rescale, "max") # 0.4394219
+cellStats(river_area_rescale, "min") # 0 
+# seems reasonable
+
+
+## save this raster to mazu 
+writeRaster(river_area_rescale, file.path(prep, "river_area_rescale.tif"))
+
+river_area_rescale <- raster(file.path(prep, "river_area_rescale.tif"))
+
+# Read in coastline raster (taken from the wastewater project: https://github.com/OHI-Science/wastewater/blob/35baf7c3ef6d8bf3fdd831ad90e4f495d3bcd809/code/3_rasterprep/3_river_raster.py)
+coast_rast <- raster(file.path("/home/shares/ohi/git-annex/land-based/wastewater/data/interim/coastline.tif"))
+
+test <- raster::select(coast_rast)
+plot(test)
+
+# reproject this to correct resolution
+## project surface water to nutrient crs...
+new_crs <- "+proj=longlat +datum=WGS84 +no_defs"
+
+new_raster <- raster::raster(nrows = 2160, ncols=4320, xmn = -180, xmx = 180, ymn = -90, ymx = 90, crs = new_crs)
+
+raster::beginCluster(n = 8) 
+
+# coast_reproj_area <- coast_rast/raster::area(coast_rast)
+
+coast_reproj <-  projectRaster(coast_rast, new_raster, crs = new_crs, method = 'bilinear') ## ngb ensures the sum stays the same... no interpolation
+
+# coast_reproj_fix <- coast_reproj*raster::area(coast_reproj)
+endCluster()
+
+plot(coast_reproj)
+
+test <- raster::select(coast_reproj)
+plot(test)
+
+
+coast_reproj[coast_reproj>0] <- 1 
+plot(coast_reproj)
+
+## now add to the river area raster
+
+river_coastline_area <- river_area_rescale + coast_reproj
+
+plot(river_coastline_area)
+test <- raster::select(river_coastline_area)
+plot(test)
+cellStats(river_coastline_area, "max")
+cellStats(river_coastline_area, "min")
+
+river_coastline_area[river_coastline_area >1] <- 1
+
+writeRaster(river_coastline_area, file.path(prep, "river_coastline.tif"))
+```
+
+

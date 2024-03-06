@@ -1,0 +1,336 @@
+---
+title: 'OHI `r format(Sys.Date(), "%Y")`: Sea Surface Temperature Pressure Layer'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 3
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This script creates the Sea Surface Temperature (SST) layer for the 2022 global Ocean Health Index assessment.
+
+------------------------------------------------------------------------
+
+# Updates from previous assessment
+
+Used updated 2021 data from NOAA
+
+------------------------------------------------------------------------
+
+# Data Source
+
+Data come from NOAA's NCEI: [CoRTAD version 6](https://www.ncei.noaa.gov/products/coral-reef-temperature-anomaly-database)
+
+See `prs_sst/v2015/dataprep.R` for preparation of the "annual_pos_anomalies" data.
+
+**Native Data Resolution**: \~4km\
+**Description**: Cortadv6_SSTA.nc = SST anomalies (weekly SST minus weekly climatological SST), weekly data for all years, degrees Kelvin Cortadv6_weeklySST.nc = SST, weekly data for all years, degrees Kelvin\
+**Time Range**: 1982 - 2021 (weekly averages across all years)\
+**Format**: NetCDF **Downloaded**: June 22, 2022
+
+------------------------------------------------------------------------
+
+## Setup
+
+```{r setup, message=F,warning=F, eval = FALSE}
+
+# Set options for code chunks
+knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'figs/', message = FALSE, warning = FALSE)
+
+# Load packages
+library(raster)
+library(RColorBrewer)
+library(tidyverse)
+library(rgdal)
+library(doParallel)
+library(foreach)
+library(sf)
+library(ncdf4)
+library(httr)
+library(lubridate)
+library(animation)
+library(plotly)
+library(here)
+library(snow)
+library(terra)
+library(tictoc)
+library(furrr)
+library(purrr)
+library(future)
+library(beepr)
+
+# suppress progress bars for terra
+terraOptions(progress=0)
+
+# OHI spatial files, directories, etc
+source(here("workflow/R/common.R"))
+
+# Update scenario year, set up programmatic scenario year updating
+scen_year_number <- 2023
+scen_year <- as.character(scen_year_number)
+prev_scen_year <- as.character(scen_year_number - 1)
+
+# Standard OHI file paths
+dir_data <- paste0(dir_M, "/git-annex/globalprep/_raw_data/CoRTAD_sst/d", scen_year)
+dir_int  <- paste0(dir_M, "/git-annex/globalprep/prs_sst/v", scen_year, "/int")
+dir_output  <- paste0(dir_M, "/git-annex/globalprep/prs_sst/v", scen_year, "/output")
+dir_anom_threshold  <- paste0(dir_M, "/git-annex/globalprep/prs_sst/sd_mean_30yr_rasters")
+
+# Load in OHI spatial data
+ohi_rasters()
+regions_shape()
+
+# Specify years for calculations
+yrs <- 1982:2022
+
+# Rainbow color scheme and load in OHI regions
+cols <- rev(colorRampPalette(brewer.pal(11, 'Spectral'))(255)) 
+land <- regions %>% subset(rgn_type %in% c("land", "land-disputed", "land-noeez"))
+
+```
+
+------------------------------------------------------------------------
+
+## Standard Deviation Calculation
+
+```{r}
+# read in this new and old SD
+sd_2023 <- rast("/home/shares/ohi/git-annex/globalprep/prs_sst/sd_mean_30yr_rasters/sst_sd_week_1.tif")
+sd_2021 <- rast("/home/shares/ohi/git-annex/globalprep/prs_sst/v2021/int/sd_sst_week_1.tif")
+            
+# extract values
+sd_2023_v <- terra::values(sd_2023, na.rm = TRUE)
+sd_2021_v <- terra::values(sd_2021, na.rm = TRUE)
+
+# sample down to 50000
+sd_2023_sampled <- sample(sd_2023_v, size = 50000)
+sd_2021_sampled <- sample(sd_2021_v, size = 50000)
+
+# Create data frames
+df_2023 <- data.frame(value = sd_2023_sampled, year = "2023")
+df_2021 <- data.frame(value = sd_2021_sampled, year = "2021")
+
+# ggplot 2023/21 SD
+sd_23 <- ggplot(df_2023, aes(x=value)) +
+  geom_histogram(bins=50, fill="skyblue", color="black", alpha=0.7) +
+  labs(x="Week 1 SD", y="Count", title="SD 2023") + #Corrected title year from 2021 to 2023
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face="bold")) +
+  xlim(0,4) +
+  ylim(0,6000)
+
+sd_21 <- ggplot(df_2021, aes(x=value)) +
+  geom_histogram(bins=50, fill="skyblue", color="black", alpha=0.7) +
+  labs(x="Week 1 SD", y="Count", title="SD 2021") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face="bold")) +
+  xlim(0,4) +
+  ylim(0,6000)
+
+
+sd_21 + sd_23
+```
+
+------------------------------------------------------------------------
+
+## Raw Anoms
+
+```{r}
+## compare raw pos anom values 
+sst_v2023_test_raw <- rast(file.path(dir_int, "annual_pos_anomalies_sd_2016.tif"))
+sst_v2021_test_raw <- rast("/home/shares/ohi/git-annex/globalprep/prs_sst/v2021/int/annual_pos_anomalies_sd_2016.tif")
+
+df_tmp_raw <- data.frame(v2023 = values(sst_v2023_test_raw), 
+                     v2021 = values(sst_v2021_test_raw))
+
+colnames(df_tmp_raw) <- c("v2023", "v2021")
+
+df_samp_raw_panom <- df_tmp_raw %>%
+  mutate(row_number = row_number()) %>% 
+  filter(row_number %in% sample(1:length(row_number), 7000))
+
+ggplot(data = df_samp_raw_panom, aes(x=v2023, y = v2021)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(x="Positive Anomalies 2023", y="Positive Anomalies 2021", title="Positive Annual Anomalies Count 23/21")
+```
+
+------------------------------------------------------------------------
+
+## Raw Excess Anoms
+
+```{r}
+## compare raw diff values 
+sst_v2023_test_raw <- rast(file.path(dir_int, "sst_diff_ocean_2008-2012.tif"))
+sst_v2021_test_raw <- rast("/home/shares/ohi/git-annex/globalprep/prs_sst/v2021/int/sst_diff_ocean_2008-2012.tif")
+
+df_tmp_raw <- data.frame(v2023 = values(sst_v2023_test_raw), 
+                     v2021 = values(sst_v2021_test_raw))
+
+colnames(df_tmp_raw) <- c("v2023", "v2021")
+
+df_samp_raw <- df_tmp_raw %>%
+  mutate(row_number = row_number()) %>% 
+  filter(row_number %in% sample(1:length(row_number), 7000))
+
+ggplot(data = df_samp_raw, aes(x=v2023, y = v2021)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) +
+  geom_abline(slope = 0, intercept = 0) +
+  labs(x="Dif Anomalies 2023", y="Dif Anomalies 2021", title="2012 5 yr Excess Anomalies 23/21")
+```
+
+------------------------------------------------------------------------
+
+```{r eval = FALSE}
+## compare 2008-2012 extremes between v2023 and v2021 assessement 
+sst_v2023_test <- rast(file.path(dir_output, "sst_2008-2012_1985-1989.tif"))
+sst_v2021_test <- rast("/home/shares/ohi/git-annex/globalprep/prs_sst/v2021/output/sst_2008-2012_1985-1989.tif")
+
+# extract values and put them into a data frame
+df_tmp <- data.frame(v2023 = values(sst_v2023_test), 
+                     v2021 = values(sst_v2021_test))
+
+# rename columns, terra fails to keep good column names
+colnames(df_tmp) <- c("v2023", "v2021")
+
+# sample down due to size constraints
+df_samp <- df_tmp %>%
+  mutate(row_number = row_number()) %>% 
+  filter(row_number %in% sample(1:length(row_number), 70000))
+
+# create the plot
+ggplot(data = df_samp, aes(x=v2023, y = v2021)) +
+  geom_point()+
+  geom_abline(slope = 1, intercept = 0) + 
+  labs(x="Scaled Excess Anoms 2023", y="Scaled Excess Anoms 2021", title="Scaled Excess Anom Raster Values 23/21")
+
+```
+
+#### Violin
+
+```{r}
+# Load necessary packages
+library(ggplot2)
+library(reshape2)
+
+# Convert data to long format
+df_long <- melt(df_samp, id.vars = NULL, measure.vars = c("v2023", "v2021"), variable.name = "Year", value.name = "Value")
+
+# Create violin plot
+ggplot(df_long, aes(x = Year, y = Value)) +
+  geom_violin(trim = FALSE, fill = 'blue', color = 'black') +
+  theme_minimal() +
+  labs(title = "Violin plot of v2023 and v2021",
+       x = "Year", 
+       y = "Value")
+
+
+```
+
+#### Statistics
+
+```{r}
+# Compute statistics
+summary_v2023 <- summary(df_samp$v2023, na.rm = TRUE)
+summary_v2021 <- summary(df_samp$v2021, na.rm = TRUE)
+
+# Standard Deviation
+sd_v2023 <- sd(df_samp$v2023, na.rm = TRUE)
+sd_v2021 <- sd(df_samp$v2021, na.rm = TRUE)
+
+# Create data frame for kable
+stat_df <- data.frame(
+  Statistic = c("Min", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max", "SD"),
+  v2023 = c(summary_v2023[1], summary_v2023[2], summary_v2023[3], summary_v2023[4], summary_v2023[5], summary_v2023[6], sd_v2023),
+  v2021 = c(summary_v2021[1], summary_v2021[2], summary_v2021[3], summary_v2021[4], summary_v2021[5], summary_v2021[6], sd_v2021)
+)
+
+# Display with kable
+knitr::kable(stat_df, row.names = FALSE, align = 'c', caption = "Summary Statistics for v2023 and v2021")
+
+```
+
+------------------------------------------------------------------------
+
+## PRS Score Dot Plot
+
+```{r}
+# load in prs data from 23 and 21
+prs_data_23 <- read.csv("output/sst_updated.csv")
+prs_data_22 <- read.csv("../v2022/output/sst_updated.csv")
+
+# join into one df
+compare <- left_join(prs_data_23, prs_data_22, by = c("rgn_id", "year")) %>%
+  rename(prs2023 = pressure_score.x, prs2022 = pressure_score.y)
+
+# 2022 vs 2023 pressure scores dot plot
+p <- ggplot(data = compare) +
+  geom_point(aes(x = prs2023, y = prs2022)) +
+  geom_abline(intercept = 0, slope = 1) +
+  facet_wrap(~year) +
+  labs(x="PRS Score 2023", y="PRS Score 2022", title="SST PRS Score 22/23")
+
+print(p)
+
+
+```
+
+------------------------------------------------------------------------
+
+## PRS Score Histogram
+
+```{r}
+# histogram comparing 2021 values to 2023 values
+hist2022 <- ggplot(compare, aes(x = prs2022)) +
+  geom_histogram(fill = "gray", color = "black") + 
+  theme_bw() + 
+  labs(x="PRS Score", y="Count", title="SST PRS Score 2022") +
+  xlim(0, 1) +
+  ylim(0, 300)
+
+hist2023 <- ggplot(compare, aes(prs2023)) +
+  geom_histogram(fill = "gray", color = "black") + 
+  theme_bw() + 
+  labs(x="PRS Score", y="Count", title="SST PRS Score 2023") +
+  xlim(0, 1) +
+  ylim(0, 300)
+
+hist2022 + hist2023
+```
+
+```{r}
+
+# Get list of rescaled and masked sst data files
+sst_res_mask <- list.files(dir_output, "sst.*_rescaled_icemask.tif", full.names = TRUE)
+
+# Create gif visualizing the rescaled and masked sst
+# This loop outputs warning and error text but successfully creates .gif
+saveGIF({
+  for(i in 1:length(sst_res_mask)){
+    
+    # Get name for image from file path date
+    n = sprintf("SST Pressure %s", 
+                substr(sst_res_mask[i], 64, 72))
+    
+    # Plot and save raster raster
+    plot(raster(sst_res_mask[i]), 
+         zlim = c(0, 1), # fix zlimits
+         axes = FALSE, box = FALSE, 
+         main = n)}}, 
+  ani.width = 750,
+  ani.height = 400,
+  movie.name = sprintf("%s/sst.gif", dir_output)) 
+
+```

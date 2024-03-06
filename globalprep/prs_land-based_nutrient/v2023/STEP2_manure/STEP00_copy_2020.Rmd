@@ -1,0 +1,85 @@
+---
+title: "OHI 2022: STEP00 copy 2019 to 2020 for manure"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Summary 
+Combines all the sources of manure volatization and leaching for each livestock system 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(here)
+library(doParallel)
+library(tidyverse)
+library(readr)
+library(janitor)
+
+nutrient_d2021_anx <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/FAOSTAT/manure_nutrient/d2021/")
+git_manure <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP2_manure")
+location_tifs_path <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/halpern_food_systems/d2021/animal_farm/location_tifs")
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+git_crop <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP1_crop")
+
+source(here(git_crop, "R/common_spatial.R")) # read in necessary spatial files 
+
+un <- read_csv(here("globalprep/spatial/v2021/UNSD_Methodology.csv")) %>% 
+  dplyr::select(iso3c, Global_Name, Region_Name, Sub_region_Name, Intermediate_Region_Name)
+```
+
+Copy all files into a the v2022 git annex file
+
+```{bash}
+
+cp -r /home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/animal_farm_int/STEP7_total_N_leaching/ /home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/animal_farm_int
+
+
+cp -r /home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/animal_farm_int/STEP7_total_N_volatizing/ /home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/animal_farm_int
+
+cp -r /home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/animal_farm_int/N_from_excretion_manure/ /home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/animal_farm_int
+
+cp -r /home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/animal_farm_int/P_from_excretion_manure/ /home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/animal_farm_int
+
+```
+
+Now loop through all 2019 files and save as 2020 files 
+
+```{r}
+
+folders <- c("STEP7_total_N_leaching", "STEP7_total_N_volatizing", "P_from_excretion_manure", "N_from_excretion_manure")
+for(folder in folders){
+
+#  folder = folders[[1]]
+files <- list.files(paste0("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/animal_farm_int/", folder), pattern = "2019", full.names = TRUE)
+
+for(file in files){
+  
+  #file = files[[1]]
+  
+  tmp <- rast(file)
+  
+  name <- basename(file)
+  
+  name <- str_replace(name, "2019", "2020")
+  
+  writeRaster(tmp, paste0("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/animal_farm_int/", folder, "/", name), overwrite = TRUE)
+}
+}
+
+```
+

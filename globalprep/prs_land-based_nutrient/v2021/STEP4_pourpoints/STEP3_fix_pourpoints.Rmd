@@ -1,0 +1,228 @@
+---
+title: 'OHI 2021 - Fix pourpoints which get masked from the plume model '
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../workflow/templates/ohi_hdr.html' 
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+
+[REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2021/globalprep/prs_land-based_nutrient/v2021/STEP1_pourpoints_prep.Rmd)
+
+
+# Summary
+This prep assigns the pourpoints which are excluded from the plume model due to the ocean mask to their nearest coastal point, and rewrites the appropriate shapefiles to run through the plume model. The resulting files will be the files which should be run through the plume model.
+
+## The following data are used:
+
+* 
+
+
+
+## Initial set-up code
+
+```{r setup, eval = FALSE}
+library(tidyverse)
+library(raster)
+library(sf)
+library(mapview)
+library(janitor)
+library(here)
+library(parallel)
+library(doParallel)
+# install.packages("nngeo")
+library(nngeo)
+
+
+source(here('workflow/R/common.R'))
+
+ww_raw_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/raw"
+ww_intermediate_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/interim"
+prs_int_dir <- "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int"
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+
+
+```
+
+## 1. Correct the global pourpoints file so that it will not be masked out of the plume model
+
+NOTE: for v2022, you can likely skip step 1 of this script and move directly to step 2. 
+
+Create list of missing pourpoints 
+
+```{r}
+global_plume <- st_read("/home/shares/ohi/git-annex/land-based/wastewater/data/raw/pour_points/global_plume_2007_2010.shp")
+# plot(global_plume$geometry)
+mapview(tail(global_plume, 10000))
+
+global_plume <- st_transform(global_plume, 4326) 
+
+## exclude the coastal pourpoints from the global pourpoint file
+coastal_pourpoints <- st_read(file.path(ww_intermediate_dir, "watersheds_coastal.shp"))
+
+coastal_pp_ids <- unique(coastal_pourpoints$basin_id)
+
+global_plume_coastal <- global_plume %>%
+  filter(basin_id %in% coastal_pp_ids)
+
+## now grab a list of the pourpoints which were included in the first plume model run of v2021
+pp_2005_all <- st_read(file.path(prs_int_dir, "pourpoints/pourpoints_crop_manure_leached_volt_N_2005.shp"))
+
+fils_try2 <- data.frame(x = list.files("/home/sgclawson/plumes/archive/output1_try2/", pattern="tif$", full.names = FALSE, recursive = TRUE))
+
+fils_try1 <- data.frame(x = list.files("/home/sgclawson/plumes/archive/output1_try1/", pattern = "tif$", full.names = FALSE, recursive = TRUE))
+
+all_files_done <- rbind(fils_try2, fils_try1)
+
+pourpoint_names_files <- data.frame(fils = sub('.*plume_effluent_', '', all_files_done$x))
+
+pourpoint_names <- data.frame(basin_id = sub('.tif', '', pourpoint_names_files$fils)) %>%
+  mutate(basin_id = as.character(basin_id)) %>%
+  dplyr::filter(str_detect(basin_id, "subsets", negate = TRUE))
+
+
+## now filter out these pourpoints from our global plume to get the ones which were excluded
+global_plume_exclude <- global_plume_coastal %>%
+  filter(!(basin_id %in% pourpoint_names$basin_id)) # many of these values 
+
+
+setdiff(pp_2005_remaining$basin_id, global_plume_exclude$basin_id)
+zero_vals <- c(setdiff(global_plume_exclude$basin_id, pp_2005_remaining$basin_id))
+
+global_plume_exclude_zero <- global_plume_exclude %>%
+  filter(!(basin_id %in% zero_vals)) # now we have a list of the pourpoints that were excluded from the first v2021 plume model run
+
+```
+
+Now take the pourpoints which are excluded from the plume model and find the nearest shore line point. Assign the masked out pourpoints to the nearest shoreline and save that file. 
+
+```{r}
+shoreline_points <- st_read(file.path(prs_int_dir, "global_pourpoints_fix/coastline_1km_points.shp"))
+
+
+## try this on a subset of points
+shoreline_points_subset <- head(shoreline_points, 1000) %>%
+  mutate(row = row_number())
+mapview(shoreline_points_subset)
+
+global_plume_exclude_zero_test <- global_plume_exclude_zero %>%
+  mutate(row = row_number()) %>%
+  filter(row %in% c(2418:2559)) %>%
+  mutate(row = row_number())
+
+mapview(global_plume_exclude_zero_test)
+
+nearest_neighbor <- st_nn(global_plume_exclude_zero_test, shoreline_points_subset, sparse = TRUE)
+
+
+test <- data.frame(row_id_pours = 1:142, row_id_shoreline = unlist(nearest_neighbor))
+
+test_global_plume_fix <- global_plume_exclude_zero_test %>%
+  st_drop_geometry() %>%
+  left_join(test, by = c("row" = "row_id_pours")) %>%
+  left_join(shoreline_points_subset, by = c("row_id_shoreline" = "row")) %>%
+  st_as_sf() # %>%
+ # st_jitter(0.05)
+
+mapview(test_global_plume_fix) # it worked! 
+
+## now try on all points...
+
+
+shoreline_points_nn <- shoreline_points %>%
+  mutate(row_id_shoreline = row_number())
+mapview(head(shoreline_points_nn, 100))
+
+global_plume_exclude_zero_nn <- global_plume_exclude_zero %>%
+  mutate(row_id_pours = row_number())
+
+mapview(global_plume_exclude_zero_nn)
+
+nearest_neighbor <- st_nn(global_plume_exclude_zero_nn, shoreline_points_nn, sparse = TRUE, parallel = 12)
+
+
+matched <- data.frame(row_id_pours = 1:nrow(global_plume_exclude_zero_nn), row_id_shoreline = unlist(nearest_neighbor))
+
+global_plume_fix <- global_plume_exclude_zero_nn %>%
+  st_drop_geometry() %>%
+  left_join(matched, by = c("row_id_pours")) %>%
+  left_join(shoreline_points_nn, by = c("row_id_shoreline")) %>%
+  st_as_sf() # %>%
+ # st_jitter(0.05)
+
+st_write(global_plume_fix, file.path(prs_int_dir, "global_pourpoints_fix/excluded_fixed.shp"))
+
+mapview(global_plume_fix)
+mapview(global_plume_exclude_zero_nn)
+
+## it worked! 
+
+global_plume_included <- global_plume_coastal %>% 
+  filter((basin_id %in% pourpoint_names$basin_id)) %>%
+  dplyr::select(basin_id, geometry)
+
+global_plume_fix_final <- global_plume_fix %>%
+  dplyr::select(basin_id, geometry)  %>%
+  rbind(global_plume_included)
+
+st_write(global_plume_fix_final, file.path(prs_int_dir, "global_pourpoints_fix/global_pourpoints_coastal_fix.shp"))
+
+```
+
+2. Correct each yearly pourpoint file to match the geometries in the fixed one we created above.
+
+```{r}
+files_list <- str_subset(string = c(list.files(file.path(prs_int_dir, "pourpoints")), full = TRUE), ".shp")
+
+excluded_shp <- st_read(file.path(prs_int_dir, "global_pourpoints_fix/excluded_fixed.shp")) %>%
+  dplyr::select("basin_id" = "basin_d", geometry)
+
+excluded_pp_list <- c(excluded_shp$basin_id)
+
+registerDoParallel(cores = 5)
+foreach(file = files_list) %dopar% {
+  
+  # file = files_list[1]
+  
+  pp <- st_read(file.path(prs_int_dir, "pourpoints", file)) 
+  
+  
+  pp_included <- pp %>%
+    filter(!(basin_id %in% excluded_pp_list))
+  
+  pp_excluded_values <- pp %>% 
+    filter((basin_id %in% excluded_pp_list)) %>%
+    st_drop_geometry()
+  
+  ## now join excluded values with the fixed pp dataset
+  pp_excluded_fix <- pp_excluded_values %>%
+    left_join(excluded_shp) %>%
+    st_as_sf() %>%
+    dplyr::select(basin_id, geometry, effluent)
+  
+  # mapview(pp_excluded_fix)
+  
+  ## now rbind back with the included 
+  
+  pp_all_fix <- rbind(pp_included, pp_excluded_fix)
+  
+
+ # final_name <- paste0("FIXED_", file)
+  
+  st_write(pp_all_fix, file.path(prs_int_dir, "pourpoints_FINAL", file), delete_dsn = TRUE) # this is what you will run through the plume! 
+}
+
+```
+

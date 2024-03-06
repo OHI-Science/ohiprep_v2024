@@ -1,0 +1,153 @@
+---
+title: "Coding Exercise for NCEAS Data Science Job Application"
+output: html_document
+---
+
+## Instructions
+
+You will have 24 hours to complete this activity. You will work directly in this Rmarkdown document to:
+
+- write code to wrangle, analyze, and visualize the data  
+- answer questions and provide additional insights/thoughts
+- document workflow
+
+Note: If you are unfamiliar with Rmarkdown, that is no problem; just add your code to the gray code chunks and treat it like any .R file. Text can be added to the white parts of the document.
+
+Once you have finished, please add your last name to the file name (e.g., NAME_coding_exercise.Rmd) and send to: Ben Halpern and Melanie Frazier (halpern@nceas.ucsb.edu and frazier@nceas.ucsb.edu). 
+You can also provide a knitted html version of this file as well, but this is not necessary.
+
+You will be evaluated on: coding ability, documentation of code, and communication of results.     
+
+
+Please contact Melanie (frazier@nceas.ucsb.edu) if you have any questions about this exercise.
+
+
+## Packages
+
+Add packages you will use to the following code chunk.  We start by loading the `readr` package, which we will use to read in dataset.
+
+```{r setup}
+
+## loading packages
+library(readr)
+
+```
+
+
+
+## Data
+
+You will be working with a dataset describing global Ocean Health Index scores for:
+ 
+  - 10 goals and 1 "Index" score for each country.  Goals describe specific benefits we receive from the ocean (e.g., food provision and tourism and recreation) and the Index score is the overall score for the country calculated by averaging the 10 goal scores. 
+  - 220 countries/regions (we use these terms interchangably)
+  - 7 years
+  
+We will read in the data from GitHub.com, and do some preliminary exploration:
+
+```{r data}
+
+## read in OHI data:
+ohi_data <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohiprep_v2019/gh-pages/Reference/Lessons_in_OHI/coding_exercise/scores.csv")
+
+
+## do an initial exploration of the data (i.e., what functions do you use to familiarize yourself with a dataset):
+
+
+
+```
+
+What information did you learn about the data from your explorations? 
+
+
+## Task 1
+
+Please help make these data more human readable by including the full goal name (vs. the 2 letter abbreviation) and the country name.  
+
+Here is a table that includes goal names: https://github.com/OHI-Science/ohi-global/blob/draft/global_supplement/tables/ten_goals.csv
+
+Here is a table with the region names: https://github.com/OHI-Science/ohi-global/blob/draft/eez/spatial/regions_list.csv
+(the rgn_id column in this file matches the region_id column in the ohi_data)
+
+```{r human readable}
+
+## Write code needed to update the ohi_data to include the full goal name and the country name.
+
+
+## Write code to save the new version of the data frame.
+
+
+```
+
+
+## Task 2
+
+The above description of the data claims there are 220 countries with Ocean Health Index scores; however, a quick examination of these data reveals there are 221 countries in the data:
+
+```{r countrycount}
+
+length(unique(ohi_data$region_id))
+
+```
+
+
+One of the countries has no data.  Figure out which one.
+
+```{r regions}
+
+## Write code to identify the country with no data.
+
+
+
+```
+
+
+## Task 3
+
+Create a plot showing all 10 goal scores and the "Index" score for the United States of America from 2012 to 2017. 
+
+```{r US}
+
+## Code to create plot of USA of 10 goal and Index scores across years
+
+
+
+```
+
+
+## Task 4
+
+For each country and goal (i.e., the 10 goal + 1 Index scores), calculate the average score across all years (note: each country should have N=11 scores when finished).
+
+```{r across year avg}
+
+## Code to summarize data
+
+
+
+```
+
+
+Create a plot that shows the distribution (e.g., histogram or barplot or ??) of *Index* scores of all countries.
+
+```{r across year plot}
+
+## Code to create a plot showing distribution of country Index scores
+
+
+
+```
+
+
+
+## Task 5
+Figure out which goals have the most NA values for scores in 2018.  Which ones have the least?  
+
+```{r missing data}
+
+## Explore missing data
+
+
+```
+
+

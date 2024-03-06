@@ -1,0 +1,212 @@
+---
+title: 'OHI `r format(Sys.Date(), "%Y")`: Mangrove condition'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+We used Global Mangrove Watch mangrove extent data to estimate the proportional yearly change in mangrove area using a linear regression model of years from 2007 up to the year in question. This length of data is longer than we usually do (typically 5 years), but we feel we get a better estimate using this period of time. Proportional yearly change is determined by first dividing yearly extents by the extent from the earliest year in the model. Year is then regressed on those proportions, and the resulting slope is multiplied by 5 to get the predicted change in five years. The original mangrove extent data are provided yearly (2007, 2008, 2009, 2010, 2015, 2016, 2017, 2018, 2019, 2020) in the form of polygons - these are subsequently rasterized to match our regions and extract the area.
+
+## Updates from previous assessment
+2022: Using updated dataset from Global Mangrove Watch. 
+
+***
+## Data Source 
+
+**Reference**: Bunting, P., Rosenqvist, A., Lucas, R., Rebelo, L.-M., Hilarides, L., Thomas, N., Hardy, A., Itoh, T., Shimada, M., Finlayson, C., 2018. The Global Mangrove Watch—A New 2010 Global Baseline of Mangrove Extent. Remote Sensing 10, 1669. https://doi.org/10.3390/rs10101669
+
+**Downloaded**: 08/02/2022
+
+**Description**:  
+Global Mangrove Watch (1996 - 2020)	
+https://data.unep-wcmc.org/datasets/45
+Reported at spatial cell scale. 
+
+"The GMW aims to provide geospatial information about mangrove extent and changes to the Ramsar Convention, national wetland practitioners, decision makers and NGOs. It is part of the Ramsar Science and Technical Review Panel (STRP) work plan for 2016-2018 and a Pilot Project to the Ramsar Global Wetlands Observation System (GWOS), which is implemented under the GEO-Wetlands Initiative. The primary objective of the GMW has been to provide countries lacking a national mangrove monitoring system with first cut mangrove extent and change maps, to help safeguard against further mangrove forest loss and degradation. The GMW has generated a global baseline map of mangroves for 2010 using ALOS PALSAR and Landsat (optical) data, and changes from this baseline for seven epochs between 1996 and 2017 derived from JERS-1, ALOS and ALOS-2. Annual maps are planned from 2018 and onwards"
+
+**Time range**: 1996-2020
+
+
+***
+# Methods
+
+
+## Setup
+``` {r setup, message = FALSE, warning = FALSE, eval = FALSE}
+library(here)
+library(tidyverse)
+library(ohicore)
+source(here("workflow/R/common.R"))
+
+version_year <- "2022"
+
+dir_hab_mangrove <- here(paste0("globalprep/hab_mangrove/v", version_year))
+dir_fao_mangrove <- file.path(dir_M, "git-annex/globalprep/_raw_data/FAO_mangrove")
+region_data()
+```
+
+```{r, eval = FALSE}
+mangrove_extent <- read_csv(file.path(dir_hab_mangrove, "data/habitat_extent_mangrove_updated.csv")) %>% 
+  filter(rgn_id <= 250, year >= 2007)
+```
+
+
+## Take an initial look at trend data and compare to old data
+
+```{r, eval = FALSE}
+## look at Benin since it had a large increase mangrove cover between 2010 and 2015 and is an outlier 
+benin <- mangrove_extent %>%
+  filter(rgn_id == 99)
+
+## ↓ comments from v2021 ↓
+
+# This accounts for 0.02 km2 of reforestation in Benin: https://www.globalnature.org/en/manatees-mangroves-benin
+# This accounts for 0.3 km2 of reforestation in Benin: https://initiative-mangroves-ffem.com/en/costa-rica-benin-project/
+# This indicates that mangrove cover in Benin has been steadily decreasing: https://link.springer.com/article/10.1007%2Fs10668-017-0075-x
+# I dont trust the benin estimates... it seems that there is a lack of information there. And looking at our FAO mangrove health data, the numbers don't match up either. I will just assign Benin a 0 trend. 
+
+## --
+
+# v2022: the extents for Benin from the latest update (2017 - 2020) appear more reasonable - this assessment we will calculate trend for Benin based on 2016 through 2020
+
+# our datasets formerly reported Dominica having 0 extent, but the analysis of the polygons from the latest update now show a small extent. The paper associated with the GMW data (https://zenodo.org/record/6894273) shows Dominica having a consistent small extent (0.01 km2) for all years. Dominica's trend will be based on years after it's extent became non-zero.
+
+# Bonaire has a suspicious jump in extent in 2018 that will be removed - this issue was identified later in the workflow after initially calculating trends and finding Bonaire had a relatively large positive trend
+
+mangrove_extent_rgns <-  mangrove_extent %>%
+  left_join(rgns_eez) %>%
+  dplyr::select(rgn_id, rgn_name, year, habitat, km2) %>%
+  filter(rgn_id != 99 | (rgn_id == 99 & year >= 2017)) %>% # crop Benin year range
+  filter(rgn_id != 123 | (rgn_id == 123 & year >= 2019)) %>%  # crop Dominica year range
+  filter(rgn_id != 245 | (rgn_id == 245 & year != 2018)) %>%  # remove 2018 for Bonaire
+  group_by(rgn_id, rgn_name) %>%
+  mutate(total_area = sum(km2),
+         km2_rel = km2 / km2[year == min(year)]) %>%
+  mutate(km2_rel = ifelse(total_area == 0, 0, km2_rel))
+
+
+# function to create linear regression and tidy the output - to be used in pipe sequence below
+trend_function <- function(df) {
+  lm(km2_rel ~ year, data = df) %>% 
+    broom::tidy()
+}
+
+mangrove_extent_trends <- mangrove_extent_rgns %>% 
+  group_by(rgn_id, rgn_name) %>% 
+  nest() %>% # create nested df based on groupings
+  mutate(model = purrr::map(data, trend_function)) %>% # perform linear regression on each region
+  unnest(cols = c(model)) %>% # unnest contents of model column
+  filter(term == "year") %>% 
+  mutate(trend = estimate * 5 %>% 
+           round(6)) %>% 
+  dplyr::select(rgn_id, rgn_name, trend) %>% 
+  ungroup()
+
+```
+
+## Look at regions with most positive trends and make sure they make sense
+
+```{r, eval = FALSE}
+
+growing_extents <- mangrove_extent_trends %>% 
+  slice_max(n = 10, order_by = trend)
+
+# investigate Bonaire
+bonaire <- mangrove_extent %>% 
+  filter(rgn_id == 245)
+
+# 2018 looks suspicious - this increase isn't reflected in the GMW paper, and I can't find anything to support it elsewhere - this year is now removed above 
+
+```
+ 
+## Compare with trends from the last update
+ 
+```{r, eval = FALSE}
+version_year_dirs <- list.dirs(here("globalprep/hab_mangrove"), recursive = FALSE, full.names = FALSE)
+prev_version_year <- version_year_dirs[length(version_year_dirs) - 1]
+
+old_trends <- read_csv(here("globalprep/hab_mangrove", prev_version_year, "data/habitat_trend_mangrove_updated.csv")) %>% 
+  filter(year == max(year)) %>% 
+  rename(old_trend = trend)
+  
+compare_trends <- mangrove_extent_trends %>% 
+  left_join(old_trends, by = "rgn_id")
+
+plot(compare_trends$old_trend, compare_trends$trend)
+
+# things look quite different, but this isn't surprising as GMW updated their methods and back-calculated extents / redefined polygons for past years
+
+```
+
+## Calculate trends for all scenario years and write final layer
+
+|Scenario year | Data years used to calculate trend|
+|:------------:|:---------------------------------:|
+|    2022      |           2007 - 2020             |
+|    2021      |           2007 - 2020             |
+|    2020      |           2007 - 2020             |
+|    2019      |           2007 - 2019             |
+|    2018      |           2007 - 2018             |
+|    2017      |           2007 - 2017             |
+|    2016      |           2007 - 2016             |
+|    2015      |           2007 - 2015             |
+|    2014      |           2007 - 2015             |
+|    2013      |           2007 - 2015             |
+|    2012      |           2007 - 2015             |
+
+```{r, eval = FALSE}
+
+# create vector of assessment years we need trends for
+assessment_years <- unique(mangrove_extent$year[mangrove_extent$year >= 2015])
+
+# list to be populated with dfs created in loop below
+extent_df_list <- list()
+
+# loop to filter extent df to just years that will be used in regression to find trend for the year in question, calculate trend, and add new df with trends to list
+for (i in seq_along(assessment_years)) {
+  
+  df <- mangrove_extent_rgns %>% 
+    filter(year <= assessment_years[i]) %>% 
+    group_by(rgn_id, rgn_name) %>% 
+    nest() %>% # create nested df based on groupings
+    mutate(model = purrr::map(data, trend_function)) %>% # perform linear regression on each region
+    unnest(cols = c(model)) %>% # unnest contents of model column
+    filter(term == "year") %>% 
+    mutate(trend = estimate * 5 %>% 
+             round(6)) %>% 
+    dplyr::select(rgn_id, rgn_name, trend) %>% 
+    ungroup() %>% 
+    mutate(year = assessment_years[i])
+  
+  df_name <- paste0("extent_trends_", assessment_years[i])
+  
+  assign(df_name, df)
+  
+  extent_df_list[[df_name]] <- get(df_name)
+  
+}
+
+# bind dfs created in loop
+habitat_trend_mangrove_updated <- bind_rows(extent_df_list) %>% 
+  select(-rgn_name) %>% 
+  mutate(habitat = "mangrove")
+
+
+write.csv(habitat_trend_mangrove_updated, here(dir_hab_mangrove, "data/habitat_trend_mangrove_updated.csv"), row.names=FALSE)
+
+```

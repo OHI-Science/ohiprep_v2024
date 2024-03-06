@@ -1,0 +1,132 @@
+---
+title: 'OHI 2023: Food Provision'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This script combines the fisheries catch data with the mariculture production data to create the weights for how much of each score will affect the entire food provision score. 
+
+# Updates from previous assessment
+
+- Mariculture data was updated since last scenario year but fisheries wasn't
+- Updated scenario year input/some file paths to be more programmatic
+- Updated labeling of the graphs
+
+# Methods
+
+```{r, eval = FALSE}
+## load libraries
+library(dplyr)
+library(tidyr)
+library(here)
+
+scen_year <- 2023 # change to latest year
+prev_scen_year <- scen_year - 1
+
+setwd(here::here("globalprep","fp", paste0("v", scen_year)))
+
+## Load FAO-specific user-defined functions
+source('http://ohi-science.org/ohiprep_v2021/workflow/R/common.R')
+```
+
+
+# Import Output Data: Mariculture data
+
+Mariculture production in tonnes.
+```{r, eval = FALSE}
+mar <- read.csv(file.path("..", "..", "mar", paste0("v", scen_year), "output", "MAR_FP_data.csv")) # see metadata in its prep
+```
+
+Fisheries data.
+```{r, eval = FALSE}
+fis <- read.csv(file.path("..", "..", "fis", paste0("v", scen_year), "output", "FP_fis_catch.csv")) %>%
+  dplyr::select(rgn_id, year, fis_t = fis_catch) # see metadata in its prep
+```
+
+# Wrangle 
+
+## Tidy MAR data
+```{r, eval = FALSE}
+mar_tidy <- mar %>%
+  group_by(rgn_id, year) %>%
+  summarize(mar_t = sum(value, na.rm=TRUE)) %>%
+  dplyr::select(rgn_id, year, mar_t) %>%
+  ungroup()
+
+# this one is turning to NA in FP
+filter(mar_tidy, rgn_id == 95) # ok, this makes sense
+```
+
+## Tidy FIS data
+
+```{r, eval = FALSE}
+fis_tidy <- fis %>%
+  mutate(fis_t = ifelse(fis_t == 0, NA, fis_t)) %>%  # 11 NA values is correct (there were 0 in v2023)
+  group_by(rgn_id) %>%
+  arrange(year) %>%
+  fill(fis_t) %>% 
+  ungroup()
+```
+
+## Combine MAR and FIS
+
+Adjust years so they are equivalent.
+```{r, eval = FALSE}
+adjust <- max(mar_tidy$year) - max(fis_tidy$year)
+
+mar_adjust <- mar_tidy %>%
+  mutate(year = year - adjust)
+
+tmp <- full_join(fis_tidy, mar_adjust, by = c('rgn_id', 'year')) # v2023: removed all = TRUE because was not a valid argument, did not see an equivalent
+
+## If NA, turn it into a 0 before weighting
+tmp_weights <- tmp %>%
+  mutate(fis_t = ifelse(is.na(fis_t), 0, fis_t)) %>%
+  mutate(mar_t = ifelse(is.na(mar_t), 0, mar_t)) %>%
+  mutate(w_fis = fis_t/(fis_t + mar_t)) %>%
+  mutate(w_fis = ifelse(mar_t == 0 & fis_t == 0, NA, w_fis)) %>%
+  filter(year >= 2005) %>%
+  dplyr::select(rgn_id, year, w_fis) 
+
+hist(tmp_weights$w_fis,
+     main = "Weights",
+     xlab = "Value")
+```
+
+# Data check
+
+Compare to previous year data
+```{r, eval = FALSE}
+compare <- read.csv(paste0("../../fp/v", prev_scen_year, "/output/wildcaught_weight.csv")) %>%
+  rename(w_fis_old = w_fis) %>%
+  left_join(tmp_weights, by = c('rgn_id', 'year'))
+plot(compare$w_fis_old, compare$w_fis,
+     xlab = paste0("Old data (v", prev_scen_year, ")"),
+     ylab = paste0("New data (v", scen_year, ")"))
+abline(0, 1, col="red")
+```
+
+# Save data
+
+```{r, eval = FALSE}
+write.csv(tmp_weights, 'output/wildcaught_weight.csv', row.names=FALSE)
+
+## add gf file (no gapfilling)
+tmp_gf <- tmp_weights %>%
+  mutate(w_fis = 0) %>%
+  dplyr::select(rgn_id, year, gapfilled = w_fis)
+
+write.csv(tmp_gf, 'output/wildcaught_weight_gf.csv', row.names=FALSE)
+```
+

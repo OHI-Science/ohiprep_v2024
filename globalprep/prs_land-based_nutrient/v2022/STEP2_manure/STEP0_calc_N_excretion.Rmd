@@ -1,0 +1,223 @@
+---
+title: "OHI 2022: Calculate N excretion rates"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Summary
+Use FAOSTAT N excreted in manure data to calculate excretion rates for livestock.
+
+## The following data are used:
+
+* Source: [FAOSTAT N excreted in manure](http://www.fao.org/faostat/en/#data/EMN)
+
+* Downloaded: 09/13/2021
+
+* Data years: 2005 - 2019
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(here)
+library(stringr)
+library(janitor)
+library(countrycode)
+
+
+source(here('workflow/R/common.R'))
+
+region_data()
+
+nutrient_d2021_anx <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/FAOSTAT/manure_nutrient/d2021/")
+git_manure <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP1_manure")
+git_crop <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP1_crop")
+location_tifs_path <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/halpern_food_systems/d2021/animal_farm/location_tifs")
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+
+source(here(git_crop, "R/common_spatial.R")) # read in necessary spatial files 
+
+
+un <- read_csv(here("globalprep/spatial/v2021/UNSD_Methodology.csv")) %>% 
+  dplyr::select(iso3c, Global_Name, Region_Name, Sub_region_Name, Intermediate_Region_Name)
+
+un_codes <-  read_csv(here("globalprep/spatial/v2021/UNSD_iso3c_codes.csv"))
+
+test <- fao_raw %>%
+  distinct(Area, `Area Code (FAO)`)
+
+test2 <- un_codes %>%
+  distinct(Country, `Country Code`, `ISO3 Code`)
+
+test3 <- test %>%
+  left_join(test2, by = c("Area Code (FAO)" = "Country Code"))
+
+
+
+```
+
+
+
+FAO wrangle
+```{r}
+
+fao_raw <- read_csv(file.path(paste0(nutrient_d2021_anx, "FAOSTAT_data_9-13-2021.csv", sep = "")))
+
+## make lookup table for iso3c codes 
+fao_codes_area <- fao_raw %>%
+  distinct(Area, `Area Code (FAO)`)
+
+fao_iso3c_codes_area <- un_codes %>%
+  distinct(Country, `Country Code`, `ISO3 Code`)
+
+lookup_codes <- fao_codes_area %>%
+  left_join(fao_iso3c_codes_area, by = c("Area Code (FAO)" = "Country Code")) %>%
+  dplyr::select(-Area, -Country)
+
+fao <- fao_raw %>% 
+  left_join(lookup_codes, by = "Area Code (FAO)") %>%
+  dplyr::select(iso3c = 'ISO3 Code',
+         country = Area,
+         Element,
+         animal = Item, 
+         year = Year,
+         Value) %>% 
+  pivot_wider(names_from = Element, values_from = Value) %>% 
+  rename(kg_N = 'Amount excreted in manure (N content)') %>% 
+  mutate(tonnes_N  = kg_N/1000,
+         tonnes_N_head = tonnes_N/Stocks) %>% 
+  dplyr::select(iso3c, country, year, animal, stocks = Stocks, tonnes_N_head)
+
+## we don't differentiate between market and breeder pigs so we'll weigh the excretion rates in each country by proportion of each
+pigs <- fao %>% 
+  filter(str_detect(animal, "Swine")) %>% 
+  group_by(iso3c, year) %>% 
+  mutate(total_count = sum(stocks)) %>% 
+  ungroup() %>% 
+  mutate(prop_count = stocks/total_count,
+         weighted = prop_count*tonnes_N_head) %>% 
+  group_by(iso3c, year, country) %>% 
+  dplyr::summarise(tonnes_N_head_weighted = sum(weighted)) %>% 
+  ungroup() %>% 
+  mutate(animal = "pigs", 
+         product = "meat") %>% 
+  dplyr::select(country, year, animal, product, tonnes_N_head = tonnes_N_head_weighted)
+
+## wrangle animal and product, add back in pigs, gapfil
+cows_buff_chick <- fao %>% 
+  filter(!str_detect(animal, "Swine")) %>% 
+  mutate(animal_fix = case_when(str_detect(animal, "Cattle") ~ "cows",
+                                str_detect(animal, "Chickens") ~ "chickens",
+                                animal == "Buffaloes" ~ "buffaloes",
+                                animal == "Goats" ~ "goats",
+                                animal == "Sheep" ~ "sheep"),
+         product = case_when(str_detect(animal, "non-dairy") ~ "meat",
+                             str_detect(animal, "dairy") ~ "milk",
+                             str_detect(animal, "layers") ~ "eggs",
+                             str_detect(animal, "broilers") ~ "meat",
+                             animal_fix == "buffaloes" ~ "milk")) %>% 
+  dplyr::select(country, year, animal = animal_fix, product, tonnes_N_head)
+
+backyard_chick <- cows_buff_chick %>% 
+  filter(animal == "chickens") %>% 
+  group_by(country, year) %>% 
+  dplyr::summarise(tonnes_N_head = mean(tonnes_N_head, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(product = "eggs&meat",
+         animal = "chickens")
+
+goats_sheep <- cows_buff_chick %>% 
+  filter(animal %in% c("goats", "sheep")) %>% 
+  dplyr::select(-product) %>% 
+  slice(rep(1:n(), each = 2)) %>% 
+  mutate(product = rep(c("milk", "meat"), times = 5588))
+
+excretion_rate <- cows_buff_chick %>% 
+  filter(!animal %in% c("goats", "sheep")) %>% 
+  rbind(pigs, goats_sheep, backyard_chick) %>% 
+  filter(country != "China") %>% 
+  mutate(country = ifelse(country == "Eswatini", "Swaziland", country),
+         country = ifelse(country == "Netherlands Antilles (former)", "Bonaire, Sint Eustatius and Saba", country),
+         country = ifelse(country == "French Guyana", "French Guiana", country),
+         country = ifelse(country == "China, mainland", "China", country),
+         iso3c = countrycode(country, origin="country.name", destination = "iso3c"))
+
+# fix serbia and mont 2005 
+serb_mont_fix <- excretion_rate %>%
+  filter(year == 2005, 
+         country == "Serbia and Montenegro") %>%
+  separate_rows(country, sep = " and ") %>%
+  mutate(iso3c = countrycode(country, origin="country.name", destination = "iso3c"))
+
+excretion_rate <- excretion_rate %>%
+  filter(country != "Serbia and Montenegro") %>%
+  rbind(serb_mont_fix)
+
+
+excretion_rate <- left_join(food_rgns, excretion_rate) %>% 
+  dplyr::select(-ID_0, -country) %>% 
+  rename(country = Country)
+
+## fill in the missing regions
+rum_add_on <- filter(excretion_rate, is.na(animal)) %>% 
+  dplyr::select(iso3c, country)  %>% 
+  slice(rep(1:n(), each = 3)) %>% 
+  mutate(animal = rep(c("goats", "cows", "sheep"), times = 43)) %>% 
+  slice(rep(1:n(), each = 2)) %>% 
+  mutate(product = rep(c("milk", "meat"), times = 129),
+         tonnes_N_head = NA) %>%
+  slice(rep(1:n(), each = 15)) %>%
+  mutate(year = rep(2005:2019, 258))
+
+chick_add_on <- filter(excretion_rate, is.na(animal)) %>% 
+  dplyr::select(iso3c, country) %>% 
+  slice(rep(1:n(), each = 3)) %>% 
+  mutate(product = rep(c("eggs", "meat", "eggs&meat"), times = 43),
+         animal = "chickens",
+         tonnes_N_head = NA) %>%
+    slice(rep(1:n(), each = 15)) %>%
+  mutate(year = rep(2005:2019, 129))
+
+buff_pigs_add_on<- filter(excretion_rate, is.na(animal)) %>% 
+  dplyr::select(iso3c, country) %>% 
+  slice(rep(1:n(), each = 2)) %>% 
+  mutate(animal = rep(c("buffaloes", "pigs"), times = 43),
+         product = case_when(animal == "buffaloes" ~ "milk",
+                             animal == "pigs" ~ "meat"),
+         tonnes_N_head = NA) %>%
+      slice(rep(1:n(), each = 15)) %>%
+  mutate(year = rep(2005:2019, 86))
+
+excretion_rate_gf <- excretion_rate %>% 
+  filter(!is.na(animal)) %>% 
+  rbind(rum_add_on, chick_add_on, buff_pigs_add_on) %>% 
+  left_join(un) %>%
+  group_by(animal, year, product, Intermediate_Region_Name) %>% 
+  mutate(tonnes_N_head = ifelse(is.na(tonnes_N_head), mean(tonnes_N_head, na.rm = TRUE), tonnes_N_head)) %>% 
+  ungroup() %>%
+  group_by(animal, year, product, Sub_region_Name) %>% 
+  mutate(tonnes_N_head = ifelse(is.na(tonnes_N_head), mean(tonnes_N_head, na.rm = TRUE), tonnes_N_head)) %>% 
+  ungroup()%>%
+  group_by(animal, year, product, Region_Name) %>% 
+  mutate(tonnes_N_head = ifelse(is.na(tonnes_N_head), mean(tonnes_N_head, na.rm = TRUE), tonnes_N_head)) %>% 
+  ungroup() %>% 
+  dplyr::select(iso3c, country, year, animal, product, tonnes_N_head) ## its ok that the excretion rates are same for every year per country... FAOSTAT uses constant excretion coefficients
+  
+
+write_csv(excretion_rate_gf, here::here(git_manure, "int/excretion_rate_gf.csv"))
+
+```
+

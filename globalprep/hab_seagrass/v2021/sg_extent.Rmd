@@ -1,0 +1,473 @@
+---
+title: 'OHI 2021: Seagrass extent'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This script generates the extent of seagrass for each OHI region. 
+
+
+## Updates from previous assessment
+Updating the data with newest version (version 7). 
+
+***
+## Data Source 
+
+**Reference**: UNEP-WCMC, Short, F.T., 2005. Global Distribution of Seagrasses (version 7.1). Seventh update to the data layer used in Green and Short (2003). UNEP World Conservation Monitoring Centre, Cambridge, UK.
+
+**Downloaded**: 03/09/2021
+
+**Description**:  
+Global Distribution of Seagrasses
+https://data.unep-wcmc.org/datasets/7
+Reported at spatial cell scale. 
+
+This dataset shows the global distribution of seagrasses, and is composed of two subsets of point and polygon occurence data. The data were compiled by UNEP World Conservation Monitoring Centre in collaboration with many collaborators (e.g. Frederick Short of the University of New Hampshire), organisations (e.g. the OSPAR Convention for the Northeast Atlantic sea), and projects (e.g. the European project Mediterranean Sensitive Habitats "Mediseh"), across the globe (full list available in "Metadata_Seagrass.dbf").
+
+**Time range**: 1934-2020
+
+
+***
+# Methods
+Reclassify the seagrass extent data into a mask of 1 or NA, and then compute zonal statistics for the count of cells within an OHI region that have seagrass and then convert into km2.
+
+
+## Setup
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE, eval = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_seagrass/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_wcmc <- file.path(file.path(dir_M, 'git-annex/globalprep/_raw_data/wcmc_seagrass/d2021'))
+ohi_rasters() # call the region zones raster
+regions_shape()
+
+```
+
+```{r, echo = FALSE, eval = FALSE}
+
+v7_seagrass_pts <- sf::st_read(dsn = file.path(dir_wcmc, "014_001_WCMC013-014_SeagrassPtPy2020_v7/01_Data"), layer = "WCMC_013_014_SeagrassesPt_v7")
+
+v7_seagrass_py <- sf::st_read(dsn = file.path(dir_wcmc, "014_001_WCMC013-014_SeagrassPtPy2020_v7/01_Data"), layer = "WCMC013014-Seagrasses-Py-v7")
+
+## take a look
+mapview(v7_seagrass_pts)
+mapview(head(v7_seagrass_py$geometry))
+test <- head(v7_seagrass_py)
+test2 <- head(v7_seagrass_pts)
+
+unique(v7_seagrass_py$BIO_CLASS)
+unique(v7_seagrass_py$FAMILY)
+# Laminariales are kelp
+unique(v7_seagrass_pts$FAMILY)
+unique(v7_seagrass_py$habitat)
+```
+
+**Convert seagrass shapefiles into same CRS as our regions shapefile**
+```{r, echo = FALSE, eval = FALSE}
+
+moll_crs <- crs(regions, asText = TRUE)
+
+v7_seagrass_pts_moll <- st_transform(v7_seagrass_pts, crs = moll_crs) #project points shapefile to match zones crs
+
+
+crs(v7_seagrass_pts_moll) #check to see it worked
+
+v7_seagrass_py_moll <- st_transform(v7_seagrass_py, crs = moll_crs)
+
+crs(v7_seagrass_py_moll)
+plot(v7_seagrass_py_moll[1])
+
+```
+
+**Prep polygon data**
+```{r, eval = FALSE}
+
+head(regions)
+plot(regions$geometry)
+
+## filter for eez
+regions_eez <- regions %>%
+  filter(rgn_type == "eez") 
+
+## filter for land
+regions_land <- regions %>%
+  filter(rgn_type == "land")
+
+crs(regions_eez)
+crs(v7_seagrass_py_moll)
+
+# Test st_intersection on one row
+sg_subset1 <- st_intersection(v7_seagrass_py_moll, regions_eez[3, ])
+mapview(sg_subset1)
+st_area(sg_subset1$geometry)*0.000001 # 415.3118 km2
+sg_subset1$GIS_AREA_K
+test <- v7_seagrass_py_moll %>%
+  dplyr::filter(datasetID == 5,
+                ISO3 == "MOZ")
+mapview(test) ## this makes sense... the area from the subsetted one is less than the area indicated in the dataset, because we have subsetted a portion of the polygon for ZAF.
+
+
+#### 2021 chunk the subsetting by datasetid  #### 
+## get a template to start adding to instead and run a for loop, so we don't lose any work if it fails... 
+## NOTE: This takes a really long time... you will almost certainly need to run datasetID's 490 and 491 overnight. 
+
+test <- v7_seagrass_py_moll %>%
+  as.data.frame() %>%
+  dplyr::select(datasetID) %>%
+  group_by(datasetID) %>%
+  summarise(n())
+
+seagrass_3 <- v7_seagrass_py_moll %>%
+  dplyr::filter(datasetID == 3)
+
+sg_subset_py <- st_intersection(st_make_valid(seagrass_3), regions)
+sum(st_area(sg_subset_py))*0.000001 # 16.01434 km2
+
+datasets <- unique(sort(v7_seagrass_py_moll$datasetID))
+n_datasets <- length(unique(sort(v7_seagrass_py_moll$datasetID)))
+
+
+for(i in c(2:107, 110:n_datasets)){   #i = 2 ## have to start with 2 since we've already created a baseline with the first row intersection.. going to skip over rows 108 and 109 and further chunk those below, because they are so large
+
+dataset_id <- datasets[i]
+  
+sg_data <- v7_seagrass_py_moll %>%
+  dplyr::filter(datasetID == dataset_id)
+
+
+sg_data <- st_intersection(st_make_valid(sg_data), regions)
+
+sg_subset_py <- rbind(sg_subset_py, sg_data)
+
+print(i) ## what dataset are we on? 
+print(n_datasets) ## out of how many datasets?
+print(nrow(sg_subset_py)) ## how many rows does our new dataframe have now? (should end up with ~290000)
+
+}
+
+
+## need to figure out something different for datasetID 490 and 491... they are too large to do in one chunk... we will need to chunk them further (see below)
+
+save_incase <- sg_subset_py ## save another in our enviro just in case
+
+## save our progress so that we can continue by chunking through 490 and 491
+st_write(sg_subset_py, file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/int/seagrass_extent_regions_datasetID_no_490_491.shp"), overwrite = TRUE) ## save to mazu so we don't lose all of that work
+
+########## chunk through 108 and 109 (datasetID 490 and 491) by 2000 rows at a time ##########
+
+sg_subset_py <- st_read(file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/int/seagrass_extent_regions_datasetID_no_490_491.shp")) 
+
+test <- v7_seagrass_py_moll %>%
+  as.data.frame() %>%
+  dplyr::select(datasetID) %>%
+  group_by(datasetID) %>%
+  summarise(n())
+
+seagrass_490_491 <- v7_seagrass_py_moll %>%
+  dplyr::filter(datasetID %in% c(490, 491)) %>%
+  mutate(new_id = 1:190368) ## make a new id so that we can use that as our chunking variable
+summary(seagrass_490_491)
+
+new_ids <- seagrass_490_491 %>%
+  .$new_id
+
+sg_subset_retry <- st_read(file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/int/seagrass_extent_regions_datasetID_no_490_491.shp"))
+
+  ### Breaking this into chunks of 2000 rows for these larger datasets (datasetID == 490, 491)
+
+  chunk_size <- 2000 ## pick a chunk size... 
+  n_chunks <- ceiling(length(seagrass_490_491$new_id)/chunk_size)
+  
+
+datasets <- unique(sort(v7_seagrass_py_moll$datasetID))
+n_datasets <- length(unique(sort(v7_seagrass_py_moll$datasetID)))
+
+
+for(j in 67:n_chunks){   #j = 1
+  
+row_index <- c( ((j - 1) * chunk_size + 1) : min((j * chunk_size), length(seagrass_490_491$new_id)) )
+
+
+dataset_id <- new_ids[row_index]
+  
+sg_data <- seagrass_490_491 %>%
+  dplyr::filter(new_id %in% dataset_id)
+
+
+sg_data <- st_intersection(st_make_valid(sg_data), regions)
+
+sg_data <- sg_data %>%
+  dplyr::select(-new_id) ## remove new_id so that we can rbind
+
+sg_subset_retry <- rbind(sg_subset_retry, sg_data)
+
+print(j) ## what chunk are we on? 
+print(n_chunks) ## out of how many chunks?
+print(nrow(sg_subset_retry)) ## how many rows does our new dataframe have now? (should end up ~290000)
+
+}
+
+
+## save the final file! 
+st_write(sg_subset_retry, file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/int/seagrass_extent_regions.shp"), overwrite = TRUE)
+
+seagrass_subset_py <- sf::st_read(dsn = file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/int/"), layer = "seagrass_extent_regions")
+
+sum(st_area(seagrass_subset_py))*0.000001 # perfect
+sum(st_area(v7_seagrass_py))*0.000001 # perfect
+
+## plot to see
+plot(regions_eez$geometry, col = sf.colors(12, categorical = TRUE), border = 'grey', 
+     axes = TRUE)
+plot(seagrass_subset_py$geometry, add = TRUE)
+zoom()
+
+## get central america coordinates in MOLL and plot to make sure it worked:
+disp_win_wgs84 <- st_sfc(st_point(c(-90, 6)), st_point(c(-78, 18)),
+                         crs = 4326) ## c(xmin,yim), c(xmax,ymax)
+disp_win_wgs84
+
+disp_win_trans <- st_transform(disp_win_wgs84, crs = '+proj=moll')
+disp_win_trans
+
+ggplot() +
+  geom_sf(data = regions_eez$geometry,  col = sf.colors(239, categorical = TRUE)) +
+  geom_sf(data = regions_land$geometry, fill = sf.colors(229, categorical = TRUE)) +
+  geom_sf(data = seagrass_subset_py$geometry, col = "red") +
+  coord_sf(xlim = c(-8989531, -7578769),ylim = c(741349.5,2211539))
+
+
+## plot global
+ggplot() +
+  geom_sf(data = regions_eez$geometry,  col = sf.colors(239, categorical = TRUE)) +
+  geom_sf(data = regions_land$geometry, fill = sf.colors(229, categorical = TRUE)) +
+  geom_sf(data = seagrass_subset_py$geometry, col = "red")
+
+## calculate polygon areas 
+seagrass_area_py <- seagrass_subset_py %>% 
+  mutate(extent_km2 = st_area(seagrass_subset_py)*0.000001)
+
+st_geometry(seagrass_area_py) <- NULL
+
+## group by and summarise to get area per each rgn_id
+seagrass_area_py_sum <- seagrass_area_py %>%
+  group_by(rgn_id) %>%
+  summarise(sum_extent_km2 = as.numeric(sum(extent_km2))) # 670348.4 km2 of polygons
+
+## save this 
+write.csv(seagrass_area_py_sum, "int/seagrass_py_area.csv", row.names = FALSE)
+```
+
+**Prep points data**
+```{r, eval = FALSE}
+## read in points data
+v7_seagrass_pts <- sf::st_read(dsn = file.path(dir_wcmc, "014_001_WCMC013-014_SeagrassPtPy2020_v7/01_Data"), layer = "WCMC_013_014_SeagrassesPt_v7")
+
+## transform pts data to have same crs as regions eez
+v7_seagrass_pts <- st_transform(v7_seagrass_pts, crs = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+
+#### 2021 chunk the subsetting by datasetid  #### 
+## get a template to start adding to instead and run a for loop, so we don't lose any work if it fails or we need to stop it for some reason... 
+## NOTE: this will take a little over an hour
+
+test <- v7_seagrass_pts %>%
+  as.data.frame() %>%
+  dplyr::select(datasetID) %>%
+  group_by(datasetID) %>%
+  summarise(n())
+
+seagrass_pts_1 <- v7_seagrass_pts %>%
+  dplyr::filter(datasetID == 1)
+
+sg_subset_pts <- st_intersection(st_make_valid(seagrass_pts_1), regions_eez)
+
+datasets <- unique(sort(v7_seagrass_pts$datasetID))
+n_datasets <- length(unique(sort(v7_seagrass_pts$datasetID)))
+
+
+for(i in 2:n_datasets){   #i = 2 ## Have the start the loop with 2, since we've already completed i = 1 above to make our template sf
+
+dataset_id <- datasets[i]
+  
+sg_data <- v7_seagrass_pts %>%
+  dplyr::filter(datasetID == dataset_id)
+
+
+sg_data <- st_intersection(st_make_valid(sg_data), regions_eez)
+
+sg_subset_pts <- rbind(sg_subset_pts, sg_data)
+
+print(i) ## what dataset are we on? 
+print(n_datasets) ## out of how many datasets?
+print(nrow(sg_subset_pts)) ## how many rows does our new dataframe have now? (should end up with less than ~17000)
+
+}
+
+## save the points subset 
+st_write(sg_subset_pts, file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/int/seagrass_extent_regions_pts.shp"), overwrite = TRUE)
+
+## plot to make sure it works 
+ggplot() +
+  geom_sf(data = regions_eez$geometry,  col = sf.colors(239, categorical = TRUE)) +
+  geom_sf(data = regions_land$geometry, fill = sf.colors(229, categorical = TRUE)) +
+  geom_sf(data = sg_subset_pts$geometry, col = "red")
+
+#### Now we will calculate a proxy area for each region which has points. We will do this by counting the points in each rgn_id, figuring out the median size of each polygon in those countries from our polygon dataset, and assigning that median value to each point. 
+
+sg_subset_pts <- st_read(file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/int/seagrass_extent_regions_pts.shp"))
+
+seagrass_subset_py <- sf::st_read(dsn = file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/int/"), layer = "seagrass_extent_regions")
+seagrass_area_py <- seagrass_subset_py %>% 
+  mutate(extent_km2 = st_area(seagrass_subset_py)*0.000001)
+
+st_geometry(seagrass_area_py) <- NULL
+
+
+## get a count of the points in each region
+seagrass_points_area <- sg_subset_pts %>%
+  group_by(rgn_id) %>%
+  summarise(count_points = n())
+
+## get rid of geometry column to make this a df 
+st_geometry(seagrass_points_area) <- NULL
+
+## filter for the point regions
+test <- seagrass_area_py %>%
+  filter(rgn_id %in% seagrass_points_area$rgn_id) %>%
+  group_by(rgn_id) %>%
+  summarise(mean_km2 = mean(extent_km2), 
+            median_km2 = median(extent_km2),
+            count_polygons = n())
+
+mean(seagrass_area_py$extent_km2) # 2.099852
+global_median_km2 <- as.numeric(median(seagrass_area_py$extent_km2)) # 0.0001730949 
+## we will use the lower of the global values
+
+## now multiply the count of points by the median area of points in these locations to get our extent in km2, for those that are still NA after (the regions which dont have polygons, and only have points), we will give them the global median size
+seagrass_points_area_sum <- seagrass_points_area %>%
+  left_join(test, by = "rgn_id") %>%
+  mutate(extent_km2 = median_km2*count_points) %>%
+  mutate(extent_km2 = ifelse(is.na(extent_km2), global_median_km2*count_points, extent_km2)) %>%
+  dplyr::select(rgn_id, sum_extent_km2_pts = extent_km2)
+
+## save this data
+write.csv(seagrass_points_area_sum, "int/seagrass_points_area.csv", row.names = FALSE)
+
+```
+
+
+**Combine points and polygon area estimates into one dataset**
+```{r, eval = FALSE}
+seagrass_points_area_sum <- read_csv("int/seagrass_points_area.csv")
+seagrass_area_py_sum <- read_csv("int/seagrass_py_area.csv")
+
+## finally, combine our points areas and polygon areas into one dataset and save
+seagrass_area_final <- seagrass_area_py_sum %>%
+  full_join(seagrass_points_area_sum, by = "rgn_id") %>%
+  mutate(sum_extent_km2 = replace_na(sum_extent_km2, 0),
+         sum_extent_km2_pts = replace_na(sum_extent_km2_pts, 0)) %>% ## make all of the NAs --> 0 so that we can sum
+  mutate(extent_km2_final = sum_extent_km2 + sum_extent_km2_pts,
+         habitat = "seagrass", 
+         year = 2020) %>% ## the latest raw data update is year = 2020
+  dplyr::select(rgn_id, year, habitat, km2 = extent_km2_final) %>%
+  dplyr::filter(rgn_id < 255)
+
+write.csv(seagrass_area_final, "data/habitat_extent_seagrass_updated.csv", row.names = FALSE)
+
+## lets make a gapfilling file
+seagrass_area_final_gf <- seagrass_area_final %>%
+  dplyr::select(rgn_id, habitat) %>%
+  mutate(variable = "extent", gap_fill = 0) %>% 
+  full_join(rgns_eez, by = "rgn_id") %>%
+  dplyr::select(rgn_id, habitat, variable, gap_fill) %>%
+  mutate(habitat = "seagrass", variable = "extent") %>%
+  filter(rgn_id < 255)
+
+write.csv(seagrass_area_final_gf, "data/extent_seagrass_gf.csv", row.names = FALSE)
+
+```
+
+# Datacheck
+```{r, eval = FALSE}
+v7_seagrass_pts <- sf::st_read(dsn = file.path(dir_wcmc, "014_001_WCMC013-014_SeagrassPtPy2020_v7/01_Data"), layer = "WCMC_013_014_SeagrassesPt_v7")
+
+v7_seagrass_py <- sf::st_read(dsn = file.path(dir_wcmc, "014_001_WCMC013-014_SeagrassPtPy2020_v7/01_Data"), layer = "WCMC013014-Seagrasses-Py-v7")
+
+seagrass_subset_py <- sf::st_read(dsn = file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/int/"), layer = "seagrass_extent_regions")
+
+seagrass_area_final <- read_csv("data/habitat_extent_seagrass_updated.csv")
+
+habitat_extent_seagrass_old <- read_csv("~/github/ohiprep_v2021/globalprep/hab_seagrass/v2012/data/habitat_extent_seagrass_updated.csv")
+
+
+compare_habitat_extent <- seagrass_area_final %>%
+  left_join(habitat_extent_seagrass_old, by = "rgn_id") %>%
+  mutate(km2.y = ifelse(
+    km2.x >0 & is.na(km2.y) ,0, #assign 0 values to old data km2 that have new data so that we can properly graph these differences.
+    km2.y
+  )) %>%
+  mutate(difference = km2.x - km2.y) %>%
+  left_join(rgns_eez)
+
+ggplot(compare_habitat_extent, aes(x = km2.y, y = km2.x)) +
+  geom_point() +
+  geom_abline() +
+  labs(title = "seagrass Habitat version old vs version 7", x = "old extent", y=  "new extent") +
+  theme_bw()
+
+filter(compare_habitat_extent, km2.y == 0)
+
+sum(st_area(v7_seagrass_py)) #670348428862 [m^2]
+670348428862*0.000001
+# 670348.4 km2 total area before eez intersection, not including points
+
+sum(st_area(seagrass_subset_py))*0.000001 
+# 670348.4 km2 total area after eez intersection, not including points # perfect
+
+## there are ~17668 points... with a mean polygon size of 2.732515 so
+17668*2.732515 # 48278.08
+48278.08 + 670348.4 # 718626.5
+
+
+sum(seagrass_area_final$km2)
+#782228.1 total area after eez intersection, including the gapfilled points
+
+sum(habitat_extent_seagrass_old$km2)
+#294811.2 total area for the old extent data - wow! 
+
+## check saudi arabia: 
+saudi_arabia_polygons <- v7_seagrass_py %>%
+  filter(ISO3 == "SAU")
+sum(saudi_arabia_polygons$AREA_SQKM) # 237385 - ok... matches our estimate pretty well actually...
+
+sum(st_area(saudi_arabia_polygons))*0.000001 # 238535.1
+
+```
+
+
+
+
+

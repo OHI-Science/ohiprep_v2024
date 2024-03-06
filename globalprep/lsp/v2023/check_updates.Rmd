@@ -1,0 +1,75 @@
+---
+title: 'OHI 2021: LSP Updates Check '
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+---
+
+```{r setup, warning=FALSE, message=FALSE, echo=FALSE}
+
+knitr::opts_chunk$set(eval=FALSE)
+
+library(raster)
+library(readr)
+library(tidyverse)
+
+dir_goal <- "~/github/ohiprep_v2021/globalprep/lsp/v2021"
+```
+
+# Summary
+
+***
+Check outliers in output files from Lasting Special Places data prep and compare to Protected Planet's [monthly updates](https://www.protectedplanet.net/c/monthly-updates/) webpage. 
+
+```{r}
+major_changes <- read_csv("output/major_changes_2021.csv" ) #added this so I could come back to it without rerunning everything
+
+```
+
+## Bouvet Island +1.0:
+ - Everything I can find suggests that this is and has been a fully protected nature preserve. 
+ - It could be possible that in the past our models somehow were ignoring this place? 
+
+#3 Mozambique +0.769:
+ - This is taken from our data sources website, and suggests that the protected area in this region did grow, however I don't think it reflects that big of a growth... 
+![image](https://user-images.githubusercontent.com/33332753/107826818-64b44a80-6d3a-11eb-9c53-73213e9513c9.png)
+ - According to our data source update, in December 2020, a protected area polygon was added. In November 2020, a polygon was updated.  
+ - This seems to be a reversal of what was done last year. Last year Mozambique lost ~0.6 
+
+## Russia +0.667:
+ - At first glance, this one is a little puzzling... 
+ - The chart here also doesn't reflect that big of growth: 
+![image](https://user-images.githubusercontent.com/33332753/107827440-abef0b00-6d3b-11eb-93fc-53293ed088e0.png)
+ - And on the [country page for protected planet](https://www.protectedplanet.net/country/RUS), it indicates that 2.24% marine protected area coverage. Even with our 30% cut off, it would make Russia's score ~7.5% (similar to what it was in 2020). 
+ - **HOWEVER, I just think that this graph hasn't been updated this year.... because [this](https://www.protectedplanet.net/en/resources/January-2021-update-of-the-wdpa-and-wd-oecm) lists the January 2021 update for the WDPA dataset, and Russia has the largest update (and its only update since 2003).** 
+ - This update added 7695 polygons, and removed 2116 polygons. 
+
+## Slovenia -0.494:
+ - Their country page on protectedplanet shows this much coverage:
+![image](https://user-images.githubusercontent.com/33332753/107828404-9ed31b80-6d3d-11eb-9ea8-8d1af8454141.png)
+ - The August 2020 update of the dataset tells us that there were 172 polygons added, 305 polygons removed, and 870 polygons updated for Slovenia. **The removal of polygons is likely why their score has decreased.**
+
+## India -0.218:
+ - Their country page shows this much protected area:
+![image](https://user-images.githubusercontent.com/33332753/107828783-68e26700-6d3e-11eb-96aa-e79aa56fa19a.png)
+ - **The February 2021 update of the dataset shows that 346 polygons in India were removed.**
+
+I feel pretty confident that these changes are not due to a screw up, and just changes in source data. Although the Bouvet Island one does confuse me. 
+
+
+
+***
+
+
+

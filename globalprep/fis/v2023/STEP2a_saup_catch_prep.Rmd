@@ -1,0 +1,893 @@
+---
+title: "OHI 2023: Food Provision, Preparing catch data for BBmsy calculations and mean catch (weights in FIS model) and FP weights"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+This script takes the SAUP 2022 catch data, provided at a resolution of per SAUP region/year/species totals, and creates 3 data layers:
+
+1. Catch data aggregated to **stock levels** to calculate B/Bmsy values. For the Ocean Health Index, we assume a stock is represented by the FAO region in which the species is caught.  We also use these data to aggregate to OHI/FAO region to weight the B/Bmsy values. In order to aggregate to FAO regions, we associate each cell to the FAO region and the OHI region in which it is located.
+
+An example of our aggregation process: New Zealand is located entirely in FAO region 81. All catch reported by New Zealand will be aggregated by species to the FAO region. If a species was reported as caught in both New Zealand waters and in the High Seas of area 81, these two records will be combined into one by summing the catch.
+
+2. An average catch dataset used to weight B/Bmsy values in the fisheries model. For this dataset, the catch is assigned to FAO and OHI regions.
+
+3. Average catch over time for each region for food provision weighting.
+
+First, we need to match SAUP EEZ regions to OHI regions, and summarize per region, year, and species.
+
+## Updates from previous assessment
+- None. This script wasn't run in v2023. Associated data files within the repo were copied from v2022 to v2023.
+
+***
+
+
+# Data Source
+
+**Reference**: Pauly D., Zeller D., Palomares M.L.D. (Editors), 2020. Sea Around Us Concepts, Design and Data (seaaroundus.org).
+
+**Downloaded**: September 27, 2022
+
+**Description**: Tons per year and SAUP region with information on sector type, industry type, fishing entitity, reporting status and taxonomic information. 
+
+**Time range**: 1950 - 2019
+
+**Format**: CSV
+
+**Additional Information**: [Methods](http://www.seaaroundus.org/sea-around-us-methods-index/)
+
+***
+
+# Setup
+
+``` {r setup, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'figs/',message = FALSE, warning = FALSE, echo = TRUE, eval=FALSE)
+```
+
+```{r, eval=FALSE}
+## Libraries
+library(readr)
+library(dplyr)
+library(parallel)
+library(purrr)
+library(stringr)
+library(tidyr)
+library(foreach)
+library(here)
+library(tidyverse)
+library(readxl)
+library(data.table)
+
+setwd(here::here("globalprep/fis/v2022"))
+source('../../../workflow/R/common.R')
+
+## Paths for data
+fis_path = file.path(dir_M,"git-annex/globalprep/fis/v2022/int") 
+SAUP_path <- file.path(dir_M, "git-annex/globalprep/fis/v2022")
+
+```
+
+***
+
+# Create lookup tables to match OHI region names to SAUP area_name (EEZ) 
+
+```{r, eval = FALSE}
+fao_eez_prod <- read.csv(file.path(SAUP_path, "eez_fao_ids_prod.csv"))
+fao_high_seas <- read.csv(file.path(SAUP_path, "high_seas_fao_ids_prod.csv"))
+
+
+high_seas_regions <- fao_high_seas %>%
+  distinct(area_name) %>%
+  mutate(area_name_ohi = case_when(
+    area_name == "Atlantic, Western Central" ~ "Atlantic, Western-Central",
+    str_detect(area_name, "Antarctic") ~ "Antarctica",
+    TRUE ~ area_name
+  )) # fix some names
+region_data()
+
+high_seas_ohi <- rgns_all %>%
+  filter(rgn_ant_id >=260)
+
+sort(unique(high_seas_regions$area_name))
+
+setdiff(high_seas_regions$area_name_ohi, high_seas_ohi$rgn_name) #    
+
+setdiff(high_seas_ohi$rgn_name, high_seas_regions$area_name_ohi)
+ 
+
+matched_high_seas_names <- left_join(high_seas_regions, rgns_all, by = c("area_name_ohi" = "rgn_name"), all = TRUE) 
+
+write.csv(matched_high_seas_names, "int/high_seas_regions_lookup.csv", row.names = FALSE) 
+
+
+#### Now manually match all distinct "area_name"'s in the SAUP EEZ dataset
+
+region_data()
+rgns_eez <- rgns_eez %>%
+  mutate(rgn_name_2 = rgn_name) %>%
+  distinct(rgn_name, rgn_id, rgn_name_2)
+
+eez_area_names <- fao_eez_prod %>%
+  distinct(area_name, rgn_num)
+
+matched_area_names <- left_join(eez_area_names, rgns_eez, by = c("area_name" = "rgn_name")) %>%
+  arrange(area_name)
+write.csv(matched_area_names, "int/area_name_lookup_raw.csv", row.names = FALSE)
+
+
+area_name_matched <- read_csv("int/area_name_lookup_manual.csv") # perfect
+
+## gibraltar, monaco, oecussi ambeno are not included - will gapfill at the end.. assign them the scores of their admin regions (Spain, France, East Timor (?))
+
+```
+
+# Join EEZ and high seas production to OHI lookup tables
+
+```{r, eval = FALSE}
+#### Join high seas fishing entities and split appropriate regions
+high_seas_matched <- read_csv("int/high_seas_regions_lookup.csv") # perfect
+fao_high_seas <- read.csv(file.path(SAUP_path, "high_seas_fao_ids_prod.csv"))
+
+# check to see if any are missing (none should be...)
+sort(setdiff(high_seas_matched$area_name, fao_high_seas$area_name))
+
+
+
+
+high_seas_ohi <- fao_high_seas %>%
+  left_join(high_seas_matched, by = "area_name") %>%
+  mutate(tonnes = ifelse(rgn_id == 213, tonnes/19, tonnes)) %>% # split antartica regions since they have 19 duplicates...
+  dplyr::select(-rgn_ant_id, -type_w_ant, -rgn_type) %>%
+  rename(rgn_name = area_name_ohi)
+
+unique(high_seas_ohi$fishing_entity)
+unique(high_seas_ohi$notes)
+sum(high_seas_ohi$tonnes) # 122230592
+sum(fao_high_seas$tonnes) # 122230592 ; good they are the same 
+
+
+#save file 
+write.csv(high_seas_ohi, file.path(fis_path, "ohi_rgn_high_seas_prod.csv"), row.names = FALSE)
+
+ # high_seas_ohi <- read.csv(file.path(fis_path, "ohi_rgn_high_seas_prod.csv"))
+
+#### Now match the EEZ production data to OHI regions using the lookup table 
+
+fao_eez_prod <- read_csv(file.path(SAUP_path, "eez_fao_ids_prod.csv")) %>%
+  dplyr::select(-Area_km., -total_area, -area_prop, -tonnes) %>%
+  dplyr::rename("tonnes" = "tonnes_fix", "fao_id" = "F_AREA")
+
+test <- fao_eez_prod %>%
+  filter(str_detect(area_name, "Korea")) %>%
+  distinct(area_name, rgn_num)
+unique(test$area_name)
+unique(test$rgn_num)
+
+area_name_matched <- read_csv("int/area_name_lookup_manual.csv")
+
+
+eez_ohi <- fao_eez_prod %>%
+  left_join(area_name_matched, by = c("area_name", "rgn_num")) %>%
+  filter(is.na(notes) | str_detect(notes, "Need to")) ## filter out regions that aren't OHI 
+
+test <- eez_ohi %>%
+  filter(rgn_id == 21)
+
+summary(eez_ohi)
+
+not_ohi_regions <- fao_eez_prod %>%
+    left_join(area_name_matched, by = c("area_name", "rgn_num")) %>%
+  filter(notes == "Not an OHI region")
+
+nrow(eez_ohi) + nrow(not_ohi_regions) == nrow(fao_eez_prod) # TRUE ; perfect
+
+not_rgn <- c(unique(not_ohi_regions$area_name))
+
+fao_eez_prod_fix <- fao_eez_prod %>%
+  filter(!(area_name %in% c(not_rgn)))
+
+unique(eez_ohi$area_name)
+unique(eez_ohi$rgn_name)
+unique(eez_ohi$notes)
+unique(area_name_matched$notes)
+sum(eez_ohi$tonnes) == sum(fao_eez_prod_fix$tonnes) # TRUE ; good 
+
+# Now lets split the regions that need to be split. For these we will equally split the catch between the 2/3 regions for every observation ;
+
+# "Channel Isl. (UK)" ; split into 1) Guernsey 2) Jersey
+# "Kiribati" ; split into 1) Saba 2) Sint Eustatius
+# Mozambique Channel Isl. (France); split into 1) Juan de Nova Island 2) Bassas da India 3) Ile Europa
+
+
+split_eez <- eez_ohi %>%
+  filter(!is.na(notes))
+
+unique(split_eez$area_name)
+
+split_saba_sint <- split_eez %>%
+  filter(area_name == "Saba and Sint Eustatius (Netherlands)") %>%
+  mutate(split_col = "Saba;Sint Eustatius") %>%
+  separate_rows(split_col, sep = ";") %>%
+  group_by(area_name, area_type, year, scientific_name, common_name, 
+functional_group, commercial_group, fishing_entity, fishing_sector, 
+catch_type, reporting_status, gear_type, end_use_type, 
+tonnes, fao_id) %>%
+  mutate(tonnes = tonnes/2) %>% # now we will divide each observation by 3, to equally split the tonnes of catch
+  ungroup()
+sum(split_saba_sint$tonnes) # 14362.37 ; perfect
+
+split_channel <- split_eez %>%
+  filter(area_name == "Channel Isl. (UK)") %>% 
+    mutate(split_col = "Guernsey;Jersey") %>%
+  separate_rows(split_col, sep = ";") %>%
+  group_by(area_name, area_type, year, scientific_name, common_name, 
+functional_group, commercial_group, fishing_entity, fishing_sector, 
+catch_type, reporting_status, gear_type, end_use_type, 
+tonnes, fao_id) %>%
+  mutate(tonnes = tonnes/2) %>% # now we will divide each observation by 2, to equally split the tonnes of catch
+  ungroup()
+sum(split_channel$tonnes) # 959896.5 ; perfect 
+
+split_channel_moz <- split_eez %>%
+  filter(area_name == "Mozambique Channel Isl. (France)") %>% 
+    mutate(split_col = "Juan de Nova Island;Bassas da India;Ile Europa") %>%
+  separate_rows(split_col, sep = ";") %>%
+  group_by(area_name, area_type, year, scientific_name, common_name, 
+functional_group, commercial_group, fishing_entity, fishing_sector, 
+catch_type, reporting_status, gear_type, end_use_type, 
+tonnes, fao_id) %>%
+  mutate(tonnes = tonnes/3) %>% # now we will divide each observation by 3, to equally split the tonnes of catch
+  ungroup()
+sum(split_channel_moz$tonnes) # 328292.1 ; perfect 
+
+#rbind splits 
+split_eez_df <- rbind(split_channel, split_saba_sint, split_channel_moz) %>%
+  dplyr::select(-rgn_name, -rgn_id) %>%
+  dplyr::rename("rgn_name" = "split_col") %>%
+  left_join(rgns_eez, by = c("rgn_name")) %>%
+  dplyr::select(-rgn_name_2)
+
+# rbind back to final high seas matched df
+final_eez_matched <- eez_ohi %>%
+  filter(is.na(notes)) %>%
+  rbind(split_eez_df) %>%
+  dplyr::select(-rgn_num)
+sum(final_eez_matched$tonnes) == sum(fao_eez_prod_fix$tonnes) # TRUE perfect
+
+#save file 
+write.csv(final_eez_matched, file.path(fis_path, "ohi_rgn_eez_prod.csv"), row.names = FALSE)
+
+
+```
+
+
+# Aggregate catch
+
+Aggregate catch per OHI region and FAO area. This catch will be used twice. 
+
+(1) The catch is used to weight scores per region. For this we need to use catch records, including those not reported at the species level. See note below.
+
+(2) The catch data at species level is used to calculate stock status (BBmsy) per stock (remember that our definition of a stock is a species caught within a single FAO area) For this, we will include discards and "Other" end use type, as well as FOFM species.
+
+
+Note:  Save IUU and Reported landings only (`CatchTotal`) as the catch sum. This is different from v2018, which saved it as IUU, Reported, and Discards. 
+
+**Total Catch**
+```{r, eval=FALSE}
+
+## Read in data files 
+eez_ohi_prod <- read.csv(file.path(fis_path, "ohi_rgn_eez_prod.csv")) %>%
+  dplyr::select(-notes, -column_label)
+
+high_seas_ohi_prod <- read.csv(file.path(fis_path, "ohi_rgn_high_seas_prod.csv"))
+
+all_saup_ohi_prod <- rbind(eez_ohi_prod, high_seas_ohi_prod)
+
+length(unique(eez_ohi_prod$rgn_id))
+sort(unique(eez_ohi_prod$rgn_id))
+
+# test <- all_saup_ohi_prod %>%
+#   filter(end_use_type == "Fishmeal and fish oil") %>%
+#   group_by(year) %>%
+#   summarise(tonnes = sum(tonnes)) ##  Keep identifiers for discards, other, fofm, and fishing_sector. Eventually we will filter some of these out, but for now we will keep them and save a version with everything, to use in our B/Bmsy calculations.
+# sum(test$tonnes)
+
+## wrangle data into what we need (total catch per OHI region per stock)
+
+output_df <- all_saup_ohi_prod %>%
+  # filter(catch_type != "Discards") %>% # filter out discards, so that we only keep reported and IUU
+  dplyr::mutate(fofm_id = ifelse(end_use_type == "Fishmeal and fish oil", 1, 0),
+                discard_id = ifelse(catch_type == "Discards", 1, 0),
+                other_id = ifelse(end_use_type == "Other", 1, 0),
+                human_use_id = ifelse(end_use_type == "Direct human consumption", 1, 0)) %>% 
+  dplyr::rename(TaxonName = scientific_name, CommonName = common_name, CatchTotal = tonnes) %>%
+  dplyr::group_by(year, rgn_id, fao_id, TaxonName, CommonName, fofm_id, discard_id, other_id, human_use_id, fishing_sector) %>%
+  dplyr::summarise(catch = sum(CatchTotal)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(stock_id = gsub(" ", "_", paste(TaxonName, fao_id, sep="-"), fixed=TRUE)) %>%
+  dplyr::rename(fao_rgn = fao_id,
+                tons = catch) 
+ 
+# test <- output_df %>%
+#   filter(rgn_id < 255) %>%
+#   filter(rgn_id != 213) %>%
+#   filter(rgn_id == 21)
+
+length(unique(test$rgn_id)) # 217.. missing oecussi ambeno, gibraltar, and monaco. These are expected, and we will gapfill them in functions.R. 
+
+write.csv(output_df, file = file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn.csv'), row.names=FALSE)
+
+unique(output_df$year)
+unique(output_df$rgn_id)
+unique(output_df$fao_rgn)
+sort(unique(output_df$stock_id))
+unique(output_df$fishing_sector)
+
+## compare to last year
+
+old_output_df <- read.csv(file.path(dir_M,'git-annex/globalprep/fis/v2021/int/stock_catch_by_rgn.csv')) %>%
+  filter(rgn_id < 255)
+
+test_old <- old_output_df %>%
+  group_by(year) %>%
+  summarise(sum = sum(tons))
+
+unique(old_output_df$year)
+unique(old_output_df$rgn_id)
+unique(old_output_df$fao_rgn)
+sort(unique(old_output_df$stock_id))
+
+test_old_2018 <- old_output_df %>%
+  filter(year == 2018)
+sum(test_old_2018$tons) # 105959436
+
+test_saup_2018 <- output_df %>%
+  filter(year == 2018) %>%
+  filter(rgn_id < 255)
+sum(test_saup_2018$tons) # 103167419 - a little less this year
+
+test <- all_saup_ohi_prod %>%
+  filter(year == 2018) %>%
+  filter(rgn_id < 255)
+sum(test$tonnes) # 103167419
+
+setdiff(test_saup_2018$stock_id, test_old_2018$stock_id)
+setdiff(test_old_2018$stock_id, test_saup_2018$stock_id) # lots of stock_id differences. Expected given the new data.
+
+```
+
+## Add Taxon Key Information
+
+Need taxon key to easily remove higher level (e.g. genus) taxonomic catch data. Unique taxon key was extracted from Watson 2019 (v5) Codes.xlsx, sheet name "Taxa" and from our old (v2016/v2017) SAUP data (taxon keys were provided directly from SAUP).
+
+Must have taxon key match for every stock. If some are not matched, do it manually by searching the SAUP website.
+
+Look at which entries that don't have a Taxon key match. Search taxon in [Sea Around Us](http://www.seaaroundus.org/data/#/topic/biodiversity) website. Click on "View graph for catches of _Taxon Name_" link in the results. It'll take you to a new page. The Taxon key is the six digit code in the url.
+
+**Note:** for v2022, all we will need to do is to grab v2021's taxon_key_v2021.csv, and use that as our taxonkey lookup df (i.e. the "taxon_key_SAUP_watson" dataframe)
+
+```{r, eval = FALSE}
+
+stock_rgn <- read.csv(file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn.csv'))
+
+taxon_key_SAUP <- read.csv("int/taxon_key_v2021.csv")
+
+duplicated_taxa <- data.frame(cbind(taxon_key_SAUP, dups = duplicated(taxon_key_SAUP$TaxonKey))) %>%
+  filter(dups == TRUE) # no dups
+
+setdiff(paste(taxon_key_SAUP$TaxonName, taxon_key_SAUP$CommonName), 
+        paste(stock_rgn$TaxonName, stock_rgn$CommonName))
+
+no_taxonkey <- setdiff(paste(stock_rgn$TaxonName,stock_rgn$CommonName), 
+                       paste(taxon_key_SAUP$TaxonName, taxon_key_SAUP$CommonName)) # 298 do not match... We need to look these up manually on the SAUP website. I emailed SAUP about obtaining all of the keys, so hopefully that will happen so we can make this prep more tidy. For now, lets write the list of no taxon keys to a csv, and start manually looking them up on SAUPs website...
+
+write.csv(sort(no_taxonkey), "int/no_taxon_key.csv", row.names = FALSE)
+
+# Once you fill out the csv file with the taxon keys obtained from SAUP website, reupload as "no_taxon_key_fix.csv"
+
+no_taxon_key_fix <- read.csv("int/no_taxon_key_fix.csv")
+
+duplicated(no_taxon_key_fix$TaxonKey)
+
+new_taxa <- stock_rgn %>% 
+  mutate(stock = paste(stock_rgn$TaxonName, stock_rgn$CommonName)) %>%
+  left_join(no_taxon_key_fix, by = c("stock" = "x")) %>%
+  filter(!is.na(TaxonKey)) %>%
+  dplyr::select(TaxonName, CommonName, TaxonKey, stock) %>%
+  unique() 
+
+taxonkey <- rbind(taxon_key_SAUP, new_taxa) 
+
+duplicated_stocks <- cbind(taxonkey, dups = duplicated(taxonkey$TaxonKey)) %>%
+  filter(dups == TRUE) ## there are some duplicated stocks for some reason, we need to remove these.  
+
+all_duplicated_stocks <- taxonkey %>%
+  filter(TaxonKey %in% duplicated_stocks$TaxonKey) %>% 
+  mutate(stock = paste(TaxonName, CommonName))
+
+# stock_rgn <- read_csv(file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn.csv'))
+
+stock_rgn_test <- stock_rgn %>%
+  mutate(stock = paste(TaxonName, CommonName))
+
+dups_not_in_SAUP <- c(setdiff(all_duplicated_stocks$stock, stock_rgn_test$stock))
+
+# now filter out the duplicated stocks that are NOT in SAUP production data
+
+taxonkey_no_dups <- taxonkey %>%
+  mutate(stock = paste(TaxonName, CommonName)) %>%
+  filter(!(stock %in% c(dups_not_in_SAUP))) 
+
+duplicated_stocks_2 <- cbind(taxonkey_no_dups, dups = duplicated(taxonkey_no_dups$stock)) %>%
+  filter(dups == TRUE) # there are still 2 stocks which have hte same names but different numbers. This will cause a problem with the join. Get rid of these taxonkeys... as long as we retain one of each in the taxonkey df then we are fine. 
+
+taxonkey_no_dups <- taxonkey_no_dups %>%
+  filter(!(TaxonKey %in% duplicated_stocks_2$TaxonKey))
+
+write.csv(taxonkey_no_dups, "int/taxon_key_v2022.csv", row.names=FALSE)
+```
+
+
+Add taxa to the stock catch by region.
+
+```{r, eval=FALSE}
+
+## read in modified taxon key table
+taxonkey <- read.csv("int/taxon_key_v2022.csv", stringsAsFactors = FALSE)
+stock_rgn <- read_csv(file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn.csv'))
+
+duplicated <- data.frame(cbind(taxonkey, duplicated(taxonkey$stock))) # no dups
+duplicated <- data.frame(cbind(taxonkey, duplicated(taxonkey$TaxonKey))) # no dups
+
+# check
+setdiff(paste(taxonkey$TaxonName, taxonkey_no_dups$CommonName), 
+        paste(stock_rgn$TaxonName, stock_rgn$CommonName)) # lots of diffs... that is ok. These are probably left-over stocks and taxonkeys from former versions of OHI that are no longer represented in the fisheries data, or decommissioned stocks. 
+setdiff(paste(stock_rgn$TaxonName, stock_rgn$CommonName), 
+  paste(taxonkey$TaxonName, taxonkey$CommonName)) # any diffs here will need to be corrected; there are none!
+
+
+stock_rgn_taxa <- stock_rgn %>% 
+  left_join(taxonkey, by = c("TaxonName","CommonName")) %>% ### it worked
+  dplyr::select(-stock)
+
+
+sum(stock_rgn$tons)
+sum(stock_rgn_taxa$tons)
+
+summary(stock_rgn_taxa) # there should be no NAs for TaxonKey
+
+write.csv(stock_rgn_taxa, file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv'), row.names=FALSE)
+
+
+# test <- stock_rgn_taxa %>%
+#   filter(rgn_id < 255) %>%
+#   distinct(rgn_id) %>%
+#   left_join(rgns_eez)
+```
+
+
+## Wrangle
+
+Filter out all stocks that don't meet our conditions. This prep will be used for B/Bmsy calculations. We will include ALL catch here (including discards):
+
+(1) Keep all stocks that have at least an average annual harvest of 1000 tons
+(2) Keep all stocks with time series of 20 years or more
+
+
+```{r prep_data_bbmsy, eval=FALSE}
+## KEEP DISCARDS, FOFM, and OTHER FOR THIS DF (THIS DF IS FOR BBMSY CALCS)
+
+## set variables to filter by
+min_yrs = 20
+min_tons = 1000
+
+## read in catch data created above
+df <- read_csv(file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv'))
+
+test <- df %>%
+  filter(rgn_id == 21)
+
+## create dataset ready to run through catch-only models
+stks <- df %>%
+              filter(TaxonKey >= 600000,               #remove all records of catch reported at higher taxonomic levels than species
+                     tons     > 0) %>%                  #remove records of 0 catch
+              dplyr::select(-rgn_id) %>%                       #remove rgn_id since we aggregate stocks to the FAO level   
+              dplyr::group_by(stock_id, year, fao_rgn, TaxonName, CommonName, TaxonKey) %>%
+              dplyr::summarise(tons = sum(tons)) %>%           #calculate total tons per stock and year
+              ungroup() %>%
+              dplyr::group_by(stock_id) %>%
+              dplyr::mutate(nyrs = n(),                       #get the total number of years the stock has records for   
+                     avg_ann_catch = mean(tons)) %>%    #calculate the mean catch over all catch years for each stock
+              dplyr::ungroup() %>%
+              dplyr::filter(avg_ann_catch >= min_tons,        #keep only those stocks that meet our conditions
+                              nyrs >= min_yrs) %>%
+              dplyr::select(year, TaxonName, CommonName, fao_rgn, stock_id, TaxonKey, tons) #Resilience
+
+write.csv(stks, file = 'output/stock_catch_no_res.csv', row.names = FALSE)
+
+```
+
+# Prep data for B/Bmsy calculations
+
+Catch-MSY is the model we use to estimate stock status for all global stocks. This model requires information about the resilience of each species in addition to the catch data for each year.
+
+**NOW WE RUN THE `species_resilience_lookup_table.Rmd` SCRIPT**
+
+Load taxonomic resilience information, created in `species_resilience_lookup_table.Rmd`. The species resilience prep (species_resilience_lookup_table.Rmd) resulted 10 more resilience information rows this year than in 2019.
+
+```{r resilience,eval=F}
+
+## add the taxon_resilence data to catch for b/bmsy calculations
+taxon_res = read_csv('output/taxon_resilience_lookup.csv') %>%
+              dplyr::select(CommonName=common, Resilience)
+
+```
+
+## More Wrangling
+ - Add the resilience information to the stks dataframe created above, and re-write it to the output folder. 
+ 
+```{r prep_data_bbmsy1, eval=FALSE}
+stks <- read_csv("output/stock_catch_no_res.csv")
+
+stks_res <- stks %>%
+              dplyr::left_join(taxon_res, by = "CommonName") %>%                  #add resilience information
+              dplyr::select(year, TaxonName, CommonName, Resilience, fao_rgn, stock_id, TaxonKey, tons) 
+
+## check on stocks that don't have a resilience
+no_res <- filter(stks_res, is.na(Resilience)) %>%
+          dplyr::select(TaxonName, CommonName) %>%
+          distinct()
+    
+nrow(no_res) # 171 species do not have a Resilience. These will get assigned a Medium Resilience by default by the CMSY model.
+
+write.csv(stks_res, file = 'output/stock_catch.csv', row.names = FALSE)
+```
+
+## Data Check
+
+Take a look at the stock data datatable
+```{r, eval=FALSE}
+
+stks = read_csv('output/stock_catch.csv')
+
+DT::datatable(head(stks,n=100))
+
+```
+
+
+***
+
+# Prep data for mean catch 
+
+## Wrangle
+
+Mean catch data is used to weight the B/Bmsy values in the fishery subgoal.
+
+```{r mean catch, eval=F}
+## FOR THIS WE WILL EXCLUDE DISCARDS, FOFM, and OTHER 
+
+file <- file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv')
+
+catch <- read_csv(file) %>%
+  rename(common = CommonName, fao_id = fao_rgn, species=TaxonName) 
+
+
+summary(catch)
+
+test <- catch %>%
+  filter(rgn_id == 21)
+
+
+## filter out non ohi eez regions 
+catch <- catch %>%
+  filter(!is.na(rgn_id)) %>%
+  filter(!is.na(fao_id)) %>%
+  filter(rgn_id <= 250) %>%
+  filter(rgn_id != 213)
+
+sum(catch$tons) # 6095900083
+
+## exclude discards and "other" end use type
+catch <- catch %>% 
+  filter(discard_id == 0) %>%
+  filter(other_id == 0)
+
+sum(catch$tons) # 5268820702
+5268820702/6095900083 # makes sense.
+
+
+## calculate total annual catch for each stock
+catch <- catch %>%
+  dplyr::select(year, rgn_id, fao_id, stock_id, TaxonKey, tons) %>% # this is where we would add fofm_id, but I'm not doing it for 2021, because the fofm_id numbers look very wrong for 2016-2018
+  group_by(rgn_id, fao_id, TaxonKey, stock_id, year) %>%
+  summarize(catch = sum(tons)) %>%
+  ungroup()
+
+```
+
+Take a look at a few stocks.
+```{r, eval=FALSE}
+
+data.frame(dplyr::filter(catch, stock_id == "Zygochlamys_patagonica-87" & rgn_id==172))
+data.frame(dplyr::filter(catch, stock_id == "Marine_fishes_not_identified-57" & rgn_id==1))
+
+```
+
+## Fill in Zeros
+For years with no reported catch, add zero values (after first reported catch)
+
+```{r, eval=FALSE}
+
+## these data have no zero catch values, so add years with no reported catch to data table:
+catch_zeros <- catch %>%
+  spread(year, catch) %>%
+  data.frame() %>%
+  gather("year", "catch", num_range("X", min(catch$year):max(catch$year))) %>%
+  mutate(year = as.numeric(gsub("X", "", year))) %>%
+  mutate(catch = ifelse(is.na(catch), 0, catch))
+
+## this part eliminates the zero catch values prior to the first reported non-zero catch   
+catch_zeros <- catch_zeros %>%
+  group_by(fao_id, TaxonKey, stock_id, rgn_id) %>%
+  arrange(year) %>%
+  mutate(cum_catch = cumsum(catch)) %>%
+  filter(cum_catch > 0) %>%
+  dplyr::select(-cum_catch) %>%
+  ungroup()
+
+test <- catch_zeros %>%
+  group_by(year) %>%
+  summarise(sum = sum(catch))
+
+```
+
+## Calculate Mean Catch
+Calculate mean catch for ohi regions (using data from 1980 onward). These data are used to weight the RAM b/bmsy values. We will also correct for the forage fish used for feed/fish oil by excluding the proportion used for non-human purposes, like animal feed (90% of forage fish catch). 
+```{r, eval=FALSE}
+
+## correcting for forage fish used as feed/fish oil
+## We have traditionally included all fisheries catch in the Food Provision goal. However, a substantial portion of catch is used in animal feed. Our plan is to remove a portion of catch of these species from the fisheries goal.
+
+## read in list of species used for feed
+forage_fish_taxa_list <- read_csv(file.path("raw/forage_fish_taxa_list.csv"))
+
+taxon_key_info <- read_csv(file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv'))
+
+## need to get TaxonKey's for each species to join with catch_zeros
+forage_fish_taxa_list <- forage_fish_taxa_list %>%
+  left_join(taxon_key_info, by = c("forage_fish" = "TaxonName")) %>%
+  dplyr::select(forage_fish, inWatson, TaxonKey) %>%
+  unique()
+
+ 
+prop_human_cons <- 0.1 ## source from https://www.nature.com/articles/s41893-018-0077-1#Sec11: "Currently, it is estimated about 10% of forage fish enter the human diet directly, but the notoriously tiny-boned fish are labour intensive (thus expensive) to process for human consumption, are the foundation of several industries and thus jobs (creating inertia to change) and are not the preferred fish type for most people"
+
+## join this with catch_zeros by species, and multiply by 0.1... this is the proportion of catch used for humans 
+catch_zero_minus_fish_feed <- forage_fish_taxa_list %>%
+  left_join(catch_zeros, by = "TaxonKey") %>%
+  mutate(catch_human = prop_human_cons*catch,
+         catch_fish_feed = catch*(1-prop_human_cons))
+write_csv(catch_zero_minus_fish_feed, "int/catch_fish_feed.csv")
+
+
+#join catch_zeros with catch_zero_minus_fish_feed
+catch_zeros <- catch_zeros %>%
+  left_join(catch_zero_minus_fish_feed) %>%
+  mutate(catch_human = case_when(
+    is.na(catch_human) ~ catch,
+    !is.na(catch_human) ~ catch_human
+  )) %>%
+  dplyr::select(-forage_fish, -inWatson)
+
+test <- catch_zeros %>%
+  group_by(rgn_id) %>%
+  group_by(year) %>%
+  summarise(tons_sum = sum(catch_human)) %>%
+  mutate(tons_mean = mean(tons_sum))
+
+sum(catch_zeros$catch_fish_feed, na.rm = TRUE)/(sum(catch_zeros$catch_human, na.rm = TRUE) + sum(catch_zeros$catch_fish_feed, na.rm = TRUE)) # 0.354365; seems right. This states that forage fish account for more than a third of fish catch every year: https://www.pewtrusts.org/-/media/assets/2013/pffforagefishfaq.pdf
+
+mean_catch <- catch_zeros %>%
+  filter(year >= 1980) %>%
+  group_by(rgn_id, fao_id, TaxonKey, stock_id) %>%
+  mutate(mean_catch = mean(catch, na.rm=TRUE),
+         mean_catch_human = mean(catch_human, na.rm = TRUE)) %>% # mean catch for each stock (in a specific ohi-fao region)
+  filter(mean_catch != 0,
+         mean_catch_human != 0)  %>%      ## some stocks have no reported catch for time period
+  ungroup()
+
+sum(mean_catch$mean_catch)
+
+test <- mean_catch %>%
+  group_by(year) %>%
+  summarise(sum = sum(mean_catch))
+
+## now lets gapfill the 3 missing fishing regions with their high admin regions, Monaco, Gibraltar, Oecussi Ambeno. This is the same as giving them the same score as their admin region. Doing it here is easier than doing it in ohi-global.
+mean_catch_gf <- mean_catch %>%
+  filter(rgn_id %in% c(182, 179, 231)) %>%
+  mutate(rgn_id = case_when(rgn_id == 182 ~ 60,
+                            rgn_id == 179 ~ 185,
+                            rgn_id == 231 ~ 237))
+
+mean_catch <- rbind(mean_catch, mean_catch_gf)
+
+setdiff(rgns_eez$rgn_id, mean_catch$rgn_id) # only missing antarctica... good
+
+
+length(unique(mean_catch$rgn_id)) # 220.. all regions are included now. 
+
+test <- mean_catch %>%
+  group_by(year) %>%
+  summarise(sum_fofm = sum(catch_fish_feed, na.rm = TRUE),
+            sum_total = sum(mean_catch, na.rm = TRUE)) %>%
+  mutate(fofm_percent = sum_fofm/sum_total) # around 30% per year are fofm... perfect.
+
+test <- mean_catch %>%
+  filter(rgn_id == 60)
+
+```
+
+Check out the data
+```{r, eval=FALSE}
+
+data.frame(dplyr::filter(catch, stock_id == "Zygochlamys_patagonica-87" & rgn_id==172))
+data.frame(filter(mean_catch, stock_id == "Marine_fishes_not_identified-57" & rgn_id==1)) # includes finfishes (100139) and other marine fishes (100039)
+```
+
+## Toolbox formatting and save
+
+```{r, eval=FALSE}
+options(scipen = 999) # to prevent taxonkey from turning into scientific notation
+
+mean_catch_toolbox <- mean_catch %>%
+  mutate(stock_id_taxonkey = paste(stock_id, TaxonKey, sep="_")) %>%
+  dplyr::select(rgn_id, stock_id_taxonkey, year, mean_catch) %>%
+  filter(year >= 2001) %>%  # filter to include only analysis years
+  data.frame()
+
+write.csv(mean_catch_toolbox, "int/mean_catch.csv", row.names=FALSE) ## save the total mean catch csv for reference if needed
+
+mean_catch_toolbox_human <- mean_catch %>%
+  mutate(stock_id_taxonkey = paste(stock_id, TaxonKey, sep="_")) %>%
+  dplyr::select(rgn_id, stock_id_taxonkey, year, mean_catch = mean_catch_human) %>%
+  filter(year >= 2001) %>%  # filter to include only analysis years
+  data.frame()
+# length(unique(mean_catch_toolbox_human$rgn_id))
+# test <- mean_catch_toolbox_human %>%
+#   filter(rgn_id == 105)
+
+write.csv(mean_catch_toolbox_human, "output/mean_catch_minus_feed.csv", row.names = FALSE)
+
+# length(unique(mean_catch_toolbox_human$rgn_id)) # 220
+# mean_catch_toolbox_human_watson <- read_csv(file.path("../v2017/data/mean_catch.csv"))
+```
+
+## Data check 
+
+Compare v2022 with last year v2021 
+```{r, eval=FALSE}
+
+library(plotly)
+
+new <- read.csv("output/mean_catch_minus_feed.csv")
+new_filt <- new %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  mutate(new_log_catch = log(mean_catch+1)) %>% 
+  filter(year == 2014) %>% 
+  dplyr::select(rgn_id, stock_id_taxonkey, new_log_catch, mean_catch) 
+
+old <- read.csv("../v2021/output/mean_catch_minus_feed.csv")
+old_filt <- old %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  rename(year = year) %>% 
+  mutate(old_log_catch = log(mean_catch+1)) %>%
+  filter(year == 2014) %>% 
+  dplyr::select(rgn_id, stock_id_taxonkey, old_log_catch, mean_catch)
+  
+check <- old_filt %>% 
+  left_join(new_filt, by = c("rgn_id","stock_id_taxonkey")) %>% 
+  mutate(new_log_catch = ifelse(is.na(new_log_catch), 0, new_log_catch)) %>% 
+  mutate(old_log_catch = ifelse(is.na(old_log_catch), 0, old_log_catch))
+
+## For quick plot
+plot(check$old_log_catch,check$new_log_catch)
+abline(col="red", 0,1)
+
+## Plot with plotly to see region id when hovering over points (takes a while)
+plot_check <- ggplot(check, aes(old_log_catch, new_log_catch, col = rgn_id)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(col="red") +
+  ggtitle("Catch Comparison for 2014 (v2021, v2022)")
+
+plot_check
+
+ #ggplotly(plot_check) #might crash RStudio
+
+```
+
+
+# Prep data for food provision weights 
+
+These data determine the tonnes of food provided by fisheries.  Ultimately, the proportion of food from fisheries relative to mariculture will be calculated to weight the contributions of fishery and mariculture scores to final food provision scores.  
+
+```{r tonnes fp, eval=F}
+
+rgns_eez_gf <- rgns_eez %>%
+  filter(rgn_id != 213)
+
+
+total_catch_FP <- mean_catch %>%
+  group_by(rgn_id, year) %>%
+  summarize(fis_catch = sum(catch_human)) %>%
+  dplyr::select(rgn_id, year, fis_catch) %>%
+  filter(year >= 2005) # filter to include only the relevant analysis years
+
+## now lets gapfill the 3 missing fishing regions with their high admin regions, Monaco, Gibraltar, Oecussi Ambeno
+total_catch_FP_gf <- total_catch_FP %>%
+  filter(rgn_id %in% c(182, 179, 231)) %>%
+  mutate(rgn_id = case_when(rgn_id == 182 ~ 60,
+                            rgn_id == 179 ~ 185,
+                            rgn_id == 231 ~ 237))
+
+total_catch_FP_final <- rbind(total_catch_FP, total_catch_FP_gf)
+
+write.csv(total_catch_FP, "output/FP_fis_catch.csv", row.names=FALSE)
+
+```
+
+Check differences in data for food provision weights
+
+```{r, eval = FALSE}
+new <- read.csv("output/FP_fis_catch.csv")
+new_filt <- new %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  filter(year == 2014) %>% 
+  rename(new_fis_catch = fis_catch) %>%
+  dplyr::select(rgn_id, year, new_fis_catch) 
+
+old <- read.csv("../v2021/output/FP_fis_catch.csv")
+old_filt <- old %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  rename(year = year) %>% 
+  filter(year == 2014) %>% 
+  rename(old_fis_catch = fis_catch) %>%
+  dplyr::select(rgn_id, year, old_fis_catch)
+  
+check <- old_filt %>% 
+  left_join(new_filt, by = c("rgn_id","year"))
+
+## For quick plot
+plot(check$old_fis_catch,check$new_fis_catch)
+abline(col="red", 1,1)
+
+## Plot with plotly to see region id when hovering over points (takes a while)
+plot_check <- ggplot(check, aes(old_fis_catch, new_fis_catch, col = rgn_id)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(col="red") +
+  ggtitle("Food Provision Comparison for 2014 (v2021, v2022)")
+
+plot_check
+```
+
+
+***
+
+# Citation information
+
+Pauly D. and Zeller D. (Editors), 2015. Sea Around Us Concepts, Design and Data (seaaroundus.org)

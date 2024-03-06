@@ -1,0 +1,496 @@
+---
+title: 'OHI 2021: Seagrass health'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+
+```{r setup, include=FALSE}
+
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(broom)
+library(mapview)
+library(ggplot2)
+
+source('http://ohi-science.org/ohiprep_v2021/workflow/R/common.R')
+
+goal     <- 'globalprep/hab_seagrass/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_waycott <- file.path(dir_git, "waycott_data_extract")
+ohi_rasters()
+regions_shape()
+
+```
+
+## Methods
+We will follow these methods:
+
+ - Reference condition was calculated as the mean of the three oldest years between 1975-1985, or the two earliest years between 1975 and 1985 if needed.
+ - For the current condition we used the mean of the three most recent years after 2000 or the two most recent years after 2000. 
+ - If condition data satisfying these constraints were still not available, we fitted a linear model to all data points, provided that there were at least three data points and then used the mean of the predicted values for 2008-2010 as the current condition and the mean of the predicted values for 1979-1981 as the reference condition. 
+     - Any model with a P-value >0.1 we will assign the health to be 1. 
+     - Any modeled data that is increasing over time will receive a health of 1. 
+     - Otherwise calculate health as current condition / reference condition 
+ - If there is predicted reference condition but non-predicted current condition, follow same rules as above. 
+ - If there is predicted current condition but non-predicted reference condition, follow same rules as above. 
+ - If there are both non-predicted current and reference conditions, calculate has current condition / reference condition.
+     
+ - We will then find country level conditions by weighting by the average seagrass area for each site. 
+ - Otherwise, we used neighboring (adjacent) regional averages, weighted by habitat area, or averages weighted by habitat area using seagrass geographical regions as defined by Hemminga and Duarte (2000). We did not project beyond a 15-year timeframe.
+
+```{r}
+## read in waycott data
+waycott_data <- read_csv(file.path("~/github/ohiprep_v2021/globalprep/hab_seagrass/v2016_explore/data1/data_waycott.csv"))
+summary(waycott_data)
+```
+
+Explore the linear models
+```{r}
+## explore the linear models 
+test_lm <- lm(data = waycott_health_ref_modeled, area_ha~year)
+names(summary(test_lm))
+summary(test_lm)$coefficients[2,4]
+
+
+test_plot <- ggplot(data = waycott_data, aes(x = year, y = area_ha, group = site_id)) + 
+  geom_point() + 
+  facet_wrap(~site_id, scales = "free") +
+  geom_smooth(method = "lm")
+
+ggsave(plot = test_plot, "int/mod_ref_condition.png", width = 20, height = 20)
+
+## this actually looks pretty ok to me. There are a couple sites with wonky trends, but with our exclusions and rules it should be ok...
+
+```
+
+Calculate reference condition
+```{r}
+
+#### Calculate reference condition
+
+waycott_site_names <- waycott_data %>%
+  group_by(site_id, rgn, site_name) %>%
+  summarise(n = n()) %>%
+  ungroup() %>%
+  dplyr::select(-n)
+
+# Condition 1: Reference condition was calculated as the mean of the three oldest years between 1975-1985.
+
+waycott_health_ref_1 <- waycott_data %>%
+  filter(year %in% 1975:1985) %>%
+  group_by(site_id) %>%
+  mutate(n_years = n()) %>%
+  ungroup() %>%
+  filter(n_years >=3) %>%
+  group_by(site_id, rgn) %>%
+  slice(1:3) %>%
+  summarise(ref_condition = mean(area_ha)) %>%
+  ungroup() %>%
+  mutate(ref_type = "mean of first 3 years between 1975 and 1985") %>%
+  left_join(waycott_site_names)
+
+# Condition 2: Mean of the two earliest years if needed
+waycott_health_ref_2 <- waycott_data %>%
+  filter(year %in% 1975:1985) %>%
+  group_by(site_id) %>%
+  mutate(n_years = n()) %>%
+  ungroup() %>%
+  filter(n_years == 2) %>%
+  group_by(site_id, site_name, rgn) %>%
+  summarise(ref_condition = mean(area_ha)) %>%
+  ungroup() %>%
+  mutate(ref_type = "mean of the 2 earliest years between 1975 and 1985") %>%
+  left_join(waycott_site_names)
+
+waycott_health_ref_no_model <- rbind(waycott_health_ref_1, waycott_health_ref_2)
+unique(waycott_health_ref_no_model$rgn)
+# [1] "Denmark"      "Australia"    "France"       "USA"          "South Africa"
+```
+
+Calculate current condition
+```{r}
+#### Calculate current condition
+
+# For the current condition we used the mean of the three most recent years after 2000.
+waycott_health_current_1 <- waycott_data %>%
+  filter(year > 2000) %>%
+  group_by(site_id) %>%
+  mutate(n_years = n()) %>%
+  ungroup() %>%
+  filter(n_years >=3,
+         site_id != 435) %>% ## filter out those with less than 3 years and turnbull (since turnbull has NAs)
+  group_by(site_id, rgn) %>%
+  slice(tail(row_number(), 3)) %>%
+  summarise(curr_condition = mean(area_ha)) %>%
+  ungroup() %>%
+  mutate(curr_type = "mean of three most recent years") %>%
+  left_join(waycott_site_names)
+
+# or the two most recent years
+waycott_health_current_2 <- waycott_data %>%
+  filter(year > 2000,
+         !(site_id %in% waycott_health_current_1$site_id),
+         site_id != 435) %>% ## filter out turnbull and those already accounted for 
+  group_by(site_id) %>%
+  mutate(n_years = n()) %>%
+  ungroup() %>%
+  filter(n_years >=2) %>%
+  group_by(site_id, rgn) %>%
+  slice(tail(row_number(), 2)) %>%
+  summarise(curr_condition = mean(area_ha)) %>%
+  ungroup() %>%
+  mutate(curr_type = "mean of two most recent years") %>%
+  left_join(waycott_site_names)
+
+waycott_health_current_no_model <- rbind(waycott_health_current_1, waycott_health_current_2)
+unique(waycott_health_current_no_model$rgn)
+# [1] "USA"    "France"
+
+
+waycott_health_all_no_model <- waycott_health_current_no_model %>%
+  full_join(waycott_health_ref_no_model)
+```
+
+
+Model our reference and current conditions
+```{r}
+## calculate linear model of all data, then take mean of predicted between 1979-1981 and 2008-2010, and THEN filter for those sites that are NOT in the reference conditions 1 or 2 OR current conditions 1 or 2.
+
+years <- data.frame(model_year = c(1979:1981, 2008:2010))
+
+waycott_health_modeled_per_site <- waycott_data %>%
+    group_by(site_id) %>%
+  mutate(n_years = n()) %>%
+  ungroup() %>%
+  #filter(site_id == 1) %>%
+  filter(n_years >=3) %>%
+  group_by(site_id, site_name, rgn) %>%
+    do(mdl = lm(area_ha ~ year, data=.)) %>%
+    summarize(rgn = rgn,
+            site_id = site_id,
+            site_name = site_name,
+            habitat = "seagrass",
+            mod_intercept = coef(mdl)['(Intercept)'],
+            mod_beta = coef(mdl)['year'],
+            p_value = summary(mdl)$coefficients[2,4]) %>%
+  ungroup() %>%
+  merge(years) %>%
+  mutate(condition_mod = mod_intercept + mod_beta*model_year) %>%
+  mutate(p_value_flag = ifelse(p_value > 0.1, "make condition 1", NA)) %>%
+  mutate(condition_type = ifelse(model_year %in% 1979:1981, "modeled_reference", "modeled_current"))
+
+waycott_model_flags <- waycott_health_modeled_per_site %>%
+  distinct(rgn, site_id, p_value_flag) ## create a dataset for p-value flags so we know which ones to assign a health of 1
+
+
+waycott_health_mod_site_rgn <- waycott_health_modeled_per_site %>%
+  group_by(site_id, rgn, condition_type) %>%
+  summarise(condition = mean(condition_mod)) %>%
+  ungroup() %>%
+  pivot_wider(names_from = condition_type, values_from = condition) %>%
+  left_join(waycott_site_names) %>%
+  left_join(waycott_model_flags) ## now we have our modeled data
+
+```
+
+Join modeled data with non-modeled, and gapfill accordingly
+```{r}
+
+waycott_health_all <- waycott_health_all_no_model %>%
+  full_join(waycott_health_mod_site_rgn)
+
+
+length(unique(waycott_health_all$site_id)) # 111 unique site ids.. losing about 100 sites with insufficient data
+length(unique(waycott_data$rgn)) # 17
+length(unique(waycott_health_all$rgn)) # 9.. we lose 9 regions with insufficient data
+
+
+## now lets make our pre geo/bioregion gapfilling final dataset
+
+waycott_health_pre_gf <- waycott_health_all %>%
+  ## create flags for if it is fully predicted or semi predicted or not predicted at all
+  mutate(gap_fill = case_when(
+    is.na(curr_condition) & is.na(ref_condition) ~ "predicted",
+    is.na(curr_condition) & !is.na(ref_condition) ~ "current condition predicted",
+    is.na(ref_condition) & !is.na(curr_condition) ~ "reference condition predicted", 
+    TRUE ~ "none")) %>%
+  mutate(ref_condition_final = ifelse(is.na(ref_condition), modeled_reference, ref_condition),
+         curr_condition_final = ifelse(is.na(curr_condition), modeled_current, curr_condition)) %>%
+  filter(site_id != 121) ## filter out region with only reference data and not enough data for model
+
+#### split into predicted and non predicted datasets and calculate health (it is just easier to think through these separately)
+
+## Fully predicted data
+#### if the p-value is >0.1, always make the health 1, otherwise calculate normally.
+
+waycott_health_predicted <- waycott_health_pre_gf %>%
+  filter(gap_fill == "predicted") %>%
+  dplyr::mutate(health = case_when(
+    p_value_flag == "make condition 1" ~ NA_real_,
+    curr_condition_final > ref_condition_final ~ 1,
+    curr_condition_final < 0 & ref_condition_final > 0 ~ 0, 
+    TRUE ~ curr_condition_final/ref_condition_final
+  )) 
+
+## Reference predicted data and current non-predicted
+#### if the p-value is >0.1, always make the health 1, otherwise calculate normally.
+waycott_health_ref_predict <- waycott_health_pre_gf %>%
+  filter(gap_fill == "reference condition predicted") %>%
+  mutate(health = case_when(curr_condition_final > ref_condition_final & is.na(p_value_flag) ~ 1,
+                            curr_condition_final < ref_condition_final & is.na(p_value_flag) ~ curr_condition_final/ref_condition_final, 
+         !is.na(p_value_flag) ~ NA_real_))
+
+
+## Current predicted data and reference non-predicted
+#### if the p-value is >0.1, always make the health 1, otherwise calculate normally.
+
+waycott_health_curr_predict <- waycott_health_pre_gf %>%
+  filter(gap_fill == "current condition predicted") %>%
+  mutate(health = case_when(curr_condition_final > ref_condition_final & is.na(p_value_flag) ~ 1,
+                            curr_condition_final < ref_condition_final & is.na(p_value_flag) ~ curr_condition_final/ref_condition_final, 
+         !is.na(p_value_flag) ~ NA_real_))
+
+## No predicted data 
+waycott_no_predict <- waycott_health_pre_gf %>%
+  filter(gap_fill == "none") %>%
+  mutate(health = ifelse(curr_condition_final > ref_condition_final, 1, curr_condition_final/ref_condition_final))
+
+## put all back together and save 
+
+waycott_health_all_int <- rbind(waycott_no_predict, waycott_health_curr_predict, waycott_health_ref_predict, waycott_health_predicted)
+
+write.csv(waycott_health_all_int, "int/waycott_health_intermediate.csv", row.names = FALSE)
+
+
+## save a pre grouping health estimate 
+waycott_health_all_pre_grouping <- waycott_health_all_int %>%
+  dplyr::select(rgn, site_id, site_name, gap_fill, health) 
+
+
+## Now we need an estimate of average area per site over all years of data so that we can take a weighted average of health to get our region estimates 
+
+site_area_averages <- waycott_data %>%
+  group_by(site_id) %>%
+  summarise(avg_area = mean(area_ha, na.rm = TRUE)) %>%
+  ungroup()
+
+
+waycott_health_pre_gf <- waycott_health_all_pre_grouping %>%
+  left_join(site_area_averages) %>%
+  mutate(rgn_name = case_when(
+    rgn == "USA" ~ "United States", 
+    rgn == "The Netherlands" ~ "Netherlands",
+    TRUE ~ as.character(rgn)
+  )) %>%
+  left_join(rgns_eez) %>%
+  dplyr::select(2:8)
+
+
+## create a proportion of rgn gapfilled file
+
+health_gf_int <- waycott_health_pre_gf %>%
+  mutate(gap_fill = ifelse(gap_fill != "none", "predicted", gap_fill)) %>%
+  group_by(rgn_id, rgn_name, gap_fill) %>%
+  summarise(n_obs = n()) %>%
+  mutate(total_obs = sum(n_obs)) %>%
+  ungroup() %>%
+  filter(gap_fill != "none") %>%
+  group_by(rgn_id, rgn_name, total_obs) %>%
+  summarise(n_obs = sum(n_obs)) %>%
+  ungroup() %>%
+  mutate(prop_gapfill = n_obs/total_obs) %>%
+  mutate(habitat = "seagrass", 
+         year = 2021,
+         gap_fill = "at least some predicted") %>%
+  dplyr::select(rgn_id, habitat, year, prop_gapfill, gap_fill)
+
+write.csv(health_gf_int, "int/health_seagrass_gf_raw_rgns.csv", row.names = FALSE)
+
+
+## now lets calculate the health based on a area weighted average
+
+health_area_weighted <- waycott_health_pre_gf %>%
+  group_by(rgn_id, rgn_name) %>%
+  dplyr::summarise(health = weighted.mean(health, avg_area, na.rm = TRUE)) %>%
+  mutate(year = 2021, habitat = "seagrass")
+
+write.csv(health_area_weighted, "int/habitat_health_seagrass_updated_int.csv", row.names = FALSE)
+```
+
+
+**Gapfill the remaining countries that have extent but no health data**
+
+Try to figure out the seagrass regions
+
+"or averages weighted by habitat area using seagrass geographical regions as defined by Hemminga and Duarte (2000). We did not project beyond a 15-year timeframe."
+
+```{r}
+sg_regions <- st_read(file.path(here(), "globalprep/hab_seagrass/v2016_explore/gis/biorgn_clip.shp"))
+mapview(sg_regions)
+
+moll_crs <- crs(regions, asText = TRUE)
+
+sg_regions_moll <- st_transform(sg_regions, crs = moll_crs) 
+
+sg_regions_ohi <- st_intersection(st_make_valid(sg_regions_moll), regions)
+
+mapview(head(sg_regions_ohi))
+
+st_write(sg_regions_ohi, file.path("/home/shares/ohi/git-annex/globalprep/hab_seagrass/v2021/health/sg_biorgns_ohi.shp"))
+
+sg_regions_ohi <- st_read(file.path("/home/shares/ohi/git-annex/globalprep/hab_seagrass/v2021/health/sg_biorgns_ohi.shp"))
+
+sg_regions_ohi_df <- sg_regions_ohi %>%
+  st_drop_geometry() %>%
+    filter(rgn_type %in% c(NA, "eez"))
+
+seagrass_extent <- read_csv("data/habitat_extent_seagrass_updated.csv") %>%
+  dplyr::select(-year)
+
+# calculate global mean for those without sg bioregions (only 2 countries)
+global_avg_health <- mean(health_area_weighted$health, na.rm = TRUE)
+
+health_extent_rgns_graph <- seagrass_extent %>%
+  left_join(rgns_eez) %>%
+  dplyr::select(1:4) %>%
+  left_join(health_area_weighted, by = c("rgn_id", "habitat", "rgn_name")) %>%
+  dplyr::mutate(year = 2021) %>%
+  left_join(sg_regions_ohi_df) %>%
+  filter(!is.na(health))
+
+ggplot(health_extent_rgns_graph, aes(x = biorgnname, y = health, color = rgn_name)) + 
+  geom_point() + 
+  #geom_text(size = 4) +
+  theme(axis.text.x = element_text(angle = -30, vjust = 0.5, hjust=1))
+
+
+health_extent_rgns <- seagrass_extent %>%
+  left_join(rgns_eez) %>%
+  dplyr::select(1:4) %>%
+  left_join(health_area_weighted, by = c("rgn_id", "habitat", "rgn_name")) %>%
+  dplyr::mutate(year = 2021) %>%
+  left_join(sg_regions_ohi_df) %>%
+  group_by(biorgn_id) %>%
+  mutate(avg_health_biorgn = weighted.mean(health, km2, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  mutate(health2 = ifelse(is.na(health), avg_health_biorgn, health)) %>%
+  mutate(health3 = ifelse(is.na(health2), global_avg_health, health2)) %>%
+  mutate(gap_fill = ifelse(is.na(health), "seagrass bio region average", NA)) %>%
+  mutate(gap_fill = ifelse(is.na(health) & is.na(avg_health_biorgn), "global average", gap_fill)) %>%
+  mutate(gap_fill = ifelse(is.na(gap_fill), 0, gap_fill)) %>%
+  dplyr::select(rgn_id, habitat, gap_fill, health = health3) 
+
+## now get final health layer
+health_rgns_final <- health_extent_rgns %>%
+  group_by(rgn_id, habitat) %>%
+  summarise(health = mean(health)) %>%
+  ungroup() %>%
+  left_join(health_extent_rgns, by = c("rgn_id", "habitat")) %>%
+  distinct(rgn_id, habitat, health.x, gap_fill) 
+  
+
+mapview(sg_regions)
+```
+
+
+ARCHIVE: 
+Otherwise, we used neighboring (adjacent) regional averages, weighted by habitat area, or averages weighted by habitat area using seagrass geographical regions as defined by Hemminga and Duarte (2000). We did not project beyond a 15-year timeframe.
+
+```{r}
+# regions <- read.csv(file.path(here('globalprep/supplementary_information/v2018/rgn_georegions_wide_2013b.csv'))) ## read in georegions data
+# 
+# seagrass_extent <- read_csv("data/habitat_extent_seagrass_updated.csv") %>%
+#   dplyr::select(-year)
+# 
+# health_area_weighted <- read_csv("int/habitat_health_seagrass_updated_int.csv")
+# 
+# health_gf_final <- read_csv("int/health_seagrass_gf_raw_rgns.csv")
+# 
+# setdiff(health_area_weighted$rgn_id, seagrass_extent$rgn_id) # rgns with health data and not extent - 0
+# setdiff(seagrass_extent$rgn_id, health_area_weighted$rgn_id) # rgns with extnet data and not health... 146... a lot
+# 
+# 
+# health_extent_rgns <- seagrass_extent %>%
+#   left_join(rgns_eez) %>%
+#   dplyr::select(1:4) %>%
+#   left_join(health_area_weighted, by = c("rgn_id", "habitat", "rgn_name")) %>%
+#   dplyr::mutate(year = 2021)
+# 
+# 
+# old_health_gf <- read_csv(file.path("/home/sgclawson/github/ohiprep_v2021/globalprep/hab_seagrass/v2012/data/health_seagrass_gf.csv"))
+# 
+# old_health <- read_csv(file.path("/home/sgclawson/github/ohiprep_v2021/globalprep/hab_seagrass/v2012/data/habitat_health_seagrass_updated.csv"))
+# 
+# 
+# old_health_adjacent <- old_health_gf %>%
+#   filter(str_detect(gap_fill, "adjacent")|gap_fill == 0) %>%
+#   left_join(rgns_eez) %>%
+#   left_join(old_health) %>%
+#   filter(!(rgn_id %in% c(210, 13, 14, 15, 151, 158, 209, 73))) %>% # Japan
+#   filter(!(rgn_id %in% c(16, 5, 7, 17, 216))) %>% ## Australia 
+#     filter(!(rgn_id %in% c(132, 129, 131, 139))) %>% ## Colombia
+#   filter(!(rgn_id %in% c(102, 41))) %>% ## South Africa 
+#   filter(!(rgn_id %in% c(218, 135, 110, 112))) %>% ## USA 
+#    filter(!(rgn_id %in% c(184))) %>% ## France
+#   filter(!(rgn_id %in% c(175, 178, 222))) %>% ## Denmark 
+#   filter(!(rgn_id %in% c())) %>% ## Portugal
+#   filter(!(rgn_id %in% c())) %>% ## Spain
+#   filter(!(rgn_id %in% c()))  ## Netherlands 
+#   
+# 
+# # # adjacent to Australia, rgnid 16:
+# # rgn_id %in% c(5, 7, 17, 216)
+# # rgn_name %in% c("New Caledonia", "Solomon Islands", "Papua New Guinea", "Indonesia")
+# #
+# # # adjacent to south africa, rgn_id 102:
+# # rgn_id %in% c(102, 41)
+# # rgn_name %in% c("Mozambique")
+# 
+# # # adjacent to USA, rgn_id 163:
+# # rgn_id %in% c(218, 135, 110, 112)
+# # rgn_name %in% c("Canada", "Mexico", "Bahamas", "Cuba")
+# 
+# 
+# # # adjacent to France, rgn_id 179:
+# # rgn_id %in% c(184, 180, )
+# # rgn_name %in% c("Italy", "United Kingdom", )
+# 
+# # # adjacent to Denmark, rgn_id 175:
+# # rgn_id %in% c(175, 178, 222)
+# # rgn_name %in% c("Poland", "Sweden")
+# 
+# 
+# # # adjacent to Colombia, rgn_id 132:
+# # rgn_id %in% c(132, 129, 131)
+# # rgn_name %in% c("Panama", "Nicauargua", "Venezuela")
+# 
+# 
+# # # adjacent to Portugal, rgn_id 183:
+# # rgn_id %in% c
+# 
+# # # adjacent to Spain, rgn_id 182:
+# # rgn_id %in% c
+# 
+# # # adjacent to Netherlands, rgn_id 177:
+# # rgn_id %in% c
+# 
+# 
+# # # adjacent to Japan, rgn_id 210
+# # rgn_id %in% c(13, 14, 15, 151, 158, 209, 73)
+
+```
+

@@ -1,0 +1,97 @@
+---
+title: 'OHI 2021: saltmarsh condition'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+<https://cdnsciencepub.com/doi/10.1139/anc-2017-0001>
+
+This script generates the condition of saltmarsh. Based on the following references, global saltmarsh has decreased by 25-50% from historical extent (no idea of the timeframe this refers to) and there is an estimated 1-2% decrease every year. Given this, we will apply a condition of 0.75 globally (using the more conservative 25% decline estimate).
+
+## Updates from previous assessment
+
+No code or data updates in 2023, copied over from v2021.
+
+------------------------------------------------------------------------
+
+## Data Source
+
+Mcowen, C., Weatherdon, L., Bochove, J.-W., Sullivan, E., Blyth, S., Zockler, C., Stanwell-Smith, D., Kingston, N., Martin, C., Spalding, M., Fletcher, S., 2017. A global map of saltmarshes. BDJ 5, e11764. <https://doi.org/10.3897/BDJ.5.e11764>
+
+**Downloaded**: October 5, 2021
+
+**Description**: "Despite their importance, saltmarsh areas are declining around the world, having lost between 25% and 50% of their global historical coverage (Crooks et al. 2011, Duarte et al. 2008)."
+
+**Time range**: NA
+
+------------------------------------------------------------------------
+
+# Methods
+
+## Setup
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE, eval = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+library(janitor)
+
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_saltmarsh/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+region_data()
+
+dir_git_old  <- file.path('~/github/ohiprep_v2021', "globalprep/hab_saltmarsh/v2012")
+
+
+
+```
+
+Apply a global value to each region.. not satisfying.
+
+```{r, eval = FALSE}
+## read in extent data
+all <- read.csv(file.path(here("globalprep/hab_saltmarsh/v2021/data/habitat_extent_saltmarsh_updated.csv")))
+
+# specify trend
+all <- all %>%
+  filter(km2 > 0) %>%
+  filter(rgn_id < 255) %>%
+  dplyr::select(-year) %>%
+  mutate(health = 0.75)
+
+
+# Save gapfilling 
+
+health_gaps <- all %>%
+  mutate(variable = "health") %>%
+  mutate(habitat = "saltmarsh") %>%
+  mutate(gapfill = 1) %>% 
+  dplyr::select(-km2)
+write.csv(health_gaps, here('globalprep/hab_saltmarsh/v2021/data/health_saltmarsh_gf.csv'), row.names=FALSE)
+
+### save trend data:
+health <- trend_gaps %>%
+  dplyr::select(rgn_id, habitat, health) %>%
+  mutate(year = 2021)
+write.csv(health, here('globalprep/hab_saltmarsh/v2021/data/habitat_health_saltmarsh_updated.csv'), row.names=FALSE)
+```

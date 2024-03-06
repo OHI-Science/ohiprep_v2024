@@ -1,0 +1,317 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')`: saltmarsh extent"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This script generates the extent of saltmarsh for each OHI region. 
+
+## Updates from previous assessment
+
+2022 - Tried updating with new dataset, but calculations did not work out. The lead author for the dataset listed here has plans on releasing saltmarsh extent estimates similar to his tidal flat extent. Look for this data and when released, the summarization process should be very similar to tidal flat. 
+
+***
+## Data Source 
+
+**Reference**: Murray, N.J., Worthington, T.A., Bunting, P., Duce, S., Hagger, V., Lovelock, C.E., Lucas, R., Saunders, M.I., Sheaves, M., Spalding, M., Waltham, N.J., Lyons, M.B., 2022. High-resolution mapping of losses and gains of Earth's tidal wetlands. Science. doi:10.1126/science.abm9583
+
+**Downloaded**: 2022-08-03
+
+**Description**:  
+The Murray Global Tidal Wetland Change Dataset contains maps of the global extent of tidal wetlands and their change. The maps were developed from a three stage classification that sought to (i) estimate the global distribution of tidal wetlands (defined as either tidal marsh, tidal flat or mangrove ecosystems), (ii) detect their change over the study period, and (iii) estimate the ecosystem type and timing of tidal wetland change events.
+
+The dataset was produced by combining observations from 1,166,385 satellite images acquired by Landsat 5 to 8 with environmental data of variables known to influence the distributions of each ecosystem type, including temperature, slope, and elevation. The image contains bands for a tidal wetland extent product (random forest probability of tidal wetland occurrence) for the start and end time-steps of the study period and a tidal wetland change product over the full study period (loss and gain of tidal wetlands).
+
+Please see the usage notes on the [project website](https://www.globalintertidalchange.org/). A full description of the methods, validation, and limitations of the data produced by this software is available in the associated scientific paper.
+
+See also [UQ/murray/Intertidal/v1_1/global_intertidal](https://developers.google.com/earth-engine/datasets/catalog/UQ_murray_Intertidal_v1_1_global_intertidal) for global maps of the distribution of tidal flat ecosystems.
+
+**Time range**: 1984-2016
+
+**Download link**: https://www.globalintertidalchange.org/data-usage use `gsutil -m cp "gs://gic-archive/gic-2019-v1-0/v1-0-1/*.tif" "PATH-TO-LOCAL-FOLDER"`
+
+- **Note**: Download should only be done once, either in this script or `saltmarsh_trend.Rmd`
+
+**Variables**:
+- `twprobabilityStart` 
+- 0 to 100 - integer which represents the agreement of random forest decision trees for the tidal wetland class in time step 1 of the analysis, 1999-2001 
+- we will use `twprobabilityStart` > 50 as a threshold to define all types of tidal wetland (tidal flat, mangrove, and tidal marsh)
+
+- `twprobabilityEnd`:
+- 0 to 100 - integer which represents the agreement of random forest decision trees for the tidal wetland class in time step 7 of the analysis, 2017-2019 
+- we will use `twprobabilityEnd` > 50 as a threshold to define all types of tidal wetland (tidal flat, mangrove, and tidal marsh)
+
+- raster shards use a hash that represents spatial extent
+- `0000000000-0000000000` represents the same spatial extent for `twprobabilityStart` and `twprobabilityEnd`
+- Not human readable but we can use this to loop over areas for our calculations
+
+**Other data**: Calculating saltmarsh extent also requires the summarized mangrove extent and summarized tidal flat extent for 2001. 
+
+***
+
+# Methods
+
+## overview
+
+1. Find `twprobabilityStart` > 50
+
+- replace numbers greater than 50 with 1, 0 otherwise
+- left with either tidal wetland, or not tidal wetland
+
+2.  Down sample rasters from 30 m$^2$ ground sample distance (GSD) to ~ 1 km$^2$ GSD
+
+- 30 pixels is 900 m$^2$
+- (900*900)/1000000 = 0.81 km$^2$
+- file size is reduced from 27-57 MB per shard to about 340 KB per shard
+- take the sum of the pixels
+- convert to area (multiply sum of pixels by 0.0009)
+- If the native raster cells are 30x30 m$^2$ area, then a raster cell with a value of 1 would be equivalent to 0.0009 km$^2$ habitat area: (30*30)/(1000*1000) = 0.0009
+
+3. Summarize tidal wetland extent to country level
+
+## Setup
+
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE, eval = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, eval = FALSE, echo = TRUE)
+
+if (!require(librarian)){install.packages("librarian")}
+if (!require(ohicore)){devtools::install_github('ohi-science/ohicore@dev')}
+
+librarian::shelf(
+  tidyverse,
+  here,
+  janitor,
+  plotly,
+  sf,
+  fasterize,
+  terra,
+  raster,
+  tictoc,
+  foreach,
+  doParallel,
+  exactextractr
+)
+### directory paths and relevant files
+current_year <- 2022
+version_year <- paste0("v", current_year)
+data_year <- paste0("d", current_year)
+
+source(here::here('workflow', 'R', 'common.R'))
+
+### Mazu
+dir_here  <- here::here('globalprep', 'hab_saltmarsh', version_year)
+dir_data <- file.path(dir_M, 'git-annex', 'globalprep', '_raw_data', 'global_tidal_wetland_change', data_year)
+
+### Aurora
+# dir_here <- file.path('/home/shares/food-systems/Global_datasets/global_tidal_wetland_change')
+# dir_data <- file.path('/home/shares/food-systems/Global_datasets/global_tidal_wetland_change/d2022')
+```
+
+### Download the data
+
+The following bash script will download the raw data for the tidal wetland change dataset. 
+
+```{bash eval = FALSE}
+### Make the new directory and move into it
+mkdir /home/shares/ohi/git-annex/globalprep/_raw_data/global_tidal_wetland_change/d2022/raw/tidal_wetland_change && cd $_
+
+### Use gsutil (MAZU only) to download the shard data 
+gsutil -m cp "gs://gic-archive/gic-2019-v1-0/v1-0-1/*.tif" .
+```
+
+### Load OHI region data
+
+```{r eval = FALSE}
+regions_shape()
+
+regions_eez_and_land <- regions %>%
+  dplyr::filter(rgn_type %in% c("eez", 'land')) %>% 
+  sf::st_transform(crs = 4326) 
+
+dummy_df <- regions_eez_and_land %>% 
+  as_tibble() %>% 
+  dplyr::select(rgn_id, rgn_name) 
+
+rgns <- ohicore::rgn_master %>% 
+  dplyr::filter(rgn_typ == "eez") %>% 
+  dplyr::select(rgn_id = rgn_id_2013, rgn_name = rgn_nam_2013) %>% 
+  dplyr::distinct() %>% 
+  dplyr::filter(!rgn_id %in% c(213, 255)) # Antarctica and DISPUTED
+```
+
+## Find tidal wetlands
+
+- replace numbers greater than 50 with 0.0009, NA otherwise
+- left with either tidal wetland, or not tidal wetland
+- units are in km$^2$
+- If the native raster cells are 30 m by 30 m (900 m$^2$ area), then a raster cell would be equivalent to 0.0009 km$^2$ habitat area
+  - (30*30)/(1000*1000) = 0.0009
+- Down sample rasters from 30 m$^2$ ground sample distance (GSD) to ~ 1 km$^2$ GSD. Take the sum of the pixels. 
+
+```{r eval = FALSE}
+### Example twprobabilityStart-0000065536-0001114112 has lots of tw
+tictoc::tic()
+
+files <- here::here(dir_data, "raw", "tidal_wetland_change") %>% 
+  list.files(pattern = "Start")
+
+j <- 1
+
+# doParallel::registerDoParallel(2)
+# 
+# foreach::foreach (i = files) %dopar% {
+
+for (i in files) {
+  
+  fn <- i %>% 
+    stringr::str_replace(
+      pattern     = "murray-gic-v1.0.1-twprobabilityStart",
+      replacement = "tw_start_ds") %>% 
+    stringr::str_replace(
+      pattern     = ".tif",
+      replacement = ".csv")
+  
+  cat(j, "/", length(files), "\n")
+  
+  j <- j + 1
+  
+  file_name <- here::here(dir_data, "int", "tidal_wetland", fn)
+  
+  if(!file.exists(file_name)){
+    cat(fn, " is being created!\n")
+    ## classify the values into two groups 
+    ## all values >= 0 and <= 50 become 0
+    ## all values > 50 and <= 100 become 0.0009
+    ##     from,  to, becomes
+    mat <- c( 0,  50, 0,
+             50, 100, 0.0009)
+    
+    reclassification_mat <- matrix(mat, ncol=3, byrow=TRUE)
+    
+    cat("    classifying...\n")
+    
+    image <- here::here(dir_data, "raw", "tidal_wetland_change", i) %>% 
+      terra::rast() %>% 
+      terra::classify(
+        rcl = reclassification_mat,
+        include.lowest=TRUE,
+        right = TRUE
+      )
+    
+    # image <- (image / 100) * 0.0009
+    
+    cat("    down sampling...\n")
+    
+    down_sampled_image <- terra::aggregate(
+      x = image, 
+      fact = 30, 
+      fun = sum,
+      na.rm = T
+    )
+    
+    cat("    extracting...\n")
+    
+    extracted_values <- exactextractr::exact_extract(
+      x = down_sampled_image, y = regions_eez_and_land, fun = 'sum'
+    )
+    
+    cbind("km2" = extracted_values, dummy_df) %>% 
+      dplyr::group_by(rgn_id, rgn_name) %>% 
+      dplyr::summarise(km2 = sum(km2)) %>% 
+      readr::write_csv(file_name)
+    
+  } else {cat(paste0(fn, " already exists!\n"))}
+}
+tictoc::toc()
+```
+
+## Summarize the grid cells within each country
+
+```{r eval = FALSE}
+files <- here::here(dir_data, "int", "tidal_wetland") %>% 
+  list.files(full.names = T)
+
+output <- tibble()
+
+for (file in files) { 
+  
+  fn <- "tidal_wetland_extent_2001.csv"
+  
+  tmp <- readr::read_csv(file)
+  
+  output <- rbind(tmp, output)
+}
+
+tidal_wetland_2001 <- output %>% 
+  dplyr::group_by(rgn_id) %>% 
+  dplyr::summarise(km2 = sum(km2)) %>% 
+  dplyr::full_join(dplyr::select(rgns, rgn_id)) %>% 
+  dplyr::mutate(year = 2001, 
+                habitat = "tidal wetland",
+                km2 = ifelse(is.na(km2), 0, km2)) %>% 
+  readr::write_csv(here::here(dir_here, "output", "tidal_wetland_2001.csv"))
+```
+
+## Load mangrove and tidal flat data
+
+Load the extent of mangroves and tidal flat for 2001-ish.
+
+```{r eval = FALSE}
+tidal_wetland_2001 <- here::here(dir_here, "output", "tidal_wetland_2001.csv") %>%
+  readr::read_csv()
+
+mangrove_2001 <- here::here("globalprep", "hab_mangrove", "v2022", "data", "habitat_extent_mangrove_updated.csv") %>% 
+  readr::read_csv() %>% 
+  dplyr::filter(year == 1996) %>% 
+  dplyr::mutate(year = 2001) 
+
+tidal_flat_2001 <- here::here("globalprep", "hab_tidal_flat", version_year, "output", "tidal_flat_extent.csv") %>% 
+  readr::read_csv() %>% 
+  dplyr::filter(year == 1995) %>% 
+  dplyr::mutate(year = 2001) 
+
+saltmarsh_2001 <- rbind(tidal_wetland_2001, mangrove_2001, tidal_flat_2001) %>% 
+  tidyr::pivot_wider(names_from = habitat, values_from = km2) %>% 
+  dplyr::mutate(`salt marsh` = `tidal wetland` - `tidal flat` - mangrove) %>% 
+  tidyr::pivot_longer(cols = 3:6, names_to = 'habitat', values_to = 'km2') %>% 
+  dplyr::filter(habitat == "salt marsh") %>% 
+  dplyr::left_join(rgns) %>% 
+  tidyr::drop_na()
+
+sum(tidal_wetland_2001$km2)
+sum(mangrove_2001$km2)
+sum(tidal_flat_2001$km2)
+sum(saltmarsh_2001$km2)
+```
+
+```{r eval = FALSE}
+saltmarsh_trend_data <- here::here(dir_here, "output", "saltmarsh_trend.csv") %>% 
+  readr::read_csv()
+sum(saltmarsh_trend_data$difference)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

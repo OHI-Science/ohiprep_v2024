@@ -1,0 +1,238 @@
+---
+title: 'OHI `r format(Sys.Date(), "%Y")`: Mangrove extent'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+This script generates the extent of mangrove for each OHI region for the latest year of data (year == 2020). We do this using polygon data. We extract the area of each polygon per each ohi region using our combined land and eez raster.
+
+
+## Updates from previous assessment
+Using a new dataset from global mangrove watch. 
+
+***
+## Data Source 
+
+**Reference**: Bunting, P.; Rosenqvist, A.; Hilarides, L.; Lucas, R.M.; Thomas, T.; Tadono, T.; Worthington, T.A.; Spalding, M.; Murray, N.J.; Rebelo, L-M. Global Mangrove Extent Change 1996 – 2020: Global Mangrove Watch Version 3.0. Remote Sensing. 2022. https://doi.org/10.5281/zenodo.6894273
+
+
+**Downloaded**: 08/02/2022
+
+**Description**:  
+Global Mangrove Watch (1996 - 2020)	
+https://data.unep-wcmc.org/datasets/45
+Reported at spatial cell scale. 
+
+The GMW aims to provide geospatial information about mangrove extent and changes to the Ramsar Convention, national wetland practitioners, decision makers and NGOs. It is part of the Ramsar Science and Technical Review Panel (STRP) work plan for 2016-2018 and a Pilot Project to the Ramsar Global Wetlands Observation System (GWOS), which is implemented under the GEO-Wetlands Initiative. The primary objective of the GMW has been to provide countries lacking a national mangrove monitoring system with first cut mangrove extent and change maps, to help safeguard against further mangrove forest loss and degradation.
+
+The GMW has generated a global baseline map of mangroves for 2010 using ALOS PALSAR and Landsat (optical) data, and changes from this baseline for epochs between 1996 and 2020 derived from JERS-1 SAR, ALOS PALSAR and ALOS-2 PALSAR-2. Annual maps are planned from 2018 and onwards.
+
+**Time range**: 1996-2020
+
+
+***
+# Methods
+
+
+## Setup
+``` {r setup, message = FALSE, warning = FALSE, eval = FALSE}
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+version_year <- "2022"
+
+source(here("workflow/R/common.R"))
+
+dir_hab_mangrove <- here(paste0("globalprep/hab_mangrove/v", version_year))
+dir_wcmc <- file.path(file.path(dir_M, 'git-annex/globalprep/_raw_data/wcmc_mangrove'))
+dir_shp <- file.path(dir_wcmc, "gmw_v3")
+ohi_rasters() # call the region zones raster
+regions_shape()
+region_data()
+
+# load in raster containing OHI regions and their EEZs represented by rgn_id as pixel values
+land_ocean <- terra::rast("/home/shares/ohi/git-annex/globalprep/spatial/v2017/regions_land_ocean.tif")
+
+```
+
+
+
+Read in GMW data and explore
+```{r, eval = FALSE}
+files <- list.files("/home/shares/ohi/git-annex/globalprep/_raw_data/wcmc_mangrove/gmw_v3/")
+
+files_2 <- files[grepl(".shp", files)]
+```
+
+
+Loop over all years of data and match their regions to OHI regions 
+
+```{r, eval = FALSE}
+dir_annex_int <- paste0(dir_M, "/git-annex/globalprep/Mangrove/v", version_year, "/int/")
+
+# create int directory for current scenario year if it doesn't already exist 
+if(!dir.exists(dir_annex_int)) {
+  dir.create(dir_annex_int, recursive = TRUE)
+}
+
+# create empty list to populate with dfs in loop
+extent_df_list <- vector(mode = "list", length = length(files_2))
+
+for (i in seq_along(files_2)) {
+  
+  gmw_file <- files_2[i]  
+  
+  gmw_year <- gsub(c("_v\\d"), "", gmw_file)
+  gmw_year <- gsub("_vec.shp", "", gmw_year)
+  
+  d_year <- gsub("GMW_", "", gmw_year, ignore.case = TRUE)
+  
+  rasterize_file = paste0(dir_annex_int, "py_mangrove_rast_", gmw_year, ".tif")
+  
+  if(!file.exists(rasterize_file)) {
+    
+    gmw_shp <- terra::vect(file.path(dir_shp, gmw_file))
+    
+    ## transform 2016 data to our projections
+    gmw_moll <- terra::project(gmw_shp, "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+    
+    
+    # rasterize our polygon dataset
+    raster_poly <- terra::rasterize(gmw_moll, land_ocean, 
+                                         field = NULL) # all polygons given value of 1
+    
+    raster_poly
+    
+    sum(terra::values(raster_poly, na.rm = TRUE)) * 0.934478877011218970 ** 2
+    
+    terra::writeRaster(raster_poly, filename = rasterize_file, overwrite = TRUE) 
+    
+    
+    
+    
+    # Calculate zonal stats with zones raster and new combined seagrass. Convert to km^2 and save int/output files*
+    
+    zonal_sums_combined <- terra::zonal(raster_poly, 
+                                         land_ocean,
+                                         fun = "sum",
+                                         na.rm = TRUE) # sum all mangrove cells for each ohi zone
+    
+    zonal_sums_km2 <- zonal_sums_combined %>%
+      mutate(year = d_year, habitat = "mangrove",
+             km2 = (0.934478877011218970 ** 2 * layer)) %>% # one cell is equal to ~0.93 km
+      rename("rgn_id" = "regions_land_ocean") %>%
+      select(-layer)
+    
+    print(sum(zonal_sums_km2$km2))
+    
+  
+    
+    # write.csv(zonal_sums_km2, (here(paste0("globalprep/hab_mangrove/v", version_year,
+    #                                          "/int/habitat_extent_mangrove_", d_year, ".csv"))), row.names = FALSE)
+    
+    
+    extent_df_list[[i]] <- zonal_sums_km2
+    
+    names(df_list[i]) <- paste0("zonal_sums_", d_year)
+    
+    print(paste0("completed ", d_year))
+    
+  } else {
+    print(paste0("file for ", d_year, "exists, skipping"))
+  }
+}
+
+zonal_sums_all <- bind_rows(extent_df_list)
+```
+
+Save the new dataset for use in global
+
+```{r, eval = FALSE}
+
+habitat_extent_mangrove_updated <- zonal_sums_all %>%
+  filter(rgn_id <= 250)
+
+write.csv(habitat_extent_mangrove_updated, here(paste0("globalprep/hab_mangrove/v", version_year, 
+                                    "/data/habitat_extent_mangrove_updated.csv")), row.names = FALSE)
+```
+
+Compare total areas with paper
+
+```{r, eval=FALSE}
+habitat_extent_mangrove_updated <- read_csv(here(paste0("globalprep/hab_mangrove/v", version_year, 
+                                    "/data/habitat_extent_mangrove_updated.csv")))
+
+# paste in data table from paper with datapasta
+paper_extents <- tibble::tribble(
+  ~year, ~km2_paper,
+    1996, 152604,
+    2007, 149973,
+    2008, 148645,
+    2009, 148453,
+    2010, 148020,
+    2015, 147345,
+    2016, 147070,
+    2017, 147260,
+    2018, 147554,
+    2019, 147605,
+    2020, 147359
+  )
+
+compare_extents <- habitat_extent_mangrove_updated %>% 
+  group_by(year) %>% 
+  summarize(km2 = sum(km2)) %>% 
+  left_join(paper_extents) %>% 
+  mutate(diff = km2 - km2_paper) %>% 
+  mutate(pct_diff = abs(diff) / km2 * 100)
+```
+
+**These differences look reasonable**
+
+Compare a few country values with those in the paper
+
+```{r, eval=FALSE}
+indonesia <- habitat_extent_mangrove_updated %>% 
+  filter(rgn_id == 216)
+
+brazil <- habitat_extent_mangrove_updated %>% 
+  filter(rgn_id == 171)
+
+```
+
+
+| Country  | Year | Workflow        | Paper          |
+|:--------:|:----:|:---------------:|:--------------:|
+|Indonesia | 1996 | 31,545.31 km^2^ | 31,273.02 km^2^|
+|Indonesia | 2020 | 29,263.51 km^2^ | 29,263.51 km^2^|
+|Brazil    | 1996 | 11,580.18 km^2^ | 11,474.56 km^2^|
+|Brazil    | 2020 | 11,497.22 km^2^ | 11,414.71 km^2^|
+
+
+**Everything looks good here**
+
+
+
+
+

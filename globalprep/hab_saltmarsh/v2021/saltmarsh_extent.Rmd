@@ -1,0 +1,403 @@
+---
+title: 'OHI 2021: saltmarsh extent'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This script generates the extent of saltmarsh for each OHI region. 
+
+
+## Updates from previous assessment
+Updating the data with new dataset! 
+
+***
+## Data Source 
+
+**Reference**: Mcowen, C., Weatherdon, L., Bochove, J.-W., Sullivan, E., Blyth, S., Zockler, C., Stanwell-Smith, D., Kingston, N., Martin, C., Spalding, M., Fletcher, S., 2017. A global map of saltmarshes. BDJ 5, e11764. https://doi.org/10.3897/BDJ.5.e11764
+
+**Downloaded**: 03/09/2021
+
+**Description**:  
+Global Distribution of saltmarshes
+https://data.unep-wcmc.org/datasets/43
+Reported at spatial cell scale. 
+
+This dataset shows the global distribution of saltmarshes, and is composed of two subsets of point and polygon occurence data. The data were compiled by UNEP World Conservation Monitoring Centre in collaboration with many collaborators (e.g. Frederick Short of the University of New Hampshire), organisations (e.g. the OSPAR Convention for the Northeast Atlantic sea), and projects (e.g. the European project Mediterranean Sensitive Habitats "Mediseh"), across the globe (full list available in "Metadata_saltmarsh.dbf").
+
+**Time range**: 1973-2015
+
+
+***
+# Methods
+
+
+
+## Setup
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE, eval = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_saltmarsh/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_wcmc <- file.path(file.path(dir_M, 'git-annex/globalprep/_raw_data/wcmc_saltmarsh'))
+ohi_rasters() # call the region zones raster
+regions_shape()
+
+```
+
+```{r, echo = FALSE, eval = FALSE}
+
+v6_saltmarsh_pts <- sf::st_read(dsn = file.path(dir_wcmc, "14_001_WCMC027_Saltmarsh_v6/01_Data"), layer = "WCMC027_Saltmarshes_Pt_v6")
+
+v6_saltmarsh_py <- sf::st_read(dsn = file.path(dir_wcmc, "14_001_WCMC027_Saltmarsh_v6/01_Data"), layer = "WCMC027_Saltmarshes_Py_v6")
+
+## take a look
+mapview(v6_saltmarsh_pts)
+mapview(head(v6_saltmarsh_py$geometry))
+
+```
+
+**Convert saltmarsh shapefiles into same CRS as our regions shapefile**
+```{r, echo = FALSE, eval = FALSE}
+
+moll_crs <- crs(regions, asText = TRUE)
+
+v6_saltmarsh_pts_moll <- st_transform(v6_saltmarsh_pts, crs = moll_crs) #project points shapefile to match zones crs
+
+
+crs(v6_saltmarsh_pts_moll) #check to see it worked
+
+v6_saltmarsh_py_moll <- st_transform(v6_saltmarsh_py, crs = moll_crs)
+
+crs(v6_saltmarsh_py_moll)
+plot(v6_saltmarsh_py_moll[1])
+
+```
+
+**Prep polygon data**
+```{r, eval = FALSE}
+
+## filter for eez
+regions_eez <- regions %>%
+  filter(rgn_type == "eez")
+#
+# ## filter for land
+regions_land <- regions %>%
+   filter(rgn_type == "land")
+#
+# crs(regions_eez)
+# crs(v6_saltmarsh_py_moll)
+
+# regions_all <- regions %>%
+#   group_by(rgn_id) %>%
+#   summarise(geometry = st_union(geometry))
+# mapview(head(regions_all))
+
+# Test st_intersection on one row
+sm_subset1 <- st_intersection(v6_saltmarsh_py_moll, regions[3, ])
+mapview(sm_subset1)
+st_area(sm_subset1$geometry)
+sm_subset1$GIS_AREA_K
+
+
+
+#### 2021 chunk the subsetting by METADATA_I  #### 
+## get a template to start adding to instead and run a for loop, so we don't lose any work if it fails... 
+## this will take awhile... ~1 hour
+
+test <- v6_saltmarsh_py_moll %>%
+  as.data.frame() %>%
+  dplyr::select(METADATA_I, GIS_AREA_K) %>%
+  group_by(METADATA_I) %>%
+  summarise(n(), area = sum(GIS_AREA_K))
+
+saltmarsh_1 <- v6_saltmarsh_py_moll %>%
+  dplyr::filter(METADATA_I == 1)
+
+sm_subset_py <- st_intersection(st_make_valid(saltmarsh_1), regions)
+sum(st_area(sm_subset_py))*0.000001 # 3293.699 km2 
+
+# sm_subset_py <- st_read(file.path(dir_M, "git-annex/globalprep/hab_saltmarsh/v2021/int/saltmarsh_extent_regions_py_81.shp")) ## I had to stop the loop at metadata_I == 81 because 82 is so large... read it back in and restart since 82 will take a long time
+
+sum(st_area(sm_subset_py))*0.000001 # 13111.01
+
+
+datasets <- unique(sort(v6_saltmarsh_py_moll$METADATA_I))
+n_datasets <- length(unique(sort(v6_saltmarsh_py_moll$METADATA_I)))
+
+for(i in 2:n_datasets){   #i = 2
+
+dataset_id <- datasets[i]
+  
+sm_data <- v6_saltmarsh_py_moll %>%
+  dplyr::filter(METADATA_I == dataset_id)
+
+
+sm_data <- st_intersection(st_make_valid(sm_data), regions)
+
+sm_subset_py <- rbind(sm_subset_py, sm_data)
+
+print(i) ## what dataset are we on? 
+print(n_datasets) ## out of how many datasets?
+print(nrow(sm_subset_py)) ## how many rows does our new dataframe have now?
+
+}
+
+
+save_incase <- sm_subset_py ## save another in our enviro just in case we accidentally over write it...
+
+## save our progress 
+st_write(sm_subset_py, file.path(dir_M, "git-annex/globalprep/hab_saltmarsh/v2021/int/saltmarsh_extent_regions_py.shp"), overwrite = TRUE) ## save to mazu so we don't lose all of that work
+
+
+saltmarsh_subset_py <- sf::st_read(dsn = file.path(dir_M, "git-annex/globalprep/hab_saltmarsh/v2021/int/"), layer = "saltmarsh_extent_regions_py")
+
+## plot to see
+plot(regions$geometry, col = sf.colors(12, categorical = TRUE), border = 'grey', 
+     axes = TRUE)
+plot(saltmarsh_subset_py$geometry, add = TRUE)
+zoom()
+
+## get central america coordinates in MOLL and plot to make sure it worked:
+disp_win_wgs84 <- st_sfc(st_point(c(-90, 6)), st_point(c(-78, 18)),
+                         crs = 4326) ## c(xmin,yim), c(xmax,ymax)
+disp_win_wgs84
+
+disp_win_trans <- st_transform(disp_win_wgs84, crs = '+proj=moll')
+disp_win_trans
+
+ggplot() +
+  geom_sf(data = regions_eez$geometry,  col = sf.colors(239, categorical = TRUE)) +
+  geom_sf(data = regions_land$geometry, fill = sf.colors(229, categorical = TRUE)) +
+  geom_sf(data = saltmarsh_subset_py$geometry, col = "red") +
+  coord_sf(xlim = c(-8989531, -7578769),ylim = c(741349.5,2211539))
+
+
+## plot global
+ggplot() +
+  geom_sf(data = regions_eez$geometry,  col = sf.colors(239, categorical = TRUE)) +
+  geom_sf(data = regions_land$geometry, fill = sf.colors(229, categorical = TRUE)) +
+  geom_sf(data = saltmarsh_subset_py$geometry, col = "red")
+
+## calculate polygon areas 
+saltmarsh_area_py <- saltmarsh_subset_py %>% 
+  mutate(extent_km2 = st_area(saltmarsh_subset_py)*0.000001)
+
+st_geometry(saltmarsh_area_py) <- NULL
+
+## group by and summarise to get area per each rgn_id
+saltmarsh_area_py_sum <- saltmarsh_area_py %>%
+  group_by(rgn_id) %>%
+  summarise(sum_extent_km2 = as.numeric(sum(extent_km2))) 
+sum(saltmarsh_area_py_sum$sum_extent_km2) # 55781.7655781.76 km2 of polygons - basically perfect!!
+sum(v6_saltmarsh_py_moll$GIS_AREA_K) # 55667.35 - a little less than the area above, but that is OK... the small difference is probably due to reprojecting
+
+## save this 
+write.csv(saltmarsh_area_py_sum, "int/saltmarsh_py_area.csv", row.names = FALSE)
+```
+
+**Prep points data**
+```{r, eval = FALSE}
+## read in points data
+v6_saltmarsh_pts <- sf::st_read(dsn = file.path(dir_wcmc, "14_001_WCMC027_Saltmarsh_v6/01_Data"), layer = "WCMC027_Saltmarshes_Pt_v6")
+
+## transform pts data to have same crs as regions eez
+v6_saltmarsh_pts <- st_transform(v6_saltmarsh_pts, crs = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+
+#### 2021 chunk the subsetting by datasetid  #### 
+## get a template to start adding to instead and run a for loop, so we don't lose any work if it fails or we need to stop it for some reason... 
+
+test <- v6_saltmarsh_pts %>%
+  as.data.frame() %>%
+  dplyr::select(METADATA_I) %>%
+  group_by(METADATA_I) %>%
+  summarise(n())
+
+saltmarsh_pts_0 <- v6_saltmarsh_pts %>%
+  dplyr::filter(METADATA_I == 0)
+
+sm_subset_pts <- st_intersection(st_make_valid(saltmarsh_pts_0), regions)
+
+datasets <- unique(sort(v6_saltmarsh_pts$METADATA_I))
+n_datasets <- length(unique(sort(v6_saltmarsh_pts$METADATA_I)))
+
+
+for(i in 2:n_datasets){   #i = 2 ## Have the start the loop with 2, since we've already completed i = 1 (METADATA_I == 0) above to make our template sf
+
+dataset_id <- datasets[i]
+  
+sm_data <- v6_saltmarsh_pts %>%
+  dplyr::filter(METADATA_I == dataset_id)
+
+
+sm_data <- st_intersection(st_make_valid(sm_data), regions)
+
+sm_subset_pts <- rbind(sm_subset_pts, sm_data)
+
+print(i) ## what dataset are we on? 
+print(n_datasets) ## out of how many datasets?
+print(nrow(sm_subset_pts)) ## how many rows does our new dataframe have now? (should end up with less than ~17000)
+
+}
+
+## save the points subset 
+st_write(sm_subset_pts, file.path(dir_M, "git-annex/globalprep/hab_saltmarsh/v2021/int/saltmarsh_extent_regions_pts.shp"), overwrite = TRUE)
+
+## plot to make sure it works 
+ggplot() +
+  geom_sf(data = regions_eez$geometry,  col = sf.colors(239, categorical = TRUE)) +
+  geom_sf(data = regions_land$geometry, fill = sf.colors(229, categorical = TRUE)) +
+  geom_sf(data = sm_subset_pts$geometry, col = "red")
+
+#### Now we will calculate a proxy area for each region which has points. We will do this by counting the points in each rgn_id, figuring out the median size of each polygon in those countries from our polygon dataset, and assigning that median value to each point. If there is no median value for a specific country, we will gapfill with the global median. 
+
+sm_subset_pts <- st_read(file.path(dir_M, "git-annex/globalprep/hab_saltmarsh/v2021/int/saltmarsh_extent_regions_pts.shp"))
+
+saltmarsh_subset_py <- sf::st_read(dsn = file.path(dir_M, "git-annex/globalprep/hab_saltmarsh/v2021/int/"), layer = "saltmarsh_extent_regions_py")
+saltmarsh_area_py <- saltmarsh_subset_py %>% 
+  mutate(extent_km2 = st_area(saltmarsh_subset_py)*0.000001)
+
+st_geometry(saltmarsh_area_py) <- NULL
+
+
+## get a count of the points in each region
+saltmarsh_points_area <- sm_subset_pts %>%
+  group_by(rgn_id) %>%
+  summarise(count_points = n())
+
+## get rid of geometry column to make this a df 
+st_geometry(saltmarsh_points_area) <- NULL
+
+## filter for the point regions
+test <- saltmarsh_area_py %>%
+  filter(rgn_id %in% saltmarsh_points_area$rgn_id) %>%
+  group_by(rgn_id) %>%
+  summarise(mean_km2 = mean(extent_km2), 
+            median_km2 = median(extent_km2),
+            count_polygons = n())
+
+mean(saltmarsh_area_py$extent_km2) # 14.2555
+global_median_km2 <- as.numeric(median(saltmarsh_area_py$extent_km2)) # 0.1121728 
+## we will use the lower of the global values
+
+## now multiply the count of points by the median area of points in these locations to get our extent in km2, for those that are still NA after (the regions which dont have polygons, and only have points), we will give them the global median size
+saltmarsh_points_area_sum <- saltmarsh_points_area %>%
+  left_join(test, by = "rgn_id") %>%
+  mutate(extent_km2 = median_km2*count_points) %>%
+  mutate(extent_km2 = ifelse(is.na(extent_km2), global_median_km2*count_points, extent_km2)) %>%
+  dplyr::select(rgn_id, sum_extent_km2_pts = extent_km2)
+
+sum(saltmarsh_points_area_sum$sum_extent_km2_pts) # 5928.334 km2
+
+## save this data
+write.csv(saltmarsh_points_area_sum, "int/saltmarsh_points_area.csv", row.names = FALSE)
+
+```
+
+
+**Combine points and polygon area estimates into one dataset**
+```{r, eval = FALSE}
+saltmarsh_points_area_sum <- read_csv("int/saltmarsh_points_area.csv")
+saltmarsh_area_py_sum <- read_csv("int/saltmarsh_py_area.csv")
+
+## finally, combine our points areas and polygon areas into one dataset and save
+saltmarsh_area_final <- saltmarsh_area_py_sum %>%
+  full_join(saltmarsh_points_area_sum, by = "rgn_id") %>%
+  mutate(sum_extent_km2 = replace_na(sum_extent_km2, 0),
+         sum_extent_km2_pts = replace_na(sum_extent_km2_pts, 0)) %>% ## make all of the NAs --> 0 so that we can sum
+  mutate(extent_km2_final = sum_extent_km2 + sum_extent_km2_pts,
+         habitat = "saltmarsh", 
+         year = 2017) %>% ## the latest raw data update is year = 2017 (when this dataset was published)
+  dplyr::select(rgn_id, year, habitat, km2 = extent_km2_final) %>%
+    filter(rgn_id < 255)
+
+
+write.csv(saltmarsh_area_final, "data/habitat_extent_saltmarsh_updated.csv", row.names = FALSE)
+
+region_data()
+## lets make a gapfilling file
+saltmarsh_area_final_gf <- saltmarsh_area_final %>%
+  dplyr::select(rgn_id, habitat) %>%
+  mutate(variable = "extent", gap_fill = 0) %>% 
+  full_join(rgns_eez, by = "rgn_id") %>%
+  dplyr::select(rgn_id, habitat, variable, gap_fill) %>%
+  mutate(habitat = "saltmarsh", variable = "extent")
+
+write.csv(saltmarsh_area_final_gf, "data/extent_saltmarsh_gf.csv", row.names = FALSE)
+
+```
+
+# Datacheck
+```{r, eval = FALSE}
+v6_saltmarsh_pts <- sf::st_read(dsn = file.path(dir_wcmc, "14_001_WCMC027_Saltmarsh_v6/01_Data"), layer = "WCMC027_Saltmarshes_Pt_v6")
+
+v6_saltmarsh_py <- sf::st_read(dsn = file.path(dir_wcmc, "14_001_WCMC027_Saltmarsh_v6/01_Data"), layer = "WCMC027_Saltmarshes_Py_v6")
+
+
+saltmarsh_area_final <- read_csv("data/habitat_extent_saltmarsh_updated.csv")
+
+habitat_extent_saltmarsh_old <- read_csv("~/github/ohiprep_v2021/globalprep/hab_saltmarsh/v2012/data/habitat_extent_saltmarsh_updated.csv")
+
+
+compare_habitat_extent <- saltmarsh_area_final %>%
+  left_join(habitat_extent_saltmarsh_old, by = "rgn_id") %>%
+  mutate(km2.y = ifelse(
+    km2.x >0 & is.na(km2.y) ,0, #assign 0 values to old data km2 that have new data so that we can properly graph these differences.
+    km2.y
+  )) %>%
+  mutate(difference = km2.x - km2.y)
+
+ggplot(compare_habitat_extent, aes(x = km2.y, y = km2.x)) +
+  geom_point() +
+  geom_abline() +
+  labs(title = "saltmarsh Habitat version old vs version 7", x = "old extent", y=  "new extent") +
+  theme_bw()
+
+filter(compare_habitat_extent, km2.y == 0)
+
+sum(st_area(v6_saltmarsh_py)) #55667303187 [m^2]
+55667303187*0.000001
+# 55667.3 total area before eez intersection, not including points
+
+
+sum(saltmarsh_area_final$km2)
+#61710.1 total area after eez intersection, including the gapfilled points - the points account for the difference
+
+sum(habitat_extent_saltmarsh_old$km2)
+#37454.98 total area for the old extent data 
+
+sum(v6_saltmarsh_py_moll$GIS_AREA_K) # 55667.35
+
+## check saudi arabia: 
+USA_polygons <- v6_saltmarsh_py %>%
+  filter(ISO3 == "USA")
+sum(USA_polygons$GIS_AREA_K) # 18815.19 - ok... matches our estimate nearly perfectly
+sum(st_area(USA_polygons))*0.000001 # 18815.19 km2
+
+```
+
+
+
+
+

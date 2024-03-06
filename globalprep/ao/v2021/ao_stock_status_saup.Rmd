@@ -1,0 +1,271 @@
+---
+title: 'OHI 2021 - Artisanal Opportunities: Preparing stock status data'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+This script takes prepped non-industrial 2021 SAUP data (created in ao_catch_prep_saup.Rmd), and B/Bmsy estimates of those stocks to calculate a score for artisanal fishing species per OHI region. The FIS data prep will need to be completed prior to this data prep.  
+
+## Updates from previous assessment
+This is a new layer to the 2021 assessment. 
+
+***
+
+# Data Source
+
+**Reference**: Pauly D., Zeller D., Palomares M.L.D. (Editors), 2020. Sea Around Us Concepts, Design and Data (seaaroundus.org).
+
+**Downloaded**: August 24, 2021
+
+**Description**: Tons per year and SAUP region with information on sector type, industry type, fishing entitity, reporting status and taxonomic information. 
+
+**Time range**: 1950 - 2018
+
+**Format**: CSV
+
+**Additional Information**: [Methods](http://www.seaaroundus.org/sea-around-us-methods-index/)
+
+
+**Reference**: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.495
+
+**Downloaded**: 06/03/2021
+
+**Description**: B/Bmsy value by stock and year (other data, which we do not use, are also available in the database)
+
+**Native data resolution**: stock (fish stock, species and region specific)
+
+**Time range**: 1950 - 2016
+
+**Format**: CSV format 
+
+**Additional Information**: We use the finalized b/bmsy layer from OHI-global for this data prep. We do not actually read in the raw RAM data here. 
+
+
+# Methods 
+
+**Steps:**
+1. Join the non-industrial catch data with the final B/Bmsy layer used in the FIS model
+2. Convert the B/Bmsy values to scores (cap them at 1.. we wont penalize for underharvesting).
+3. Take a catch weighted average of B/Bmsy scores for each region/year and gapfill those regions that are missing.
+
+```{r, eval = FALSE}
+library(tidyverse)
+library(here)
+source(here('workflow/R/common.R'))
+```
+
+
+## Join with the final B/Bmsy layer from the fis model, convert the B/Bmsy values to scores (this is done in functions.R for FIS subgoal, but we do it in the dataprep for AO), and take a catch weighted average of B/Bmsy scores for each region/year.
+
+```{r, eval = FALSE}
+fis_bbmsy <- read_csv(file.path(here(), "globalprep/fis/v2021/output/fis_bbmsy.csv"))
+
+catch_AO <- read_csv(file.path(here(), "globalprep/ao/v2021/intermediate/mean_catch.csv")) 
+
+length(unique(catch_AO$rgn_id)) # there are only 196 regions here... we want there to be 220 regions. Which regions are missing? 
+
+region_data()
+test <- catch_AO %>%
+  left_join(rgns_eez)
+
+setdiff(rgns_eez$rgn_id, test$rgn_id)
+
+cat(paste(shQuote(setdiff(rgns_eez$rgn_name, test$rgn_name), type = "cmd"), collapse = ","))
+cat(paste(shQuote(setdiff(rgns_eez$rgn_id, test$rgn_id), type = "cmd"), collapse = ","))
+
+
+#  [1] "Macquarie Island"                             "Wake Island"                                  "Glorioso Islands"                            
+#  [4] "Juan de Nova Island"                          "Bassas da India"                              "Ile Europa"                                  
+#  [7] "Ile Tromelin"                                 "British Indian Ocean Territory"               "Gibraltar"                                   
+# [10] "South Georgia and the South Sandwich Islands" "Prince Edward Islands"                        "Crozet Islands"                              
+# [13] "Amsterdam Island and Saint Paul Island"       "Kerguelen Islands"                            "Heard and McDonald Islands"                  
+# [16] "Bouvet Island"                                "Clipperton Island"                            "Jan Mayen"                                   
+# [19] "Jarvis Island"                                "Palmyra Atoll"                                "Howland Island and Baker Island"             
+# [22] "Johnston Atoll"                               "Monaco"                                       "Antarctica"                                  
+# [25] "Oecussi Ambeno"    
+
+
+## All small islands.. weird. So we need to gapfill these regions somehow... do they have b/bmsy data?
+
+missing <- c("Macquarie Island","Wake Island","Glorioso Islands","Juan de Nova Island","Bassas da India","Ile Europa","Ile Tromelin","British Indian Ocean Territory","Gibraltar","South Georgia and the South Sandwich Islands","Prince Edward Islands","Crozet Islands","Amsterdam Island and Saint Paul Island","Kerguelen Islands","Heard and McDonald Islands","Bouvet Island","Clipperton Island","Jan Mayen","Jarvis Island","Palmyra Atoll","Howland Island and Baker Island","Johnston Atoll","Monaco","Antarctica","Oecussi Ambeno")
+
+missing_id <- as.numeric(c("4","12","30","33","34","35","36","38","60","89","90","91","92","93","94","105","107","144","149","150","158","159","185","213","237"))
+
+test <- fis_bbmsy %>%
+  left_join(rgns_eez) %>%
+  filter(rgn_name %in% missing)
+
+setdiff(missing, unique(test$rgn_name)) # bouvet island is missing?
+## they do have b/bmsy data! Lets just use their overall b/bmsy scores (for industrial fishing), as their AO b/bsmy scores.. not perfect, but better than nothing!
+
+test <- fis_bbmsy %>%
+  filter(rgn_id == 105)
+
+test <- read.csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv") %>%
+  filter(region_id == 105,
+         goal == "FIS") # bouvet has fisheries scores... so lets use that for their AO score
+
+## First cap b/bmsy scores
+b <- fis_bbmsy %>%
+    dplyr::mutate(bbmsy = ifelse(bbmsy > 1, 1, bbmsy))
+
+c <- catch_AO %>%
+    dplyr::mutate(stock_id_taxonkey = as.character(stock_id_taxonkey)) %>%
+    dplyr::mutate(taxon_key = stringr::str_sub(stock_id_taxonkey,-6,-1)) %>%
+    dplyr::mutate(stock_id = substr(stock_id_taxonkey, 1, nchar(stock_id_taxonkey) -
+                               7)) %>%
+    dplyr::mutate(catch = as.numeric(mean_catch)) %>%
+    dplyr::mutate(year = as.numeric(as.character(year))) %>%
+    dplyr::mutate(region_id = as.numeric(as.character(rgn_id))) %>%
+    dplyr::mutate(taxon_key = as.numeric(as.character(taxon_key))) %>%
+    dplyr::select(rgn_id, year, stock_id, taxon_key, mean_catch)
+
+
+## read in fisheries mean catch so we can use to gapfill missing regions
+  fis_mean_catch <- read.csv("globalprep/fis/v2021/int/mean_catch.csv") %>% 
+     dplyr::mutate(stock_id_taxonkey = as.character(stock_id_taxonkey)) %>%
+    dplyr::mutate(taxon_key = sub('.*_', '', stock_id_taxonkey)) %>%
+    dplyr::mutate(stock_id = sub('_[^_]*$', '', stock_id_taxonkey)) %>%
+    dplyr::mutate(catch = as.numeric(mean_catch)) %>%
+    dplyr::mutate(year = as.numeric(as.character(year))) %>%
+    dplyr::mutate(region_id = as.numeric(as.character(rgn_id))) %>%
+    dplyr::mutate(taxon_key = as.numeric(as.character(taxon_key))) %>%
+    dplyr::select(region_id, year, stock_id, taxon_key, catch)
+
+  # test <- fis_mean_catch %>%
+  #   filter(region_id == 105)
+
+b <- b %>%
+    dplyr::mutate(bbmsy = as.numeric(bbmsy)) %>%
+    dplyr::mutate(region_id = as.numeric(as.character(rgn_id))) %>%
+    dplyr::mutate(year = as.numeric(as.character(year))) %>%
+    dplyr::mutate(stock_id = as.character(stock_id)) # fix some classes
+  
+  
+  ####
+  # Merge the b/bmsy data with catch data
+  ####
+  data_fis <- c %>%
+    dplyr::left_join(b, by = c('rgn_id', 'stock_id', 'year')) %>%
+    dplyr::select(rgn_id, stock_id, year, taxon_key, mean_catch, bbmsy)
+  
+  
+  gapfill_missing <- b %>%
+    filter(rgn_id %in% missing_id) %>% 
+    left_join(fis_mean_catch, by = c("rgn_id" = "region_id", "stock_id", "year")) %>%
+    dplyr::select(rgn_id, stock_id, year, taxon_key, mean_catch = catch, bbmsy) 
+  
+  fix_bouvet <- fis_mean_catch %>%
+    filter(region_id == 105) %>%
+    dplyr::select(rgn_id = region_id, stock_id, year, taxon_key, mean_catch = catch) %>%
+    mutate(bbmsy = NA)
+  
+  data_fis_final <- rbind(data_fis, gapfill_missing, fix_bouvet)
+  
+  length(unique(data_fis_final$rgn_id)) # 220 regions ; perfect 
+  
+  
+  ###
+  #  Estimate scores for taxa without b/bmsy values
+  # Mean score of other fish in the region is the starting point
+  # Then a penalty is applied based on the level the taxa are reported at
+  ###
+  
+  ## this takes the mean score within each region and year
+  data_fis_gf <- data_fis_final %>%
+    dplyr::group_by(rgn_id, year) %>%
+    dplyr::mutate(mean_score = mean(bbmsy, na.rm = TRUE)) %>%
+    dplyr::ungroup()
+  
+  ## this takes the mean score across all regions within a year
+  # (when no stocks have scores within a region)
+  data_fis_gf <- data_fis_gf %>%
+    dplyr::group_by(year) %>%
+    dplyr::mutate(mean_score_global = mean(bbmsy, na.rm = TRUE)) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(mean_score = ifelse(is.na(mean_score), mean_score_global, mean_score)) %>%
+    dplyr::select(-mean_score_global)
+  
+  
+  data_fis_gf <- data_fis_gf %>%
+    dplyr::mutate(TaxonPenaltyCode = as.numeric(substring(taxon_key, 1, 1))) %>%
+    dplyr::mutate(score_gf = mean_score) %>%
+    dplyr::mutate(method = ifelse(is.na(bbmsy), "Mean gapfilled", NA)) %>%
+    dplyr::mutate(gapfilled = ifelse(is.na(bbmsy), 1, 0)) %>%
+    dplyr::mutate(score = ifelse(is.na(bbmsy), score_gf, bbmsy)) %>%
+    dplyr::mutate(method = ifelse(rgn_id %in% missing_id, "Used fisheries subgoal b/bmsy and catch", method)) %>%
+    dplyr::mutate(gapfilled = ifelse(rgn_id %in% missing_id, 1, gapfilled))
+  
+  test <- data_fis_gf %>%
+    filter(rgn_id == 105)
+   # filter(method == "Used fisheries subgoal b/bmsy and catch") # perfect
+  
+  
+  gap_fill_data <- data_fis_gf %>%
+    dplyr::select(rgn_id,
+           stock_id,
+           taxon_key,
+           year,
+           mean_catch,
+           score,
+           gapfilled,
+           method) 
+  
+  write.csv(gap_fill_data, here('globalprep/ao/v2021/output/AO_bbmsy_summary_gf.csv'), row.names = FALSE)
+  
+  score_data <- data_fis_gf %>%
+    dplyr::select(rgn_id, stock_id, year, mean_catch, score)
+  
+   ###
+  # Calculate status for each region
+  ###
+
+  ## Take a catch weighted average of B/Bmsy scores for each region/year.
+  
+  score_data <- score_data %>%
+    dplyr::group_by(rgn_id, year) %>%
+    dplyr::summarize(score = weighted.mean(score, mean_catch)) %>%
+    dplyr::ungroup() 
+
+summary(score_data)
+length(unique(score_data$rgn_id)) # 220 - perfect! 
+
+test <- score_data %>%
+  filter(rgn_id %in% missing_id) # perfect! 
+
+write.csv(score_data, here('globalprep/ao/v2021/output/ao_nind_scores.csv'), row.names = FALSE)
+
+```
+
+Data check
+
+```{r, eval = FALSE}
+region_data()
+
+stk <- read.csv(here('globalprep/ao/v2021/output/ao_nind_scores.csv')) %>%
+  left_join(rgns_eez)
+
+need <- read.csv(here('globalprep/ao/v2021/output/wb_gdppcppp_rescaled_gf.csv')) %>%
+  left_join(rgns_eez)
+
+setdiff(need$rgn_name, stk$rgn_name)
+
+# character(0); perfect! 
+```
+

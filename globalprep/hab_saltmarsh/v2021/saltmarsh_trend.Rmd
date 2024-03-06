@@ -1,0 +1,99 @@
+---
+title: 'OHI 2021: Saltmarsh trend'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This script generates the trend of saltmarsh. 
+
+"The global loss rate of threatened coastal ecosystems is estimated at 4–9% year−1 for corals (Gardner et al. 2003, Bellwood et al. 2004), a minimum of 1–2% year−1 for saltmarshes (Adam 2002; Lotze et al. 2006)"
+https://link.springer.com/article/10.1007%2Fs12237-008-9038-7
+
+Apply a decreasing rate of 2% per year, or -0.015 over five years to each region.
+
+
+## Updates from previous assessment
+
+***
+## Data Source 
+Duarte, C.M., Dennison, W.C., Orth, R.J.W., Carruthers, T.J.B., 2008. The Charisma of Coastal Ecosystems: Addressing the Imbalance. Estuaries and Coasts: J CERF 31, 233–238. https://doi.org/10.1007/s12237-008-9038-7
+
+
+**Downloaded**: October 5, 2021
+
+**Description**:  Estimate of a global percentage of loss of saltmarsh habitat per year. 
+
+
+**Time range**: NA
+
+
+***
+# Methods
+
+
+
+## Setup
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE, eval = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_saltmarsh/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+region_data()
+
+dir_git_old  <- file.path('~/github/ohiprep_v2021', "globalprep/hab_saltmarsh/v2012")
+
+```
+
+
+Apply a global trend for each region.. not satisfying. 
+
+```{r, eval = FALSE}
+## read in extent data
+all <- read.csv(file.path(here("globalprep/hab_saltmarsh/v2021/data/habitat_extent_saltmarsh_updated.csv")))
+
+# specify trend
+all <- all %>%
+  filter(km2 > 0) %>%
+  filter(rgn_id < 255) %>%
+  dplyr::select(-year) %>%
+  mutate(trend = -0.015)
+
+
+# Save gapfilling 
+
+trend_gaps <- all %>%
+  mutate(variable = "trend") %>%
+  mutate(habitat = "saltmarsh") %>%
+  mutate(gapfill = 1)
+write.csv(trend_gaps, here('globalprep/hab_saltmarsh/v2021/data/trend_saltmarsh_gf.csv'), row.names=FALSE)
+
+### save trend data:
+trend <- trend_gaps %>%
+  dplyr::select(rgn_id, habitat, trend) %>%
+  mutate(year = 2021)
+write.csv(trend, here('globalprep/hab_saltmarsh/v2021/data/habitat_trend_saltmarsh_updated.csv'), row.names=FALSE)
+
+```
+

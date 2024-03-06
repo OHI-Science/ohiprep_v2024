@@ -1,0 +1,104 @@
+---
+title: "OHI 2022: Excess P leaching from manure"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Summary 
+Creates rasters for amount of P leached from livestock manure
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(here)
+library(stringr)
+library(doParallel)
+library(janitor)
+library(countrycode)
+
+source(here('workflow/R/common.R'))
+
+region_data()
+
+nutrient_d2021_anx <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/FAOSTAT/manure_nutrient/d2021/")
+git_manure <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP2_manure")
+git_crop <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP1_crop")
+location_tifs_path <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/halpern_food_systems/d2021/animal_farm/location_tifs")
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+
+source(here(git_crop, "R/common_spatial.R")) # read in necessary spatial files 
+
+```
+
+Calculate a P leaching rasters
+
+```{r}
+files <- list.files(file.path(prep, "animal_farm_int/P_from_excretion_manure"), full.names = TRUE)
+
+
+for(file in files){
+  
+  #file <- files[30]
+    
+  animal_name <- str_split(str_split(file, pattern = "/")[[1]][11], pattern = "_")[[1]][1]
+  system_name <- str_split(str_split(file, pattern = "/")[[1]][11], pattern = "_")[[1]][2]
+  product_name <- str_split(str_split(file, pattern = "/")[[1]][11], pattern = "_")[[1]][3]
+  yr <- str_split(str_split(file, pattern = "/")[[1]][11], pattern = "_")[[1]][6]
+  yr <- str_remove(yr, ".tif")
+  
+  rast <- raster(file)*0.065
+  # par(mar=c(1,1,1,1))
+  # plot(rast)
+
+  raster::writeRaster(rast,
+                      file.path(paste(prep, "/animal_farm_int/STEP2_P_leach/", animal_name, "_", system_name, "_", product_name, "_", yr, ".tif",  sep = "")),
+                      format = "GTiff",
+                      overwrite = TRUE)
+  }
+
+```
+
+Check 
+
+```{r}
+
+files <- list.files(file.path(prep, "animal_farm_int/STEP2_P_leach"), pattern = "2017", full.names = TRUE)
+
+total_p_leach_stack <- raster::stack(lapply(files,
+                        raster))
+
+total_p_leach_raster<- sum(total_p_leach_stack, na.rm = TRUE)
+
+plot(log(1+total_p_leach_raster))
+
+cellStats(total_p_leach_raster, "sum")
+
+
+# 2651073 tonnes P 
+
+files_test <- files[12]
+
+test <- raster(files_test)
+plot(log(test+1)) ## looks good
+```
+
+"This simple calculation indicates that about 10% of the P inputs to soil are lost to aquatic systems. In the period 1970–2000 this represented 2–3 Tg P a−1"
+
+This is 3,000,000 tonnes which is close.
+
+https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2009GB003576
+

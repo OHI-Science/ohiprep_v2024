@@ -1,0 +1,845 @@
+---
+title: "Explore NP Changes"
+author: "Gage Clawson"
+date: "7/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup, warning=FALSE, message=FALSE}
+
+knitr::opts_chunk$set(eval=FALSE)
+
+## load libraries, set directories
+library(ohicore)  #devtools::install_github('ohi-science/ohicore@dev')
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(zoo)  
+library(ggplot2)
+library(here)
+library(tidyverse)
+library(plotly)
+library(readr)
+
+
+## Load FAO-specific user-defined functions
+source(here('workflow/R/fao_fxn.R')) # function for cleaning FAO files
+source(here('workflow/R/common.R')) # directory locations
+source(here('globalprep/np/v2020/R/np_fxn.R'))
+source(here('globalprep/mar/v2020/mar_fxs.R')) # functions specific to mariculture dealing with compound countries
+
+```
+
+
+Simultaneously read and process FAO commodities value and quantity data.
+
+```{r}
+
+# ## NOTE: This can be run as a loop, but the "value" and "quant" datasets need to be run individually to make sure
+# ##  there are no problems (after this check, they can be looped for efficiency)
+# 
+# ## describe where the raw data are located:
+# dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2020')
+# 
+# ## list files included in d2020 folder (value and quant datasets)
+# files <- list.files(dir_fao_data, pattern=glob2rx('*.csv'), full.names=TRUE)
+# 
+# ## To compare to old data:
+# # dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2018')
+# # files <- list.files(dir_fao_data, pattern=glob2rx('*.csv'), full.names=T)
+# 
+# ## loop
+# for (f in files){ # f = files[2]
+#   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
+#   
+#   
+#   d <- read.csv(f, check.names=FALSE, strip.white=TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
+#   # checks names syntactically, strips leading and trailing whitespace, prevents conversion of characters to factors 
+#   
+#   ## Specifies that units are tonnes if we are reading in the Commodities Quantity data csv, and usd if we are reading in the Commodities Value data csv
+#   units <- c('tonnes','usd')[str_detect(f, c('quant','value'))] # detect unit name using lowercase American English
+# 
+#   ## gather into long format and clean up FAO-specific data foibles
+#   ## warning: attributes are not identical across measure variables; they will be dropped: this is fine
+#   m <- d %>% 
+#     rename(country   = `Country (Country)`,
+#            commodity = `Commodity (Commodity)`,
+#            trade     = `Trade flow (Trade flow)`) %>%
+#     gather(year, value, -country, -commodity, -trade, -Unit)
+#   
+#   ## Include only the "Exports" data:
+#   m <- m %>%
+#     filter(trade == "Exports")
+# 
+#   m <- m %>%
+#     fao_clean_data() %>%  # swaps out FAO-specific codes. NOTE: optional parameter 'sub_0_0' can be passed to control how a '0 0' code is interpreted.
+#     select(-trade, -Unit) %>% # eliminate 'trade' column
+#   arrange(country, commodity, is.na(value), year)
+# 
+#   
+#   ## Products join: attach product categories from com2prod, and
+#   ##   filter out all entries that do not match a product category.
+#   ## Note: commodity_lookup is user-defined function to compare 
+#   ##   commodities in data vs commodities in lookup table
+#   
+#   ## load lookup for converting commodities to products
+#   com2prod <- read.csv(here('globalprep/np/v2020/raw/commodities2products.csv'), na.strings='')
+#   
+#   ## version used in 2019:
+#   ##    read.csv(here('globalprep/np/v2019/raw/commodities2products.csv'), na.strings='')
+#   ## version used in 2018:
+#   ##    com2prod <- read.csv('raw/commodities2products.csv', na.strings='')
+#   ## version used in 2015: use when testing....
+#   ##    com2prod <- read.csv('../v2014_test/commodities2products.csv', na.strings='')
+#     
+#   ## Check the current commodity-to-product lookup table.  If necessary, make changes to     "raw/commodities2products.csv"
+#   np_commodity_lookup(m, com2prod)
+#     
+#   ## inner_join will attach product names to matching commodities according to
+#   ##    lookup table 'com2prod', and eliminate all commodities that do not appear in the lookup table.
+#   m <- m %>%
+#       inner_join(com2prod, by='commodity')
+#     
+#     
+#   ## Special case: user-defined function deals with 
+#   ##   breaking up Antilles into separate reported rgns
+#   m <- np_split_antilles(m)
+#     
+#   ## Some changes to region names that aren't working in name_2_rgn()
+#   m <- m %>%
+#     mutate(country = ifelse(country == "Côte d'Ivoire", "Ivory Coast", country)) %>%
+#     mutate(country = ifelse(country == "C<f4>te d'Ivoire	", "Ivory Coast", country)) %>%
+#     mutate(country = ifelse(country == "C\xf4te d'Ivoire", "Ivory Coast", country)) %>%
+#     mutate(country = ifelse(country == "Cura<e7>ao","Curacao", country)) %>%
+#     mutate(country = ifelse(country == "Curaçao","Curacao", country)) %>%
+#     mutate(country = ifelse(country == "Cura\xe7ao","Curacao", country)) %>%
+#     mutate(country = ifelse(country == "R\xe9union", "Reunion", country)) %>% 
+#     mutate(country = ifelse(country == "Réunion", "Reunion", country)) %>% 
+#     mutate(country = ifelse(country == "R<e9>union", "Reunion", country)) %>% 
+#     filter(country != "Azerbaijan") # landlocked, but not being removed by name_2_rgn?
+#                
+#     
+#   m_rgn <- name_2_rgn(df_in = m,
+#                       fld_name='country', 
+#                       flds_unique=c('commodity', 'product', 'year'))
+#     
+# # v2020 duplicates: China, Hong Kong SAR, Macao SAR, Guadeloupe, Serbia and Montenegro, etc - these are addressed below in the group_by/summarize pipe  
+#   
+#   ## combine composite regions
+#   ## When summarizing the dataset, this function provides a modified way to sum the value column while maintaining NA values when both variables are NA (rather than turning to zero values). The function will sum non-NA values normally.
+#   sum_function <- function(x) {
+#     if (sum(is.na(x)) == length(x)) 
+#       return(NA)
+#     return(sum(x, na.rm = T))}
+#   
+#   m_rgn <- m_rgn %>%
+#     group_by(rgn_id, rgn_name, commodity, product, year) %>%
+#     summarize(value = sum_function(value)) %>%
+#     ungroup()
+# 
+#   ## units: rename value field to units based on filename
+#   names(m_rgn)[names(m_rgn) == 'value'] <- units  
+#   
+#   ## output to .csv - should create two csvs (tonnes.csv and usd.csv)
+#   harvest_out <- sprintf(here('globalprep/np/v2020/int/%s.csv'), units)
+#   write.csv(m_rgn, harvest_out, row.names = FALSE, na = '')
+# }
+
+```
+
+Read in relevant csvs
+```{r}
+## Read in quant dataset from intermediate folder
+h_tonnes <- read.csv(here('globalprep/np/v2020/int/tonnes.csv'))
+
+## Read in value dataset from intermediate folder
+h_usd <- read.csv(here('globalprep/np/v2020/int/usd.csv'))
+
+## concatenates h_tonnes and h_usd data
+## h includes rgn_name, rgn_id, commodity, product, year, tonnes, usd.
+h <- h_usd %>%
+    full_join(h_tonnes, by=c('rgn_name', 'rgn_id', 'commodity', 'product', 'year')) %>%
+    mutate(commodity = as.character(commodity)) %>%
+    arrange(rgn_id, product, commodity, year)
+
+## clips out years prior to first reporting year, for each commodity per region
+h <- h %>% np_harvest_preclip()
+
+write.csv(h, "../int/h_methods_sum.csv")
+```
+
+```{r}
+graph_ts_df <- h %>%
+  group_by(year, product) %>%
+  summarise(sum_tonnes = sum(tonnes, na.rm = TRUE), 
+            sum_usd = sum(usd, na.rm = TRUE))
+
+ggplot(graph_ts_df, aes(x = year, y = sum_usd)) +
+  geom_line() + 
+  facet_wrap(~product)
+
+ggplot(graph_ts_df, aes(x = year, y = sum_tonnes)) +
+  geom_line() + 
+  facet_wrap(~product)
+
+
+## graph totals of each product
+
+graph_data_1 <- h %>%
+  group_by(product) %>%
+  summarise(sum_usd = sum(usd, na.rm = TRUE), sum_tonnes = sum(tonnes, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(percent_total_usd = sum_usd/sum(sum_usd),
+         percent_total_tonnes = sum_tonnes/sum(sum_tonnes),
+         dollar_per_tonne = sum_usd/sum_tonnes)
+  
+ggplot(graph_data_1, aes(x = product, y = sum_usd)) +
+  geom_col() + 
+  theme_bw()
+
+
+ggplot(graph_data_1, aes(x = product, y = sum_tonnes)) +
+  geom_col() + 
+  theme_bw()
+
+
+graph_data_2 <- h %>%
+  group_by(rgn_id, rgn_name, product) %>%
+  summarise(sum_usd = sum(usd, na.rm = TRUE), sum_tonnes = sum(tonnes, na.rm = TRUE)) %>%
+  arrange(-sum_usd)
+
+test <- graph_data_2 %>%
+  group_by(rgn_id, rgn_name) %>%
+  summarise(max = max(sum_usd)) %>%
+  ungroup() %>%
+  left_join(graph_data_2, by = c("rgn_id", "rgn_name")) %>%
+  filter(max == sum_usd) %>%
+  group_by(product) %>%
+  summarise(max_count_usd = n())
+  
+
+  ggplot(test, aes(x = product, y = max_count_usd, label = max_count_usd)) +
+  geom_col() + 
+  theme_bw() +
+  geom_label() + 
+  labs(title = "Count of regions with maximum usd per product ")
+```
+
+# Seaweeds
+
+**Steps**
+1. Explore using FAO aquaculture dataset for seaweed instead of FAO commodities dataset
+  - compare summed values
+2. New reference point: no net loss of seaweed production within a country
+
+## Import Raw Data: FAO Mariculture data
+
+Mariculture production in tonnes.
+
+```{r}
+
+mar <- read.csv(file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_mariculture/d2020/FAO_GlobalAquacultureProduction_Quantity_1950_2018.csv'), check.names=FALSE, stringsAsFactors=FALSE) ; head(mar) 
+
+```
+
+## Wrangle: 
+
+### Tidy mariculture data
+
+Filter freshwater mariculture, make long format, and clean FAO codes.
+
+```{r}
+
+mar <- mar %>%
+  rename(country = `Country (Country)`,
+         FAO_name = `ASFIS species (ASFIS species)`, 
+         fao = `FAO major fishing area (FAO major fishing area)`, 
+         environment = `Environment (Environment)`)
+table(mar$environment)  
+
+## include only marine environments
+mar <- mar %>%
+filter(environment %in% c("Brackishwater", "Marine"))  
+
+## convert to long format and clean FAO codes:
+mar <- mar %>%
+  select(-Unit) 
+
+mar <- mar %>%
+  gather(key="year", value="value", num_range("",1950:2018)) %>%
+    fao_clean_data() 
+
+```
+
+## Update seaweed species information
+
+Filter out seaweed species from raw/species_list.csv (originally from MAR dataprep), assign best guess proportions to "include" column determined by research of non-human food vs human food seaweed species cultivated in mariculture.
+
+```{r}
+
+## Read in 'species_list.csv' (originally from 'globalprep/mar/v2020/raw'). Filter out for 'Taxon_code = AL' (only seaweed species). Rename 'exclude' columns to 'include' since we're including previously excluded seaweed species (not primarily used as human food). Therefore, "0" means exclude, and "1" means include. Four scenarios for comparison purposes: 1) "include" - best guess of non-human food species; 2) "include_no_food" - if species is used for human food at all, exclude it; 3) "include_all_seaweed" - including all seaweeds in NP goal (including seaweeds used primarily for human food), 4) "include_all_nei" - including all seaweeds not elsewhere included in the dataset.
+seaweed_sp <- read.csv('raw/species_list.csv', stringsAsFactors=FALSE) %>% 
+  filter(Taxon_code == 'AL') %>% 
+  rename(include = exclude, 
+         include_all_seaweed = exclude_no_seaweed, 
+         include_all_nei = exclude_no_nei) %>% 
+  mutate(include_no_food = include) %>% 
+  dplyr::select(1:2, include_no_food, everything())
+  
+
+## Save in 'globalprep/np/v2020/explore/raw' as 'species_list_np_seaweeds.csv'. Export and edit csv file directly to go through each species and confirm if appropriate to include in NP goal, adding to 'notes_2' column why each species is included/excluded and what proportion (with a reference).
+write.csv(seaweed_sp,"raw/species_list_np_seaweeds.csv", row.names = FALSE)
+
+```
+
+Changes made to species_list_np_seaweeds.csv:
+
+FAO_name                   |  change in "include" value  | explanation
+-------------------------- | --------------------------- | -------------
+[Chondracanthus chamissoi] | 0 --> 0.8                   | Used in carrageenan
+[Porphyra columbina]       | 0 --> 0.01                  | Porphyra spp. are produced almost exclusively for direct human consumption
+[Spirulina maxima]         | 0 --> 0.3                   | More than 70% of Spirulina market is for human consumption, mainly as health food
+Aquatic plants nei         | no change (0)               | The important seaweeds for human consumption are already listed
+Babberlocks                | no change (0)               | Only used for human food according to FAO
+Bright green nori          | 0 --> 0.01                  | Used for abalone feed
+Dark green nori            | 0 --> 0.01                  | Used for abalone feed
+Sea lettuces nei           | 0 --> 0.5                   | Used for feed in aquarium trade
+Brown seaweeds             | 0 --> 0.5                   | Main uses: food and alginate
+Caulerpa seaweeds          | 0 --> 0.01                  | Used for abalone feed
+[Meristotheca senegalense] | no change (0)               | Only used for human food
+Dulse                      | 0 --> 0.1                   | Found to be a valuable food for red abalone
+Elkhorn sea moss           | 1 --> 0.99                  | Primarily used to produce carrageenan, but also edible
+Eucheuma seaweeds nei      | 1 --> 0.9                   | Also eaten raw in some countries
+Fragile codium             | 1 --> 0.1                   | Medicinal uses
+Fusiform sargassum         | no change (0)               | Only used for human food
+Gelidium seaweeds          | 1 --> 0.8                   | Primarily used for agar, but also consumed as food
+Giant kelp                 | 1 --> 0.9                   | Primarily used for alginate, but also consumed as food
+Gracilaria seaweeds        | 1 --> 0.75                  | Primarily used for agar, but also consumed as food (Ogo)
+Green laver                | 0 --> 0.01                  | Used for abalone feed
+Harpoon seaweeds           | 1 --> 0.75                  | Also used for human food (ingredient in poke)
+Japanese isinglass         | 1 --> 0.95                  | Primarily used for agar, but also consumed as food, especially in Korea
+Japanese kelp              | 0 --> 0.1                   | Primarily used for human food (kombu), but also for alginate
+Kelp nei                   | 1 --> 0.5                   | Main uses: food and alginate
+Laver (Nori)               | 0 --> 0.01                  | Used for abalone feed
+Mozuku                     | 0 --> 0.01                  | Used for homeopathic purposes
+Nori nei                   | 0 --> 0.01                  | Used for abalone feed
+Red seaweeds               | 1 --> 0.75                  | Main uses: food and 2 sources of hydrocolloids (agar and carrageenan)
+Sea belt                   | 1 --> 0.95                  | Primarily used for agar, but food market growing
+Seaweeds nei               | 0 --> 0.15                  | Most seaweeds are used for human food
+Spiny eucheuma             | 1 --> 0.9                   | Primarily used for carrageenan, but also consumed as food
+Tangle                     | 1 --> 0.99                  | Primarily used for alginate, but also consumed as food
+Wakame                     | 0 --> 0.01                  | Used for abalone feed
+Wakame nei                 | 0 --> 0.01                  | Used for abalone feed
+Warty gracilaria           | 1 --> 0.95                  | Primarily used for agar, but increasingly used for abalone feed
+Giant kelps nei            | 1 --> 0.9                   | Primarily used for alginate, but also consumed as food
+Green seaweeds             | 1 --> 0.75                  | Mixed non-food uses, but also consumed as food
+Coarse seagrape            | no change (0)               | Only used for human food
+[Sargassum spp]            | 1 --> 0.99                  | Primarily used for alginate, but also consumed as food
+Spirulina nei.             | 1 --> 0.3                   | More than 70% of Spirulina market is for human consumption, mainly as health food
+[Dunaliella salina]        | no change (1)               | Used in cosmetics and dietary supplements
+[Capsosiphon fulvescens]   | 1 --> 0.1                   | Used as traditional medicine
+Slender wart weed          | 1 --> 0.75                  | Primarily used for agar and fish feed, but also consumed as food
+
+
+### Update species names
+
+Update species name in the `raw/species_list_np_seaweeds_edited.csv` file with names in the `mar` dataset. I simplified the species list.  I cut the "species" name columns because it wasn't clear what this was trying to accomplish and created potential error.  
+
+```{r}
+
+## Read in edited 'species_list_np_seaweeds_edited.csv'.
+seaweeds <- read.csv('raw/species_list_np_seaweeds_edited.csv', stringsAsFactors = FALSE)
+
+## Different versions of the dataset, representing the four different seaweed inclusion methods (include proportions of non-human food species, include only completely non-human food species, include all seaweeds, include all seaweeds nei). Use at the end for data checking. The first one "seaweeds_include" is the one which is saved to the "output" folder. 
+seaweeds_sp <- seaweeds %>%
+  select(FAO_name, include, alias, Taxon_code)
+# seaweeds_sp <- seaweeds %>%
+#   select(FAO_name, include_no_food, alias, Taxon_code)
+# seaweeds_sp <- seaweeds %>%
+#   select(FAO_name, include_all_seaweed, alias, Taxon_code)
+# seaweeds_sp <- seaweeds %>%
+#   select(FAO_name, include_all_nei, alias, Taxon_code)
+
+new.spp <- setdiff(mar$FAO_name, seaweeds_sp$FAO_name)
+new.spp # check: if dim has 0 rows it means all match
+## if there is a list of species, hand check species_list.csv to see whether to keep (include seaweeds and species harvested for ornamental/medicinal), check if synonyms match Trujillo names. 
+## This is outlined in issue #8 and issue #81 for reference. You need to add the species output from this to species_list_np_seaweeds_edited.csv and fill out the corresponding information. I.e. add FAO_name, include (whether to include in assessment or not. If they are only harvested for human food purposes, do not include), alias, and Taxon_code to species_list_np_seaweeds_edited.csv.
+
+## REMOVE SPECIES not relevant to natural products goal (i.e., human food species)
+seaweed_np <- seaweeds_sp %>% 
+  left_join(mar, by="FAO_name") %>% 
+  filter(include > 0)
+ 
+## Change names using species alias or FAO species name (global changes)
+seaweed_np$species <- ifelse(!is.na(seaweed_np$alias), seaweed_np$alias, seaweed_np$FAO_name) 
+
+## Sum production values for each group to account for duplicate rows after name change (remove NA values)
+seaweed_np <- seaweed_np %>%
+  filter(!is.na(value)) %>%
+  group_by(country, fao, environment, species, year, Taxon_code, include) %>% 
+    summarize(value = sum(value)) %>% 
+  ungroup()
+
+## Eliminate country-species data with zero production throughout the time-series (1950-recent)
+seaweed_np <- seaweed_np %>%
+  group_by(country, species) %>%
+  mutate(total_value = sum(value)) %>%
+  filter(total_value > 0) %>%
+  select(-total_value) %>%
+  ungroup()
+
+```
+
+## Convert country names to OHI regions
+
+```{r}
+
+# Divide mariculture from countries that we report as separate regions (assume equal production in all regions)
+# Netherlands Antilles: Conch restoration among Aruba, Bonaire, Curacao
+# Channel Islands: Jersey and Guernsey
+# Bonaire/S.Eustatius/Saba
+# Yugoslavia SFR: no longer a country after 1992
+
+seaweed_np <- seaweed_np %>%
+  mutate(country = ifelse(country=="Réunion", "Reunion", country)) %>%  # this one is hard to get right; v2020: last year it was "R\xe9union", but this year it was "Réunion"
+  mar_split()  # function in mar_fxs.R
+
+mar_rgn <- name_2_rgn(df_in = seaweed_np, 
+                       fld_name='country', 
+                       flds_unique=c('species', 'fao', 'environment', 'Taxon_code', 'year', 'include')) 
+
+
+## sum values of regions with multiple subregions
+mar_rgn <- mar_rgn %>%
+  group_by(fao, environment, species, year, Taxon_code, rgn_id, include) %>% 
+  summarize(value = sum(value)) %>%
+  ungroup()
+
+```
+
+**Take a look at the tidied data for a single year and region**
+
+```{r}
+
+data.frame(filter(mar_rgn, rgn_id==182) %>%
+  filter(year==2016) %>%
+  arrange(species))
+
+```
+
+# Gapfilling
+
+## Fill in missing years after first year of harvest data with 0 values
+
+For example: Production of blue shrimp in Maine starts in 1983 -- don't include years before that.
+
+Checked to make sure that there weren't instances in which it made more sense to carry the previous year's data forward as a method of gapfilling. This didn't seem to be the case.
+
+```{r}
+
+## spread mar_rgn to create a value for every year-species-region (if missing it will be given a NA)
+mar_rgn_spread <- spread(mar_rgn, year, value)
+dim(mar_rgn_spread)
+
+## turn data frame back into long format
+mar_rgn_gf <- gather(mar_rgn_spread, "year", "value", num_range("",1950:2018)) %>%
+  arrange(rgn_id, species, year, Taxon_code, fao, environment) 
+
+## NA values are converted to zero.
+mar_rgn_gf <- mar_rgn_gf %>%
+  mutate(year = as.numeric(as.character(year))) %>%
+  mutate(value_w_0 = ifelse(is.na(value), 0, value)) %>%
+  group_by(fao, environment, species, Taxon_code, rgn_id) %>% 
+  mutate(cum_value = cumsum(value_w_0)) %>%
+  ungroup() %>%
+  filter(cum_value > 0) %>% # eliminates years before mariculture began
+  mutate(gap_0_fill = ifelse(is.na(value), "NA_to_zero", "0")) %>% # record gapfill
+  mutate(value = ifelse(is.na(value), 0, value)) %>% # finally, convert all NAs in original column to 0
+  select(-cum_value, -value_w_0)
+```
+
+See how may NA values were converted to 0
+
+```{r}
+
+table(mar_rgn_gf$gap_0_fill)
+## 382 of these out of 2299+382 cases had NA converted to 0 - 2020 assessment
+
+```
+
+Remove species-region-environment time series with less than four years of seaweeed mariculture production > 0 tonnes (assume these are not established seaweed mariculture programs).
+
+```{r}
+
+mar_rgn_gf = mar_rgn_gf %>% 
+  group_by(rgn_id, species, fao, environment) %>%
+  mutate (not_0 = length(value[value>0])) %>% # length of vector of years greater than 0
+  filter (not_0>3) %>% # filter for groups that have at least four years of seaweed mariculture production 
+  ungroup() %>% 
+  select(rgn_id, species, fao, environment, year, include, value, Taxon_code, gap_0_fill) 
+
+```
+
+Add a unique identifier per cultivated stock that describes each species, fao region, and environment grouping.
+
+```{r}
+
+## add a unique identifier per cultivated stock
+identifier = mar_rgn_gf %>% 
+  select(rgn_id, species, fao, environment) %>% 
+  unique() %>% 
+  mutate(species_code = 1:n())
+
+mar_rgn_gf = left_join(mar_rgn_gf, identifier)
+maric <- mar_rgn_gf
+
+```
+
+## Calculate and save tonnes of seaweed
+
+Find the tonnes per each region/year per each seaweed type (multiplied by "include" proportions).
+
+Used to estimate total seaweed mariculture yield per country.
+
+```{r}
+
+## Multiply "include" column by "value" column to find tonnes per region/year for each seaweed species
+maric <- maric %>% 
+  mutate(tonnes = include*value)
+
+## Save in 'globalprep/np/v2020/explore/int' as 'np_seaweeds_tonnes.csv'
+write.csv(maric,"int/np_seaweeds_tonnes.csv", row.names = FALSE)
+
+```
+
+## Import data: Trujillo sustainability scores
+
+These data describe the sustainability and genetic escapes for country/species combinations (and, in a couple cases, environment and FAO region combinations). In cases where these data were not available for a specific county/species, we averaged the data across taxonomic groups to gapfill the missing data.
+
+```{r}
+
+## Trujillo sustainability data copied over from 'globalprep/mar/v2020/raw':
+sus = read.csv('raw/Truj_label_sust.csv', stringsAsFactors = FALSE, na.strings = NA)
+
+```
+
+## Wrangle
+
+```{r}
+
+## These need to be re-added (get cut when associated with region ids)
+sus_no_rgn <- filter(sus, is.na(country))
+
+```
+
+## Convert country names to OHI region names.
+
+```{r}
+
+sus_rgn <- name_2_rgn(df_in = sus, 
+                       fld_name='country', 
+                       flds_unique=c('species_fao', 'fao', 'environment', 'species_Truj'))
+
+sus_rgn <- bind_rows(sus_rgn, sus_no_rgn) %>%
+  unique()
+
+```
+
+**Check that the non-matches between Trujillo sustainability FAO spp (sus_rgn) and the FAO mariculture species in the wrangled FAO Aquaculture Production data table (maric) are not due to spelling errors or slightly different names. We want to include as many species that have sustainability scores as possible**
+
+```{r}
+
+## Make sure same species are spelled the same in the two data tables (e.g. check that there are no extra spaces)
+sort(setdiff(sus_rgn$species_fao, maric$species)) # species that no longer have mariculture industry or are not included due to being freshwater, etc.
+# Brown seaweeds (Pac), Edible seaweeds 
+
+
+sort(setdiff(maric$species, sus_rgn$species_fao)) # FAO species with no Trujillo data - there will probably be a long list
+# [1] "[Capsosiphon fulvescens]" "Caulerpa seaweeds"        "Dark green nori"          "Elkhorn sea moss"         "Eucheuma seaweeds nei"   
+# [6] "Fragile codium"           "Gelidium seaweeds"        "Giant kelp"               "Green laver"              "Harpoon seaweeds"        
+# [11] "Japanese isinglass"       "Japanese kelp"            "Mozuku"                   "Red seaweeds"             "Sea belt"                
+# [16] "Sea lettuces nei"         "Seaweeds nei"             "Spiny eucheuma"           "Wakame"                   "Wakame nei"              
+# [21] "Warty gracilaria"        
+
+## Hand check each of the species output here. I mainly check to make sure there aren't obvious cases when the species is the same, but the names are presented slightly differently in the lists. For example, some species might have an extra space in the name somewhere. If any of these obvious differences exist, we need to go in and change the names to match. 
+## Its not too surprising (unfortunately) that the FAO list has far more species than the sustainability list. But, I like to go over them to make sure that we are getting sustainability scores for as many species as we can.
+
+```
+
+# FAO mariculture and sustainability scores
+
+Append sustainability score to the FAO mariculture data.
+
+The following joins the sustainability scores to regions/species that have Trujillo data.
+```{r}
+
+table(sus_rgn$match_type)
+
+## join taxa specific to country/species/environment
+c_sp_env = sus_rgn %>% 
+  filter(match_type == 'c_sp_env') %>% 
+  select(rgn_id, species=species_fao, environment, Sust_c_sp_env = Maric_sustainability)
+
+mar_sus <- maric %>%
+  left_join(c_sp_env, by= c("species", "environment", "rgn_id"))
+
+## join taxa specific to country/species/fao region
+c_sp_fao = sus_rgn %>% 
+  filter(match_type == 'c_sp_fao') %>% 
+  select(rgn_id, species=species_fao, fao, Sust_c_sp_fao = Maric_sustainability)
+
+mar_sus <- mar_sus %>%
+  left_join(c_sp_fao, by= c("species", "fao", "rgn_id"))
+
+```
+
+**Take a look at the data thus far**
+```{r}
+
+head(data.frame(filter(mar_sus, rgn_id==14 & species == "Laver (Nori)")))
+head(data.frame(filter(mar_sus, !is.na(Sust_c_sp_fao))))
+
+```
+
+```{r}
+
+## join taxa specific to country/species
+c_sp = sus_rgn %>% 
+  filter(match_type == 'c_sp') %>% 
+  select(rgn_id, species=species_fao, Sust_c_sp = Maric_sustainability)
+
+mar_sus <- mar_sus %>%
+  left_join(c_sp, by= c("species", "rgn_id"))
+
+```
+
+**Now look at a summary after appending all the Trujillo data**
+```{r}
+
+summary(mar_sus)
+
+```
+
+Merge the three Trujillo type categories into a single sustainability score column in the following order:
+
+1. Sust_c_sp_env: taxa specific to country/species/environment (smallest taxonomic level)
+2. Sust_c_sp_fao:  taxa specific to country/species/fao region
+3. Sust_c_sp: taxa specific to country/species (highest taxonomic level)
+
+For example, if Sust_c_sp_env is missing, use Sust_c_sp_fao and so on. 
+
+```{r}
+
+mar_sus = mar_sus %>% 
+  mutate(Sust = ifelse(!is.na(Sust_c_sp_env), Sust_c_sp_env, Sust_c_sp_fao)) %>%
+  mutate(Sust = ifelse(is.na(Sust), Sust_c_sp, Sust)) %>%
+  select(-Sust_c_sp_env, -Sust_c_sp_fao, -Sust_c_sp)
+
+```
+
+
+This joins the sustainability data that is gapfilled either at the species level (average of specific species/genera across regions) or at a higher course taxonomic levels and documents which data are gapfilled and how.
+
+```{r}
+
+## Select observations gapfilled at the species/genera level:
+gf_sp_sus <- sus_rgn %>% 
+  filter(gapfill != "actuals" & match_type == "species") %>%
+  select(species = species_fao, gapfill, Sust_gf_sp = Maric_sustainability)
+
+## check that there are no duplicated species_fao
+gf_sp_sus[duplicated(gf_sp_sus$species), ]
+
+## Match gapfilling values by species
+mar_sus_gf = mar_sus %>%
+  left_join(gf_sp_sus, by = 'species')
+
+## Select observations gapfilled at the coarse taxon level:
+gf_taxon_sus <- sus_rgn %>% 
+  filter(gapfill != "actuals" & match_type == "taxon") %>%
+  select(Taxon_code=taxon, Sust_gf_taxon = Maric_sustainability)
+
+## Match gapfilling values by species
+mar_sus_gf = mar_sus_gf %>%
+  left_join(gf_taxon_sus, by = c('Taxon_code'))
+
+```
+
+**Take a look at the wrangled data**
+```{r}
+
+summary(mar_sus_gf) # should be no NA's in Sust_gf_taxon column
+table(mar_sus_gf$gapfill)
+
+```
+
+Obtain a sustainability score for each record, and a book-keeping column of whether it's actual or gap-filled
+
+For missing sustainability scores:
+
+1. Use species-level Sustainability score
+2. If no species-level scores, gapfill with taxon-level sustainability average
+
+```{r}
+
+mar_sus_final = mar_sus_gf %>% 
+  mutate(gapfill = ifelse(!is.na(Sust), "none", gapfill)) %>%
+  mutate(Sust = ifelse(is.na(Sust), Sust_gf_sp, Sust)) %>% # gapfill with species level
+  mutate(gapfill = ifelse(is.na(Sust), "taxon_average", gapfill)) %>% # add in taxon gapfill record
+  mutate(Sust = ifelse(is.na(Sust), Sust_gf_taxon, Sust)) %>% # gapfill with taxon level
+  mutate(taxa_code = paste(species, species_code, sep="_")) %>%
+  select(rgn_id, species, species_code, taxa_code, taxa_group=Taxon_code, year, gapfill_sus = gapfill, gapfill_fao = gap_0_fill, tonnes, Sust)
+
+```
+
+# Save Data:
+
+```{r}
+
+## Save seaweed mariculture harvest tonnes data ("tonnes" column already incorporated include proportions)
+seaweed_harvest_tonnes <- mar_sus_final %>%
+  dplyr::select(rgn_id, taxa_code, year, tonnes)
+
+anyDuplicated(seaweed_harvest_tonnes) # check for duplication
+
+write.csv(seaweed_harvest_tonnes, 'int/seaweed_harvest_tonnes.csv', row.names=F)
+
+## Multiply tonnes by sustainability coefficient for each seaweed and save
+seaweed_harvest_tonnes_sust <- mar_sus_final %>% 
+  mutate(tonnes_sust = tonnes*Sust) %>% 
+  select(rgn_id, taxa_code, year, tonnes_sust)
+
+write.csv(seaweed_harvest_tonnes_sust, 'int/seaweed_harvest_tonnes_sust.csv', row.names=F)
+
+```
+
+## Summarize values
+
+Summarize the sustainably harvested tonnes per region per year. And, do some error checking.
+
+```{r}
+
+seaweed_sust_sum <- seaweed_harvest_tonnes_sust %>%
+  group_by(rgn_id, taxa_code, year) %>%
+  summarise(tonnes_sust = sum(tonnes_sust, na.rm = TRUE))
+# no change from seaweed_harvest_tonnes_sust
+
+## Error-checking and table exports to see if there are duplicates
+stopifnot(sum(duplicated(seaweed_sust_sum[ , c('rgn_id', 'taxa_code', 'year')])) == 0)
+
+```
+
+## Calculate Rolling Averages
+Determine rolling averages for sustainably harvested tonnes in order to determine peak values.
+
+```{r}
+
+# Find max year in the summarized data table
+year_max <- max(seaweed_harvest_tonnes_sust$year)
+
+roll_tonnes_sust <- seaweed_harvest_tonnes_sust %>%
+  arrange(rgn_id, taxa_code, year) %>%
+  group_by(rgn_id, taxa_code) %>%
+  mutate(tonnes_rollmean = rollapply(tonnes_sust, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE)) %>%
+  rename(tonnes_orig = tonnes_sust) %>% # prevent overwriting of reported and gapfilled values
+  mutate(tonnes = ifelse(!is.na(tonnes_rollmean), tonnes_rollmean, tonnes_orig)) %>%
+  select(rgn_id, taxa_code, year, tonnes, tonnes_orig)
+
+```
+
+## Score Harvest Relative to Peaks
+
+Score harvest (tonnes) relative to peaks. Output values as .csvs. Perform this using a for loop.
+
+```{r}
+
+buffer  <-  0.35 # 35% buffer (from OHI Methods)
+recent_years  <-  10
+
+## Find peak harvest per region-product and apply conservative buffer (scale down)
+## Find max USD value over the last 10 years 
+peak_tonnes_sust <- roll_tonnes_sust %>%
+    group_by(rgn_id, taxa_code) %>%
+    mutate(tonnes_peak = max(tonnes, na.rm=T)  * (1 - buffer)) %>%
+    ungroup() 
+
+## Determine relative status:
+smooth_tonnes_sust <- peak_tonnes_sust %>% 
+    mutate(tonnes_rel = ifelse(tonnes >= tonnes_peak, 1, tonnes / tonnes_peak))
+  
+```
+
+## Save data layer
+
+```{r}
+
+## Write entire data frame to .csv:
+write.csv(smooth_tonnes_sust, 'int/seaweed_harvest_smoothed_data.csv', row.names = FALSE, na = '')
+
+## Write individual data layers:
+## Save tonnes data for weighting purposes 
+seaweed_tonnes <- smooth_tonnes_sust %>%
+  dplyr::select(rgn_id, taxa_code, year, tonnes) 
+
+write.csv(seaweed_tonnes, 'int/np_seaweed_harvest_tonnes.csv', row.names = FALSE, na = '')
+
+## Save scores data for the seaweed layer 
+tonnes_seaweed_rel <- smooth_tonnes_sust %>%
+  dplyr::select(rgn_id, taxa_code, year, tonnes_rel)
+
+write.csv(tonnes_seaweed_rel, 'output/np_seaweeds_scores.csv', row.names = FALSE, na = '')
+
+
+```
+
+
+
+
+## Exploring new seaweed reference point
+
+**Steps**
+1. Per country: divide tonnes production / area of suitability
+2. Use the value corresponding to the 95th quantile (across countries and a range of years) of these country data to rescale the data.
+
+```{r}
+
+# ## Filter out seaweeds from tonnes production data
+# seaweeds <- read.csv(here('globalprep/np/v2020/output/np_harvest_tonnes.csv')) %>% # using gapfilled layer from np_dataprep.Rmd
+#   filter(product == "seaweeds") %>% 
+#   left_join(rgns_eez, by = "rgn_id") %>% 
+#   dplyr::select(rgn_id, rgn_name, year, tonnes)
+# 
+# ## Read in list of seaweed suitable countries from Froehlich (2018)
+# urlfile = "https://raw.githubusercontent.com/CART-sci/seaweed/master/Data/sw_feasible_countries.csv"
+# sw_feas_countries <- read_csv(url(urlfile)) %>% 
+#   rename(rgn_name = country)
+# 
+# ## Divide tonnes production / area of suitability
+# seaweed_density <- seaweeds %>% 
+#   left_join(sw_feas_countries, by = "rgn_name") %>% 
+#   mutate(density = tonnes/feas_area) %>% # tonnes/area(km2)
+#   dplyr::select(-X1, -ID)
+# 
+# summary(seaweed_density)
+# 
+# ## Find 95th quantile density for each region, year
+# quant_95 <- seaweed_density %>% 
+#   group_by(rgn_name, year) %>% 
+#   summarize(quantDensity = quantile(density, c(0.95), na.rm=TRUE)) %>% 
+#   data.frame()
+# 
+# ## Rescale the density using 95th quantile value across countries and years
+# seaweed_rescale <- seaweed_density %>% 
+#   mutate(density_rescaled = density/quant_95$quantDensity) %>% 
+#   mutate(density_rescaled_capped = ifelse(density_rescaled > 1, 1, density_rescaled))
+# 
+# hist(seaweed_rescale$density_rescaled_capped)
+# 
+# # Scrapping this
+
+```
+

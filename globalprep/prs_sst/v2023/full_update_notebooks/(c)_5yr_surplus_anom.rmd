@@ -1,0 +1,284 @@
+---
+title: 'OHI `r format(Sys.Date(), "%Y")`: Sea Surface Temperature Pressure Layer'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 3
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This takes the positive anomaly rasters created in earlier steps and groups them into 5 year segments. Then uses the reference 5 year period of 1985 - 1989 to find the surplus positive anomalies in each 5 year period. These values are then rescaled to be between 0 and 1 and then saved to disk. Once complete, you can return to the main prs_sst folder to finish the data prep.
+
+------------------------------------------------------------------------
+
+## Setup
+
+```{r setup, message=F,warning=F, eval = FALSE}
+
+# Set options for code chunks
+knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'figs/', message = FALSE, warning = FALSE)
+
+# Load packages
+library(raster)
+library(RColorBrewer)
+library(tidyverse)
+library(rgdal)
+library(doParallel)
+library(foreach)
+library(sf)
+library(ncdf4)
+library(httr)
+library(lubridate)
+library(animation)
+library(plotly)
+library(here)
+library(snow)
+library(terra)
+
+# suppress progress bars for terra
+terraOptions(progress=0)
+
+# OHI spatial files, directories, etc
+source(here("workflow/R/common.R"))
+
+# Update scenario year, set up programmatic scenario year updating
+scen_year_number <- 2023
+scen_year <- as.character(scen_year_number)
+prev_scen_year <- as.character(scen_year_number - 1)
+
+# Standard OHI file paths
+dir_data <- paste0(dir_M, "/git-annex/globalprep/_raw_data/CoRTAD_sst/d", scen_year)
+dir_int  <- paste0(dir_M, "/git-annex/globalprep/prs_sst/v", scen_year, "/int")
+dir_output  <- paste0(dir_M, "/git-annex/globalprep/prs_sst/v", scen_year, "/output")
+
+# Change this file path for full update to correct update scenario year
+dir_rasters <- paste0(dir_M, 
+                      "/git-annex/globalprep/prs_sst/prs_sst_calculated_rasters/v2023_update")
+
+# Specify years for calculations, the data set's years, often 1 year behind scenario year
+yrs <- 1982:2022
+
+# Load in OHI spatial data
+ohi_rasters()
+regions_shape()
+
+# Rainbow color scheme and load in OHI regions
+cols <- rev(colorRampPalette(brewer.pal(11, 'Spectral'))(255)) 
+land <- regions %>% subset(rgn_type %in% c("land", "land-disputed", "land-noeez"))
+
+```
+
+------------------------------------------------------------------------
+
+## Five Year Reference Raster
+
+This chunk creates and saves the 5 year reference period anomaly raster that sums all the positive anomalies from 1985 - 1989. This file is then subtracted from the 5 year anomaly periods starting from 1986 - 1990 and going to the most recent 5 year period.
+
+```{r create reference 5 year anomalies}
+
+# List all pos anom files 
+anom_files <- list.files(file.path(dir_rasters, "annual_positive_anomalies"), pattern = "annual_pos_anomalies", full.names = TRUE)
+
+# Initialize an empty vector 'ref_years'
+ref_years <- c()
+
+# This loop puts all the anom files between 1985 - 1989 together
+for(i in 1985:1989){ref_years = c(ref_years, grep(i, anom_files))}
+
+# Take the file names in ref_years and sum them into a 1 layer raster
+ref <- rast(anom_files[ref_years]) %>% app(., fun=sum)
+
+# Write the raster to a TIFF file named "85_89_ref_anom.tif".
+writeRaster(ref, filename = file.path(file.path(dir_rasters, "referenc_period_5yr_positive_anomalies"), "85_89_ref_anom.tif"),
+            overwrite=TRUE)
+```
+
+------------------------------------------------------------------------
+
+## 5 Year Surplus Anomalies Rasters
+
+This code chunk sums positive anomalies in every 5 year period starting from 1986 - 1990 and going to the most recent 5 year period and subtracts the reference period anomalies to create a surplus anomaly file representing how many more positive anomalies happens in each cell during that 5 year period than the 5 year reference period.
+
+```{r 5 yr Surplus Anom}
+
+# Specify the projection
+anom_proj = "+proj=longlat +ellps=WGS84 +no_defs"
+
+# Load OHI land sf object then transform to Mollweide
+land_mask <- land %>% st_geometry %>% st_transform(anom_proj)
+
+# Convert the 'land_mask' to a terra vector object to use later
+land_mask_terra <- terra::vect(land_mask)
+
+# This loop groups pos anom rasters into 5 year chunks and subtracts the reference year
+foreach(i = seq(1986, yrs[length(yrs)-4])) %do% {
+  
+  # Start timer
+  start_time <- Sys.time()
+
+  # Generate a sequence of 5 consecutive years starting from 'i'
+  years <- i:(i + 4)
+  
+  # Load reference anomaly period raster
+  ref <- rast(file.path(dir_rasters, "referenc_period_5yr_positive_anomalies", "85_89_ref_anom.tif"))
+  
+  # Load OHI five year anomaly period raster stack
+  five_year_rast <- rast(c(anom_files[substr(anom_files, 137, 140) %in% years]))
+
+  # Sum pos anoms in 5 year period then subtract reference period 
+  r <- app(five_year_rast, fun=sum) - ref
+  
+  # Then apply the land mask to the resulting raster
+  r <- mask(r, land_mask_terra, inverse = TRUE) 
+  
+  # Save raster file
+  terra::writeRaster(r, file=sprintf("%s/sst_diff_ocean_%s-%s.tif", 
+                                      file.path(dir_rasters, "surplus_5yr_positive_anomalies"), years[1], years[5]), 
+                      overwrite=TRUE)
+  
+  # End timer and calculate elapsed time
+  end_time <- Sys.time()
+  elapsed_time <- end_time - start_time
+  
+  # Print time message
+  print(paste("Anom for years", years[1], "through", years[5], "started at", 
+              start_time, "and took", elapsed_time, "to complete"))
+}
+
+```
+
+------------------------------------------------------------------------
+
+## Calculate Rescaling Value
+
+This code chunk extracts all the values from all the 5 year surplus anomaly files and calculates the 99.99th percentile value. This percentile value is then used to rescale the data between 0 and 1.
+
+```{r}
+# List all surplus pos anom files
+diffs <- list.files(file.path(dir_rasters, "surplus_5yr_positive_anomalies"), pattern = "diff", full.names = TRUE)
+
+# Initialize an empty vector to store raster values
+vals <- c()
+
+# Loop over the list of surplus anom files
+for(i in 1:length(diffs)){
+  
+  # Extract values from each raster file in list
+  m = rast(diffs[i]) %>% values()
+  
+  # Concatenate the values into a single vector 
+  vals = c(vals, m)
+}
+
+# Calculate minimum (-142 v2018; -159 v2021; -157 v2022; -166 v2023)
+min_val   <- min(vals, na.rm = TRUE) 
+
+# Calculate maximum (182 v2018; 228 v2021; 247 v2023)
+max_val   <- max(vals, na.rm = TRUE) 
+
+# Calculate 99.99th percentile (128 v2018; 148 v2021; 148 v2022, 159 v2023)
+resc_num  <- quantile(vals, prob = 0.9999, na.rm = TRUE)
+
+# Specify path to previous 99.99th percentile
+sup_info  <- here(paste0("globalprep/supplementary_information/v", scen_year))
+
+# Read the reference points pressures data
+rescale <- read.csv(file.path(sup_info, "reference_points_pressures.csv"))
+
+# Update the stored reference point with the calculated 99.99th percentile
+rescale$ref_point[rescale$pressure == "Sea Surface Temperature"] <- resc_num 
+
+# Write the updated data back to the file
+write.csv(rescale, file.path(sup_info, "reference_points_pressures.csv"), row.names = FALSE)
+
+```
+
+------------------------------------------------------------------------
+
+## Rescaling
+
+This code chunk takes the 99.99th percentile value and uses it to rescale all the surplus anomaly files to values between 0 and 1. It then resamples to the OHI standard resolution and saves to disk
+
+```{r rescale surplus pos anoms}
+
+# List surplus pos anom files
+diffs <- list.files(file.path(dir_rasters, "surplus_5yr_positive_anomalies"), pattern = "diff.*tif", full.names = TRUE)
+
+# Read in 99.99th percentile rescaling value
+resc_num <- read.csv(file.path(sup_info, "reference_points_pressures.csv")) %>%
+  filter(pressure == "Sea Surface Temperature") %>%
+  .$ref_point
+
+# Transition to numeric
+resc_num <- as.numeric(as.character(resc_num))
+
+# Create output directory if it does not exist
+if(!file.exists(dir_output)){dir.create(path = dir_output)}
+
+# Loop over each file in the diffs list, 2.5 minutes per file
+for(i in 1:length(diffs)) {
+  
+  # Start timer with tic()
+  start_time <- Sys.time()
+
+  # Load the ith raster file from diffs
+  r = terra::rast(diffs[i])
+
+  # Extract the year from the filename
+  years = substr(diffs[i], 133, 141)
+  
+  # Check if output file for this year already exists
+  if(file.exists(sprintf("%s/sst_%s_1985-1989.tif", dir_output, years))){
+    print(paste("skipping", years))
+    next
+  } else {
+    
+    # Set the Coordinate Reference System (CRS) for the raster
+    crs(r) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+    
+    # Reproject the raster to Mollweide projection (mollCRS)
+    out = terra::project(x = r, y = mollCRS, threads = TRUE)
+    
+    # Apply a function to rescale positive values between 0 and 1
+    out <- terra::app(out,
+                      fun = function(x){ifelse(x > 0,
+                                               ifelse(x > resc_num, 1, x/resc_num), 0)})
+    
+    # Resameple to resolution of ocean raster and save to disk
+    terra::resample(out, ocean, method = "near",
+                    filename = sprintf("%s/sst_%s_1985-1989.tif", dir_output, years),
+                    overwrite = TRUE,
+                    threads = TRUE)
+    
+  } # End if statement
+  
+  # End timer and calculate elapsed time
+  end_time <- Sys.time()
+  elapsed_time <- end_time - start_time
+  
+  # Print time message
+  print(paste("Nomalized anoms for years", years, 
+              "started at", start_time, "and took", 
+              elapsed_time, "minutes to complete"))
+  
+  # Free up memory
+  gc()
+  
+} # End loop
+
+```
+
+## Next Steps
+
+Now that you have successfully recalculated all the SST rasters, you can return to the main prs_sst folder and work through the sst_layer_prep.rmd notebook to complete this layer.

@@ -1,0 +1,256 @@
+---
+title: 'OHI 2021: Coral extent'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+This script generates the extent of coral for each OHI region. We do this using point and polygon data. For the polygon data, we extract the area of each polygon per each ohi region. For the point data, we count the number of points per region, and assign a region specific median (based on the median area of polygons) as the area for each point (and if there isn't a region specific median, we use the global median). 
+
+
+## Updates from previous assessment
+Creating an actual script to calculate this. This has not been updated since 2012. Updating the data with newest version (version 4). 
+
+***
+## Data Source 
+
+**Downloaded**: 07/25/2019
+
+**Description**:  
+Global Distribution of Coral Reefs
+https://data.unep-wcmc.org/datasets/1
+Reported at spatial cell scale. 
+
+This dataset shows the global distribution of coral reefs in tropical and subtropical regions. It is the most comprehensive global dataset of warm-water coral reefs to date, acting as a foundation baseline map for future, more detailed, work. This dataset was compiled from a number of sources by UNEP World Conservation Monitoring Centre (UNEP-WCMC) and the WorldFish Centre, in collaboration with WRI (World Resources Institute) and TNC (The Nature Conservancy). Data sources include the Millennium Coral Reef Mapping Project (IMaRS-USF and IRD 2005, IMaRS-USF 2005) and the World Atlas of Coral Reefs (Spalding et al. 2001).
+
+**Time range**: 1954-2018
+
+
+***
+# Methods
+Reclassify the coral extent data into a mask of 1 or NA, and then compute zonal statistics for the count of cells within an OHI region that have coral and then convert into km2.
+
+
+## Setup
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_coral/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_wcmc <- file.path(file.path(dir_M, 'git-annex/globalprep/_raw_data/d2018/wcmc_coral'))
+ohi_rasters() # call the region zones raster
+```
+
+**Prep polygon data**
+```{r, eval = FALSE}
+## read in polygon data
+v4_coral_py <- sf::st_read(dsn = file.path(dir_wcmc, "14_001_WCMC008_CoralReefs2018_v4/01_Data"), layer = "WCMC008_CoralReef2018_Py_v4")
+
+## take a look
+head(v4_coral_py) 
+
+coral_moll <- st_transform(v4_coral_py, crs = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+
+land_ocean <- raster("/home/shares/ohi/git-annex/globalprep/spatial/v2017/regions_land_ocean.tif")
+
+
+fasterize_py <- fasterize::fasterize(coral_moll, raster = land_ocean, 
+                                     field = NULL) # all polygons given value of 1
+
+sum(st_area(v4_coral_py))*0.000001
+sum(v4_coral_py$Shape_Leng)
+
+print(cellStats(fasterize_py, "sum", na.rm=TRUE)*0.934478877011218970**2) # 149899.6 km2 - metadata says there is around 150000 km2 of cover.. this seems good to me. 
+
+sum(st_area(v4_coral_py))*0.000001 # 152275.7 km2 using R function...
+
+plot(fasterize_py, col = "black")
+
+writeRaster(fasterize_py, filename = file.path(dir_M, "/git-annex/globalprep/hab_coral/v2021/int/py_coral_rast.tif"), overwrite=TRUE) 
+
+
+old_2020 <- read_csv(file.path(here(), "globalprep/hab_coral/v2020/data/habitat_extent_coral_updated.csv"))
+sum(old_2020$km2) # 138809.7 - definitely good we are updating this
+
+
+# Calculate zonal stats with zones raster and new coral. Convert to km^2 and save int/output files*
+
+zonal_sums_combined <- raster::zonal(fasterize_py, 
+                                     land_ocean,
+                                     fun = "sum",
+                                     na.rm = TRUE,
+                                     progress="text") #sum all kelp cells for each ohi zone
+zonal_sums_combined_df <- data.frame(zonal_sums_combined)
+
+zonal_sums_km2 <- zonal_sums_combined_df %>%
+  mutate(year = 2021, habitat = "coral",
+         km2 = (0.934478877011218970**2*sum)) %>% #one cell is equal to ~0.93 km
+  rename("rgn_id" = "zone") %>%
+  dplyr::select(-sum) %>% 
+  filter(rgn_id <= 250)
+
+print(sum(zonal_sums_km2$km2)) # 146152.5
+
+
+
+## save this 
+write.csv(zonal_sums_km2, file.path("globalprep/hab_coral/v2021/int/coral_py_area_zonal.csv"), row.names = FALSE)
+```
+
+**Prep points data**
+```{r, eval = FALSE}
+## read in points data
+v4_coral_pts <- sf::st_read(dsn = file.path(dir_wcmc, "14_001_WCMC008_CoralReefs2018_v4/01_Data"), layer = "WCMC008_CoralReef2018_Pt_v4")
+
+## transform pts data to have same crs as regions eez
+v4_coral_pts <- st_transform(v4_coral_pts, crs = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+
+coral_subset_points <- st_intersection(st_make_valid(v4_coral_pts), regions) ## run intersection to get the rgn_id for each point
+
+st_write(coral_subset_points, file.path(dir_M, "git-annex/globalprep/hab_coral/v2021/int/coral_extent_regions_pts.shp"))
+
+## plot to make sure it works 
+ggplot() +
+  geom_sf(data = regions_eez$geometry,  col = sf.colors(239, categorical = TRUE)) +
+  geom_sf(data = regions_land$geometry, fill = sf.colors(229, categorical = TRUE)) +
+  geom_sf(data = coral_subset_points$geometry, col = "red")
+
+#### Now we will calculate a proxy area for each region which has points. We will do this by counting the points in each rgn_id, figuring out the median size of each polygon in those countries from our polygon dataset, and assigning that median value to each point. If there is no median value for a specific country, we will gapfill with the global median. 
+
+coral_subset_pts <- st_read(file.path(dir_M, "git-annex/globalprep/hab_coral/v2021/int/coral_extent_regions_pts.shp"))
+
+coral_pts_countries <- c(unique(coral_subset_pts$ISO3))
+
+# coral_area_py <- v4_coral_py %>% 
+#   mutate(extent_km2 = st_area(v4_coral_py)*0.000001)
+# 
+# st_geometry(coral_area_py) <- NULL
+
+
+## get a count of the points in each region
+coral_points_area <- coral_subset_pts %>%
+  group_by(rgn_id) %>%
+  summarise(count_points = n())
+
+## get rid of geometry column to make this a df 
+st_geometry(coral_points_area) <- NULL
+
+mean(st_area(v4_coral_py)) # 6.114509
+global_median_km2 <- as.numeric(st_area(v4_coral_py)) # 0.1371961 
+
+global_median_km2 <- 0.1371961 
+## we will use the lower of the global values
+
+## now multiply the count of points by the median area of points in these locations to get our extent in km2, for those that are still NA after (the regions which dont have polygons, and only have points), we will give them the global median size
+coral_points_area_sum <- coral_points_area %>%
+  mutate(extent_km2 = 0.1371961*count_points) %>%
+  dplyr::select(rgn_id, sum_extent_km2_pts = extent_km2)
+
+sum(coral_points_area_sum$sum_extent_km2_pts) # 126.9064 km2
+
+## save this data
+write.csv(coral_points_area_sum, file.path("globalprep/hab_coral/v2021/int/coral_points_area.csv"), row.names = FALSE)
+
+```
+
+**Combine points and polygon area estimates into one dataset**
+```{r, eval = FALSE}
+coral_points_area_sum <- read_csv(here(dir_git, "int/coral_points_area.csv"))
+coral_area_py_sum <- read_csv(here(dir_git, "int/coral_py_area_zonal.csv"))
+
+## finally, combine our points areas and polygon areas into one dataset and save
+coral_area_final <- coral_area_py_sum %>%
+  full_join(coral_points_area_sum, by = "rgn_id") %>%
+  mutate(sum_extent_km2 = replace_na(km2, 0),
+         sum_extent_km2_pts = replace_na(sum_extent_km2_pts, 0)) %>% ## make all of the NAs --> 0 so that we can sum
+  mutate(extent_km2_final = sum_extent_km2 + sum_extent_km2_pts,
+         habitat = "coral", 
+         year = 2021) %>% ## the latest raw data update is year = 2017 (when this dataset was published)
+  dplyr::select(rgn_id, year, habitat, km2 = extent_km2_final)
+
+write.csv(coral_area_final, "globalprep/hab_coral/v2021/data/habitat_extent_coral_updated.csv", row.names = FALSE)
+
+region_data()
+## lets make a gapfilling file
+coral_area_final_gf <- coral_area_final %>%
+  dplyr::select(rgn_id, habitat) %>%
+  mutate(variable = "extent", gap_fill = 0) %>% 
+  full_join(rgns_eez, by = "rgn_id") %>%
+  dplyr::select(rgn_id, habitat, variable, gap_fill) %>%
+  mutate(habitat = "coral", variable = "extent")
+
+write.csv(coral_area_final_gf, "globalprep/hab_coral/v2021/data/extent_coral_gf.csv", row.names = FALSE)
+
+```
+
+# Datacheck
+```{r, eval = FALSE}
+v4_coral_py <- sf::st_read(dsn = file.path(dir_wcmc, "14_001_WCMC008_CoralReefs2018_v4/01_Data"), layer = "WCMC008_CoralReef2018_Py_v4")
+
+coral_area_final <- read_csv(here("globalprep/hab_coral/v2021/data/habitat_extent_coral_updated.csv"))
+
+habitat_extent_coral_old <- read_csv("~/github/ohiprep_v2021/globalprep/hab_coral/v2012/data/habitat_extent_coral_updated.csv")
+
+
+compare_habitat_extent <- coral_area_final %>%
+  left_join(habitat_extent_coral_old, by = "rgn_id") %>%
+  mutate(km2.y = ifelse(
+    km2.x >0 & is.na(km2.y) ,0, #assign 0 values to old data km2 that have new data so that we can properly graph these differences.
+    km2.y
+  )) %>%
+  mutate(difference = km2.x - km2.y)
+
+ggplot(compare_habitat_extent, aes(x = km2.y, y = km2.x)) +
+  geom_point() +
+  geom_abline() +
+  labs(title = "Coral Habitat version old vs version 4", x = "old extent", y=  "new extent") +
+  theme_bw()
+
+
+sum(st_area(v4_coral_py)) #151390250085 [m^2]
+151390250085*0.000001
+# 151390.3 total area before eez intersection
+
+sum(coral_area_final$km2)
+# 146279.4 total area after eez intersection - missing some, but the v4_coral_py includes regions that OHI doesnt include
+
+sum(habitat_extent_coral_old$km2)
+#132924.5 total area for the old extent data
+
+
+## hand check belize (rgn 164): Google says belize ~960 km2 of coral reef... we estimate ~875... that is good enough for me.
+```
+
+
+
+ - I hand modified the gapfilling file to include the 4 newly added regions from the new data. 
+
+
+
+
+

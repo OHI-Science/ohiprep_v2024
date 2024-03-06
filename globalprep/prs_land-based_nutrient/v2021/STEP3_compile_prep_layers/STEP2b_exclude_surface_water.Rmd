@@ -1,0 +1,231 @@
+---
+title: "OHI 2021: Exclude non-surface water areas"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Summary
+
+Multiply our leaching and volatized rasters by the appropriate surface water rasters to get an estimate of the amount of N that will reach the coast. See below for more instructions. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(here);library(janitor);library("future");library(furrr);library(vroom);library(raster); library(tidyverse);library(readr); library(fasterize); library(sf)
+
+
+nutrient_d2021_anx <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/FAOSTAT/manure_nutrient/d2021/")
+git_manure <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP2_manure")
+location_tifs_path <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/halpern_food_systems/d2021/animal_farm/location_tifs")
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+git_crop <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP1_crop")
+git_compile <- file.path(here(), "globalprep/prs_land-based_nutrient/v2021/STEP3_compile_prep_layers")
+
+source(here(git_crop, "R/common_spatial.R")) # read in necessary spatial files 
+
+```
+
+## Methods 
+
+Loop that will multiply the yearly leaching raster by the surface water raster and save. Multiply the volatilization rasters by a raster proportion of cell covered by surface water + 1km from coast. Additionally save the total cellStats sum for each of the multiplied rasters so that we can compare to the total nutrient layers. 
+
+Do this for: 
+
+ - Crop Leaching N * 1km coast + 1km surface water
+ - Manure Leaching N * 1km coast + 1km surface water
+ - Manure volatilization N * 1km coast + prop rivers 
+ - Crop volatilitzation N * 1km coast + prop rivers 
+
+We could also do this for P, but we are excluding P for this analysis. 
+
+```{r}
+
+## load in the 1km surface and coast raster
+sw_reproj <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/surface_water_reproj.tif"))
+
+## load in 1km coast + prop river 
+prop_river <- raster(file.path(prep, "river_coastline.tif"))
+
+years <- as.character(c(2005:2019))
+nutrients <- c("N")
+types <- c("leached", "volt")
+
+sum_df <- data.frame(nutrient = NA, year = NA, process_type = NA, category_type = NA, before_exclusion_sum = NA, after_exclusion_sum = NA)
+
+registerDoParallel(cores = 6)
+
+foreach(yr = years) %:% 
+  foreach(nut = nutrients) %:% 
+    foreach(type = types) %dopar% {
+
+# yr <- 2005
+# nut <- "N"
+# type <- "leached_volt"
+
+      if(type == "leached"){
+crop_raster <- raster(file.path(paste0(prep, "/crop_stressors_yearly/", "crop_", type, "_nutrient_", nut, "_", yr, ".tif")))
+manure_raster <- raster(file.path(paste0(prep, "/manure_stressors_yearly/", "manure_", type, "_nutrient_", nut, "_", yr, ".tif")))
+
+combined_rast <- crop_raster + manure_raster
+
+before_surface_combined <- cellStats(combined_rast, "sum", na.rm = TRUE)
+
+combined_surface <- combined_rast * sw_reproj
+
+after_surface_combined <- cellStats(combined_surface, "sum", na.rm = TRUE)
+
+for_df_combined <- data.frame(nutrient = nut, year = yr, process_type = type, category_type = "crop_manure", before_exclusion_sum = before_surface_combined, after_exclusion_sum = after_surface_combined)
+
+
+writeRaster(combined_surface, file.path(paste0(prep, "/exclude_surface_water/", "surface_water_1km_crop_manure_", type, "_nutrient_", nut, "_", yr, ".tif" )), overwrite=TRUE)
+
+
+
+before_surface_crop <- cellStats(crop_raster, "sum", na.rm = TRUE)
+
+crop_surface <- crop_raster * sw_reproj
+
+after_surface_crop <- cellStats(crop_surface, "sum", na.rm = TRUE)
+
+for_df_crop <- data.frame(nutrient = nut, year = yr, process_type = type, category_type = "crop", before_exclusion_sum = before_surface_crop, after_exclusion_sum = after_surface_crop)
+
+
+writeRaster(crop_surface, file.path(paste0(prep, "/exclude_surface_water/", "surface_water_1km_crop_", type, "_nutrient_", nut, "_", yr, ".tif" )), overwrite=TRUE)
+
+
+
+before_surface_manure <- cellStats(manure_raster, "sum", na.rm = TRUE)
+
+manure_surface <- manure_raster * sw_reproj
+
+after_surface_manure <- cellStats(manure_surface, "sum", na.rm = TRUE)
+
+for_df_manure <- data.frame(nutrient = nut, year = yr, process_type = type, category_type = "manure", before_exclusion_sum = before_surface_manure, after_exclusion_sum = after_surface_manure)
+
+
+writeRaster(manure_surface, file.path(paste0(prep, "/exclude_surface_water/", "surface_water_1km_manure_", type, "_nutrient_", nut, "_", yr, ".tif" )), overwrite=TRUE)
+
+
+
+sum_df <- rbind(sum_df, for_df_combined, for_df_crop, for_df_manure) %>%
+  dplyr::filter(!is.na(nutrient))
+
+write.csv(sum_df, file.path(paste0(git_compile, "/tmp/", "sum_df_", type, "_", nut, "_", yr, ".csv")), row.names = FALSE)
+
+      }else{
+        
+crop_raster <- raster(file.path(paste0(prep, "/crop_stressors_yearly/", "crop_", type, "_nutrient_", nut, "_", yr, ".tif")))
+manure_raster <- raster(file.path(paste0(prep, "/manure_stressors_yearly/", "manure_", type, "_nutrient_", nut, "_", yr, ".tif")))
+
+combined_rast <- crop_raster + manure_raster
+
+before_surface_combined <- cellStats(combined_rast, "sum", na.rm = TRUE)
+
+combined_surface <- combined_rast * prop_river
+
+after_surface_combined <- cellStats(combined_surface, "sum", na.rm = TRUE)
+
+for_df_combined <- data.frame(nutrient = nut, year = yr, process_type = type, category_type = "crop_manure", before_exclusion_sum = before_surface_combined, after_exclusion_sum = after_surface_combined)
+
+
+writeRaster(combined_surface, file.path(paste0(prep, "/exclude_surface_water/", "surface_water_1km_crop_manure_", type, "_nutrient_", nut, "_", yr, ".tif" )), overwrite=TRUE)
+
+
+
+before_surface_crop <- cellStats(crop_raster, "sum", na.rm = TRUE)
+
+crop_surface <- crop_raster * prop_river
+
+after_surface_crop <- cellStats(crop_surface, "sum", na.rm = TRUE)
+
+for_df_crop <- data.frame(nutrient = nut, year = yr, process_type = type, category_type = "crop", before_exclusion_sum = before_surface_crop, after_exclusion_sum = after_surface_crop)
+
+
+writeRaster(crop_surface, file.path(paste0(prep, "/exclude_surface_water/", "surface_water_1km_crop_", type, "_nutrient_", nut, "_", yr, ".tif" )), overwrite=TRUE)
+
+
+
+before_surface_manure <- cellStats(manure_raster, "sum", na.rm = TRUE)
+
+manure_surface <- manure_raster * prop_river
+
+after_surface_manure <- cellStats(manure_surface, "sum", na.rm = TRUE)
+
+for_df_manure <- data.frame(nutrient = nut, year = yr, process_type = type, category_type = "manure", before_exclusion_sum = before_surface_manure, after_exclusion_sum = after_surface_manure)
+
+
+writeRaster(manure_surface, file.path(paste0(prep, "/exclude_surface_water/", "surface_water_1km_manure_", type, "_nutrient_", nut, "_", yr, ".tif" )), overwrite=TRUE)
+
+
+
+sum_df <- rbind(sum_df, for_df_combined, for_df_crop, for_df_manure) %>%
+  dplyr::filter(!is.na(nutrient))
+
+write.csv(sum_df, file.path(paste0(git_compile, "/tmp/", "sum_df_", type, "_", nut, "_", yr, ".csv")), row.names = FALSE)
+        
+}
+
+}
+
+files <- list.files(path = file.path(git_compile, "tmp"), full = TRUE)
+sum_df_all <- 
+  do.call(rbind,
+          lapply(files, read.csv))
+
+write.csv(sum_df_all, file.path(git_compile, "int/all_nutrient_layers_sw_sums.csv"), row.names = FALSE)
+
+```
+
+3. Join the surface water nutrient layer sums with the total nutrient sums, and compare the percentages of each. Just for data checking funsies. 
+
+```{r}
+surface_water_sums <- read.csv(file.path(git_compile, "int/all_nutrient_layers_sw_sums.csv"))
+
+total_nutrient_sums_crop <- read.csv(file.path(git_compile, "int/crop_nutrient_by_year.csv")) %>%
+  mutate(type = "crop")
+
+total_nutrient_sums_manure <- read.csv(file.path(git_compile, "int/manure_nutrient_by_year.csv"))
+
+total_nutrient_sums <- rbind(total_nutrient_sums_crop, total_nutrient_sums_manure) %>% 
+  group_by(year, nutrient) %>%
+  summarise(nutrient_sum = sum(nutrient_sum)) %>%
+  mutate(type = "crop_manure") %>%
+  ungroup() %>%
+  rbind(total_nutrient_sums_crop, total_nutrient_sums_manure) 
+
+
+all_dfs <- surface_water_sums %>%
+  left_join(total_nutrient_sums, by = c("category_type" = "type", "year", "nutrient")) %>%
+  rename("total_nutrient_applied" = "nutrient_sum") %>%
+  mutate(percent_excluded_before = before_exclusion_sum/total_nutrient_applied) %>%
+  mutate(percent_excluded_after = after_exclusion_sum/total_nutrient_applied)
+
+write.csv(all_dfs, file.path(git_compile, "int/all_layers_sw_percents.csv"), row.names = FALSE)
+
+
+test <- read.csv(file.path(git_compile, "int/all_layers_sw_percents.csv")) #### NOTE: show Mel this ####
+
+test2 <- test %>%
+  group_by(nutrient, process_type, category_type) %>%
+  summarise(mean_pre_sw = mean(percent_excluded_before)*100,
+            mean_post_sw = mean(percent_excluded_after)*100)
+
+```
+
+
+
+

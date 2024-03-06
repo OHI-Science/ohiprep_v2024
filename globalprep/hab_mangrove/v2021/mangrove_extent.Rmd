@@ -1,0 +1,329 @@
+---
+title: 'OHI 2021: Mangrove extent'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+This script generates the extent of mangrove for each OHI region for the latest year of data (year == 2016). We do this using polygon data. We extract the area of each polygon per each ohi region using our combined land and eez raster.
+
+
+## Updates from previous assessment
+Using a new dataset from global mangrove watch. 
+
+***
+## Data Source 
+
+**Reference**: Bunting, P., Rosenqvist, A., Lucas, R., Rebelo, L.-M., Hilarides, L., Thomas, N., Hardy, A., Itoh, T., Shimada, M., Finlayson, C., 2018. The Global Mangrove Watch—A New 2010 Global Baseline of Mangrove Extent. Remote Sensing 10, 1669. https://doi.org/10.3390/rs10101669
+
+**Downloaded**: 03/09/2021
+
+**Description**:  
+Global Mangrove Watch (1996 - 2016)	
+https://data.unep-wcmc.org/datasets/45
+Reported at spatial cell scale. 
+
+The GMW aims to provide geospatial information about mangrove extent and
+changes to the Ramsar Convention, national wetland practitioners, decision makers
+and NGOs. It is part of the Ramsar Science and Technical Review Panel (STRP) work
+plan for 2016-2018 and a Pilot Project to the Ramsar Global Wetlands Observation
+System (GWOS), which is implemented under the GEO-Wetlands Initiative. The
+primary objective of the GMW has been to provide countries lacking a national
+mangrove monitoring system with first cut mangrove extent and change maps, to
+help safeguard against further mangrove forest loss and degradation.
+The GMW has generated a global baseline map of mangroves for 2010 using ALOS
+PALSAR and Landsat (optical) data, and changes from this baseline for seven epochs
+between 1996 and 2017 derived from JERS-1, ALOS and ALOS-2. Annual maps are
+planned from 2018 and onwards
+
+**Time range**: 1996-2016
+
+
+***
+# Methods
+
+
+## Setup
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE}
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(mapview)
+library(sp)
+library(rgeos)
+
+source(file.path('~/github/ohiprep_v2021/workflow/R/common.R'))
+
+goal     <- 'globalprep/hab_mangrove/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_wcmc <- file.path(file.path(dir_M, 'git-annex/globalprep/_raw_data/wcmc_mangrove'))
+ohi_rasters() # call the region zones raster
+regions_shape()
+region_data()
+
+land_ocean <- raster("/home/shares/ohi/git-annex/globalprep/spatial/v2017/regions_land_ocean.tif")
+plot(log(land_ocean+1)) # i think this is the one i want
+
+land_ocean
+```
+
+Read in GMW data and explore
+```{r, eval = FALSE}
+
+files <- list.files("/home/shares/ohi/git-annex/globalprep/_raw_data/wcmc_mangrove/01_Data/")
+
+files_2 <- files[grepl(".shp", files) & !grepl(".xml", files)]
+```
+
+
+Loop over all years of data and match their regions to OHI regions 
+
+```{r, eval = FALSE}
+  
+for(i in 1:7){ ## there are 7 files 
+ # i = 1
+  
+gmw_file = files_2[i]  
+
+gmw_year = gsub("_v2.shp", "", gmw_file)
+
+d_year <- gsub("GMW_", "", gmw_year)
+
+fasterize_file = file.path(dir_M, "/git-annex/globalprep/Mangrove/v2021/int", sprintf("py_mangrove_rast_%s.tif", gmw_year))
+  
+if(!file.exists(fasterize_file)) {
+
+gmw_shp <- st_read(file.path(dir_wcmc, "01_Data", gmw_file))
+  
+## transform 2016 data to our projections
+gmw_moll <- st_transform(gmw_shp, crs = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+
+
+#fasterize our polygon dataset into a raster
+fasterize_py <- fasterize::fasterize(gmw_moll, raster = land_ocean, 
+                                     field = NULL) # all polygons given value of 1
+
+fasterize_py
+
+print(cellStats(fasterize_py, "sum", na.rm=TRUE)*0.934478877011218970**2) 
+
+writeRaster(fasterize_py, filename = file.path(dir_M, "/git-annex/globalprep/Mangrove/v2021/int", sprintf("py_mangrove_rast_%s.tif", gmw_year)), overwrite=TRUE) 
+
+
+
+
+# Calculate zonal stats with zones raster and new combined seagrass. Convert to km^2 and save int/output files*
+
+zonal_sums_combined <- raster::zonal(fasterize_py, 
+                                     land_ocean,
+                                     fun = "sum",
+                                     na.rm = TRUE,
+                                     progress="text") #sum all mangrove cells for each ohi zone
+zonal_sums_combined_df <- data.frame(zonal_sums_combined)
+
+zonal_sums_km2 <- zonal_sums_combined_df %>%
+  mutate(year = d_year, habitat = "mangrove",
+         km2 = (0.934478877011218970**2*sum)) %>% #one cell is equal to ~0.93 km
+  rename("rgn_id" = "zone") %>%
+  select(-sum)
+
+print(sum(zonal_sums_km2$km2))
+
+
+## Testing year 2016:
+#136804.3 km2.. worked perfectly!
+
+# From GMW website: 
+# "The area of mangrove habitat in Indonesia was 26,508.12  km² in 2016"
+
+# Our estimates say indonesia has 26684.8 km2... nearly perfect... i believe it worked. Now I will do this with every year... 
+
+write.csv(zonal_sums_km2, file.path(here("globalprep/hab_mangrove/v2021/int", sprintf("habitat_extent_mangrove_%s.csv", d_year))), row.names = FALSE)
+
+
+}else{
+  print("file exists, skipping")
+}
+}
+```
+
+Save 2016 as most current year to use in global
+
+```{r, eval = FALSE}
+gmw_ohi_2016 <- read.csv(file.path(here("globalprep/hab_mangrove/v2021/int/habitat_extent_mangrove_2016.csv"))) 
+
+gmw_ohi_2016 <- gmw_ohi_2016 %>%
+  filter(rgn_id <= 250)
+
+write.csv(gmw_ohi_2016, file.path(here("globalprep/hab_mangrove/v2021/data/habitat_extent_mangrove_updated.csv")), row.names = FALSE)
+```
+
+
+
+Datacheck: 
+
+```{r, eval = FALSE}
+gmw_2016 <- st_read(file.path(dir_wcmc, "01_Data/GMW_2016_v2.shp"))
+
+sum(st_area(gmw_2016))*0.000001 # 135927.3 km2
+
+colnames(gmw_2016) # [1] "ogc_fid"  "pxlval"   "geometry"
+
+head(gmw_2016)
+
+# Simple feature collection with 6 features and 2 fields
+# geometry type:  POLYGON
+# dimension:      XY
+# bbox:           xmin: -62.86778 ymin: 9.999333 xmax: -62.45511 ymax: 10
+# geographic CRS: WGS 84
+#   ogc_fid pxlval                       geometry
+# 1       1      1 POLYGON ((-62.86778 10, -62...
+# 2       2      1 POLYGON ((-62.866 10, -62.8...
+# 3       3      1 POLYGON ((-62.846 10, -62.8...
+# 4       4      1 POLYGON ((-62.84311 10, -62...
+# 5       5      1 POLYGON ((-62.45556 10, -62...
+# 6       6      1 POLYGON ((-62.74844 10, -62...
+
+
+gmw_1996 <- st_read(file.path(dir_wcmc, "01_Data/GMW_1996_v2.shp"))
+
+sum(st_area(gmw_1996))*0.000001 # 142004.9 km2
+
+
+gmw_2007 <- st_read(file.path(dir_wcmc, "01_Data/GMW_2007_v2.shp"))
+
+sum(st_area(gmw_2007))*0.000001 # 138110.5 km2
+
+
+gmw_2008 <- st_read(file.path(dir_wcmc, "01_Data/GMW_2008_v2.shp"))
+
+sum(st_area(gmw_2008))*0.000001 # 138324.3  km2
+
+
+gmw_2009 <- st_read(file.path(dir_wcmc, "01_Data/GMW_2009_v2.shp"))
+
+sum(st_area(gmw_2009))*0.000001 # 138098.9 km2
+
+
+gmw_2010 <- st_read(file.path(dir_wcmc, "01_Data/GMW_2010_v2.shp"))
+
+sum(st_area(gmw_2010))*0.000001 # 136839.3 km2
+
+
+gmw_2015 <- st_read(file.path(dir_wcmc, "01_Data/GMW_2015_v2.shp"))
+
+sum(st_area(gmw_2015))*0.000001 # 135968.2 km2
+
+
+## Now compare to what we calculated above 
+
+gmw_ohi_2016 <- read.csv(file.path(here("globalprep/hab_mangrove/v2021/int/habitat_extent_mangrove_2016.csv")))
+sum(gmw_ohi_2016$km2) # 136804.3
+
+gmw_ohi_1996 <- read.csv(file.path(here("globalprep/hab_mangrove/v2021/int/habitat_extent_mangrove_1996.csv")))
+sum(gmw_ohi_1996$km2) # 142919.7
+
+gmw_ohi_2007 <- read.csv(file.path(here("globalprep/hab_mangrove/v2021/int/habitat_extent_mangrove_2007.csv")))
+sum(gmw_ohi_2007$km2) # 139059.1
+
+gmw_ohi_2008 <- read.csv(file.path(here("globalprep/hab_mangrove/v2021/int/habitat_extent_mangrove_2008.csv")))
+sum(gmw_ohi_2008$km2) # 139264.3
+
+gmw_ohi_2009 <- read.csv(file.path(here("globalprep/hab_mangrove/v2021/int/habitat_extent_mangrove_2009.csv")))
+sum(gmw_ohi_2009$km2) # 139033.7
+
+gmw_ohi_2010 <- read.csv(file.path(here("globalprep/hab_mangrove/v2021/int/habitat_extent_mangrove_2010.csv")))
+sum(gmw_ohi_2010$km2) # 137775.4
+
+gmw_ohi_2015 <- read.csv(file.path(here("globalprep/hab_mangrove/v2021/int/habitat_extent_mangrove_2015.csv")))
+sum(gmw_ohi_2015$km2) # 136855.9
+
+## All of our estimates are a little bit bigger than the raw data estimates, probably due to reprojections. I am ok with this amount of error. 
+
+old_extent <- read.csv(file.path(here("globalprep/hab_mangrove/v2015/data/habitat_extent_mangrove_updated.csv"))) %>%
+  filter(habitat == "mangrove")
+sum(old_extent$km2) # 82292.24 km2
+
+## Our new extent is much larger than our old extent 
+
+
+compare_habitat_extent <- gmw_ohi_2016 %>%
+  filter(rgn_id <= 250) %>%
+  left_join(rgns_eez) %>%
+  left_join(old_extent, by = "rgn_id") %>%
+  mutate(km2.y = ifelse(
+    km2.x >0 & is.na(km2.y) ,0, #assign 0 values to old data km2 that have new data so that we can properly graph these differences.
+    km2.y
+  )) %>%
+  mutate(difference = km2.x - km2.y)
+sum(compare_habitat_extent$km2.x) - sum(compare_habitat_extent$km2.y) # 54397.7 km2 increase 
+
+test <- compare_habitat_extent %>%
+  filter(km2.x == 0, km2.y > 0) ## we lost 11 regions but gained 4... net loss of 7
+
+ggplot(compare_habitat_extent, aes(x = km2.y, y = km2.x)) +
+  geom_point() +
+  geom_abline() +
+  labs(title = "mangrove Habitat version old vs new", x = "old extent", y=  "new extent") +
+  theme_bw()
+
+filter(compare_habitat_extent, km2.y == 0 & km2.x > 0)
+
+
+compare_habitat_extent <- gmw_ohi_2016 %>%
+  left_join(gmw_ohi_2015, by = "rgn_id") %>%
+  mutate(km2.y = ifelse(
+    km2.x >0 & is.na(km2.y) ,0, #assign 0 values to old data km2 that have new data so that we can properly graph these differences.
+    km2.y
+  )) %>%
+  mutate(difference = km2.x - km2.y)
+sum(compare_habitat_extent$km2.x) - sum(compare_habitat_extent$km2.y) # -51.5218 km2 increase 
+sum(compare_habitat_extent$difference)
+
+ggplot(compare_habitat_extent, aes(x = km2.y, y = km2.x)) +
+  geom_point() +
+  geom_abline() +
+  labs(title = "Global mangrove watch Habitat 2015 vs 2016", x = "old extent", y=  "new extent") +
+  theme_bw()
+
+filter(compare_habitat_extent, km2.y == 0 & km2.x > 0)
+
+
+compare_habitat_extent <- gmw_ohi_2016 %>%
+  left_join(gmw_ohi_1996, by = "rgn_id") %>%
+  mutate(km2.y = ifelse(
+    km2.x >0 & is.na(km2.y) ,0, #assign 0 values to old data km2 that have new data so that we can properly graph these differences.
+    km2.y
+  )) %>%
+  mutate(difference = km2.x - km2.y)
+sum(compare_habitat_extent$km2.x) - sum(compare_habitat_extent$km2.y) # -51.5218 km2 increase 
+sum(compare_habitat_extent$difference)
+
+ggplot(compare_habitat_extent, aes(x = km2.y, y = km2.x)) +
+  geom_point() +
+  geom_abline() +
+  labs(title = "Global mangrove watch Habitat 1996 vs 2016", x = "old extent", y=  "new extent") +
+  theme_bw()
+
+filter(compare_habitat_extent, km2.y == 0 & km2.x > 0)
+```
+
+

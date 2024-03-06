@@ -1,0 +1,270 @@
+---
+title: 'OHI 2021 - Land based nutrient plume exploration '
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../workflow/templates/ohi_hdr.html' 
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+[REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2020/globalprep/cw_nutrient_o_chem/v2020/plume_output_exploration.html)
+
+
+# Summary
+This document is used to explore the output of the plume modeling done for this data layer.  
+
+## The following data are used:
+
+* 
+
+
+
+## Initial set-up code
+
+```{r setup, eval = FALSE}
+library(tidyverse)
+library(raster)
+library(sf)
+library(mapview)
+library(janitor)
+library(here)
+
+
+source(here('workflow/R/common.R'))
+
+ww_raw_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/raw"
+ww_intermediate_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/interim"
+prs_int_dir <- "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int"
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+
+```
+
+
+
+See if we can combine try1, try2, and try3 rasters (for those that it applies)
+
+ - 2005: combine try1, try2, and try3
+ - 2006: combine try1, try2, and try3
+ - 2007: combine try1 and try3
+ - 2008: combine try1 and try3
+```{r}
+
+########## mosaic 2005
+try1 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try1/pourpoints_crop_manure_leached_volt_N_2005_joined.tif"))
+try2 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try2/pourpoints_crop_manure_leached_volt_N_2005_joined.tif"))
+try3 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try3/pourpoints_crop_manure_leached_volt_N_2005_joined.tif"))
+
+# plot(log(try2+1))
+
+cellStats(try2, "sum", na.rm = TRUE) # 8576483
+cellStats(try1, "sum", na.rm = TRUE) # 4296690
+cellStats(try3, "sum", na.rm = TRUE) # 3212059
+
+8576483 + 4296690 + 3212059 # 16085232
+
+test <- st_read("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int/pourpoints_FINAL/pourpoints_crop_manure_leached_volt_N_2005.shp")
+
+sum(test$effluent) # 16217349 
+
+16217349 - 16085232 # 132117 - still missing this much... that is ok by me. 
+
+
+mosaic(try1, try2, try3, fun = "sum", na.rm = TRUE, filename = "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/mosaic/pourpoints_crop_manure_leached_volt_N_2005_joined.tif", progress = "text")
+
+mosaic <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/mosaic/pourpoints_crop_manure_leached_volt_N_2005_joined.tif"))
+
+cellStats(mosaic, "sum", na.rm = TRUE) # 16085231 it worked i think? 
+
+mosaic[mosaic < 0] <- 0 # change all negatives to 0 and rewrite to final N_plume folder
+
+cellStats(mosaic, "sum", na.rm = TRUE) # 16085234 ; perfect
+
+writeRaster(mosaic, file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/N_plume/pourpoints_crop_manure_leached_volt_N_2005_joined.tif"))
+
+test <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/N_plume/pourpoints_crop_manure_leached_volt_N_2005_joined.tif"))
+cellStats(test, "sum", na.rm = TRUE)
+plot(test)
+
+m <- c(0, 0.00000000000001, NA)
+rclmat <- matrix(m)
+test_mosaic_reclass <- reclassify(test, rclmat, progress = "text")
+cellStats(test_mosaic_reclass, "sum", na.rm = TRUE, progress = "text") #  - 16085234 it worked
+
+plot(test_mosaic_reclass)
+
+mosaic_calc <- raster::calc(test_mosaic_reclass, fun=function(x){log(x+1)}, progress = "text")
+plot(mosaic_calc)
+
+par(mar=c(1,1,1,1))
+
+library(colorspace)
+library(RColorBrewer)
+breakpoints <- c(0, 0.01, 1, 2, 3,4,5,6,7,8,9)
+colors <- c("white", diverge_hcl(9, "Blue-Red"))
+# colors <- c("white", "#11C638", "#48CA58", "#66CE70", "#7FD286", "#95D69A", "#A9D9AD", "#BDDDBF", "#D0E0D1", "#E2E2E2", "#E7D9D0", "#EBCFBD", "#EEC6A9", "#F0BC95", "#F1B37F", "#F1AA66", "#F1A047", "#8B000")
+#8b0000
+
+# diverge_hcl(9, h=c(130, 43), c =100, l = c(70,90))
+
+
+plot(mosaic_calc, breaks = breakpoints, col = colors)
+
+testing <- raster::select(mosaic_calc)
+plot(testing, breaks = breakpoints, col = colors)
+plot(testing)
+
+
+
+########## mosaic 2006
+try1 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try1/pourpoints_crop_manure_leached_volt_N_2006_joined.tif"))
+try2 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try2/pourpoints_crop_manure_leached_volt_N_2006_joined.tif"))
+try3 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try3/pourpoints_crop_manure_leached_volt_N_2006_joined.tif"))
+
+# plot(log(try2+1))
+
+cellStats(try2, "sum", na.rm = TRUE) # 6541477
+cellStats(try1, "sum", na.rm = TRUE, progress = "text") # 4323434
+cellStats(try3, "sum", na.rm = TRUE, progress = "text") # 5375158
+
+ 6541477 + 4323434 + 5375158 # 16240069
+
+test <- st_read("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int/pourpoints_FINAL/pourpoints_crop_manure_leached_volt_N_2006.shp")
+
+sum(test$effluent) # 16371598 
+
+16371598 -  16240069 # 131529 - still missing this much... that is ok by me. ~0.8% of the total.
+
+
+
+mosaic(try1, try2, try3, fun = "sum", na.rm = TRUE, filename = "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/mosaic/pourpoints_crop_manure_leached_volt_N_2006_joined.tif", progress = "text")
+
+mosaic <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/mosaic/pourpoints_crop_manure_leached_volt_N_2006_joined.tif"))
+
+cellStats(mosaic, "sum", na.rm = TRUE, progress = "text") # 16240069 it worked i think? 
+
+mosaic[mosaic < 0] <- 0 # change all negatives to 0 and rewrite to final N_plume folder
+
+cellStats(mosaic, "sum", na.rm = TRUE, progress = "text") # 16240072 ; perfect
+
+writeRaster(mosaic, file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/N_plume/pourpoints_crop_manure_leached_volt_N_2006_joined.tif"), progress = "text")
+
+test <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/N_plume/pourpoints_crop_manure_leached_volt_N_2006_joined.tif"))
+cellStats(test, "sum", na.rm = TRUE, progress = "text") # 16240072
+# plot(test)
+
+m <- c(0, 0.00000000000001, NA)
+rclmat <- matrix(m)
+test_mosaic_reclass <- reclassify(test, rclmat, progress = "text")
+cellStats(test_mosaic_reclass, "sum", na.rm = TRUE, progress = "text") #  - 16240072 it worked
+
+plot(test_mosaic_reclass)
+
+mosaic_calc <- raster::calc(test_mosaic_reclass, fun=function(x){log(x+1)}, progress = "text")
+# plot(mosaic_calc)
+
+# par(mar=c(1,1,1,1))
+
+library(colorspace)
+library(RColorBrewer)
+breakpoints <- c(0, 0.01, 1, 2, 3,4,5,6,7,8,9)
+colors <- c("white", diverge_hcl(9, "Blue-Red"))
+# colors <- c("white", "#11C638", "#48CA58", "#66CE70", "#7FD286", "#95D69A", "#A9D9AD", "#BDDDBF", "#D0E0D1", "#E2E2E2", "#E7D9D0", "#EBCFBD", "#EEC6A9", "#F0BC95", "#F1B37F", "#F1AA66", "#F1A047", "#8B000")
+#8b0000
+
+# diverge_hcl(9, h=c(130, 43), c =100, l = c(70,90))
+
+
+plot(mosaic_calc, breaks = breakpoints, col = colors)
+
+testing <- raster::select(mosaic_calc)
+plot(testing, breaks = breakpoints, col = colors)
+plot(testing)
+
+
+
+########## mosaic 2007
+try1 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try1/pourpoints_crop_manure_leached_volt_N_2007_joined.tif"))
+try3 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try3/pourpoints_crop_manure_leached_volt_N_2007_joined.tif"))
+
+
+cellStats(try1, "sum", na.rm = TRUE, progress = "text") # 4357773
+cellStats(try3, "sum", na.rm = TRUE, progress = "text") # 12136012
+
+ 12136012 + 4357773 # 16493785
+
+test <- st_read("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int/pourpoints_FINAL/pourpoints_crop_manure_leached_volt_N_2007.shp")
+
+sum(test$effluent) # 16546587 
+
+16546587 -  16493785 # 52802 - still missing this much... that is ok by me. ~0.3% of the total.
+
+
+
+mosaic(try1, try3, fun = "sum", na.rm = TRUE, filename = "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/mosaic/pourpoints_crop_manure_leached_volt_N_2007_joined.tif", progress = "text")
+
+mosaic <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/mosaic/pourpoints_crop_manure_leached_volt_N_2007_joined.tif"))
+
+cellStats(mosaic, "sum", na.rm = TRUE, progress = "text") # 16493786 it worked i think? 
+
+mosaic[mosaic < 0] <- 0 # change all negatives to 0 and rewrite to final N_plume folder
+
+cellStats(mosaic, "sum", na.rm = TRUE, progress = "text") # 16493790 ; perfect
+
+writeRaster(mosaic, file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/N_plume/pourpoints_crop_manure_leached_volt_N_2007_joined.tif"), progress = "text")
+
+test <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/N_plume/pourpoints_crop_manure_leached_volt_N_2007_joined.tif"))
+cellStats(test, "sum", na.rm = TRUE, progress = "text") # 16493790
+
+
+########## mosaic 2008
+try1 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try1/pourpoints_crop_manure_leached_volt_N_2008_joined.tif"))
+try3 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try3/pourpoints_crop_manure_leached_volt_N_2008_joined.tif"))
+
+
+cellStats(try1, "sum", na.rm = TRUE, progress = "text") # 4351395
+cellStats(try3, "sum", na.rm = TRUE, progress = "text") # 12065183
+
+ 12065183 + 4351395 # 16416578
+
+test <- st_read("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int/pourpoints_FINAL/pourpoints_crop_manure_leached_volt_N_2008.shp")
+
+sum(test$effluent) # 16469710 
+
+16469710 -  16416578 # 53132 - still missing this much... that is ok by me. ~0.3% of the total.
+
+
+
+mosaic(try1, try3, fun = "sum", na.rm = TRUE, filename = "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/mosaic/pourpoints_crop_manure_leached_volt_N_2008_joined.tif", progress = "text")
+
+mosaic <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/mosaic/pourpoints_crop_manure_leached_volt_N_2008_joined.tif"))
+
+cellStats(mosaic, "sum", na.rm = TRUE, progress = "text") # 16416578 it worked i think? 
+
+mosaic[mosaic < 0] <- 0 # change all negatives to 0 and rewrite to final N_plume folder
+
+cellStats(mosaic, "sum", na.rm = TRUE, progress = "text") # 16416582 ; perfect
+
+writeRaster(mosaic, file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/N_plume/pourpoints_crop_manure_leached_volt_N_2008_joined.tif"), progress = "text")
+
+test <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/N_plume/pourpoints_crop_manure_leached_volt_N_2008_joined.tif"))
+cellStats(test, "sum", na.rm = TRUE, progress = "text") # 16416582
+
+
+```
+
+
+
+
+
+

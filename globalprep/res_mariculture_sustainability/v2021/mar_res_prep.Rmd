@@ -1,0 +1,207 @@
+---
+title: 'OHI 2021: Mariculture resilience'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+**NOTE: This layer was not added to the OHI yet. We will hopefully revise and add for v2022.**
+
+# Summary
+
+# Updates from previous assessment
+* Updated sustainability scores from seafood watch.
+
+***
+
+# Data Source 
+
+## Seafood Watch sustainability data
+
+**Reference**: 
+https://www.seafoodwatch.org/-/m/sfw/pdf/whats%20new/complete%20recommendation%20list.pdf
+Release date: August 3, 2020
+
+**Downloaded**: Auguest 3, 2020
+
+**Description**: Monterey Bay Aquarium Seafood Watch aquaculture recommendations. Sustainability scored from 0-10. Rescaled to 0-1.
+
+***
+  
+```{r setup, message=FALSE, warning=FALSE}
+
+knitr::opts_chunk$set(eval=FALSE)
+  
+## Load libraries, set directories
+library(ohicore)  #devtools::install_github('ohi-science/ohicore@dev')
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(tidyverse)
+library(taxize)
+library(knitr)
+library(kableExtra)
+
+## Load user-defined functions
+source('../../../workflow/R/common.R') # directory locations
+
+```
+
+
+
+# Sustainability Scores from Seafood Watch Data
+
+## Import data: Seafood Watch sustainability scores
+
+These data describe the sustainability country/species combinations.
+
+```{r sw-scores, eval = FALSE}
+
+## Load in Seafood Watch sustainability scores data from mazu:
+sw_sus_raw <- read.csv(file.path(dir_M, 'git-annex/globalprep/_raw_data/seafood_watch_mar_sustainability/d2020/Seafood-Watch_aquaculture-recs_July-2020.csv'), check.names = FALSE, stringsAsFactors = FALSE, na.strings = c("NA", ""))
+
+head(sw_sus)
+
+```
+
+## Wrangle
+
+### Tidy Seafood Watch sustainability data
+
+Rename columns and fill in species column
+
+```{r tidy_sw-sus, eval = FALSE}
+
+## Rename columns
+sw_sus <- sw_sus_raw %>%
+  rename(report_title = 'Report Title',
+         start_year = 'Start year',
+         sw_species = 'Common name',
+         genus = 'Genus',
+         spp = 'Species',
+         fao_species = 'FAO Common name',
+         region = 'Region',
+         country = 'Country',
+         state_territory = 'State/Territory',
+         sub_region = 'Sub-Region',
+         water_body = 'Body of Water',
+         parent_method = 'Parent Method',
+         method = 'Method',
+         score = 'Overall Score',
+         data_score = 'AqCriteria1',
+         effluent_score = 'AqCriteria2',
+         habitat_score = 'AqCriteria3', 
+         chemical_score = 'AqCriteria4',
+         feed_score = 'AqCriteria5',
+         escapes_score = 'AqCriteria6',
+         pathogen_score = 'AqCriteria7',
+         stock_score = 'AqCriteria8',
+         mortality_score = 'AqCriteria9',
+         sec_species_score = 'AqCriteria10',
+         rec = 'Overall Recommendation'
+         ) 
+
+## Change species names using FAO species name (fao_species); if NA, use common name (sw_species)
+sw_sus$species <- ifelse(!is.na(sw_sus$fao_species), sw_sus$fao_species, sw_sus$sw_species)
+
+```
+
+### Keep NA countries
+
+```{r keep-na-countries_sw-sus, eval = FALSE}
+
+## These need to be re-added later (get cut when associated with region ids)
+sw_sus_no_rgn <- filter(sw_sus, is.na(country))
+  # 203 entries with no country
+
+```
+
+### Convert country names to OHI region IDs.
+
+```{r sw-sus_convert-region, eval = FALSE}
+
+## Change country names to match OHI region names
+sw_sus <- sw_sus %>% 
+  mutate(country = ifelse(country=="Korea, the Republic of", "South Korea", country)) %>% # Data removed for not having a match; change name to match
+  mutate(country = ifelse(country=="United Kingdom of Great Britain and Northern Ireland (the)", "United Kingdom", country))  # Data removed for not having a match; change name to match
+
+## Convert country names to OHI region IDs. (ohicore/R/name_2_rgn.R)
+sw_sus_rgn <- name_2_rgn(df_in = sw_sus, 
+                       fld_name='country', 
+                       flds_unique=c('fao_species', 'sw_species', 'region', 'score'),
+                       keep_fld_name = TRUE) # 'country' now shows the original Seafood Watch data name; 'rgn_name' is what we want to use from now on
+  # Goes from 330 obs. to 127 obs. (because 203 obs. have no country associated)
+
+
+## Re-add NA countries
+sw_sus_rgn <- bind_rows(sw_sus_rgn, sw_sus_no_rgn) %>%
+  unique()
+  # Back to 330 obs.
+
+```
+
+```{r match-type_sw-sus-data, eval = FALSE}
+
+## Add column "match_type" to categorize obs. that 1) have a country associated, 2) are "global" Seafood Watch data, or 3) only distinguished by water body
+sw_sus_rgn <- sw_sus_rgn %>% 
+  dplyr::mutate(match_type = dplyr::case_when(!is.na(country) ~ "sw_sp_c", # Add match type specific to species/country
+                                str_detect(report_title, regex("Global")) ~ "sw_sp_g", # Add match type specific to species/global Seafood Watch data
+                                TRUE ~ "sw_sp_w" # Add match type specific to species/water body
+  ))
+
+table(sw_sus_rgn$match_type)
+
+```
+
+**Assign a mediterraen bordering rgn id to each waterbody row**
+```{r gf_sw_sp_w, eval = FALSE}
+## Add a line for each country that borders each water body
+  # The only water body is the Mediterranean; add all countries that border it (source: https://www.medqsr.org/mediterranean-marine-and-coastal-environment#:~:text=Today%2021%20countries%2C%20with%20surface,Syria%2C%20Tunisia%2C%20and%20Turkey.)
+
+## filter for waterbody specific rows 
+sw_sus_rgn_water <- sw_sus_rgn %>%
+  filter(match_type == 'sw_sp_w')
+
+## define meditteraen rgns
+med_rgns <- data.frame(rgn_id = c(82, 84, 232, 187, 81, 214, 179, 80, 79, 184, 78, 67, 68, 185, 186, 62, 188, 182, 77, 61, 76))
+
+expand.grid.df <- function(...) Reduce(function(...) merge(..., by=NULL), list(...))
+
+gf_sw_sp_w <- expand.grid.df(sw_sus_rgn_water, med_rgns) %>%
+  dplyr::select(-rgn_id.x, rgn_id = rgn_id.y)
+
+
+```
+
+
+```{r sw-joining, eval = FALSE}
+
+## add back the water region scores 
+
+sw_sus_rgn_all <- sw_sus_rgn %>%
+  filter(match_type != "sw_sp_w") %>%
+  rbind(gf_sw_sp_w)
+
+test <- sw_sus_rgn_all %>%
+  filter(!is.na(rgn_id)) %>%
+  group_by(rgn_id) %>%
+  summarise(sust = mean(score))
+
+final_data <- sw_sus_rgn_all %>%
+  filter(!is.na(rgn_id)) %>%
+  group_by(rgn_id) %>%
+  summarise(resilience.score = mean(score)*0.1) %>%
+  ungroup()
+
+write.csv(final_data, "output/res_sfw.csv", row.names = FALSE)
+```
+
+

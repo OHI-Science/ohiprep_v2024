@@ -1,0 +1,333 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - tidal flat extent"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This script generates the extent of tidal flat for each OHI region. 
+
+
+# Updates from previous assessment
+
+2022 - Completely new dataset and layer!
+
+***
+
+# Data Source 
+
+**Reference**: Murray, N.J., Phinn, S.R., DeWitt, M., Ferrari, R., Johnston, R., Lyons, M.B., Clinton, N., Thau, D. & Fuller, R.A. (2019) The global distribution and trajectory of tidal flats. Nature, 565, 222-225.
+
+**Downloaded**: 2022-07-26
+
+**Description**:  
+The Murray Global Intertidal Change Dataset contains global maps of tidal flat ecosystems produced via a supervised classification of 707,528 Landsat Archive images. Each pixel was classified into tidal flat, permanent water or other with reference to a globally distributed set of training data.
+
+The classification was implemented along the entire global coastline between 60° North and 60° South from 1 January 1984 to 31 December 2016. The image collection consists consists of a time-series of 11 global maps of tidal flats at 30m pixel resolution for set time-periods (1984−1986; 1987−1989; 1990−1992; 1993−1995; 1996−1998; 1999−2001; 2002−2004; 2005−2007; 2008−2010; 2011−2013; 2014−2016)
+
+This product depicts tidal flat ecosystems around the global coastline.
+
+Pixels classified as tidal flat in the analysis represent several types of tidal flat ecosystems, including unconsolidated fine-grain sediments (tidal mudflats), unconsolidated coarse-grain sediments (tidal sand flats), and consolidated sediments, organic material or rocks (wide tidal rock-platforms), while excluding spectral signatures indicating the presence of vegetation dominated intertidal ecosystems such as mangroves and vegetated marshes. The analysis aimed to identify pixels that are subject to regular tidal inundation, and therefore may also include other intertidal systems where intertidal dynamics are observable.
+
+**Time range**: 1984-2016
+
+**Download link**: https://www.intertidal.app/download/direct-download (use the provided shell script in this file)
+
+**Variables**:
+
+- classification	occurrence: intertertidal area classification for the interval.
+
+  - 0 is not tidal flat
+  - 1 is tidal flat
+
+- raster shards use geodetic extent in the file names
+
+***
+
+# Methods
+
+## Overview
+
+The goal is to find tidal flat area in each raster
+
+1. Down sample rasters from 30 m$^2$ ground sample distance (GSD) to ~ 1 km$^2$ GSD
+
+    - Group 30 pixels into 1 to get 900 m$^2$ resolution
+      - $\frac{(900 * 900)}{(1,000 * 1,000)}$ = 0.81 km$^2$
+      - take the sum of the pixels in the group
+  
+2. Convert to area
+
+    - multiply sum of grouped pixels by 0.0009
+    - If the native raster cells are 30x30 m$^2$ area, then a raster cell with a value of 1 would be equivalent to 0.0009 km$^2$ habitat area
+      - $\frac{(30*30)}{(1000*1000)}$ = 0.0009 km$^2$
+    
+3. Summarize the grid cells within each region of the raster shard
+
+    - Take the sum of the cells in each country for each year
+    - Output a `.csv` file for each raster
+
+4. Summarize tidal flat inside each region
+
+    - read in the tidal flat files
+    - concatenate files
+    - summarize to OHI regions
+    - output final tidal flat extent summary
+
+## Setup
+
+``` {r setup, eval = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, eval = FALSE, echo = TRUE)
+
+if (!require(librarian)){install.packages("librarian")}
+if (!require(ohicore)){devtools::install_github('ohi-science/ohicore@dev')}
+
+librarian::shelf(
+  tidyverse,
+  here,
+  janitor,
+  plotly,
+  sf,
+  terra,
+  exactextractr,
+  tictoc,
+  foreach,
+  doParallel
+) 
+
+### directories, paths, and relevant files
+current_year <- 2022
+version_year <- paste0("v", current_year)
+data_year <- paste0("d", current_year)
+
+source(here::here('workflow', 'R', 'common.R'))
+
+### Mazu
+dir_here  <- here::here('globalprep', 'hab_tidal_flat', version_year)
+dir_data <- file.path(dir_M, 'git-annex', 'globalprep', '_raw_data', 'global_tidal_wetland_change', data_year)
+
+### Aurora
+# dir_here <- file.path('/home/shares/food-systems/Global_datasets/global_tidal_wetland_change')
+# dir_data <- file.path('/home/shares/food-systems/Global_datasets/global_tidal_wetland_change/d2022')
+```
+
+### Download the data
+
+The following bash script will download the raw data for the tidal wetland change dataset. 
+
+```{bash eval = FALSE}
+### Make the new directory and move into it
+
+### Mazu
+mkdir /home/shares/ohi/git-annex/globalprep/_raw_data/global_tidal_wetland_change/d2022/raw/tidal_flats && cd $_
+
+### Aurora
+# mkdir /home/shares/food-systems/Global_datasets/global_tidal_wetland_change/d2022/raw/tidal_flats && cd $_
+
+### Declare an array of strings, these are the folders for each time step
+declare -a StringArray=(
+  "1984-1986" "1987-1989" "1990-1992" "1993-1995" "1996-1998" 
+  "1999-2001" "2002-2004" "2005-2007" "2008-2010" "2011-2013" "2014-2016"
+)
+
+### Iterate the string array using for loop
+for val in ${StringArray[@]}; do
+  ### print the folder
+  echo $val 
+  ### download the zip folder
+  wget https://storage.googleapis.com/uq-intertidal/v1_1/global_intertidal/$val.zip 
+  ### unzip the folder
+  unzip $val.zip -d ./$val 
+  ### delete the zip folder
+  rm $val.zip 
+done
+```
+
+### Load OHI region data
+
+```{r eval = FALSE}
+### load in regions shapefile
+regions_shape()
+
+### filter regions for only EEZ and land. We need both polygons for each region
+### because our habitat sits at the intersection of the two
+regions_eez_and_land <- regions %>%
+  dplyr::filter(rgn_type %in% c("eez", 'land'),
+                ### Antarctica and DISPUTED
+                !rgn_id %in% c(213, 255)) %>% 
+  sf::st_transform(crs = 4326)  
+
+### this will be used to construct our outputs from exactextractr
+dummy_df <- regions_eez_and_land %>% 
+  tibble::as_tibble() %>% 
+  dplyr::select(rgn_id, rgn_name) 
+```
+
+## Find tidal flat area in each raster
+
+Down sample rasters from 30 m$^2$ ground sample distance (GSD) to ~ 1 km$^2$ GSD
+
+- Group 30 pixels into 1 to get 900 m$^2$ resolution
+  - $\frac{(900 * 900)}{(1,000 * 1,000)}$ = 0.81 km$^2$
+  - take the sum of the pixels in the group
+  
+Convert to area
+
+- multiply sum of grouped pixels by 0.0009
+- If the native raster cells are 30x30 m$^2$ area, then a raster cell with a value of 1 would be equivalent to 0.0009 km$^2$ habitat area
+  - $\frac{(30*30)}{(1000*1000)}$ = 0.0009 km$^2$
+    
+Summarize the grid cells within each country
+
+- Take the sum of the cells in each country for each year
+- Output a `.csv` file for each raster
+
+```{r eval = FALSE}
+tictoc::tic()
+
+### list folders in raw data
+folders <- here::here(dir_data, "raw", "tidal_flats") %>% 
+  list.files()
+
+### start an iterator for pretty outputs
+j <- 1
+
+### if doing in parallel, you loose pretty outputs :(
+doParallel::registerDoParallel(11)
+foreach::foreach (dir = folders) %dopar% {
+
+# for (dir in folders) { 
+  
+  ### list files in the folder
+  files <- here::here(dir_data, "raw", "tidal_flats", dir) %>% 
+    list.files()
+  
+  ### find the end year of the current time step
+  year = stringr::str_split(dir, pattern = "-", n = 2)[[1]][2]
+  
+  ### loop through files in the folder
+  for (file in files){
+    
+    ### pretty output
+    cat(j, "/", length(files), "\n")
+    
+    j <- j + 1
+    
+    ### new file name
+    fn <- file %>% 
+      stringr::str_replace(
+        pattern     = ".tif",
+        replacement = paste0("_", year, ".csv"))
+    
+    ### new file path
+    file_name <- here::here(dir_data, "int", "tidal_flat", fn)
+    
+    ### check if file path exists
+    if(!file.exists(file_name)){
+      
+      ### pretty output
+      cat(fn, " is being created!\n    down sampling...\n")
+      
+      ### open file as SpatRaster
+      image <- here::here(dir_data, "raw", "tidal_flats", dir, file) %>% 
+        terra::rast() 
+       
+      ### Downsample from 30 m resolution to ~1 km resolution
+      down_sampled_image <- terra::aggregate(
+        x = image, 
+        fact = 30, 
+        fun = sum,
+        na.rm = T
+      )
+      
+      ### pretty output
+      cat("    converting to area (km2)...\n\n")
+      
+      ### convert to area
+      down_sampled_image <- down_sampled_image * 0.0009
+      
+      ### pretty output
+      cat("    extracting...\n")
+      
+      ### extract value sin each polygon
+      extracted_values <- exactextractr::exact_extract(
+        x = down_sampled_image, y = regions_eez_and_land, fun = 'sum'
+      )
+      
+      ### bind extracted values to the dummy data frame we made earlier
+      cbind("km2" = extracted_values, dummy_df) %>% 
+        dplyr::group_by(rgn_id, rgn_name) %>% 
+        dplyr::summarise(km2 = sum(km2)) %>% 
+        dplyr::mutate(year = year, habitat = "tidal flat") %>% 
+        readr::write_csv(file_name)
+      
+    } else {cat(paste0(fn, " already exists!\n"))}
+  }
+}
+tictoc::toc()
+```
+
+## Summarise tidal flat inside each region
+
+Read in the tidal flat files, concatenate files, summarize to OHI regions, and output final tidal flat extent summary
+
+```{r eval = FALSE}
+### list csv files with extracted tidal flat values
+files <- here::here(dir_data, "int", "tidal_flat") %>% 
+  list.files(full.names = T)
+
+### make an empty tibble to fill through iteration
+output <- dplyr::tibble()
+
+### loop through files
+for (file in files) {
+  
+  ### read in files, suppress messages with col_types argument
+  tmp <- readr::read_csv(file, col_types = cols()) 
+  
+  ### bind temporary output to complete output
+  output <- rbind(output, tmp) 
+}
+
+### summarize results and write final output
+final <- output %>%
+  dplyr::group_by(rgn_id, year, habitat) %>%
+  dplyr::summarise(km2 = sum(km2, na.rm = T)) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(rgn_id, habitat) %>% 
+  dplyr::mutate(has_hab = ifelse(sum(km2) == 0.0, 0, 1),
+                km2 = ifelse(has_hab == 0, NA, km2)) %>%
+  dplyr::ungroup() %>% 
+  dplyr::select(-has_hab) %>% 
+  dplyr::filter(rgn_id != 213) %>% 
+  readr::write_csv(here::here(dir_here, 'output', "tidal_flat_extent.csv"))
+```
+
+## Data check
+
+Look for large scale changes in single countries.
+
+```{r eval = FALSE}
+rgns <- dplyr::distinct(dummy_df)
+
+final <- dplyr::left_join(final, rgns)
+
+p <- ggplot(data = final, aes(x = year, y = km2, color = rgn_id, text = rgn_name)) +
+  geom_line()
+
+plotly::ggplotly(p, width = 800, height = 450)
+```
+
+

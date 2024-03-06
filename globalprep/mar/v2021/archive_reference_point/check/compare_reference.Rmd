@@ -1,0 +1,508 @@
+---
+title: "OHI 2019: Old vs New Reference Point Methods"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+  pdf_document:
+    toc: true
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(eval=FALSE)
+
+### libraries useful for data wrangling
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+
+## libraries useful for spatial data
+library(raster)       
+library(rgdal)        
+library(sf)         
+library(fasterize)
+
+## data visualization
+library(RColorBrewer)
+library(ggplot2)
+library(rasterVis)    
+library(maps)
+
+## path management
+library(here)
+
+
+## some OHI files
+source('http://ohi-science.org/ohiprep_v2019/workflow/R/common.R')
+dir_git_ref <- file.path(here(), "globalprep/mar/v2019/archive_reference_point")
+```
+
+# Reference Point/ Status Comparison
+
+```{r}
+
+# read in data
+scores_2019 <- read_csv(file.path(dir_git_ref, "/check/scores.csv"))
+
+mar_status_v2019 <- scores_2019 %>%
+  filter(dimension == "status",
+         goal == "MAR") 
+
+# calculate some statistics to help compare 
+sum(mar_status_v2019$score == 0, na.rm = TRUE) #732 out of 1776 are 0
+sum(is.na(mar_status_v2019$score)) #168 out of 1776 are NA
+
+  #harvest_tonnes <-
+  #  AlignDataYears(layer_nm = "mar_harvest_tonnes", layers_obj = layers)
+  
+# read in v2019 data
+harvest_tonnes_v2019 <- read_csv("/home/sgclawson/github/ohiprep_v2019/globalprep/mar/v2019/output/mar_harvest_tonnes.csv")  
+
+  #sustainability_score <-
+  #  AlignDataYears(layer_nm = "mar_sustainability_score", layers_obj = layers)
+
+sustainability_score_v2019 <- read_csv("/home/sgclawson/github/ohiprep_v2019/globalprep/mar/v2019/output/mar_sustainability.csv") %>%
+  dplyr::select(-year)
+  
+pot_aq_final <- read_csv(file.path(dir_git_ref, "/production_output/aq_potential_final.csv"))
+  
+#read in v2019 pop data
+mar_pop_25mi_v2019 <- read_csv(file.path("/home/sgclawson/github/ohiprep_v2019/globalprep/mar_prs_population/v2019/output/mar_pop_25mi.csv"))
+```
+
+
+## Calculate scores the OLD WAY (taken (and modified) from functions.R file in OHI Global)
+```{r}
+
+  rky_old <-  harvest_tonnes_v2019 %>%
+    dplyr::left_join(sustainability_score_v2019,
+              by = c('rgn_id', 'taxa_code')) %>%
+    dplyr::select(rgn_id, year, taxa_code, taxa_group, tonnes, sust_coeff)
+  summary(rky_old)
+  
+  # fill in gaps with no data
+  rky_old <- tidyr::spread(rky_old, year, tonnes)
+  rky_old <- tidyr::gather(rky_old, "year", "tonnes",-(1:4)) %>%
+    dplyr::mutate(year = as.numeric(year))
+  summary(rky_old)
+  
+  # adjustment for seaweeds based on protein content
+  rky_old <- rky_old %>%
+    dplyr::mutate(tonnes = ifelse(taxa_group == "AL", tonnes*0.2, tonnes)) %>%
+    dplyr::select(-taxa_group)
+  
+  # 4-year rolling mean of data
+  m_old <- rky_old %>%
+    dplyr::group_by(rgn_id, taxa_code, sust_coeff) %>%
+    dplyr::arrange(rgn_id, taxa_code, year) %>%
+    dplyr::mutate(sm_tonnes = zoo::rollapply(tonnes, 4, mean, na.rm = TRUE, partial =
+                                        TRUE, align = "right")) %>%
+    dplyr::ungroup()
+  summary(m_old)
+  
+  # smoothed mariculture harvest * sustainability coefficient
+  m_old <- m_old %>%
+    dplyr::mutate(sust_tonnes = sust_coeff * sm_tonnes)
+  summary(m_old)
+  # aggregate all weighted timeseries per region, and divide by coastal human population
+  ry_old = m_old %>%
+    dplyr::group_by(rgn_id, year) %>%
+    dplyr::summarize(sust_tonnes_sum = sum(sust_tonnes, na.rm = TRUE)) %>%  #na.rm = TRUE assumes that NA values are 0
+    dplyr::left_join(mar_pop_25mi_v2019, by = c('rgn_id', 'year')) %>%
+    dplyr::mutate(mar_pop = sust_tonnes_sum / popsum) %>%
+    dplyr::ungroup()
+  summary(ry_old)
+  tail(ry_old)
+  # get reference quantile based on argument years
+  
+  ref_95pct_old <- quantile(ry_old$mar_pop, 0.95, na.rm = TRUE)
+ 
+    
+ry_old = ry_old %>%
+    dplyr::mutate(status = ifelse(mar_pop / ref_95pct_old > 1,
+                           1,
+                           mar_pop / ref_95pct_old)) 
+summary(ry_old)
+
+  ## Add all other regions/countries with no mariculture production to the data table
+  ## Uninhabited or low population countries that don't have mariculture, should be given a NA since they are too small to ever be able to produce and sustain a mariculture industry.
+  ## Countries that have significant population size and fishing activity (these two are proxies for having the infrastructure capacity to develop mariculture), but don't produce any mariculture, are given a '0'.
+
+georegions <- ohicore::georegions
+  all_rgns_old <- expand.grid(rgn_id = georegions$rgn_id, year = min(ry_old$year):max(ry_old$year))
+  
+  all_rgns_old <- all_rgns_old[!(all_rgns_old$rgn_id %in% ry_old$rgn_id),]
+  table(all_rgns_old$rgn_id)
+  
+  uninhabited_old <- read.csv("https://raw.githubusercontent.com/OHI-Science/ohiprep/master/globalprep/spatial/v2017/output/rgn_uninhabited_islands.csv")
+  
+  uninhabited_old <- uninhabited_old %>% 
+    dplyr::filter(rgn_nam != "British Indian Ocean Territory") # remove British Indian Ocean Territory which has fishing activity and a population size of 3000 inhabitants
+  
+  ## Combine all regions with mariculture data table
+  ry_all_rgns_old <- all_rgns_old %>% 
+    dplyr::mutate(status = 0) %>% 
+    dplyr::mutate(status = ifelse(rgn_id %in% uninhabited_old$rgn_id, NA, status)) %>% 
+    dplyr::bind_rows(ry_old) %>% 
+    dplyr::arrange(rgn_id) 
+ summary(ry_all_rgns_old) 
+  
+  status_old <- ry_all_rgns_old %>%
+    dplyr::filter(year == 2017) %>%
+    dplyr::mutate(dimension = "status") %>%
+    dplyr::select(region_id = rgn_id, score = status, dimension, year) %>%
+    dplyr::mutate(score = round(score * 100, 2))
+
+  summary(status_old)
+
+  #in this case, 2019 in the ohi global scores we already calculated is actually 2017...
+  
+  write_csv(status_old, file.path(dir_git_ref, "/check/status_old_ref.csv"))
+```
+
+
+## Calculate scores the NEW WAY (taken (and modified) from functions.R file in OHI Global)
+```{r}
+  rky_new <-  harvest_tonnes_v2019 %>%
+    dplyr::left_join(sustainability_score_v2019,
+              by = c('rgn_id', 'taxa_code')) %>%
+    dplyr::select(rgn_id, year, taxa_code, taxa_group, tonnes, sust_coeff)
+  
+  # fill in gaps with no data
+  rky_new <- tidyr::spread(rky_new, year, tonnes)
+  rky_new <- tidyr::gather(rky_new, "year", "tonnes",-(1:4)) %>%
+    dplyr::mutate(year = as.numeric(year))
+  
+  # adjustment for seaweeds based on protein content
+  rky_new <- rky_new %>%
+    dplyr::mutate(tonnes = ifelse(taxa_group == "AL", tonnes*0.2, tonnes)) %>%
+    dplyr::select(-taxa_group)
+  
+  # 4-year rolling mean of data
+  m_new <- rky_new %>%
+    dplyr::group_by(rgn_id, taxa_code, sust_coeff) %>%
+    dplyr::arrange(rgn_id, taxa_code, year) %>%
+    dplyr::mutate(sm_tonnes = zoo::rollapply(tonnes, 4, mean, na.rm = TRUE, partial =
+                                        TRUE, align = "right")) %>%
+    dplyr::ungroup()
+  
+  
+  # smoothed mariculture harvest * sustainability coefficient
+  m_new <- m_new %>%
+    dplyr::mutate(sust_tonnes = sust_coeff * sm_tonnes)
+  
+  
+  # aggregate all weighted timeseries per region, and divide by potential aquaculture tonnes
+  ry_new = m_new %>%
+    dplyr::group_by(rgn_id, year) %>%
+    dplyr::summarize(sust_tonnes_sum = sum(sust_tonnes, na.rm = TRUE)) %>%  #na.rm = TRUE assumes that NA values are 0
+    dplyr::left_join(pot_aq_final, by = c('rgn_id')) %>%
+       # dplyr::mutate(mar_pop = sust_tonnes_sum / popsum) %>%
+    dplyr::ungroup()
+  summary(ry_new)
+  
+  ry_new = ry_new %>%
+    dplyr::mutate(status = ifelse(sust_tonnes_sum / potential_mar_tonnes  > 1,
+                           1,
+                           sust_tonnes_sum / potential_mar_tonnes)) %>%
+    dplyr::mutate(status = ifelse(is.na(status),
+                                  0,
+                                  status)) ## correct for R making 0/0 = NA. 
+  
+ summary(ry_new) 
+  
+  
+  ## Add all other regions/countries with no mariculture production to the data table
+  ## Uninhabited or low population countries that don't have mariculture, should be given a NA since they are too small to ever be able to produce and sustain a mariculture industry.
+  ## Countries that have significant population size and fishing activity (these two are proxies for having the infrastructure capacity to develop mariculture), but don't produce any mariculture, are given a '0'.
+  
+  georegions <- ohicore::georegions
+  all_rgns_new <- expand.grid(rgn_id = georegions$rgn_id, year = min(ry_new$year):max(ry_new$year))
+  
+  all_rgns_new <- all_rgns_new[!(all_rgns_new$rgn_id %in% ry_new$rgn_id),]
+  
+  uninhabited <- read.csv("https://raw.githubusercontent.com/OHI-Science/ohiprep/master/globalprep/spatial/v2017/output/rgn_uninhabited_islands.csv")
+  
+  uninhabited <- uninhabited %>% 
+    dplyr::filter(rgn_nam != "British Indian Ocean Territory") # remove British Indian Ocean Territory which has fishing activity and a population size of 3000 inhabitants
+  
+  ## Combine all regions with mariculture data table
+  ry_all_rgns_new <- all_rgns_new %>% 
+    dplyr::mutate(status = 0) %>% 
+    dplyr::mutate(status = ifelse(rgn_id %in% uninhabited$rgn_id, NA, status)) %>% 
+    dplyr::bind_rows(ry_new) %>% 
+    dplyr::arrange(rgn_id)
+  summary(ry_all_rgns_new)
+  
+  status_new <- ry_all_rgns_new %>%
+    dplyr::filter(year == 2017) %>%
+    dplyr::mutate(dimension = "status") %>%
+    dplyr::select(region_id = rgn_id, score = status, dimension, year) %>%
+    dplyr::mutate(score = round(score * 100, 2))
+
+  write_csv(status_new, file.path(dir_git_ref, "/check/status_new_ref.csv"))
+```
+
+## Explore some potential rules
+ - Those with low sust_tonnes_sum (i.e. rgns 10, 219, and 232) shouldn't be rewarded for "out producing" their potential aquaculture.
+ - A rule could be: sust_tonnes_sum < 100 & potential_mar_tonnes < 100, then NA.
+ - If potential aquaculture is low, then mariculture should not contribute to a score. 
+
+```{r}
+  rky_new_rules <-  harvest_tonnes_v2019 %>%
+    dplyr::left_join(sustainability_score_v2019,
+              by = c('rgn_id', 'taxa_code')) %>%
+    dplyr::select(rgn_id, year, taxa_code, taxa_group, tonnes, sust_coeff)
+  
+  # fill in gaps with no data
+  rky_new_rules <- tidyr::spread(rky_new_rules, year, tonnes)
+  rky_new_rules <- tidyr::gather(rky_new_rules, "year", "tonnes",-(1:4)) %>%
+    dplyr::mutate(year = as.numeric(year))
+  
+  # adjustment for seaweeds based on protein content
+  rky_new_rules <- rky_new_rules %>%
+    dplyr::mutate(tonnes = ifelse(taxa_group == "AL", tonnes*0.2, tonnes)) %>%
+    dplyr::select(-taxa_group)
+  
+  # 4-year rolling mean of data
+  m_new_rules <- rky_new_rules %>%
+    dplyr::group_by(rgn_id, taxa_code, sust_coeff) %>%
+    dplyr::arrange(rgn_id, taxa_code, year) %>%
+    dplyr::mutate(sm_tonnes = zoo::rollapply(tonnes, 4, mean, na.rm = TRUE, partial =
+                                        TRUE, align = "right")) %>%
+    dplyr::ungroup()
+  
+  
+  # smoothed mariculture harvest * sustainability coefficient
+  m_new_rules <- m_new_rules %>%
+    dplyr::mutate(sust_tonnes = sust_coeff * sm_tonnes)
+  
+  
+  # aggregate all weighted timeseries per region, and divide by potential aquaculture tonnes
+  ry_new_rules = m_new_rules %>%
+    dplyr::group_by(rgn_id, year) %>%
+    dplyr::summarize(sust_tonnes_sum = sum(sust_tonnes, na.rm = TRUE)) %>%  #na.rm = TRUE assumes that NA values are 0
+    dplyr::left_join(pot_aq_final, by = c('rgn_id')) %>%
+       # dplyr::mutate(mar_pop = sust_tonnes_sum / popsum) %>%
+    dplyr::ungroup()
+  
+  ry_new_rules = ry_new_rules %>%
+    dplyr::mutate(status = ifelse(sust_tonnes_sum / potential_mar_tonnes  > 1,
+                           1,
+                           sust_tonnes_sum / potential_mar_tonnes)) %>%
+    dplyr::mutate(status = ifelse(is.na(status),
+                                  0,
+                                  status)) %>% ## correct for R making 0/0 = NA.
+    dplyr::mutate(status = ifelse(sust_tonnes_sum < 100 & potential_mar_tonnes < 100, 
+                                  NA, 
+                                  status))
+  
+ summary(ry_new_rules) 
+  
+  
+  ## Add all other regions/countries with no mariculture production to the data table
+  ## Uninhabited or low population countries that don't have mariculture, should be given a NA since they are too small to ever be able to produce and sustain a mariculture industry.
+  ## Countries that have significant population size and fishing activity (these two are proxies for having the infrastructure capacity to develop mariculture), but don't produce any mariculture, are given a '0'.
+  
+  georegions <- ohicore::georegions
+  all_rgns_new_rules <- expand.grid(rgn_id = georegions$rgn_id, year = min(ry_new_rules$year):max(ry_new_rules$year))
+  
+  all_rgns_new_rules <- all_rgns_new_rules[!(all_rgns_new_rules$rgn_id %in% ry_new_rules$rgn_id),]
+  
+  uninhabited <- read.csv("https://raw.githubusercontent.com/OHI-Science/ohiprep/master/globalprep/spatial/v2017/output/rgn_uninhabited_islands.csv")
+  
+  uninhabited <- uninhabited %>% 
+    dplyr::filter(rgn_nam != "British Indian Ocean Territory") # remove British Indian Ocean Territory which has fishing activity and a population size of 3000 inhabitants
+  
+  ## Combine all regions with mariculture data table
+  ry_all_rgns_new_rules <- all_rgns_new_rules %>% 
+    dplyr::mutate(status = 0) %>% 
+    dplyr::mutate(status = ifelse(rgn_id %in% uninhabited$rgn_id, NA, status)) %>% 
+    dplyr::bind_rows(ry_new_rules) %>% 
+    dplyr::arrange(rgn_id)
+  summary(ry_all_rgns_new_rules)
+  
+  status_new_rules <- ry_all_rgns_new_rules %>%
+    dplyr::filter(year == 2017) %>%
+    dplyr::mutate(dimension = "status") %>%
+    dplyr::select(region_id = rgn_id, score = status, dimension, year) %>%
+    dplyr::mutate(score = round(score * 100, 2))
+
+  write_csv(status_new_rules, file.path(dir_git_ref, "/check/status_new_ref_rules.csv"))
+```
+
+
+## Compare New and Old Scores
+
+```{r, eval = TRUE, warning = FALSE}
+#read in status data
+region_data()
+
+status_new <- read_csv(file.path(dir_git_ref, "/check/status_new_ref.csv")) %>%
+  left_join(rgns_eez, by = c("region_id" = "rgn_id")) %>%
+  select(region_id:rgn_name)
+status_old <- read_csv(file.path(dir_git_ref, "/check/status_old_ref.csv")) %>%
+  left_join(rgns_eez, by = c("region_id" = "rgn_id")) %>%
+  select(region_id:rgn_name)
+
+#join status data
+compare <- status_old %>%
+  full_join(status_new, by = c("region_id", "rgn_name")) %>%
+  rename(old_score = score.x, new_score = score.y)
+
+#calculate summary statistics for the differences 
+compare_stats <- compare %>%
+  mutate(score_diff = old_score - new_score) %>%
+  mutate(score_diff_abs = abs(score_diff)) %>%
+  select(-dimension.x, -dimension.y, -year.x, -year.y)
+
+sum(compare_stats$score_diff > 0, na.rm = TRUE) # 81 scores got worse
+sum(compare_stats$score_diff < 0, na.rm = TRUE) # 25 scores got better 
+sum(compare_stats$score_diff == 0 & (compare_stats$new_score != 0|compare_stats$old_score != 0), na.rm = TRUE) # 3 scores didn't change that were not already 0
+sum(compare_stats$score_diff == 0 & (compare_stats$new_score == 0|compare_stats$old_score == 0), na.rm = TRUE)# 91 scores didn't change that were already 0. 
+sum(is.na(compare_stats$score_diff)) # 20 NAs
+mean(compare_stats$score_diff > 0, na.rm = TRUE)
+mean(compare_stats$score_diff < 0, na.rm = TRUE)
+
+#arrange to see the top scorers for old and new reference point
+top_10_old <- status_old %>%
+  arrange(-score) %>%
+  select(region_id, rgn_name, score)
+DT::datatable(top_10_old)
+
+top_10_new <- status_new %>%
+  arrange(-score) %>%
+  select(region_id, rgn_name, score)
+DT::datatable(top_10_new)
+```
+
+```{r, eval=TRUE}
+##explore the aquaculture data
+
+#graph to see the actual differences 
+library(plotly)
+library(ggplot2)
+p <- ggplot(compare, aes(x=old_score, y=new_score)) +
+  geom_point(aes(text = paste0("rgn = ", region_id)), shape=19) +
+  geom_abline(slope=1, intercept=0) +
+  theme_bw()
+
+#ggsave(file.path(dir_git_ref, "/check/compare_reference_graph.png"), p)
+
+plotly_fig <- plotly::ggplotly(p)
+plotly_fig
+
+
+# plot histograms to determine a good cutoff for potential_mar_tonnes. Some regions are scoring too well because they have 0 potential for aquaculture. For example, Nauru barely harvests any seafood, and has no potential for aquaculture, yet they score a 100. 
+bw <- 2 * IQR(pot_aq_final$potential_mar_tonnes) / length(pot_aq_final$potential_mar_tonnes)^(1/3)
+
+ggplot(pot_aq_final, aes(x = potential_mar_tonnes)) +
+  geom_histogram(binwidth = bw) +
+  theme_bw() +
+  scale_x_continuous(expand = c(0,0), breaks = seq(0, 40000000, by  = 2500000)) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme(axis.text.x = element_text(angle = -45, hjust = 1))
+
+#check for those with potential tonnes <= 100000
+ggplot(filter(pot_aq_final, potential_mar_tonnes <= 100000), aes(x = potential_mar_tonnes)) +
+  geom_histogram() +
+  theme_bw() +
+  scale_x_continuous(breaks = seq(0, 100000, by  = 5000)) +
+  theme(axis.text.x = element_text(angle = -45, hjust = 1))
+
+summary(pot_aq_final)  # median potential is 66996 tonnes....
+summary(harvest_tonnes_v2019) # median is 102 tonnes....
+
+less_100000 <- pot_aq_final %>%
+  filter(potential_mar_tonnes <= 100000) %>%
+  left_join(rgns_eez, by = "rgn_id") %>%
+  select(rgn_id, rgn_name, potential_mar_tonnes) %>%
+  arrange(-potential_mar_tonnes)
+
+
+
+library(knitr)
+  #pretty table
+  print(kable(less_100000))
+
+# View in a way so that we can see sust_tonnes_sum, potential_mar_tonnes, and score. This shows us the regions that might have an unfair advantage with the new scoring system. 
+  status_new_check <- ry_all_rgns_new %>%
+    dplyr::filter(year == 2017) %>%
+    dplyr::mutate(dimension = "status") %>%
+    dplyr::select(region_id = rgn_id, sust_tonnes_sum, potential_mar_tonnes, score = status, dimension, year) %>%
+    dplyr::mutate(score = round(score * 100, 2)) %>% 
+    filter(score == 100, potential_mar_tonnes == 0)
+```
+
+## Compare new rules scores and old scores
+```{r, eval = TRUE, warning = FALSE}
+#read in status data
+region_data()
+
+status_old <- read_csv(file.path(dir_git_ref, "/check/status_old_ref.csv")) %>%
+  left_join(rgns_eez, by = c("region_id" = "rgn_id")) %>%
+  select(region_id:rgn_name)
+status_new_rules <- read_csv(file.path(dir_git_ref, "/check/status_new_ref_rules.csv")) %>% 
+  left_join(rgns_eez, by = c("region_id" = "rgn_id")) %>%
+  select(region_id:rgn_name)
+
+#join status data
+compare_rules <- status_old %>%
+  full_join(status_new_rules, by = c("region_id", "rgn_name")) %>%
+  rename(old_score = score.x, new_score = score.y)
+
+compare_new_rule_change <- status_new_rules %>%
+  full_join(status_new_rules, by = c("region_id", "rgn_name")) %>%
+   rename(old_score = score.x, new_score = score.y)
+
+#calculate summary statistics for the differences 
+compare_stats_rules <- compare_rules %>%
+  mutate(score_diff = old_score - new_score) %>%
+  mutate(score_diff_abs = abs(score_diff)) %>%
+  select(-dimension.x, -dimension.y, -year.x, -year.y)
+
+compare_stats_rules_change_new <- compare_new_rule_change %>%
+  mutate(score_diff = old_score - new_score) %>%
+  mutate(score_diff_abs = abs(score_diff)) %>%
+  select(-dimension.x, -dimension.y, -year.x, -year.y)
+
+sum(compare_stats_rules$score_diff > 0, na.rm = TRUE) # 81 scores got worse
+sum(compare_stats_rules$score_diff < 0, na.rm = TRUE) # 22 scores got better 
+sum(compare_stats_rules$score_diff == 0 & (compare_stats_rules$new_score != 0|compare_stats_rules$old_score != 0), na.rm = TRUE) # 3 scores didn't change that were not already 0
+sum(compare_stats_rules$score_diff == 0 & (compare_stats_rules$new_score == 0|compare_stats_rules$old_score == 0), na.rm = TRUE)# 88 scores didn't change that were already 0. 
+sum(is.na(compare_stats_rules$score_diff)) # 26 NAs
+mean(compare_stats_rules$score_diff > 0, na.rm = TRUE) # 0.4175258 average loss in score
+mean(compare_stats_rules$score_diff < 0, na.rm = TRUE) # 0.1134021 average gain in score
+
+#arrange to see the top scorers for old and new reference point
+top_10_old <- status_old %>%
+  arrange(-score) %>%
+  select(region_id, rgn_name, score)
+DT::datatable(top_10_old)
+
+top_10_new_rules <- status_new_rules %>%
+  arrange(-score) %>%
+  select(region_id, rgn_name, score)
+DT::datatable(top_10_new_rules)
+```
+
+```{r, eval=TRUE}
+##explore the aquaculture data with new reference rules established above 
+
+#graph to see the actual differences 
+library(plotly)
+library(ggplot2)
+p <- ggplot(compare_rules, aes(x=old_score, y=new_score)) +
+  geom_point(aes(text = paste0("rgn = ", region_id)), shape=19) +
+  geom_abline(slope=1, intercept=0) +
+  theme_bw()
+
+p
+
+```
+
+

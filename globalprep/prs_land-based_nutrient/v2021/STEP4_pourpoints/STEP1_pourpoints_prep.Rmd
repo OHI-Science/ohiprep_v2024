@@ -1,0 +1,417 @@
+---
+title: 'OHI 2021 - Land based nutrient pourpoints prep '
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../workflow/templates/ohi_hdr.html' 
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+
+[REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2021/globalprep/prs_land-based_nutrient/v2021/STEP4_pourpoints/STEP1_pourpoints_prep.Rmd)
+
+
+# Summary
+This document describes the steps for obtaining and prepping data used for the land based nutrient data layer for clean waters. In specific, this data prep focuses on prepping the N pourpoint shapefiles from crop fertilizer and manure excretion, which will be fed into the plume model. Here we aggregate each N raster to the appropriate watershed, and eventually the appropriate pourpoint.
+
+## The following data are used:
+
+* N leaching and volatilization rasters created in previous steps of this prep.
+* Global watersheds dataset 
+* Global pourpoints dataset (associated with each watershed)
+
+
+# Updates from previous assessment
+This is a new layer for the 2021 assessment year.
+
+## Initial set-up code
+
+```{r setup, eval = FALSE}
+library(tidyverse)
+library(raster)
+library(sf)
+library(mapview)
+library(janitor)
+library(here)
+library(parallel)
+library(doParallel)
+
+
+source(here('workflow/R/common.R'))
+
+ww_raw_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/raw"
+ww_intermediate_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/interim"
+prs_int_dir <- "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int"
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+
+
+```
+
+# Methods 
+
+**Read in watersheds files, transform the CRS to 4326, and bind together to make one file.**
+These watershed files are taken from the wastewater project at NCEAS (Tulhoske & Halpern 2021). These will be combined with the pourpoints data and the nutrient data, and evenutally be plugged into the plume model.
+```{r, eval = FALSE}
+## Watersheds; read in, reproject to EPSG 4326, and combine into one file. 
+
+watersheds_af <- st_read(file.path(ww_raw_dir, "basins_laea/af_bas.shp")) %>%
+  clean_names() %>%
+  dplyr::select(id, gridcode, area, basin_id) ## select columns of interest
+crs(watersheds_af) ## check CRS
+plot(watersheds_af$geometry)
+watersheds_af <- st_transform(watersheds_af, 4326) ## change CRS to 4326
+plot(watersheds_af$geometry)
+crs(watersheds_af)
+st_write(watersheds_af, file.path(prs_int_dir, "watersheds/watersheds_af_4326.shp")) ## write transformed file to mazu. 
+
+watersheds_au <- st_read(file.path(ww_raw_dir, "basins_laea/au_bas.shp")) %>%
+    clean_names() %>%
+  dplyr::select(id, gridcode, area, basin_id)
+plot(watersheds_au$geometry)
+watersheds_au <- st_transform(watersheds_au, 4326)
+plot(watersheds_au$geometry)
+crs(watersheds_au)
+st_write(watersheds_au, file.path(prs_int_dir, "watersheds/watersheds_au_4326.shp"))
+
+watersheds_eu <- st_read(file.path(ww_raw_dir, "basins_laea/eu_bas.shp")) %>%
+    clean_names() %>%
+  dplyr::select(id, gridcode, area, basin_id)
+plot(watersheds_eu$geometry)
+watersheds_eu <- st_transform(watersheds_eu, 4326) 
+crs(watersheds_eu)
+st_write(watersheds_eu, file.path(prs_int_dir, "watersheds/watersheds_eu_4326.shp"))
+
+watersheds_na <- st_read(file.path(ww_raw_dir, "basins_laea/na_bas.shp")) %>%
+  #filter(ID == 79890) %>% 
+    clean_names() %>%
+  dplyr::select(id, gridcode, area, basin_id)
+plot(watersheds_na$geometry)
+watersheds_na <- st_transform(watersheds_na, 4326) 
+plot(watersheds_na$geometry)
+crs(watersheds_na)
+st_write(watersheds_na, file.path(prs_int_dir, "watersheds/watersheds_na_4326.shp"))
+
+watersheds_pa <- st_read(file.path(ww_raw_dir, "basins_laea/pa_bas.shp")) %>%
+    clean_names() %>%
+  dplyr::select(id, gridcode, area, basin_id)
+plot(watersheds_pa$geometry)
+watersheds_pa <- st_transform(watersheds_pa, 4326) 
+plot(watersheds_pa$geometry)
+crs(watersheds_pa)
+st_write(watersheds_pa, file.path(prs_int_dir, "watersheds/watersheds_pa_4326.shp"))
+
+watersheds_sa <- st_read(file.path(ww_raw_dir, "basins_laea/sa_bas.shp")) %>%
+    clean_names() %>%
+  dplyr::select(id, gridcode, area, basin_id)
+plot(watersheds_sa$geometry)
+watersheds_sa <- st_transform(watersheds_sa, 4326) 
+crs(watersheds_sa)
+st_write(watersheds_sa, file.path(prs_int_dir, "watersheds/watersheds_sa_4326.shp"))
+
+watersheds_as <- st_read(file.path(ww_raw_dir, "basins_laea/as_bas.shp")) %>%
+    clean_names() %>%
+  dplyr::select(id, gridcode, area, basin_id)
+plot(watersheds_as$geometry)
+watersheds_as <- st_transform(watersheds_as, 4326) 
+crs(watersheds_as)
+st_write(watersheds_as, file.path(prs_int_dir, "watersheds/watersheds_as_4326.shp"))
+
+watersheds_all <- rbind(watersheds_eu, watersheds_au, watersheds_na, watersheds_pa, watersheds_af, watersheds_sa, watersheds_as) ## bind all of these files together to make the global watershed files with CRS 4326. 
+plot(watersheds_all$geometry)
+
+st_write(watersheds_all, file.path(prs_int_dir, "watersheds/watersheds_all_4326.shp"))
+
+# mapview(tail(watersheds_all, 10000))
+```
+
+**Read in pourpoints file and transform crs to be 4326**
+```{r, eval = FALSE}
+## Pourpoints
+
+global_plume <- st_read("/home/shares/ohi/git-annex/land-based/wastewater/data/raw/pour_points/global_plume_2007_2010.shp")
+# plot(global_plume$geometry)
+mapview(tail(global_plume, 10000))
+
+global_plume <- st_transform(global_plume, 4326) 
+
+```
+
+**Write a function or for loop to read in nutrient data per year and disaggregate by 15 to make higher resolution.**
+```{r, eval = FALSE}
+
+dis_rast_area <- raster(file.path(prs_int_dir, "disagg_raster_area.tif"))
+
+years <- as.character(c(2006:2019))
+
+# takes 12 mins per file doing 4 at a time.. so (12*15)/4 = 45 mins to run
+
+registerDoParallel(cores=4)
+foreach(yr = years) %dopar% {
+## N/P fertilizer databanks 
+  
+ # yr = 2005
+  
+  volt_file <- raster(list.files(file.path(prep, "exclude_surface_water"), pattern = paste0("crop_manure_volt_nutrient_N_", yr), full = TRUE))
+  
+  leached_file <- raster(list.files(file.path(prep, "exclude_surface_water"), pattern = paste0("crop_manure_leached_nutrient_N_", yr), full = TRUE))
+  
+ # file = files_list[1]
+ rast <- volt_file + leached_file
+
+# cellStats(rast, "sum") # 18172110
+
+# divide nutrients by area of cell.  to get nutrients/km2 (or, whatever); 2, Disagregate the data; 3. multiply the disagregated raster by the new cell areas; 4. sum across all raster cells and compare to the original raster…the total should be about the same
+
+rast_div <- rast/raster::area(rast)
+
+dis_rast <- disaggregate(rast_div, fact = 15, method = '', progress = TRUE) # this about 2 mins for 1 file... so if we do 4 at a time should be fairly quick
+
+
+# only needs to be done once... you can ignore this.. or if you do want to run it, don't run it in the for loop. We just need an area raster so that we can multiply by the cell area, without having to calculate the cell area every time again
+# beginCluster(n = 12)
+# dis_rast_area <- clusterR(dis_rast, fun=raster::area, n = 12)
+# writeRaster(dis_rast_area, file.path(prs_int_dir, "disagg_raster_area.tif"))
+# endCluster()
+
+
+dis_rast_fix <- dis_rast*dis_rast_area # takes 4 mins per raster
+
+# cellStats(dis_rast_fix, "sum") # 18172109 it worked! 
+ 
+file_final <- paste0(prs_int_dir, "/disagg_rasts/", "disagg_crop_manure_leached_volt_N_", yr, ".tif") 
+
+writeRaster(x = dis_rast_fix, filename = file.path(file_final), overwrite = TRUE) # save the file takes 6 mins
+
+
+}
+
+
+```
+
+
+**Calculate zonal stats per watershed and save.**
+Take the watersheds shapefile and rasterize it so that we can run zonal stats on it. We will calculate the zonal stats per each watershed to obtain an estimate of the N concentration per each watershed. 
+```{r, eval = FALSE}
+## Zonal stats per watershed 
+rast_files <- list.files(file.path(prs_int_dir, "disagg_rasts"), full = TRUE) ## read in disaggregated raster
+
+## rasterize the watershed file (only need to do this once.. doesn't need to be in a loop)
+rast <- raster(rast_files[1])
+
+watersheds_all <- st_read(file.path(prs_int_dir, "watersheds/watersheds_all_4326.shp")) ## read in watersheds file
+
+wat_length <- length(watersheds_all$basin_id)
+
+watersheds_all <- watersheds_all %>%
+  arrange(id) %>%
+  mutate(id_new = 1:wat_length) # produce a new id for watersheds so that we can fasterize correctly... I don't believe fasterize would work with basin_id since it is a character variable. 
+
+
+raster_watersheds <- fasterize::fasterize(watersheds_all, rast, field = "id_new") ## make watershed raster
+
+plot(raster_watersheds)
+# length(unique(raster_watersheds)) # 
+raster_watersheds
+
+writeRaster(x = raster_watersheds, filename = file.path(prs_int_dir, "raster_watersheds.tif"), overwrite = TRUE)
+
+raster_watersheds <- raster::raster(file.path(prs_int_dir, "raster_watersheds.tif"))
+plot(raster_watersheds)
+
+
+## Start for loop here for(file in files){}
+
+rast_files <- list.files(file.path(prs_int_dir, "disagg_rasts"), full = TRUE) ## read in disaggregated raster
+
+registerDoParallel(cores = 6)
+foreach(file = rast_files) %dopar% {
+
+ # file <- rast_files[15]
+  
+  rast <- raster(file)
+  
+ # cellStats(rast, "sum") 
+  
+zs <- raster::zonal(rast, raster_watersheds, fun = 'sum', progress = 'text', na.rm = TRUE) ## calculate sum of N or P per watershed
+zs_df <- data.frame(zs)
+
+file_base <- gsub(".tif", "", basename(file))
+
+write_csv(zs_df, file.path(paste0(prs_int_dir, "/zonal_df", "/zonal_", file_base, ".csv")))
+
+
+watersheds_all_zs <- watersheds_all %>%
+  left_join(zs_df, by = c("id_new" = "zone"))
+
+# test <- watersheds_all_zs %>%
+#   filter(is.na(sum))
+
+st_write(watersheds_all_zs, file.path(paste0(prs_int_dir, "/zonal_shp", "/zonal_watersheds_", file_base, ".shp")))
+
+}
+
+## 43 NAs of sum after joining... This means that 43 watersheds are being left out for some reason... likely because they are too small for fasterizing/zonal statistics. 
+```
+
+**Fix the missing 43 watersheds that zonal stats missed and add back into the data**
+```{r, eval = FALSE}
+watersheds_all <- st_read(file.path(prs_int_dir, "watersheds/watersheds_all_4326.shp")) %>%
+  arrange(id)  ## read in watersheds file
+
+
+files_list <- str_subset(string = c(list.files(file.path(prs_int_dir, "zonal_shp")), full = TRUE), ".shp")
+
+registerDoParallel(cores = 5)
+foreach(file = files_list) %dopar% {
+  
+#   file <- files_list[1]
+watersheds_zonal <- st_read(file.path(prs_int_dir, "zonal_shp/", file))
+
+watersheds_zonal_NA <- watersheds_zonal %>%
+  dplyr::filter(is.na(sum)) ## filter for NAs
+
+watersheds_zonal_NA$centroid <- st_centroid(watersheds_zonal_NA) %>%
+  st_geometry() ## check the centroids
+
+## take a look to compare and see if it worked correctly
+# plot(st_geometry(watersheds_zonal_NA))
+# plot(st_set_geometry(watersheds_zonal_NA, 'centroid')[, 0], add = T, col = 'red', pch = 19) ## it worked..
+
+## now lets extract from our N/P raster disaggregated
+watersheds_zonal_NA_centroid <- watersheds_zonal_NA %>%
+  dplyr::select(-centroid) %>%
+  st_centroid() %>%
+  dplyr::select(-sum)
+
+
+dis_rast_file <- gsub("^.*?_", "", file)
+dis_rast_file <- gsub("^.*?_", "", dis_rast_file)
+dis_rast_file <- gsub(".shp", ".tif", dis_rast_file)
+
+dis_rast <- raster(file.path(prs_int_dir, "disagg_rasts", dis_rast_file))
+
+nutrient_type <- str_extract(dis_rast_file, "N")
+
+
+ ## extract from N
+zonal_NA_sum <- raster::extract(dis_rast, watersheds_zonal_NA_centroid, method = 'simple') ## extract zonal stats based on centroid point data 
+
+# join extracted values with NA df
+watersheds_zonal_NA_fixed <- data.frame(watersheds_zonal_NA, sum_new = zonal_NA_sum) %>%
+  mutate(sum = ifelse(is.na(sum), sum_new, sum)) %>%
+  dplyr::select(-centroid, -sum_new) %>%
+  st_as_sf() %>%
+  mutate(sum = sum*area)
+
+
+##  bind back together with overall zonal sf
+watersheds_zonal_all_fixed <- watersheds_zonal %>%
+  dplyr::filter(!is.na(sum)) %>%
+  rbind(watersheds_zonal_NA_fixed)  %>%
+  mutate(nutrient = nutrient_type) %>%
+  dplyr::select(basin_id, nutrient, total_nutrient = sum) ## now we have a dataset with the columns we want
+
+# sum(watersheds_zonal_all_fixed$total_nutrient) # 17632698
+
+st_write(watersheds_zonal_all_fixed, file.path(paste0(prs_int_dir, "/zonal_shp_fix/", file)), delete_dsn  = TRUE)
+
+
+}
+```
+
+**Combine watersheds zonal stats with pourpoints data**
+```{r, eval = FALSE}
+files_list <- str_subset(string = c(list.files(file.path(prs_int_dir, "zonal_shp_fix")), full = TRUE), ".shp")
+
+coastal_pourpoints <- st_read(file.path(ww_intermediate_dir, "watersheds_coastal.shp"))
+
+coastal_pp_ids <- unique(coastal_pourpoints$basin_id)
+
+
+registerDoParallel(cores = 5)
+foreach(file = files_list) %dopar% {
+  # file <- files_list[15]
+  
+watersheds_zonal_all_fixed <- as.data.frame(st_read(file.path(prs_int_dir, "zonal_shp_fix", file))) %>%
+  dplyr::select(-geometry, basin_id = 1, nutrient = 2, total_nutrient = 3) ## fix the column names, for some reason they were mispelled in the writing process
+
+# length(unique(global_plume$basin_id)) # 142642
+# length(unique(watersheds_zonal_all_fixed$basin_id)) # 142641
+
+## there is one more watershed present in the pourpoint data than in the watershed data
+
+## join these datasets together 
+ws_pp_zonal_all <- left_join(watersheds_zonal_all_fixed, global_plume, by = "basin_id") %>%
+  dplyr::select(-4, -5, -6)
+
+# unique(ws_pp_zonal_all$basin_id)
+
+n_occur <- data.frame(table(ws_pp_zonal_all$basin_id)) %>% ## check the duplicates (or triplicates)
+      filter(Freq >1) ## filter for the duplicates in the data
+
+dups <- ws_pp_zonal_all %>%
+  filter(basin_id %in% n_occur$Var1) %>% ## duplicates... there appear to be multiple geometries for some basin_ids
+st_as_sf()
+  
+# mapview(dups)
+
+# dups_orig <- watersheds_zonal_all_fixed %>%
+#   filter(basin_id %in% n_occur$Var1) ## compare to original data
+# 
+# dups_pourpoints <- global_plume %>%
+#   filter(basin_id %in% n_occur$Var1) ## compare to pourpoints data 
+
+## I've convinced myself this is nothing to worry about. Just select one of the multiple geometries and use that. They are all very close together. 
+
+dups_fix <- dups %>%
+  group_by(basin_id) %>%
+  filter(row_number() == 1) %>% ## filter for the first row in each basin id group.
+  ungroup() %>%
+  as.data.frame()
+
+`%notin%` <- Negate(`%in%`)
+
+## remove the dups from joined data 
+ws_pp_zonal_all_no_dups <- ws_pp_zonal_all %>%
+  filter(basin_id %notin% dups$basin_id)
+
+## add the dups back into the no dups file
+ws_pp_zonal_all_fix <- ws_pp_zonal_all_no_dups %>%
+  rbind(dups_fix) %>%
+  st_as_sf() %>%
+  rename("effluent" = "total_nutrient") %>%
+  dplyr::select(-nutrient) %>%
+  filter(basin_id %in% c(coastal_pp_ids)) %>% ## filter for only coastal pourpoints
+  filter(!is.na(effluent)) %>%
+  filter(effluent > 0) # filter for effluent greater than 0... no reason to run the plume model on no nutrients
+
+
+  
+# str(ws_pp_zonal_all_fix)
+# 
+# summary(ws_pp_zonal_all_fix)
+# sum(ws_pp_zonal_all_fix$effluent, na.rm = TRUE) # 18035161
+
+
+final_name <- gsub("^.*?disagg_", "pourpoints_", file)
+
+st_write(ws_pp_zonal_all_fix, file.path(prs_int_dir, "pourpoints", final_name), delete_dsn = TRUE) 
+
+# mapview(ws_pp_zonal_all_fix)
+}
+
+
+```
+
+

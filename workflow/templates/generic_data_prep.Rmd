@@ -1,0 +1,73 @@
+---
+title: "OHI 2016 - Artisanal Opportunities: Preparing need data"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../src/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+---
+
+[REFERENCE RMD FILE: https://ohi-science/ohiprep_v2018/globalprep/prs_oa/v2016/oa_dataprep.html]
+
+# Summary
+[general description: What data are being generated? Why (what project, etc.)? Upstream/downstream processing information that might be helpful?  Other information?]
+
+# Updates from previous assessment
+[Any significant changes in methods from previous analyses?]
+
+***
+
+# Data Source [NOTE: can be copied from README.md in rawdata file]
+**Reference**: [citation for source data; website, literature, contact information. Version of data (if relevant). Screenshots if a series of menus had to be navigated to obtain the data.]
+
+**Downloaded**: [date downloaded or received]
+
+**Description**:  [e.g., surface aragonite state]
+
+**Native data resolution**: [e.g., 1 degree, 30 m, etc.]   
+
+**Time range**: [e.g., 1880-1899, monthly data provided for each year] 
+
+**Format**:  [e.g. NetCDF]
+
+***
+[Following set up will vary with analyses, but this is a good starting point]  
+``` {r setup, message = FALSE, warning = FALSE, eval=F}
+
+knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'figs/', message = FALSE, warning = FALSE)
+
+
+library(ohicore) # devtools::install_github('ohi-science/ohicore@dev')
+library(dplyr)
+library(tidyr)
+library(here)
+
+# comment out when knitting:
+# setwd("globalprep/ao/v2018")
+
+# directory paths
+source('http://ohi-science.org/ohiprep_v2019/workflow/R/common.R')
+
+```
+  
+  
+  
+# Methods
+[R code used to generate the final layer data. Code to gapfill missing data and create a csv file that records gapfilling.]
+
+# Data check
+[R code used to check data, e.g., compare to previous year's data and make sure any changes make sense, check ranks to make sure high and low scoring countries make sense, does the range of values seem reasonable, etc.]
+
+***
+
+# Citation information  
+[citation information: include if these data will have their own specific citation.]

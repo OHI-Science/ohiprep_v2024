@@ -1,0 +1,706 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - saltmarsh trend"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This script generates the trend of saltmarsh for each OHI region. 
+
+## Updates from previous assessment
+
+2022 - Updating the data with new dataset!
+
+***
+
+## Data Source 
+
+**Reference**: Murray, N.J., Worthington, T.A., Bunting, P., Duce, S., Hagger, V., Lovelock, C.E., Lucas, R., Saunders, M.I., Sheaves, M., Spalding, M., Waltham, N.J., Lyons, M.B., 2022. High-resolution mapping of losses and gains of Earth's tidal wetlands. Science. doi:10.1126/science.abm9583
+
+**Downloaded**: 2022-06-29
+
+**Description**:  
+The Murray Global Tidal Wetland Change Dataset contains maps of the global extent of tidal wetlands and their change. The maps were developed from a three stage classification that sought to (i) estimate the global distribution of tidal wetlands (defined as either tidal marsh, tidal flat or mangrove ecosystems), (ii) detect their change over the study period, and (iii) estimate the ecosystem type and timing of tidal wetland change events.
+
+The dataset was produced by combining observations from 1,166,385 satellite images acquired by Landsat 5 to 8 with environmental data of variables known to influence the distributions of each ecosystem type, including temperature, slope, and elevation. The image contains bands for a tidal wetland extent product (random forest probability of tidal wetland occurrence) for the start and end time-steps of the study period and a tidal wetland change product over the full study period (loss and gain of tidal wetlands).
+
+Please see the usage notes on the [project website](https://www.globalintertidalchange.org/). A full description of the methods, validation, and limitations of the data produced by this software is available in the associated scientific paper.
+
+See also [UQ/murray/Intertidal/v1_1/global_intertidal](https://developers.google.com/earth-engine/datasets/catalog/UQ_murray_Intertidal_v1_1_global_intertidal) for global maps of the distribution of tidal flat ecosystems.
+
+**Time range**: 1999-2019
+
+**Download link**: https://www.globalintertidalchange.org/data-usage use `gsutil -m cp "gs://gic-archive/gic-2019-v1-0/v1-0-1/*.tif" "PATH-TO-LOCAL-FOLDER"`
+
+- **Note**: Download should only be done once, either in this script or `saltmarsh_extent.Rmd`
+
+**Variables**:
+- `gain` and `loss`:
+  - 0 = no change
+  - 1 = gain or loss in respective layers
+
+- `gainType` and `lossType`:
+  - 2 - Tidal flat
+  - 3 - Mangrove
+  - 5 - Tidal marsh
+
+- `gainYear` and `lossYear`
+  - 19 = 2017-2019
+  - 16 = 2014-2016 
+  - etc
+
+- raster shards use a hash that represents spatial extent
+  - `0000000000-0000000000` represents the same spatial extent for `gain`, `loss`, `gainType`, `lossType`, `gainYear`, and `lossYear`
+  - Not human readable but we can use this to loop over areas for our calculations
+
+***
+
+# Methods
+
+## Overview
+
+1. Replace gainType/lossType values 
+
+    - 5 &rarr; 1, else 0
+    - write new `.tif` files into `int/type` folder
+
+2. Separate years into individual layers and replace values
+
+    - 19 &rarr; 1, else 0 for gainYear_19
+    - repeat for each year
+    - write new `.tif` files into `int/year` folder
+
+3. Multiply gain/loss layers by gainType/lossType and gainYear/lossYear for each gainYear/lossYear
+
+    - gain * gainType * gainYear_19 = tidal marsh gain for 2019
+      - All three layers are now either 0 or 1 so multiplication makes sense
+    - we now have 1 raster per region for gain and 1 for loss, for each year
+    - write new `.tif` files into `int/gain_loss` folder
+
+4. Down sample rasters from 30 m$^2$ ground sample distance (GSD) to ~ 1 km$^2$ GSD
+
+    - 30 pixels is 900 m$^2$
+      - (900*900)/1000000 = 0.81 km$^2$
+    - file size is reduced from 27-57 MB per shard to about 340 KB per shard
+    - take the sum of the pixels
+    - convert to area (multiply sum of pixels by 0.0009)
+      - If the native raster cells are 30x30 m$^2$ area, then a raster cell with a value of 1 would be equivalent to 0.0009 km$^2$ habitat area: (30*30)/(1000*1000) = 0.0009
+    - write new `.tif` files into `int/down_sample` folder
+
+5. Mosaic the down-sampled diff rasters together
+
+    - 1 global raster per year for with gain-loss difference at 1 km$^2$ resolution
+    - `terra::mosaic()` is still crashing my R session at this resolution so need to look into a better way to do this
+    - write new `.tif` files into `int/output` folder
+
+6. Summarize the grid cells within each country
+
+    - Take the sum of the cells in each country for each year for gain and loss
+
+7. Subtract the loss from the gain for each country 
+
+    - gain - loss
+    - left with a difference for each country
+    - write the results as a `.csv` in the output directory
+    - left with a gain or loss for each country
+    
+8. Use extent to calculate final trend...
+
+## Setup
+
+``` {r setup, eval = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, eval = FALSE, echo = TRUE)
+
+if (!require(librarian)){install.packages("librarian")}
+
+librarian::shelf(
+  tidyverse,
+  here,
+  janitor,
+  plotly,
+  sf,
+  fasterize,
+  terra,
+  raster,
+  tictoc,
+  foreach,
+  doParallel,
+  exactextractr
+) 
+### directory paths and relevant files
+current_year <- 2022
+version_year <- paste0("v", current_year)
+data_year <- paste0("d", current_year)
+source(here::here('workflow', 'R', 'common.R'))
+
+### Mazu
+dir_here  <- here::here('globalprep', 'hab_saltmarsh', version_year)
+dir_data <- file.path(dir_M, 'git-annex', 'globalprep', '_raw_data', 'global_tidal_wetland_change', data_year)
+
+### Aurora
+# dir_here <- file.path('/home/shares/food-systems/Global_datasets/global_tidal_wetland_change')
+# dir_data <- file.path('/home/shares/food-systems/Global_datasets/global_tidal_wetland_change/d2022')
+```
+
+### Download the data
+
+The following bash script will download the raw data for the tidal wetland change dataset. 
+
+```{bash eval = FALSE}
+### Make the new directory and move into it
+mkdir /home/shares/ohi/git-annex/globalprep/_raw_data/global_tidal_wetland_change/d2022/raw/tidal_wetland_change && cd $_
+
+### Use gsutil (MAZU only) to download the shard data 
+gsutil -m cp "gs://gic-archive/gic-2019-v1-0/v1-0-1/*.tif" .
+```
+
+## Filter habitat to tidal marsh
+
+- 5 becomes 1 and everything else becomes 0
+- write new `.tif` files into `int/type` folder
+
+```{r eval = FALSE}
+### Example gainType-0000065536-0001114112 has all the different habitat types
+tictoc::tic()
+
+registerDoParallel(4)
+
+files <- list.files(paste0(dir_data, "/raw/tidal_wetland_change"), pattern = "Type")
+
+foreach (i = files) %dopar% { 
+  
+  fn <- i %>% 
+    stringr::str_replace(pattern = "gainType", replacement = "TM_gain") %>% 
+    stringr::str_replace(pattern = "lossType", replacement = "TM_loss")
+  
+  file_name <- paste0(dir_data, "/int/type/", fn)
+  
+  if(!file.exists(file_name)){
+    
+    img <- terra::rast(paste0(dir_data, "/raw/tidal_wetland_change/", i))
+    
+    terra::subst(
+      x = img,
+      from = c(2, 3, 5),
+      to   = c(0, 0, 1),
+      filename = file_name,
+      overwrite = FALSE
+    )
+    
+  } else {
+    cat(paste0(fn, " already exists!\n"))
+  }
+}
+tictoc::toc()
+```
+
+## Separate years into individual layers 
+
+- 19 becomes 1, else 0 (for gainYear_19)
+- repeat for each year
+- write new `.tif` files into `int/year` folder
+    
+```{r eval=FALSE}
+### 29886 seconds round 1
+### 29063 seconds round 2
+### 29058 seconds round 3
+### 12854 seconds round 4
+### 19319
+### 13020
+### 13089
+### 147
+
+
+# 57546.739 
+tictoc::tic()
+
+registerDoParallel(4)
+
+files <- list.files(paste0(dir_data, "/raw/tidal_wetland_change"), pattern = "Year")
+years <- c(4, 7, 10, 13, 16, 19)
+
+foreach (i = files) %dopar% { 
+  for (yr in years){
+    
+    fn <- i %>% 
+      stringr::str_replace(pattern = "gainYear", replacement = paste0("gain_", yr)) %>% 
+      stringr::str_replace(pattern = "lossYear", replacement = paste0("loss_", yr))
+    
+    file_name <- paste0(dir_data, "/int/year/", fn)
+    
+    if(!file.exists(file_name)){
+      
+      img <- terra::rast(paste0(dir_data, "/raw/tidal_wetland_change/", i))
+      
+      ### Delete current year from list of years
+      yrs <- years %>% magrittr::extract(. != yr) 
+      
+      ### Substitute years not equal to this year with 0
+      int <- terra::subst(
+        x    = img,
+        from = yrs,
+        to   = 0
+      )
+      ### Substitute this year with 1 and save file with year appended to file name
+      terra::subst(
+        x    = int,
+        from = yr,
+        to   = 1,
+        filename = file_name
+      )
+      
+    } else {
+      cat(paste0(fn, " already exists!\n"))
+    }
+  }
+}
+tictoc::toc()
+```
+
+## Find yearly gain and loss
+
+Multiply gain/loss layers by gainType/lossType and gainYear/lossYear for each gainYear/lossYear
+- gain * gainType * gainYear_19 = tidal marsh gain for 2019
+  - All three layers are now either 0 or 1 so multiplication makes sense
+- we now have 1 raster per region for gain and 1 for loss, for each year
+- write new `.tif` files into `int/gain_loss` folder
+
+```{r eval = FALSE}
+# 19265.198 
+# 111120.502 
+# 71964.249 
+
+# 68641.013 
+
+# Total:
+# 202349.9 sec = 3372.498 min = 56.2083 hrs
+
+tictoc::tic()
+
+registerDoParallel(4)
+
+loss_files <- list.files(paste0(dir_data, "/raw/tidal_wetland_change"), pattern = "loss-")
+gain_files <- list.files(paste0(dir_data, "/raw/tidal_wetland_change"), pattern = "gain-")
+
+years <- c(4, 7, 10, 13, 16, 19)
+
+foreach (i = c(loss_files, gain_files)) %dopar% { 
+  for (yr in years){
+    
+    fn <- i %>% 
+      stringr::str_replace(pattern = "gain-", replacement = paste0("gain_in_", yr, "_")) %>% 
+      stringr::str_replace(pattern = "loss-", replacement = paste0("loss_in_", yr, "_"))
+    
+    file_name <- paste0(dir_data, "/int/gain_loss/", fn)
+    
+    if(!file.exists(file_name)){
+      
+      if (stringr::str_detect(string = i, pattern = "gain-")) {
+        
+        hash <- i %>% 
+          stringr::str_split(pattern = "gain-")[[1]][2] %>% 
+          stringr::str_remove(".tif")
+        
+        type_file <- list.files(paste0(dir_data, "/int/type"), 
+                                pattern = paste0("gain-", hash), 
+                                full.names = TRUE)
+        
+        year_file <- list.files(paste0(dir_data, "/int/year"),
+                                pattern = paste0("gain_", yr, "-", hash), 
+                                full.names = TRUE)
+      } else {
+        
+        hash <- i %>% 
+          stringr::str_split(pattern = "loss-")[[1]][2] %>% 
+          stringr::str_remove(".tif")
+        
+        type_file <- list.files(paste0(dir_data, "/int/type"), 
+                                pattern = paste0("loss-", hash), 
+                                full.names = TRUE)
+        
+        year_file <- list.files(paste0(dir_data, "/int/year"),
+                                pattern = paste0("loss_", yr, "-", hash), 
+                                full.names = TRUE)
+      }
+      
+      gain_loss_img <- terra::rast(paste0(dir_data, "/raw/tidal_wetland_change/", i))
+      
+      type_img <- terra::rast(type_file)
+      
+      year_img <- terra::rast(year_file)
+      
+      gain_loss <- gain_loss_img * type_img * year_img
+      
+      terra::writeRaster(gain_loss, filename = file_name)
+      
+    } else {
+      cat(paste0(fn, " already exists!\n"))
+    }
+  }
+}
+tictoc::toc()
+```
+
+## Down sample rasters
+
+Down sample rasters from 30 m$^2$ ground sample distance (GSD) to ~ 1 km$^2$ GSD
+
+- 30 pixels is 900 m$^2$
+  - (900*900)/1000000 = 0.81 km$^2$
+- file size is reduced from 27-57 MB per shard to about 340 KB per shard
+- take the sum of the pixels
+- convert to area (multiply sum of pixels by 0.0009)
+  - If the native raster cells are 30x30 m$^2$ area, then a raster cell with a value of 1 would be equivalent to 0.0009 km$^2$ habitat area: (30*30)/(1000*1000) = 0.0009
+- write new `.tif` files into `int/down_sample` folder
+
+```{r eval = FALSE}
+# 16617.227 seconds
+# 17865.384 seconds
+tictoc::tic()
+
+registerDoParallel(14)
+
+scale_factor = 30
+
+files <- list.files(paste0(dir_data, "/int/gain_loss"))
+years <- c(4, 7, 10, 13, 16, 19)
+
+sum_to_area <- function(x) {sum(x) * 0.0009}
+
+foreach (i = files) %dopar% { 
+  for (yr in years){
+    
+    fn <- i %>% 
+      stringr::str_replace(pattern     = paste0("gain_in_", yr),
+                           replacement = paste0("gain_in_", yr, "_down_sampled")) %>% 
+      stringr::str_replace(pattern     = paste0("loss_in_", yr),
+                           replacement = paste0("loss_in_", yr, "_down_sampled"))
+    
+    file_name <- paste0(dir_data, "/int/down_sample/", fn)
+    
+    if(!file.exists(file_name)){
+      
+      img <- terra::rast(paste0(dir_data, "/int/gain_loss/", i)) # * 0.0009
+      
+      down_sampled_img <- terra::aggregate(
+        x = img, 
+        fact = scale_factor, 
+        fun = sum,
+        na.rm = T
+      )
+      
+      sum_to_area_img <- down_sampled_img * 0.0009
+
+      terra::writeRaster(sum_to_area_img, filename = file_name)
+      
+    } else {
+      cat(paste0(fn, " already exists!\n"))
+    }
+  }
+}
+tictoc::toc()
+```
+
+The above script makes two files, one with the aggregate function, and one after the cells have been converted to area. This chunk deletes the redundant and useless rasters with a shell script. 
+
+```{bash eval = FALSE}
+cd /home/shares/ohi/git-annex/globalprep/_raw_data/global_tidal_wetland_change/d2022/int/down_sample
+# Declare an array
+declare -a Array=(4 7 10 13 16 19)
+# Iterate the array using for loop
+for val in ${Array[@]}; do rm *_${val}_[0-9]*.tif; done
+```
+
+## Mosaic the rasters
+
+- 1 global raster per year for with gain-loss difference at 1 km$^2$ resolution
+- `terra::mosaic()` is still crashing my R session at this resolution so need to look into a better way to do this
+- write new `.tif` files into `int/output` folder
+
+This step usually fails if you try to do all of the raster. Here we break it up into two steps. 
+
+### Step 1
+
+The first step takes the 147 files per group and breaks them into 7 parts (21 images each), and mosaics those parts together.
+
+```{r eval = FALSE}
+tictoc::tic()
+
+registerDoParallel(6)
+
+loss_files <- list.files(paste0(dir_data, "/int/down_sample"), pattern = "loss_in_")
+gain_files <- list.files(paste0(dir_data, "/int/down_sample"), pattern = "gain_in_")
+
+years <- c(4, 7, 10, 13, 16, 19)
+
+foreach (yr = years) %dopar% {
+  
+  yr_loss_files <- grep(paste0("_", yr, "_"), loss_files, value = TRUE)
+  yr_gain_files <- grep(paste0("_", yr, "_"), gain_files, value = TRUE)
+  
+  for (part in 1:7) {
+    
+    yr_loss_files_chunk = yr_loss_files[(21*part-20):(21*part)]
+    
+    fn_loss <- yr_loss_files_chunk %>%
+      stringr::str_replace(
+        pattern = paste0("murray-gic-v1.0.1-loss_in_", yr, "_"),
+        replacement = paste0("loss_in_", yr, "_part_", part, "_"))
+
+    file_name_loss <- paste0(dir_data, "/int/partial_mosaic/", fn_loss[1])
+    
+    if(!file.exists(file_name_loss)){
+      
+      img_rast_agg <- sprc(lapply(paste0(dir_data, "/int/down_sample/", yr_loss_files_chunk), terra::rast))
+      
+      raster_mos <- terra::merge(
+        img_rast_agg,
+        filename = file_name_loss
+      )
+    } else {cat(paste0(fn_loss[1], " already exists!\n"))}
+    
+    
+    yr_gain_files_chunk = yr_gain_files[(7*part-6):(7*part)]
+    
+    fn_gain <- yr_gain_files_chunk %>%
+      stringr::str_replace(
+        pattern = paste0("murray-gic-v1.0.1-gain_in_", yr, "_"),
+        replacement = paste0("gain_in_", yr, "_part_", part, "_"))
+
+    file_name_gain <- paste0(dir_data, "/int/partial_mosaic/", fn_gain[1])
+    
+    if(!file.exists(file_name_gain)){
+      
+      img_rast_agg <- sprc(lapply(paste0(dir_data, "/int/down_sample/", yr_gain_files_chunk), terra::rast))
+      
+      raster_mos <- terra::merge(
+        img_rast_agg,
+        filename = file_name_gain
+      )
+    } else {cat(paste0(fn_gain[1], " already exists!\n"))}
+  }
+}
+
+tictoc::toc()
+```
+
+### Step 2
+
+The second step takes the 7 files per group and mosaics those parts together.
+
+```{r eval = FALSE}
+tictoc::tic()
+
+registerDoParallel(3)
+
+loss_files <- list.files(paste0(dir_data, "/int/partial_mosaic"), pattern = "loss_in_")
+gain_files <- list.files(paste0(dir_data, "/int/partial_mosaic"), pattern = "gain_in_")
+
+years <- c(4, 7, 10, 13, 16, 19)
+
+foreach (yr = years) %dopar% {
+  
+  yr_loss_files <- grep(paste0("in_", yr, "_"), loss_files, value = TRUE)
+  yr_gain_files <- grep(paste0("in_", yr, "_"), gain_files, value = TRUE)
+  
+  fn_loss <- yr_loss_files %>%
+    stringr::str_replace(
+      pattern = paste0("_part_[:digit:]_down_sampled_\\d+-\\d+.tif"),
+      replacement = "_global.tif")
+  
+  file_name_loss <- paste0(dir_data, "/output/", fn_loss[1])
+  
+  if(!file.exists(file_name_loss)){
+    
+    spat_raster_collection <- sprc(lapply(paste0(dir_data, "/int/partial_mosaic/", yr_loss_files), terra::rast))
+    
+    raster_mosaic <- terra::merge(
+      spat_raster_collection,
+      filename = file_name_loss
+    )
+  } else {cat(paste0(fn_loss[1], " already exists!\n"))}
+  
+  fn_gain <- yr_gain_files %>%
+    stringr::str_replace(
+      pattern = paste0("_part_[:digit:]_down_sampled_\\d+-\\d+.tif"),
+      replacement = "_global.tif")
+  
+  file_name_gain <- paste0(dir_data, "/output/", fn_gain[1])
+  
+  if(!file.exists(file_name_gain)){
+    
+    spat_raster_collection <- sprc(lapply(paste0(dir_data, "/int/partial_mosaic/", yr_gain_files), terra::rast))
+    
+    raster_mosaic <- terra::merge(
+      spat_raster_collection,
+      filename = file_name_gain
+    )
+  } else {cat(paste0(fn_gain[1], " already exists!\n"))}
+  
+}
+
+tictoc::toc()
+```
+
+## Summarize the grid cells within each country
+
+- Take the sum of the cells in each country for each year for gain and loss
+
+```{r eval = FALSE}
+### call the region shape file to import regions
+regions_shape()
+
+### filter for only eez shapes and land shapes
+### we want both to ensure all of the intertidal zone is captured
+regions_eez_and_land <- regions %>%
+  dplyr::filter(rgn_type %in% c("eez", 'land')) %>% 
+  sf::st_transform(crs = 4326)  
+
+rgns <- ohicore::rgn_master %>% 
+  dplyr::filter(rgn_typ == "eez") %>% 
+  dplyr::select(rgn_id = rgn_id_2013, rgn_name = rgn_nam_2013) %>% 
+  dplyr::distinct()
+
+loss_files <- list.files(paste0(dir_data, "/output/tidal_wetland_change"), pattern = "loss_")
+gain_files <- list.files(paste0(dir_data, "/output/tidal_wetland_change"), pattern = "gain_")
+
+years <- c(4, 7, 10, 13, 16, 19)
+
+registerDoParallel(2)
+
+foreach (yr = years) %dopar% {
+  ###### LOSS
+  yr_loss_files <- grep(paste0("in_", yr, "_"), loss_files, value = TRUE)
+  
+  loss <- paste0(dir_data, "/output/tidal_wetland_change/", yr_loss_files)
+  
+  file_name_loss <- here::here(dir_here, "int", paste0("saltmarsh_loss_", yr, ".csv"))
+  
+  if(!file.exists(file_name_loss)){
+    
+    loss_image <- terra::rast(loss)
+    
+    loss_image[loss_image==0] <- NA
+    
+    loss_image_sf <- loss_image %>% 
+      terra::as.points(na.rm = T) %>% 
+      sf::st_as_sf()
+    
+    loss_country <- sf::st_intersection(loss_image_sf, regions_eez_and_land)
+    
+    loss_summary <- loss_country %>%
+      as.data.frame() %>% 
+      dplyr::group_by(rgn_id) %>% 
+      dplyr::summarise(loss = sum(loss)) %>% 
+      dplyr::left_join(rgns) %>% 
+      readr::write_csv(file_name_loss)
+  } else {cat(paste0(yr_loss_files, " already exists!\n"))}
+  
+  ###### GAIN
+  yr_gain_files <- grep(paste0("in_", yr, "_"), gain_files, value = TRUE)
+  
+  gain <- paste0(dir_data, "/output/tidal_wetland_change/", yr_gain_files)
+  
+  file_name_gain <- here::here(dir_here, "int", paste0("saltmarsh_gain_", yr, ".csv"))
+  
+  if(!file.exists(file_name_gain)){ 
+    
+    gain_image <- terra::rast(gain)
+    
+    gain_image[gain_image==0] <- NA
+    
+    gain_image_sf <- gain_image %>% 
+      terra::as.points(na.rm = T) %>% 
+      sf::st_as_sf()
+    
+    gain_country <- sf::st_intersection(gain_image_sf, regions_eez_and_land)
+    
+    gain_summary <- gain_country %>%
+      as.data.frame() %>% 
+      dplyr::group_by(rgn_id) %>% 
+      dplyr::summarise(gain = sum(gain)) %>% 
+      dplyr::left_join(rgns) %>% 
+      readr::write_csv(file_name_gain)
+  } else {cat(paste0(yr_gain_files, " already exists!\n"))}
+
+}
+```
+
+```{r eval = FALSE}
+### Whoops, forgot to add year as a column above lol
+loss_files <- list.files(paste0(dir_here, "/int"), pattern = "loss_")
+gain_files <- list.files(paste0(dir_here, "/int"), pattern = "gain_")
+
+years <- c(4, 7, 10, 13, 16, 19)
+
+loss_output <- dplyr::tibble()
+gain_output <- dplyr::tibble()
+
+for (yr in years){
+  ### LOSS
+  yr_loss_files <- grep(paste0(yr), loss_files, value = TRUE)
+  
+  loss_tmp <- here::here(dir_here, 'int', yr_loss_files) %>% 
+    readr::read_csv() %>% 
+    dplyr::full_join(rgns) %>% 
+    dplyr::mutate(loss = case_when(is.na(loss) ~ 0,T ~ loss),
+                  year = 2000 + yr)
+  
+  loss_output <- rbind(loss_output, loss_tmp)
+  
+  ### GAIN
+  yr_gain_files <- grep(paste0(yr), gain_files, value = TRUE)
+  
+  gain_tmp <- here::here(dir_here, 'int', yr_gain_files) %>% 
+    readr::read_csv() %>% 
+  dplyr::full_join(rgns) %>% 
+  dplyr::mutate(gain = case_when(is.na(gain) ~ 0,T ~ gain),
+                year = 2000 + yr)
+  
+  gain_output <- rbind(gain_output, gain_tmp)
+}
+```
+
+## Subtract gain from loss
+
+- gain - loss
+- left with a difference for each country
+- write the results as a `.csv` in the output directory
+- left with a gain or loss for each country
+
+```{r eval = FALSE}
+gain_minus_loss <- gain_output %>% 
+  dplyr::left_join(loss_output) %>% 
+  dplyr::mutate(difference = gain - loss)
+
+### extra for the curious
+loss_summary <- gain_minus_loss %>% 
+  dplyr::group_by(rgn_id, rgn_name) %>% 
+  dplyr::summarise(loss = sum(loss))
+
+gain_summary <- gain_minus_loss %>% 
+  dplyr::group_by(rgn_id, rgn_name) %>% 
+  dplyr::summarise(gain = sum(gain))
+
+difference_summary <- gain_minus_loss %>% 
+  dplyr::group_by(rgn_id, rgn_name) %>% 
+  dplyr::summarise(difference = sum(difference))
+```
+
+## Write the results to output
+
+```{r eval = FALSE}
+gain_minus_loss %>% 
+  dplyr::select(rgn_id, year, difference) %>% 
+  readr::write_csv(here::here(dir_here, 'output', "saltmarsh_trend.csv"))
+```

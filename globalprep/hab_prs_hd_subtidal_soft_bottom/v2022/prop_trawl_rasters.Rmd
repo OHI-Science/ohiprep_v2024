@@ -1,0 +1,145 @@
+---
+title: "OHI 2022 - Soft bottom pressure data prep"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(here)
+#library(terra)
+library(raster)
+library(tidyverse)
+library(foreach)
+library(doParallel)
+library(readr)
+library(dplyr)
+library(sf)
+library(readxl)
+
+r <- raster::raster(ncol=720, nrow=360, vals=c(1:259200))
+```
+
+## Catch data
+
+Read in the Watson fisheries catch data for 2012-2017 and match the gear and taxa indices that Watson provides. 
+
+```{r}
+catch_raw_1 <- readRDS("/home/shares/ohi/git-annex/globalprep/_raw_data/IMAS_GlobalFisheriesLandings/d2020/Catch2010_2014.rds")
+
+catch_raw_2 <- readRDS("/home/shares/ohi/git-annex/globalprep/_raw_data/IMAS_GlobalFisheriesLandings/d2020/Catch2015_2019.rds")
+
+combine_catch <- rbind(catch_raw_1, catch_raw_2) %>%
+  filter(IYear %in% c(2012:2017)) # filter for years >2012
+
+
+## read in taxa index 
+taxa_index <- read_xlsx("/home/shares/ohi/git-annex/globalprep/_raw_data/IMAS_GlobalFisheriesLandings/d2020/Codes.xlsx", sheet = "Taxa")
+
+## read in gear index 
+gear_index <- read_xlsx("/home/shares/ohi/git-annex/globalprep/_raw_data/IMAS_GlobalFisheriesLandings/d2020/Codes.xlsx", sheet = "Gear") %>%
+  dplyr::select(Gear, GearName = VBDesc) %>%
+  unique()
+
+
+## join datasets together
+catch_full <- left_join(combine_catch, taxa_index, by="Taxonkey")
+dim(catch_full) # [1] 62090885       18
+
+catch_full <- left_join(catch_full, gear_index, by="Gear")
+dim(catch_full) # [1] 62090885       19s
+
+
+catch_all <- catch_full %>%
+  mutate(catch = ReportedIND + IUUIND + DiscardsIND + ReportedNIND + IUUNIND + DiscardsNIND)
+
+test <- head(catch_all)
+
+```
+
+Here we will make rasters describing: 
+
+Proportion of bottom trawling to all trawling: tonnes(bottom_trawls)/tonnes(bottom_trawl + midwater_trawl) for all marine fisheries catch for each year from 2012-2017.
+
+```{r}
+# tonnes(bottom_trawls)/tonnes(bottom_trawl + midwater_trawl) for all marine fisheries catch
+
+bottom_trawls_tonnes <- catch_all %>%
+  filter(GearName == "bottom trawls") %>%
+  group_by(Cell, IYear) %>%
+  summarise(catch = sum(catch, na.rm = TRUE)) %>%
+  ungroup()
+
+test <- bottom_trawls_tonnes %>%
+  group_by(IYear) %>%
+  summarise(catch = sum(catch, na.rm = TRUE))
+test
+
+
+all_trawls_tonnes <- catch_all %>%
+  filter(str_detect(GearName, "trawl")) %>%
+  group_by(Cell, IYear) %>%
+  summarise(catch = sum(catch, na.rm = TRUE)) %>%
+  ungroup()
+
+# A tibble: 6 × 2
+#   IYear     catch
+#   <int>     <dbl>
+# 1  2012 35823295.
+# 2  2013 36280555.
+# 3  2014 38621236.
+# 4  2015 37974409.
+# 5  2016 36547559.
+# 6  2017 37332269.
+
+years = c(2012:2017)
+
+registerDoParallel(cores = 3)
+foreach (year = years) %dopar% {
+  
+ # year = 2012
+  
+  ## make bottom trawl raster
+bottom_trawl_rast <- raster::subs(r, bottom_trawls_tonnes %>% filter(IYear == year), by = "Cell", which = "catch", subsWithNA=TRUE, file = file.path(sprintf("/home/shares/ohi/git-annex/globalprep/hab_prs_hd_subtidal_soft_bottom/v2022_gage/trawling_catch/bottom_trawl_tonnes_raster_%s.tif", year)), overwrite = TRUE)
+
+# cellStats(bottom_trawl_rast, "sum", na.rm = TRUE) # 35823295
+
+all_trawls_tonnes_raster <- raster::subs(r, all_trawls_tonnes %>% filter(IYear == year), by = "Cell", which = "catch", subsWithNA=TRUE, file = file.path(sprintf("/home/shares/ohi/git-annex/globalprep/hab_prs_hd_subtidal_soft_bottom/v2022_gage/trawling_catch/bottom_midwater_trawl_tonnes_raster_%s.tif", year)), overwrite = TRUE)
+
+# cellStats(all_trawls_tonnes_raster, "sum", na.rm = TRUE) # 50069865
+#  
+# 35823295/50069865 # 0.7154662 of trawling in bottom for 2012
+
+
+trawl_prop_raster <- bottom_trawl_rast/all_trawls_tonnes_raster
+# plot(trawl_prop_raster)
+
+
+writeRaster(trawl_prop_raster, file.path(sprintf("/home/shares/ohi/git-annex/globalprep/hab_prs_hd_subtidal_soft_bottom/v2022_gage/bottom_trawl_props/bottom_trawl_prop_%s.tif", year)), overwrite = TRUE)
+
+}
+
+## check 
+
+raster_2012 <- raster("/home/shares/ohi/git-annex/globalprep/hab_prs_hd_subtidal_soft_bottom/v2022_gage/bottom_trawl_props/bottom_trawl_prop_2012.tif")
+plot(raster_2012)
+
+raster_2013 <- raster("/home/shares/ohi/git-annex/globalprep/hab_prs_hd_subtidal_soft_bottom/v2022_gage/bottom_trawl_props/bottom_trawl_prop_2013.tif")
+plot(raster_2013)
+## looks good
+
+```
+

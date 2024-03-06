@@ -1,0 +1,397 @@
+---
+title: 'OHI 2021: Kelp trend'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Summary
+
+This script generates the trend of kelp for each OHI region for the latest year of data. We do this using trend data from Krumhansl et al. 2016, which calculated regional kelp trend values using Bayesian hierarchical linear models. We extract these trends per the Marine Ecoregions of the World (MEOW), and a take weighted area mean to get final trends per region represented in the paper. We then gapfill the remaining areas with kelp extent but no trends with georegional averages. 
+
+
+## Updates from previous assessment
+This is an entirely new layer for the 2021 assessment! 
+
+***
+## Data Sources 
+
+**Reference**: Krumhansl, K.A., Okamoto, D.K., Rassweiler, A., Novak, M., Bolton, J.J., Cavanaugh, K.C., Connell, S.D., Johnson, C.R., Konar, B., Ling, S.D., Micheli, F., Norderhaug, K.M., Pérez-Matus, A., Sousa-Pinto, I., Reed, D.C., Salomon, A.K., Shears, N.T., Wernberg, T., Anderson, R.J., Barrett, N.S., Buschmann, A.H., Carr, M.H., Caselle, J.E., Derrien-Courtel, S., Edgar, G.J., Edwards, M., Estes, J.A., Goodwin, C., Kenner, M.C., Kushner, D.J., Moy, F.E., Nunn, J., Steneck, R.S., Vásquez, J., Watson, J., Witman, J.D., Byrnes, J.E.K., 2016. Global patterns of kelp forest change over the past half-century. Proc Natl Acad Sci USA 113, 13785–13790. https://doi.org/10.1073/pnas.1606102113
+
+
+**Downloaded**: 05/18/2021
+
+**Description**: 
+"Kelp forests support diverse and productive ecological communities throughout temperate and arctic regions worldwide, providing numerous ecosystem services to humans. Literature suggests that kelp forests are increasingly threatened by a variety of human impacts, including climate change, overfishing, and direct harvest. We provide the first globally comprehensive analysis of kelp forest change over the past 50 y, identifying a high degree of variation in the magnitude and direction of change across the geographic range of kelps. These results suggest region-specific responses to global change, with local drivers playing an important role in driving patterns of kelp abundance. Increased monitoring aimed at understanding regional kelp forest dynamics is likely to prove most effective for the adaptive management of these important ecosystems."
+
+https://www.pnas.org/content/113/48/13785
+
+
+
+**Time range**: 1983 - 2012
+
+
+**Reference**: Spalding MD, Fox HE, Allen GR, Davidson N, Ferdaña ZA, Finlayson M, Halpern BS, Jorge MA, Lombana A, Lourie SA, Martin KD, McManus E, Molnar J, Recchia CA, Robertson J (2007) Marine Ecoregions of the World: a bioregionalization of coast and shelf areas. BioScience 57: 573-583.
+
+**Downloaded**: 5/11/2016
+
+
+***
+
+# Methods
+
+## Setup
+
+```{r setup, include=FALSE, eval = FALSE}
+
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(broom)
+library(mapview)
+library(ggplot2)
+library(rgeos)
+library(dplyr)
+
+
+
+source('http://ohi-science.org/ohiprep_v2021/workflow/R/common.R')
+
+goal     <- 'globalprep/hab_kelp/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+ohi_rasters()
+region_data()
+
+```
+
+
+Steps: 
+1. Read in the kelp trend data from Krumhansl et al. 2016 and join with our MEOW shapefile. 
+2. Rasterize and use zonal statistics to calculate the trend and amount of ecoregion area in each OHI region
+3. Calculate the trend per each OHI region by taking the weighted area mean.
+4. Match to our extent data, and gapfill any region that has extent data but not trend data by georegion.
+
+**Read in kelp trend data**
+
+ - paper: https://www.pnas.org/content/113/48/13785#:~:text=The%20brown%20algae%20known%20as,of%20all%20continents%20except%20Antarctica.
+ - code adapted from: https://github.com/kelpecosystems/global_kelp_time_series/blob/master/07_analysis_of_HLM_results/03_slope_maps.R
+
+```{r, eval = FALSE}
+
+## read in the trend data 
+
+params <- read_csv(file.path(dir_git, "raw/kelp_trends_krumhansl_2016.csv"))
+
+params <- params %>% filter(parameter=="mean_slope")
+params$group_name <- as.character(params$group_name)
+params$group_name[which(params$group_name=="Gulf of Maine-Bay of Fundy")] <- "Gulf of Maine/Bay of Fundy"
+
+getProb <- function(p, levs=c(0.05, 0.1)){
+  levs <- sort(levs)
+  levs <- c(-1, levs)
+  probs <- cut(p, levs)
+  probs <- gsub("\\(.*,", "", probs)
+  probs <- gsub("\\]", "", probs)
+  probs
+}
+
+params$bayesian_probability <- getProb(1-ifelse(params$p-0.5 < 0, 1-params$p, params$p))
+params$bayesian_probability <- gsub("0.05", "95%", params$bayesian_probability)
+params$bayesian_probability <- gsub("0.1", "90%", params$bayesian_probability)
+
+geoGroup="Ecoregion"
+Timespan="1900-2015"
+  
+trends_df <- params %>% filter(grouping==geoGroup &
+                             Period==Timespan) %>% 
+      filter(parameter=="mean_slope")
+    
+
+write.csv(trends_df, file.path(dir_git, "int/krumhansl_trends.csv"), row.names = FALSE) # save the file 
+ 
+## now we have a df that shows the trend per each eco region... now we need to join with the ecoregion shape file
+  
+  
+# read in ecoregion shp
+meow_rgns <- st_read(file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/meow/meow_ecos.shp"))
+
+# mapview(meow_rgns)
+
+## join together
+trend_data_meow <- meow_rgns %>%
+  left_join(adf, by = c("ECOREGION" = "group_name")) %>%
+  filter(!is.na(mean))
+
+mapview(trend_data_meow) ## take a look
+
+
+st_write(trend_data_meow, file.path("/home/shares/ohi/git-annex/globalprep/hab_kelp/v2021/trends/krumshansl_trends_MEOW_raw.shp")) ## save the shapefile
+
+```
+
+**Then: rasterize and use zonal statistics to calculate the trend and amount of ecoregion area in each OHI region**
+```{r, eval = FALSE}
+ # 2. Then: rasterize and use zonal statistics to calculate the trend and amount of ecoregion area in each region
+
+## use a eez and 25mile inland raster; if no 25km inland use just EEZ
+ocean_25_mile <- raster(file.path("/home/shares/ohi/git-annex/globalprep/spatial/v2019/ocean_plus25mile_inland.tif"))
+
+## fasterize per seagrass species 
+kelp_moll <- st_transform(trend_data_meow, crs = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs") %>%
+  mutate(ecorgn_fix = ifelse(ECOREGION == "Gulf of Maine/Bay of Fundy", "Gulf of Maine-Bay of Fundy", ECOREGION))
+
+for(i in 1:26){ ## there are 26 ecoregions 
+ # i = 1
+
+kelp_moll_i <- kelp_moll[i, ]  
+  
+ecoregion <- kelp_moll_i$ecorgn_fix
+
+fasterize_file = file.path(dir_M, "git-annex/globalprep/hab_kelp/v2021/trends/int", sprintf("kelp_trend_id_%s_%s.tif", i, ecoregion))
+  
+if(!file.exists(fasterize_file)) {
+
+trend_raster <- fasterize(kelp_moll_i, ocean_25_mile, field = "mean")
+
+writeRaster(trend_raster, file.path("/home/shares/ohi/git-annex/globalprep/hab_kelp/v2021/trends/int", sprintf("kelp_trend_id_%s_%s.tif", i, ecoregion)))
+
+
+}else{
+  print("file exists, skipping")
+}
+}
+
+## stack all values and do zonal stats summed per rgn 
+
+# get raster files
+kelp_trend_raster_files <- list.files(file.path("/home/shares/ohi/git-annex/globalprep/hab_kelp/v2021/trends/int"), 
+                                    pattern = 'kelp_trend_id_', 
+                                    full.names = TRUE)
+
+#stack 
+kelp_trend_raster_stack <- raster::stack(kelp_trend_raster_files)
+
+# calculate zonal mean of trend 
+zonal_means_combined_kelp <- raster::zonal(kelp_trend_raster_stack, 
+                                     ocean_25_mile,
+                                     fun = "mean",
+                                     na.rm = TRUE,
+                                     progress="text") #mean of all kelp trend cells for each ohi zone
+zonal_means_combined_kelp_df <- data.frame(zonal_means_combined_kelp)
+
+zonal_means_df <- zonal_means_combined_kelp_df %>%
+  dplyr::rename("rgn_id" = "zone") %>%
+  pivot_longer(cols = starts_with("kelp_trend"),
+               names_to = "observation",
+               names_prefix = "kelp_trend_id_", 
+               values_to = "trend_score", 
+               values_drop_na = TRUE) 
+
+write.csv(zonal_means_df, file.path(dir_git, "int/kelp_trends_no_distribution_area.csv"), row.names = FALSE)
+
+kelp_extent <- read_csv(file.path(dir_git, "data/habitat_extent_kelp.csv")) %>%
+  filter(km2 >0)
+
+setdiff(kelp_extent$rgn_id, zonal_means_df$rgn_id)
+setdiff(zonal_means_df$rgn_id, kelp_extent$rgn_id)
+
+
+## now find area of each ecoregion within each OHI region so we can weight later
+for(i in 1:26){ ## there are 26 ecoregions 
+ # i = 26
+
+kelp_moll_i <- kelp_moll[i, ]  
+  
+ecoregion <- kelp_moll_i$ecorgn_fix
+
+fasterize_file = file.path(dir_M, "git-annex/globalprep/hab_kelp/v2021/trends/int/eco_areas", sprintf("kelp_area_id_%s_%s.tif", i, ecoregion))
+  
+if(!file.exists(fasterize_file)) {
+
+area_raster <- fasterize(kelp_moll_i, ocean_25_mile, field = NULL)
+# plot(area_raster)
+print(cellStats(area_raster, "sum")*0.934478877011218970**2)
+print(st_area(kelp_moll_i)*0.000001)
+
+writeRaster(area_raster, file.path("/home/shares/ohi/git-annex/globalprep/hab_kelp/v2021/trends/int/eco_areas", sprintf("kelp_area_id_%s_%s.tif", i, ecoregion)))
+
+
+}else{
+  print("file exists, skipping")
+}
+}
+
+
+######### read in just one of the files and check to see if it works correctly... ##########
+# raster_1 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/hab_kelp/v2021/trends/int/eco_areas/kelp_area_id_26_Southern Norway.tif"))
+# 
+# plot(raster_1)
+# plot(log(ocean_25_mile + 1))
+# 
+# cellStats(raster_1, "sum")*0.934478877011218970**2 # 429999.2
+# 
+# zonal_sum_area_combined_sg <- raster::zonal(raster_1,
+#                                      ocean_25_mile,
+#                                      fun = "sum",
+#                                      na.rm = TRUE,
+#                                      progress="text") # sum of all kelp area cells for each ohi zone
+# zonal_sum_area_combined_sg_df <- data.frame(zonal_sum_area_combined_sg)
+# 
+# 
+# zonal_sums_km2 <- zonal_sum_area_combined_sg_df %>%
+#   mutate(habitat = "kelp",
+#          km2 = (0.934478877011218970**2*sum)) %>% #one cell is equal to ~0.93 km
+#   dplyr::rename("rgn_id" = "zone") %>%
+#   select(-sum)
+# 
+# sum(zonal_sums_km2$km2) # 357630.2
+# st_area(kelp_moll_i)*0.000001 # 430001.7 ## lost some... but not a crazy amount. This is probably fine.  
+
+## stack all values and do zonal stats summed per rgn 
+
+kelp_area_raster_files <- list.files(file.path("/home/shares/ohi/git-annex/globalprep/hab_kelp/v2021/trends/int/eco_areas"), 
+                                    pattern = 'kelp_area_id_', 
+                                    full.names = TRUE)
+
+kelp_area_raster_stack <- raster::stack(kelp_area_raster_files)
+
+zonal_sums_combined_kelp <- raster::zonal(kelp_area_raster_stack, 
+                                     ocean_25_mile,
+                                     fun = "sum",
+                                     na.rm = TRUE,
+                                     progress="text") #sum of ecoregion area cells for each ohi zone
+zonal_sums_combined_kelp_df <- data.frame(zonal_sums_combined_kelp)
+
+zonal_sums_df <- zonal_sums_combined_kelp_df %>%
+  dplyr::rename("rgn_id" = "zone") %>%
+  pivot_longer(cols = starts_with("kelp_area"),
+               names_to = "observation",
+               names_prefix = "kelp_area_id_", 
+               values_to = "area", 
+               values_drop_na = TRUE) %>%
+  mutate(habitat = "kelp",
+          km2 = (0.934478877011218970**2*area)) %>%
+  filter(km2 > 0)
+
+write.csv(zonal_sums_df, file.path(dir_git, "int/kelp_eco_areas.csv"), row.names = FALSE)
+
+
+## combine the trends and area together 
+
+zonal_means_df <- read_csv(file.path(dir_git, "int/kelp_trends_no_distribution_area.csv"))
+
+zonal_sum_df <- read_csv(file.path(dir_git, "int/kelp_eco_areas.csv"))
+
+zonal_combined_area_trends <- zonal_means_df %>%
+  left_join(zonal_sum_df) 
+
+write.csv(zonal_combined_area_trends, file.path(dir_git, "int/kelp_trends_distributions_area_final.csv"), row.names = FALSE)
+ 
+```
+
+**Then: calculate the trend per each OHI region by taking the weighted area mean.**
+```{r, eval = FALSE}
+ # 5. Then: calculate the trend per each OHI region by taking the weighted area mean and regular mean (and compare to see which makes more sense). 
+ 
+## now lets calculate the trend based on a area weighted average
+
+
+trends_area_weighted <- zonal_combined_area_trends %>%
+  group_by(rgn_id) %>%
+  dplyr::summarise(trend = weighted.mean(trend_score, km2)) %>%
+  mutate(year = 2021) %>%
+  filter(rgn_id <= 250)
+
+write.csv(trends_area_weighted, file.path(dir_git, "int/habitat_trend_kelp_weighted.csv"), row.names = FALSE)
+
+```
+
+**Then: match to our extent data, and gapfill any region that has extent data but not trend data by georegion.**
+```{r, eval = FALSE}
+
+ # 6. Then: match to our extent data, and gapfill any region that has extent data but not trend data by georegion. 
+
+## now match to the regions which have extent data and gapfill
+
+regions <- read.csv(file.path(here::here('globalprep/supplementary_information/v2018/rgn_georegions_wide_2013b.csv'))) ## read in georegions data
+
+
+kelp_extent <- read_csv(file.path(dir_git, "data/habitat_extent_kelp.csv")) %>%
+  dplyr::select(-year) %>%
+  filter(km2 >0)
+
+trends_area_weighted <- read_csv(file.path(dir_git, "int/habitat_trend_kelp_weighted.csv")) %>%
+  mutate(habitat = "kelp")
+
+
+setdiff(trends_area_weighted$rgn_id, kelp_extent$rgn_id) # rgns with trend data and not extent # 219
+setdiff(kelp_extent$rgn_id, trends_area_weighted$rgn_id) # rgns with extnet data and not trend.. 39 regions... a little over half. Better than nothing. I'm not that concerned, because we have most of the regions with the most kelp extent.
+
+#  [1]   3   4   5  14  15  20  21  42  55  58  62  63  68  69  70  76  80  84  88  90  91  95 137 143 144 145 147 155 171 172
+# [31] 173 174 178 184 188 189 209 210
+
+
+trends_extent_rgns <- kelp_extent %>%
+  left_join(trends_area_weighted, by = c("rgn_id", "habitat")) %>% 
+  left_join(regions) %>%
+  dplyr::group_by(r2) %>%
+  dplyr::mutate(avg_trend_r2 = mean(trend, na.rm=TRUE)) %>%
+  ungroup() %>%
+  dplyr::group_by(r1) %>%
+  dplyr::mutate(avg_trend_r1 = mean(trend, na.rm=TRUE)) %>%
+  ungroup() %>%
+  dplyr::group_by(r0) %>%
+  dplyr::mutate(avg_trend_r0 = mean(trend, na.rm=TRUE)) %>%
+  ungroup() %>%
+  mutate(trend2 = ifelse(is.na(trend), avg_trend_r2, trend)) %>%
+  mutate(trend3 = ifelse(is.na(trend2), avg_trend_r1, trend2)) %>%
+  mutate(trend4 = ifelse(is.na(trend3), avg_trend_r0, trend3)) %>%
+  mutate(habitat = "kelp") %>%
+  mutate(gap_fill = ifelse(is.na(trend), "r2_gap_fill", NA)) %>%
+  mutate(gap_fill = ifelse(is.na(trend) & is.na(avg_trend_r2), "r1_gap_fill", gap_fill)) %>%
+  mutate(gap_fill = ifelse(is.na(trend) & is.na(avg_trend_r2) & is.na(avg_trend_r1), "r0_gap_fill", gap_fill)) %>%
+  mutate(gap_fill = ifelse(is.na(gap_fill), 0, gap_fill)) %>%
+  dplyr::select(rgn_id, habitat, gap_fill, trend=trend4) %>%
+  mutate(trend = trend*5) # multiply by 5 to get what the decrease/increase will be in 5 years 
+
+
+trends_extent_rgns_gf <- trends_extent_rgns %>%
+  mutate(year = 2021) %>%
+  dplyr::select(rgn_id, habitat, year, gap_fill)
+
+write.csv(trends_extent_rgns_gf, file.path(dir_git, "data/trend_kelp_gf.csv"), row.names = FALSE)
+
+trends_rgns_final <- trends_extent_rgns %>%
+  mutate(year = 2021) %>%
+  dplyr::select(rgn_id, habitat, year, trend)
+
+write.csv(trends_rgns_final, file.path(dir_git, "data/habitat_trend_kelp.csv"), row.names = FALSE)
+
+
+## take a look - distribution seems reasonable
+ggplot(trends_rgns_final, aes(trend)) +
+  geom_histogram()
+
+
+
+```
+
+
+

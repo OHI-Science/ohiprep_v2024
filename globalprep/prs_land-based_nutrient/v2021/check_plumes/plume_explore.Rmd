@@ -1,0 +1,223 @@
+---
+title: 'OHI 2021 - Land based nutrient plume exploration '
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../workflow/templates/ohi_hdr.html' 
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+[REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2020/globalprep/cw_nutrient_o_chem/v2020/plume_output_exploration.html)
+
+
+# Summary
+This document is used to explore the output of the plume modeling done for this data layer.  
+
+## The following data are used:
+
+* 
+
+
+
+## Initial set-up code
+
+```{r setup, eval = FALSE}
+library(tidyverse)
+library(raster)
+library(sf)
+library(mapview)
+library(janitor)
+library(here)
+
+
+source(here('workflow/R/common.R'))
+
+ww_raw_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/raw"
+ww_intermediate_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/interim"
+prs_int_dir <- "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int"
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+
+```
+
+**Take a look at the output from the full plume model**
+ - We need to check this to see if the model ran on all of the basin_id
+ - It looks like the model did not write rasters for everything. I think this is due to very small effluent values. 
+ - Check the plumes that were run, and see if the ones with really small values are included. 
+ 
+```{r, eval = FALSE}
+## Count how many rasters the plume model created and compare to the number of pourpoints with >0 N effluent
+
+fils <- list.files("/home/sgclawson/plumes/output1/", pattern="tif$", full.names = FALSE, recursive = TRUE)
+
+files <- data_frame(fils)
+ 
+
+pourpoint_names_files <- data.frame(fils = sub('.*plume_effluent_', '', files$fils))
+
+pourpoint_names <- data.frame(basin_id = sub('.tif', '', pourpoint_names_files$fils)) %>%
+  mutate(basin_id = as.character(basin_id)) %>%
+  dplyr::filter(str_detect(basin_id, "subsets", negate = TRUE))
+
+
+## now read in total shp file
+
+files_shp <- list.files(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int/pourpoints/"), pattern = "shp", full = TRUE)
+
+ws_pp_zonal_all_fix <- st_read(files_shp[1])   %>%
+  mutate(row_num = row_number()) 
+
+test_ws <- ws_pp_zonal_all_fix %>%
+  filter(effluent !=0)
+sum(test_ws$effluent) # 16217349
+
+excluded_2005 <- c(setdiff(ws_pp_zonal_all_fix$basin_id, pourpoint_names$basin_id))
+
+included_2005 <- c(pourpoint_names$basin_id)
+
+excluded <- paste0("plume_effluent_", excluded_2005)
+write.csv(excluded, file.path(here("globalprep/prs_land-based_nutrient/v2021/STEP6_check_plumes/int/excluded_pp.csv")), row.names = FALSE)
+
+
+check <- ws_pp_zonal_all_fix %>%
+  dplyr::filter(basin_id %in% excluded_2005)
+sum(check$effluent) # missing 3212062 tonnes N 
+mapview(check, cex = "effluent")
+
+check_0 <- check %>%
+  dplyr::filter(effluent >0) ## yes, the really small values were excluded... 
+
+# Now lets check where those small pourpoints were located in the shapefile... I bet that one of them is in row number 36522?
+check_2 <- ws_pp_zonal_all_fix %>%
+  arrange(basin_id) %>%
+  mutate(row_num = row_number()) %>%
+  filter(effluent >0)
+
+check_1 <- ws_pp_zonal_all_fix %>%
+  filter(effluent == 0)
+
+
+test <- raster("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/N_plume/pourpoints_crop_manure_leached_volt_N_2005_joined.tif")
+cellStats(test, "sum") # 4296690
+
+plot(test)
+
+test2 <- raster::select(test)
+plot(test2)
+
+N_effluent_log <- raster::calc(test, fun = function(x){log(x + 1)})
+plot(N_effluent_log)
+
+
+files_shp <- list.files(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int/pourpoints/"), pattern = "shp", full = TRUE)
+
+tester <- st_read(files_shp[1])
+sum(tester$effluent) # 16217349
+
+min(tester$effluent)
+
+
+testing <- tester %>%
+  filter(effluent != 0)
+
+
+testing <- tester %>% 
+  filter(str_detect(basin_id, "ai"))
+
+mapview(testing)
+
+
+test_0_val <- raster(file.path("/home/sgclawson/plumes/output2/subsets/subset4/plume_effluent_pa_00001.tif"))
+plot(test_0_val)
+cellStats(test_0_val, "sum")
+```
+
+See if we can combine try1 and try2 rasters
+```{r}
+try1 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/try1/pourpoints_crop_manure_leached_volt_N_2005_joined.tif"))
+try2 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/output/N_plume/pourpoints_crop_manure_leached_volt_N_2005_joined.tif"))
+
+plot(log(try2+1))
+
+cellStats(try2, "sum", na.rm = TRUE) # 8576483
+cellStats(try1, "sum", na.rm = TRUE) # 4296690
+
+8576483 + 4296690 # 12873173
+
+# 16217349... I think im missing ~ 3 million tonnes ? 
+
+# try3 <- try1 + try2 # i think i will have to mosaic these together... shouldn't be a problem 
+
+test <- st_read("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int/pourpoints/pourpoints_crop_manure_leached_volt_N_2005.shp")
+
+sum(test$effluent) 
+
+## We should check the pourpoints against each other to see what are missing 
+
+
+plot(log(try2 + 1))
+
+mosaic(try1, try2, fun = "sum", filename = "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int/test_mosaic/mosaic_2005.tif", progress = "text")
+
+test_mosaic <- raster(file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int/test_mosaic/mosaic_2005.tif"))
+
+cellStats(test_mosaic, "sum", na.rm = TRUE) # 12873176 it worked i think? 
+
+test_mosaic[test_mosaic < 0] <- 0
+
+
+m <- c(0, 0.000000001, NA)
+rclmat <- matrix(m)
+test_mosaic_reclass <- reclassify(test_mosaic, rclmat, progress = "text")
+cellStats(test_mosaic_reclass, "sum", na.rm = TRUE, progress = "text") # 12873176 - it worked
+
+plot(test_mosaic_reclass)
+
+mosaic_calc <- raster::calc(test_mosaic_reclass, fun=function(x){log(x+1)}, progress = "text")
+plot(mosaic_calc)
+
+par(mar=c(1,1,1,1))
+
+library(colorspace)
+library(RColorBrewer)
+breakpoints <- c(0, 0.01, 1, 2, 3,4,5,6,7,8,9)
+colors <- c("white", diverge_hcl(9, "Blue-Red"))
+# colors <- c("white", "#11C638", "#48CA58", "#66CE70", "#7FD286", "#95D69A", "#A9D9AD", "#BDDDBF", "#D0E0D1", "#E2E2E2", "#E7D9D0", "#EBCFBD", "#EEC6A9", "#F0BC95", "#F1B37F", "#F1AA66", "#F1A047", "#8B000")
+#8b0000
+
+# diverge_hcl(9, h=c(130, 43), c =100, l = c(70,90))
+
+testing <- raster::select(mosaic_calc)
+plot(testing, breaks = breakpoints, col = colors)
+
+```
+
+
+```{r}
+test_plumes <- list.files("/home/sgclawson/grassdata/location/PERMANENT/cats", pattern = "plume_effluent")
+test_plumes
+included_2005
+
+
+test <- st_read(file.path("/home/shares/ohi/git-annex/land-based/wastewater/data/processed/N_effluent_output/effluent_N_pourpoints_plumes_tot_N.shp"))
+st_crs(test)
+summary(test)
+
+st_crs(ws_pp_zonal_all_fix)
+
+summary(ws_pp_zonal_all_fix)
+
+```
+
+
+

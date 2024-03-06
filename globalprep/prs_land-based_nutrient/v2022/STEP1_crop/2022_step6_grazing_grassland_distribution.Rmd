@@ -1,0 +1,240 @@
+---
+title: "OHI 2022 - Distribute grassland fertilizers"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+
+# Summary
+Distribute grassland fertilizer across grazers at the country-level
+
+```{r setup, include = FALSE}
+# getting packages we want
+library(here)
+library(janitor)
+library(furrr)
+library(readxl)
+library(tidyverse)
+library(vroom)
+library(doParallel)
+library(terra)
+
+# Import food_rgns xy df
+food_rgns_xy <-
+  read.csv(file.path("/home/shares/ohi/git-annex/globalprep/spatial/v2021/food_rgns_xy.csv")) %>%
+  dplyr::select(x, y, iso3c)
+
+food_crs <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
+
+
+source(here('workflow/R/common.R'))
+
+source(here('globalprep/prs_land-based_nutrient/v2022/STEP1_crop/R/common_spatial.R'))
+
+crop_nutrient <- file.path(here(), "globalprep/prs_land-based_nutrient/v2022")
+
+region_data()
+
+food_rgns <- read_csv(here("globalprep/spatial/v2021/food_rgns.csv"), col_types = "cdc")
+
+nutrient_d2022_anx <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/FAOSTAT/crop_nutrient/d2022")
+
+halpern_raw <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/halpern_food_systems/d2021") # data is static.. doesn't change
+
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2022/")
+
+ 
+```
+
+# Distribute grassland fertilizer across grazers at the country-level
+```{r}
+location_list <- list.files(file.path(halpern_raw, "animal_farm/location_tifs"), pattern = "grassland", full = TRUE)
+
+location_list <- grep(location_list, pattern= 'buffaloes_grassland_meat', inv=T, value=T)
+
+conversion_list <-list.files(file.path(halpern_raw, "animal_farm/disturbance/lsu_conversion_rasters"), full = TRUE)
+
+stack1 <- stack(lapply(location_list, raster))
+
+stack2 <- stack(lapply(conversion_list, raster))
+
+stack_all <- stack(stack1, stack2) %>% 
+  raster_df()
+
+df_all <- 
+  stack_all %>% 
+  rowwise() %>% 
+  mutate(cows_milk_lsu      = cows_grassland_milk  * cows_lsu_conversions,
+         cows_meat_lsu      = cows_grassland_meat  * cows_lsu_conversions,
+         sheep_meat_lsu     = sheep_grassland_meat * sheep_lsu_conversions,
+         sheep_milk_lsu     = sheep_grassland_milk * sheep_lsu_conversions,
+         goats_milk_lsu     = goats_grassland_milk * goats_lsu_conversions,
+         goats_meat_lsu     = goats_grassland_meat * goats_lsu_conversions,
+         buffaloes_milk_lsu = buffaloes_grassland_milk * buffaloes_lsu_conversions) %>% 
+  mutate(sum_lsu = sum(cows_milk_lsu, cows_meat_lsu, sheep_meat_lsu, 
+                       sheep_milk_lsu, goats_milk_lsu, goats_meat_lsu, 
+                       buffaloes_milk_lsu, na.rm = TRUE)) %>%
+  mutate(prop_cows_milk      = cows_milk_lsu / sum_lsu,
+         prop_cows_meat      = cows_meat_lsu / sum_lsu,
+         prop_sheep_meat     = sheep_meat_lsu / sum_lsu,
+         prop_sheep_milk     = sheep_milk_lsu / sum_lsu,
+         prop_goats_milk     = goats_milk_lsu / sum_lsu,
+         prop_goats_meat     = goats_meat_lsu / sum_lsu,
+         prop_buffaloes_milk = buffaloes_milk_lsu / sum_lsu)
+```
+
+
+```{r}
+fao_nutrient_grassland_N <- 
+  vroom(here(crop_nutrient, "STEP1_crop/int/fubc_2017_grassland_2.csv")) %>% 
+    filter(nutrient %in% "N") %>% 
+    dplyr::select(-nutrient)
+
+fao_nutrient_grassland_P2O5 <- 
+  vroom(here(crop_nutrient, "STEP1_crop/int/fubc_2017_grassland_2.csv")) %>% 
+    filter(nutrient %in% "P2O5") %>% 
+    dplyr::select(-nutrient)
+
+fao_nutrient_grassland_K2O <- 
+  vroom(here(crop_nutrient, "STEP1_crop/int/fubc_2017_grassland_2.csv")) %>% 
+    filter(nutrient %in% "K2O") %>% 
+    dplyr::select(-nutrient)
+
+df_all_2 <-
+  df_all %>% 
+  left_join(food_rgns_xy) # add iso3c
+```
+
+Loop through N and P2O5
+```{r}
+df_all_3_N <- 
+  df_all_2 %>% 
+  left_join(fao_nutrient_grassland_N) %>% #add grassland total
+  group_by(iso3c, year) %>%
+  mutate(iso3c_prop_sum_lsu = sum_lsu / sum(sum_lsu, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(cell_application = iso3c_prop_sum_lsu * country_application) 
+
+df_all_3_P2O5 <- 
+  df_all_2 %>% 
+  left_join(fao_nutrient_grassland_P2O5) %>% #add grassland total
+  group_by(iso3c, year) %>%
+  mutate(iso3c_prop_sum_lsu = sum_lsu / sum(sum_lsu, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(cell_application = iso3c_prop_sum_lsu * country_application) 
+
+df_all_3_K2O <- 
+  df_all_2 %>% 
+  left_join(fao_nutrient_grassland_K2O) %>% #add grassland total
+  group_by(iso3c, year) %>%
+  mutate(iso3c_prop_sum_lsu = sum_lsu / sum(sum_lsu, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(cell_application = iso3c_prop_sum_lsu * country_application)
+
+sum(df_all_3_K2O$cell_application, na.rm = TRUE) # 20573816
+sum(fao_nutrient_grassland_K2O$country_application, na.rm = TRUE) # 20574113
+
+# slightly off, but nothing of concern
+
+```
+
+
+```{r}
+# i = 23
+# correct_proj <- df_all_3_N %>%
+#   filter(year == 2008) %>%
+#  # dplyr::select(x, y, .i, cell_application) %>%
+#    mutate(cell_grazer_application = .[i] * cell_application) %>%
+#  select(x, y, cell_grazer_application) %>%
+#  rasterFromXYZ(crs = food_crs)
+# # 
+# # correct_proj
+
+## ok.. delete what we don't need to clear up memory space
+rm(df_all, df_all_2, fao_nutrient_grassland_K2O, fao_nutrient_grassland_N, fao_nutrient_grassland_P2O5, food_rgns, food_rgns_xy, food_rgns_tif, rgns_eez, rgns_all, stack1, stack2, stack_all)
+
+
+grassland_fertilizer_application <- function(i, nutrient, this_year) {
+  
+  # i = 23
+  # this_year = 2017
+  # nutrient = "N"
+  if (nutrient == "N") { grassland_df <- df_all_3_N %>% dplyr::filter(year == this_year) } else if (nutrient == "P2O5") { grassland_df <- df_all_3_P2O5 %>% dplyr::filter(year == this_year) } else { grassland_df <- df_all_3_K2O %>% dplyr::filter(year == this_year)} 
+   
+ prop_livestock <- colnames(grassland_df[i]) %>% str_extract(., "[^prop_].*")
+
+ grassland_df %>%
+ mutate(cell_grazer_application = .[i] * cell_application) %>%
+ dplyr::select(x, y, cell_grazer_application) %>%
+ rasterFromXYZ(crs = food_crs) %>%
+ projectRaster(., food_raster, method = 'ngb') %>% ## ngb ensures the sum stays the same... no interpolation
+ writeRaster(.,
+             file.path(prep,
+                       "animal_farm_int/grassland_fertilizer_application/",
+                       str_extract(prop_livestock, ".+?(?=_)"), 
+                       "_grassland_", 
+                       str_extract(prop_livestock, "(?<=_).*$"),
+                       "_nutrient_application_",
+                       nutrient,
+                       "_",
+                       this_year,
+                       ".tif",
+                       fsep = ""),
+             overwrite = TRUE,
+             format = "GTiff")
+  
+
+}
+
+
+# write for loop to loop through the scenarios; for next year, maybe try dopar for parallel processing to speed up. Takes around 1.5 hours as it is.
+for(j in 2005:2020){
+  
+ # j = 2010
+  for(k in c("N", "P2O5", "K2O")){
+   # k = "P2O5"
+    for(l in 23:29){
+     
+      #l = 23
+       grassland_fertilizer_application(l, k, j)
+      
+    }
+  }
+  
+}
+```
+
+# Data check
+```{r}
+# takes way too long to run this
+list.files(file.path(prep,
+                     "animal_farm_int/grassland_fertilizer_application",
+                     fsep = ""),
+           full.names = TRUE) %>%
+  stack() %>%
+  stackApply(., 1, fun = "sum") %>%
+  raster::cellStats(., stat = "sum")
+
+sum(
+sum(fao_nutrient_grassland_N$country_application, na.rm = TRUE),
+sum(fao_nutrient_grassland_P2O5$country_application, na.rm = TRUE),
+sum(fao_nutrient_grassland_K2O$country_application, na.rm = TRUE), na.rm = TRUE) # 114338614
+
+
+```

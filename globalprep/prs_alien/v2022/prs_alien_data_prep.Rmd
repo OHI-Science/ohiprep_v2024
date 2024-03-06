@@ -1,0 +1,466 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - Pressure: Invasive Species"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+# Summary
+
+This script generates the pressure incurred from invasive species for each OHI region. 
+
+# Updates from previous assessment
+
+2022 - Updating with new dataset!
+
+***
+
+# Data Source 
+
+**Reference**: Pagad, S., Genovesi, P., Carnevali, L. et al. Introducing the Global Register of Introduced and Invasive Species. Sci Data 5, 170202 (2018). https://doi.org/10.1038/sdata.2017.202
+
+**Downloaded**: 2022-08-04
+
+**Description**:  
+Harmonised, representative data on the state of biological invasions remain inadequate at country and global scales, particularly for taxa that affect biodiversity and ecosystems. Information is not readily available in a form suitable for policy and reporting. The Global Register of Introduced and Invasive Species (GRIIS) provides the first country-wise checklists of introduced (naturalised) and invasive species. GRIIS was conceived to provide a sustainable platform for information delivery to support national governments. We outline the rationale and methods underpinning GRIIS, to facilitate transparent, repeatable analysis and reporting. Twenty country checklists are presented as exemplars; GRIIS Checklists for close to all countries globally will be submitted through the same process shortly. Over 11000 species records are currently in the 20 country exemplars alone, with environmental impact evidence for just over 20% of these. GRIIS provides significant support for countries to identify and prioritise invasive alien species, and establishes national and global baselines. In future this will enable a global system for sustainable monitoring of trends in biological invasions that affect the environment.
+
+**Time range**: 1999-2019
+
+**Download link**: http://griis.org/download - There is a download shell script in this file, making manual download unnecessary. 
+
+**Variables**: The most important variable names are:
+
+- `scientific_name`: the species name, sometimes with taxanomic source
+
+- `habitat`: the species habitat (marine, brackish, terrestrial, freshwater, or a combination of them)
+
+- `is_invasive`: weather or not the species is considered invasive (harmful) or simply alien (introduced, but not harmful)
+
+***
+
+# Methods
+
+## Overview
+
+1. Download the data and clean it up
+
+2. Identify habitat for species with none listed
+
+3. Match listed countries to OHI regions
+
+4. Gapfill by regional averages
+
+5. Calulate the pressure score for each country
+
+6. Save prepared data and associated gapfilling datasets
+
+7. Check how pressure scores have changed from previous assesments
+
+## Setup
+
+``` {r setup, eval = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, eval = FALSE, echo = TRUE)
+
+if (!require(librarian)){install.packages("librarian")}
+if (!require(ohicore)){devtools::install_github('ohi-science/ohicore@dev')}
+
+librarian::shelf(
+  tidyverse,
+  here,
+  janitor,
+  sf,
+  plotly,
+  countrycode,
+  ohicore
+) 
+### directory paths and relevant files
+current_year <- 2022
+version_year <- paste0("v", current_year)
+data_year <- paste0("d", current_year)
+source(here::here('workflow', 'R', 'common.R'))
+
+### Mazu
+dir_here  <- here::here('globalprep', 'prs_alien', version_year)
+dir_data <- file.path(dir_M, 'git-annex', 'globalprep', '_raw_data', 'griis', data_year)
+
+# rgns <- ohicore::georegion_labels # Kiribati is broke v2022
+rgns <- read.csv("https://raw.githubusercontent.com/OHI-Science/ohiprep/master/globalprep/spatial/v2017/output/georegion_labels.csv")
+
+rgns_eez <- read.csv("https://raw.githubusercontent.com/OHI-Science/ohiprep_v2022/gh-pages/globalprep/spatial/v2017/output/rgn_labels.csv") %>% 
+  dplyr::filter(type == "eez") %>% 
+  dplyr::select(-type, rgn_name = label)
+```
+
+## Download the data
+
+```{bash eval = F}
+mkdir /home/shares/ohi/git-annex/globalprep/_raw_data/griis/d2022 && cd $_
+
+wget --recursive --no-parent --level 1 --accept zip http://griis.org/download
+
+mv griis.org/assets/checklists/*.zip .
+
+rm -r griis.org
+
+for FILE in *; do 
+  echo $FILE 
+  unzip $FILE 
+  rm *.txt
+done 
+
+rm *.zip
+```
+
+## Clean raw data
+
+Read in country codes from the `countrycode` package.
+
+```{r eval = F}
+codes <- countrycode::codelist %>% 
+  janitor::clean_names() %>% 
+  dplyr::select(country = country_name_en, country_code = iso2c) %>% 
+  tidyr::drop_na()
+```
+
+Loop through the raw data files and join them into one large file. 
+
+```{r eval = F}
+files <- list.files(dir_data, full.names = T)
+
+output <- tibble("id" = character())
+
+for (file in files) {
+  tmp <- read_csv(file, col_types = cols(.default = "c")) 
+  output <- full_join(output, tmp)
+}
+```
+
+Make the data consistent and tidy. Some of this is unnecessary but facilitates richer data exploration. 
+
+```{r eval = F}
+clean_output <- output %>%
+  janitor::clean_names() %>% 
+  dplyr::select(
+    id, taxon_id, scientific_name,kingdom, phylum, class, order, 
+    family, taxon_rank, taxonomic_status, is_invasive, habitat,
+    location_id, country_code, occurrence_status, establishment_means) %>% 
+  dplyr::left_join(codes) %>% 
+  dplyr::mutate(
+    habitat = tolower(habitat),
+    habitat = str_replace_all(habitat, "/", "|"),
+    habitat = str_replace_all(habitat, "terrestriali", "terrestrial\\|"),
+    habitat = str_replace_all(habitat, "terrestrial,", "terrestrial"),
+    habitat = str_replace_all(habitat, "freshwatetr", "freshwater"),
+    habitat = str_replace_all(habitat, "terrestrial \\|freshwater \\|brackish", "terrestrial\\|freshwater\\|brackish"),
+    habitat = str_replace_all(habitat, "freshwater\\|marine", "marine\\|freshwater"),
+    habitat = str_replace_all(habitat, "brackish\\|marine\\|freshwater", "marine\\|freshwater\\|brackish"),
+    habitat = str_replace_all(habitat, "freshhwater\\|brackish\\|marine", "marine\\|freshwater\\|brackish"),
+    habitat = str_replace_all(habitat, "freshwater\\|brackish\\|marine", "marine\\|freshwater\\|brackish"),
+    habitat = str_replace_all(habitat, "freshwater\\|brackish", "brackish\\|freshwater"),
+    establishment_means = case_when(establishment_means == "Present" ~ occurrence_status, T ~ establishment_means),
+    establishment_means = tolower(establishment_means),
+    establishment_means = str_replace_all(establishment_means, "/", "|"),
+    establishment_means = str_replace_all(establishment_means, "uncerain", "uncertain"),
+    establishment_means = str_replace_all(establishment_means, "cryptogenic\\|", ""),
+    establishment_means = str_replace_all(establishment_means, "native\\|", ""),
+    establishment_means = replace_na(establishment_means, "uncertain"),
+    is_invasive = tolower(is_invasive),
+    is_invasive = str_replace_all(is_invasive, "null", "0"),
+    is_invasive = str_replace_all(is_invasive, "false", "0"),
+    is_invasive = str_replace_all(is_invasive, "to be evaluated", "0"),
+    is_invasive = replace_na(is_invasive, "0"),
+    is_invasive = str_replace_all(is_invasive, "yes", "1"),
+    is_invasive = str_replace_all(is_invasive, "invasive", "1"),
+    is_invasive = as.numeric(is_invasive),
+    country_code = toupper(country_code),
+    country_code = case_when(location_id == "Namibia" ~ "NA", T ~ country_code),
+    country = str_replace_all(country, "St. Lucia", "Saint Lucia"),
+    country = str_replace_all(country, "&", "and"),
+    country = str_replace_all(country, "Congo - Kinshasa", "Democratic Republic of the Congo"),
+    country = str_replace_all(country, "Côte d’Ivoire", "	Ivory Coast"),
+    country = str_replace_all(country, "Curaçao", "Curacao"),
+    country = str_replace_all(country, "Myanmar \\(Burma\\)", "Myanmar"),
+    country = str_replace_all(country, "Saint Martin \\(French part\\)", "Northern Saint-Martin"),
+    country = str_replace_all(country, "São Tomé and Príncipe", "Sao Tome and Principe"),
+    country = str_replace_all(country, "St. Vincent and Grenadines", "Saint Vincent and the Grenadines"),
+    country = str_replace_all(country, "Svalbard & Jan Mayen", "Jan Mayen"),
+    country = case_when(
+      country_code == "EC-W" ~ "Ecuador", # NEEDS to be first
+      is.na(country) & !is.na(location_id) ~ location_id,
+      country_code == "BQ-BO" ~ "Bonaire",
+      country_code == "BQ-SE" ~ "Sint Eustatius",
+      country_code == "BQ-SA" ~ "Saba",
+      country_code == "FM-PNI" ~ "Micronesia",
+      country_code == "FM-TRK" ~ "Micronesia",
+      country_code == "YE-SU" ~ "Yemen",
+      T ~ country)) 
+```
+
+Some species from above do not come with an associated habitat type. This chunk queries GBIF and returns species names and their assosciated habitat. 
+
+```{r eval = F}
+na_df <- dplyr::filter(clean_output, is.na(habitat))
+
+na_species <- unique(na_df$scientific_name)
+
+spp_out <- tibble()
+
+pb = txtProgressBar(min = 0, max = length(na_species), initial = 0, style = 3, width = 60) 
+
+for (spp in seq_along(na_species)) {
+  
+  setTxtProgressBar(pb, spp)
+  
+  data <- rgbif::name_lookup(query = na_species[spp])$data %>% 
+    janitor::clean_names() 
+  
+  if (length(data) == 0) {
+    
+    int <- tibble(scientific_name = na_species[spp], habitat_na = NA)
+    
+  } else {
+    
+    int <- data %>% 
+      tidyr::drop_na(habitats) %>% 
+      dplyr::select(scientific_name, habitat_na = habitats) %>% 
+      dplyr::mutate(habitat_na = tolower(habitat_na)) %>% 
+      dplyr::distinct()
+    
+  }
+  
+  spp_out <- rbind(int, spp_out)
+  
+}
+
+close(pb)
+```
+
+The above chunk returns many duplicate entries, with many messy habitat type options. This matches species names exactly, unlike the above query, and then declares any species with marine habitat, a marine species, even if it has more than one listed. 
+
+```{r eval = F}
+spp_out_marine <- spp_out %>% 
+  dplyr::filter(scientific_name %in% na_species) %>% 
+  dplyr::mutate(
+    habitat_na = dplyr::case_when(
+      stringr::str_detect(habitat_na, 'marine') ~ 'marine',
+      stringr::str_detect(habitat_na, 'freshwater') ~ 'freshwater',
+      stringr::str_detect(habitat_na, 'terrestrial') ~ 'terrestrial')) %>% 
+  dplyr::distinct() %>% 
+  dplyr::filter(habitat_na == 'marine')
+```
+
+We then join these names to the data of only NA habitat species and assign the marine species a marine habitat. 
+
+```{r eval = F}
+marine_spp <- na_df %>% 
+  dplyr::left_join(spp_out_marine) %>% 
+  dplyr::distinct() %>% 
+  dplyr::filter(habitat_na == 'marine') %>% 
+  dplyr::mutate(habitat = habitat_na) %>% 
+  dplyr::select(-habitat_na)
+```
+
+This binds the marine species back to the full dataset and does some final cleanup. 
+
+```{r eval = F}
+df <- clean_output %>% 
+  rbind(marine_spp) %>% 
+  dplyr::filter(!habitat %in% c("terrestrial", "freshwater", "terrestrial|freshwater", "freshwater|terrestrial", "host", NA)) %>%
+  dplyr::select(-c(location_id)) %>%
+  dplyr::left_join(rgns, by = c('country' = 'rgn_label')) %>%
+  dplyr::select(-rgn_id) %>% 
+  dplyr::mutate(country = ifelse(country_code == "IC", "Canary Islands", country))
+```
+
+## Match countries to OHI regions
+
+```{r eval = F}
+df_ohi <- ohicore::name_2_rgn(df_in = df)
+
+# v2022
+# These data were removed for not having any match in the lookup tables:
+# Eswatini (Landlocked), French Southern Territories (will be split up later), North Macedonia (landlocked), and St. Barthélemy (IDK lol)
+```
+
+Break up French Southern Territories into 8 regions and Kiribati into 2, each repeating the data of the larger region. 
+
+```{r eval = F}
+### Report these regions at higher spatial resolution:
+french_territories <- c(
+    'Glorioso Islands', 'Juan de Nova Island', 'Bassas da India', 
+    'Ile Europa', 'Ile Tromelin', 'Crozet Islands',
+    'Amsterdam Island and Saint Paul Island', 'Kerguelen Islands')
+
+kiribati <- c(
+  "Line Islands (Kiribati)", "Phoenix Islands (Kiribati)", "Gilbert Islands (Kiribati)")
+
+country_split_data <- dplyr::tibble(
+  country = c(rep("French Southern Territories", 8),
+              rep("Kiribati", 3)), 
+  region = c(french_territories, kiribati)) %>%
+  dplyr::left_join(df) %>%
+  dplyr::select(-c(country, r0_label, r1_label, r2_label)) %>%
+  dplyr::rename(country = region) %>% 
+  dplyr::left_join(rgns, by = c('country' = 'rgn_label')) %>% 
+  dplyr::mutate(rgn_name = country) 
+```
+
+Bind French Southern Territories and kiribati back to the full dataset. 
+
+```{r eval = F}
+alien_sp_df <- rbind(df_ohi, country_split_data) %>%
+  dplyr::select(-country) %>% 
+  dplyr::filter(rgn_name != 'Kiribati') %>% 
+  dplyr::distinct()
+```
+
+Summarize the number of alien/invasive species to each region and fill missing regions with NA values. 
+
+```{r eval = F}
+alien_sp_summary <- alien_sp_df %>% 
+  dplyr::group_by(rgn_id, rgn_name) %>%
+  dplyr::mutate() %>% 
+  dplyr::summarise(spp_count = n() - sum(is_invasive),
+                   invasive_count = sum(is_invasive)) %>% 
+  dplyr::full_join(rgns, by = c("rgn_id", 'rgn_name' = 'rgn_label')) %>% 
+  dplyr::ungroup() 
+```
+
+## Gapfilling
+
+Gapfill values from regional averages.
+
+### Step 1
+
+First try "r2 regions" (i.e. Caribbean countries filled with Caribbean islands mean).
+
+```{r, eval = F}
+gf_step_1 <- alien_sp_summary %>% 
+  dplyr::mutate(
+    r0_spp = mean(spp_count, na.rm = T),
+    r0_inv = mean(invasive_count, na.rm = T)) %>% 
+  dplyr::group_by(r1_label) %>% 
+  dplyr::mutate(
+    r1_spp = mean(spp_count, na.rm = T),
+    r1_inv = mean(invasive_count, na.rm = T)) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(r2_label) %>% 
+  dplyr::mutate(
+    r2_spp = mean(spp_count, na.rm = T),
+    r2_inv = mean(invasive_count, na.rm = T)) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::mutate(
+    has_data       = ifelse(is.na(spp_count), 0, 1),
+    gapfilled      = ifelse(is.na(spp_count), NA, "no"),
+    method         = ifelse(is.na(spp_count), NA, "not gapfilled"),
+    spp_count      = ifelse(is.na(spp_count), r2_spp, spp_count),
+    invasive_count = ifelse(is.na(invasive_count), r2_inv, invasive_count),
+    gapfilled      = ifelse(has_data == 0 & !is.na(spp_count), "yes", gapfilled),
+    method         = ifelse(has_data == 0 & !is.na(spp_count), "used r2 average", method))
+```
+
+In v2022, everything was filled with step 1. Step 2 and 3 were written just in case step 1 stops filling everything. 
+
+### Step 2
+
+Then try "r1 regions" (i.e. "Oceania" or "Asia").
+
+```{r eval = F}
+gf_step_2 <- gf_step_1 %>% 
+  dplyr::mutate(
+    spp_count      = ifelse(is.na(spp_count), r1_spp, spp_count),
+    invasive_count = ifelse(is.na(invasive_count), r1_inv, invasive_count),
+    gapfilled      = ifelse(has_data == 0 & !is.na(spp_count) & is.na(gapfilled), "yes", gapfilled),
+    method         = ifelse(has_data == 0 & !is.na(spp_count) & is.na(method), "used r1 average", method))
+```
+
+### Step 3
+
+If there remain any that can't be gapfilled in one of the regions, gapfill with the world score.
+
+__Note:__ This is an aggressive strategy but also an unlikely scenario that will ensure complete data
+
+```{r eval = F}
+gf_step_3 <- gf_step_2 %>% 
+  dplyr::mutate(
+    spp_count      = ifelse(is.na(spp_count), r0_spp, spp_count),
+    invasive_count = ifelse(is.na(invasive_count), r0_inv, invasive_count),
+    gapfilled      = ifelse(has_data == 0 & !is.na(spp_count) & is.na(gapfilled), "yes", gapfilled),
+    method         = ifelse(has_data == 0 & !is.na(spp_count) & is.na(method), "used r0 average", method),
+    year = 2022)
+```
+
+## Calculate the pressure score
+
+It was decided, somewhat arbitrarily to use a weighted avergae where species listed as invasive have a 90% weight, and alien species get a 10% weight. This allows us to account for species not listed as invasive (harmful), but that could still be harmful, despite the data. There may be a better way to determine weights, and this is an area that could be improved upon in future iterations. 
+
+```{r eval = F}
+min_spp_count <- min(gf_step_3$spp_count)
+min_inv_count <- min(gf_step_3$invasive_count)
+
+max_spp_count <- max(gf_step_3$spp_count)
+max_inv_count <- max(gf_step_3$invasive_count)
+
+spp_weight <- 0.1
+inv_weight <- 0.9
+
+pressure <- gf_step_3 %>% 
+  dplyr::group_by(rgn_id, rgn_name, year) %>% 
+  dplyr::summarise(
+    pressure_score = (((spp_count-min_spp_count)/(max_spp_count-min_spp_count)) * spp_weight) + 
+      (((invasive_count-min_inv_count)/(max_inv_count-min_inv_count)) * inv_weight)) %>% 
+  dplyr::ungroup()
+```
+
+## Save the prepped data
+
+```{r, eval = F}
+## save gapfilling flags 
+gf_step_3 %>%
+  dplyr::select(rgn_id, rgn_name, year, gapfilled, method) %>%
+  readr::write_csv(here::here(dir_here, "output", "prs_alien_gf.csv"))
+
+## save pressure score dataset
+pressure %>%
+  dplyr::select(rgn_id, year, pressure_score) %>% 
+  readr::write_csv(here::here(dir_here, "output", "prs_alien.csv"))
+```
+
+## Datacheck
+
+Lets compare to 2013 scores.  
+
+```{r, eval = F}
+new_data <- here::here(dir_here, "output", "prs_alien.csv") %>% 
+  readr::read_csv() %>%
+  dplyr::left_join(rgns_eez)
+
+old_data <- here::here('globalprep', 'prs_alien', 'v2013', 'data', "p_sp_alien_2013a.csv") %>% 
+  readr::read_csv() %>%
+  dplyr::rename(pressure_score = pressures.score) %>% 
+  dplyr::left_join(rgns_eez)
+
+compare <- new_data %>%
+  dplyr::bind_rows(old_data) %>% 
+  tidyr::pivot_wider(names_from = year, values_from = pressure_score)
+
+plot_diff <- 
+  ggplot2::ggplot(
+    compare, ggplot2::aes(x = `2022`, y = `2008`, text = rgn_name, label = rgn_id), color = "black") +
+  ggplot2::geom_jitter(width = 0.025, height = .025) +
+  ggplot2::geom_abline() +
+  ggplot2::labs(title = "Invasive species pressure") +
+  ggplot2::theme_bw() 
+
+plotly::ggplotly(plot_diff, tooltip = c("rgn_id", "rgn_name", "x", "y"))
+```

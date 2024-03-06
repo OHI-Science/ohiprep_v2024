@@ -1,0 +1,456 @@
+---
+title: 'OHI 2021: Seagrass trend'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+
+```{r setup, include=FALSE, eval = FALSE}
+
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(broom)
+library(mapview)
+library(ggplot2)
+
+source('http://ohi-science.org/ohiprep_v2021/workflow/R/common.R')
+
+goal     <- 'globalprep/hab_seagrass/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_waycott <- file.path(dir_git, "waycott_data_extract")
+dir_iucn <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/iucn_spp/d2020-3")
+ohi_rasters()
+
+```
+
+# Summary
+
+
+We use data from Short et al. 2011, Waycott et al. 2009, and the IUCN 2020 to determine the trends of seagrass for our OHI regions. First, we determine the population trends for seagrasses (increasing, stable, decreasing), based on Short and IUCN data. Then we replace the population trends with numerical values from Waycott et al. 2009. Following we gapfill missing trends first by species family average, and then by the global average if there is no species family average. Then, we calculate the trend per OHI region using a species distribution weighted mean. The final round of gapfilling we gapfill any region that has extent data but no trend data by the georegional average. 
+
+## Updates from previous assessment
+
+
+
+***
+## Data Sources
+
+**Reference**: Waycott, M., Duarte, C.M., Carruthers, T.J.B., Orth, R.J., Dennison, W.C., Olyarnik, S., Calladine, A., Fourqurean, J.W., Heck, K.L., Hughes, A.R., Kendrick, G.A., Kenworthy, W.J., Short, F.T., Williams, S.L., 2009. Accelerating loss of seagrasses across the globe threatens coastal ecosystems. PNAS 106, 12377–12381. https://doi.org/10.1073/pnas.0905620106
+
+**Description**: Contains data regarding the trends of seagrasses since 1879. 
+
+**Time range**: 1879 - 2007
+
+
+
+**Reference**: Short, F.T., Polidoro, B., Livingstone, S.R., Carpenter, K.E., Bandeira, S., Bujang, J.S., Calumpong, H.P., Carruthers, T.J.B., Coles, R.G., Dennison, W.C., Erftemeijer, P.L.A., Fortes, M.D., Freeman, A.S., Jagtap, T.G., Kamal, A.H.M., Kendrick, G.A., Judson Kenworthy, W., La Nafie, Y.A., Nasution, I.M., Orth, R.J., Prathep, A., Sanciangco, J.C., Tussenbroek, B. van, Vergara, S.G., Waycott, M., Zieman, J.C., 2011. Extinction risk assessment of the world’s seagrass species. Biological Conservation 144, 1961–1971. https://doi.org/10.1016/j.biocon.2011.04.010
+
+**Description**: Contains general population trends of seagrass species.
+
+**Time range**: 1975 - 2010
+
+
+
+**Reference**: IUCN 2020. The IUCN Red List of Threatened Species. Version 2020-3. <http://www.iucnredlist.org>. 
+
+Shapefiles available from: https://www.iucnredlist.org/resources/spatial-data-download
+
+**Downloaded**: Feb 1, 2021
+
+**Description**: Shapefiles containing the species distribution of seagrass.
+
+
+
+
+# Methods
+
+We will use data from Short et al. 2011, Waycott et al. 2009, and the IUCN 2020 to determine the trends of seagrass for our OHI regions. First, we determine the population trends for seagrasses (increasing, stable, decreasing), based on Short and IUCN data. Then we replace the population trends with numerical values from Waycott et al. 2009. Following we gapfill missing trends first by species family average, and then by the global average if there is no species family average. Then, we calculate the trend per OHI region using a species distribution weighted mean. The final round of gapfilling we gapfill any region that has extent data but no trend data by the georegional average. 
+
+
+## Use IUCN species maps, Short et al. 2011, and Waycott et al. 2009
+
+This is basically recreating the analysis done in Short et al. 2011: https://www.researchgate.net/publication/235433892_Extinction_Risk_Assessment_of_the_World's_Seagrass_Species
+
+ 1. Use the IUCN maps to map the location of all species of seagrass (similar to the Short paper). We gapfill the iucn population trend data with short data and vice versa when it is missing in the IUCN data. 
+
+ 2. Then: we replace stable species with 0, increasing with 0.0845, and decreasing with -0.0767. These numbers come from Table S2 in Waycott et al. 2009: https://www.pnas.org/content/pnas/suppl/2009/07/08/0905620106.DCSupplemental/ST2_PDF.pdf
+ 
+ 3. Then: gapfill the missing trends by species family average, and then by the global average if there is no species family average
+ 
+ 4. Then: rasterize and use zonal statistics to calculate the trend and amount of species distribution area in each region
+ 
+ 5. Then: calculate the trend using an species distribution area weighted mean. Create a gapfilling flag based on the proportion of species trends that are gapfilled within a region. 
+ 
+ 6. Then: match to our extent data, and gapfill any region that has extent data but not trend data by georegion. 
+ 
+
+## Steps 1 - 3
+```{r, eval = FALSE}
+seagrasses <- st_read(file.path(dir_iucn, "SEAGRASSES.shp"))
+
+# mapview(head(seagrasses$geometry)) # take a look - this takes a couple of minutes to process
+
+seagrass_ids <- unique(seagrasses$id_no)
+
+## read in the trend data from spp subgoal
+iucn_trend <- read_csv(file.path("~/github/ohiprep_v2021/globalprep/spp/v2021/_data/iucn_trend_by_spp_2020-3.csv")) %>%
+  dplyr::filter(iucn_sid %in% seagrass_ids) ## grab the population trends from our spp dataprep
+
+
+## read in data from Short et al. 
+
+short_trend <- read_csv(file.path("/home/shares/ohi/git-annex/globalprep/hab_seagrass/v2021/trends/short_pop_trends.csv")) %>% 
+  dplyr::select("binomial" = `Species name`, "population_trend" = `Pop. trend`) %>%
+  dplyr::mutate(population_trend = case_when(population_trend == "Unknown" ~ "unknown", 
+                                             population_trend == "Stable" ~ "stable", 
+                                             population_trend == "Increasing" ~ "increasing",
+                                             population_trend == "Decreasing" ~ "decreasing")) ## fix the names 
+
+seagrasses_trends <- seagrasses %>%
+  left_join(iucn_trend, by = c("id_no" = "iucn_sid")) %>% ## join with iucn data
+  left_join(short_trend) %>% # join with short data 
+  mutate(pop_trend_final = case_when(is.na(pop_trend) & is.na(population_trend) ~ "Unknown",
+                                     !is.na(pop_trend) & is.na(population_trend) ~ pop_trend,
+                                     is.na(pop_trend) & !is.na(population_trend) ~ population_trend,
+                                     TRUE ~ pop_trend
+                                     )) %>% # gapfill the population trends that are missing from either short OR iucn, using Short as the baseline
+    mutate(waycott_trend = case_when(
+    pop_trend_final == "decreasing" ~ -0.0767,
+    pop_trend_final == "increasing" ~ 0.0845, 
+    pop_trend_final == "stable" ~ 0
+  )) ## now assign the global waycott trends 
+
+summary(seagrasses_trends)
+
+unique(seagrasses_trends$pop_trend)
+
+colnames(seagrasses_trends)
+
+## calculate an overall mean to use for gapfilling if necessary
+overall_mean <- mean(seagrasses_trends$waycott_trend, na.rm = TRUE)
+
+seagrasses_trends_gf <- seagrasses_trends %>%
+  dplyr::group_by(family) %>%
+  dplyr::mutate(family_trend_gf = mean(waycott_trend, na.rm = TRUE)) %>% ## calculate family level mean
+  dplyr::ungroup() %>%
+  dplyr::mutate(waycott_trend_gf = ifelse(is.na(waycott_trend) & !is.na(family_trend_gf), family_trend_gf, waycott_trend),
+                gapfill = ifelse(is.na(waycott_trend) & !is.na(family_trend_gf), "family", NA)) %>% ## gapfill trend based on family mean
+  mutate(gapfill = ifelse(is.na(waycott_trend_gf), "global", gapfill), 
+         waycott_trend_gf = ifelse(is.na(waycott_trend_gf), overall_mean, waycott_trend_gf)) %>% # gapfill trend based on global mean
+  mutate(gapfill = ifelse(is.na(gapfill), "none", gapfill))
+  
+  
+test999 <- st_drop_geometry(seagrasses_trends_gf) ## it worked 
+ 
+```
+
+
+## Step 4: 
+Rasterize and use zonal statistics to calculate the trend and amount of species distribution area in each region.
+
+```{r, eval = FALSE}
+## use a eez and 25mile inland raster; if no 25km inland use just EEZ
+ocean_25_mile <- raster(file.path("/home/shares/ohi/git-annex/globalprep/spatial/v2019/ocean_plus25mile_inland.tif"))
+
+## fasterize per seagrass species 
+sg_moll <- st_transform(seagrasses_trends_gf, crs = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+
+for(i in 1:80){ ## there are 80 observations 
+ # i = 1
+
+sg_moll_i <- sg_moll[i, ]  
+  
+id <- sg_moll_i$id_no
+
+pop_trend <- sg_moll_i$pop_trend_final
+
+gapfill <- sg_moll_i$gapfill
+
+fasterize_file = file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/trends/int", sprintf("sg_trend_id_%s_%s_%s_%s.tif", i, id, pop_trend, gapfill))
+  
+if(!file.exists(fasterize_file)) {
+
+trend_raster <- fasterize(sg_moll_i, ocean_25_mile, field = "waycott_trend_gf")
+
+writeRaster(trend_raster, file.path("/home/shares/ohi/git-annex/globalprep/hab_seagrass/v2021/trends/int", sprintf("sg_trend_id_%s_%s_%s_%s.tif", i, id, pop_trend, gapfill)))
+
+
+}else{
+  print("file exists, skipping")
+}
+}
+
+## stack all values and do zonal stats summed per rgn 
+
+sg_trend_raster_files <- list.files(file.path("/home/shares/ohi/git-annex/globalprep/hab_seagrass/v2021/trends/int"), 
+                                    pattern = 'sg_trend_id_', 
+                                    full.names = TRUE)
+
+sg_trend_raster_stack <- raster::stack(sg_trend_raster_files)
+
+zonal_means_combined_sg <- raster::zonal(sg_trend_raster_stack, 
+                                     ocean_25_mile,
+                                     fun = "mean",
+                                     na.rm = TRUE,
+                                     progress="text") #mean of all seagrass trend cells for each ohi zone
+zonal_means_combined_sg_df <- data.frame(zonal_means_combined_sg)
+
+zonal_means_df <- zonal_means_combined_sg_df %>%
+  pivot_longer(cols = starts_with("sg_trend"),
+               names_to = "observation",
+               names_prefix = "sg_trend_id_", 
+               values_to = "trend_score", 
+               values_drop_na = TRUE) %>%
+  separate(observation, c("row", "species_id_no", "pop_trend", "gapfill")) 
+
+write.csv(zonal_means_df, "int/seagrass_trends_no_distribution_area.csv", row.names = FALSE)
+
+
+### Now we need to extract the species distribution area per each region
+for(i in 1:80){ ## there are 80 observations 
+ # i = 1
+
+sg_moll_i <- sg_moll[i, ]  
+  
+id <- sg_moll_i$id_no
+
+pop_trend <- sg_moll_i$pop_trend_final
+
+gapfill <- sg_moll_i$gapfill
+
+fasterize_file = file.path(dir_M, "git-annex/globalprep/hab_seagrass/v2021/trends/int/species_areas", sprintf("sg_area_id_%s_%s_%s_%s.tif", i, id, pop_trend, gapfill))
+  
+if(!file.exists(fasterize_file)) {
+
+area_raster <- fasterize(sg_moll_i, ocean_25_mile, field = NULL)
+
+writeRaster(area_raster, file.path("/home/shares/ohi/git-annex/globalprep/hab_seagrass/v2021/trends/int/species_areas", sprintf("sg_area_id_%s_%s_%s_%s.tif", i, id, pop_trend, gapfill)))
+
+
+}else{
+  print("file exists, skipping")
+}
+}
+
+######### read in just one of the files and check to see if it works correctly... ##########
+# raster_1 <- raster(file.path("/home/shares/ohi/git-annex/globalprep/hab_seagrass/v2021/trends/int/species_areas/sg_area_id_1_153534_decreasing_none.tif"))
+
+# zonal_sum_area_combined_sg <- raster::zonal(raster_1, 
+#                                      ocean_25_mile,
+#                                      fun = "sum",
+#                                      na.rm = TRUE,
+#                                      progress="text") # sum of all seagrass area cells for each ohi zone
+# zonal_sum_area_combined_sg_df <- data.frame(zonal_sum_area_combined_sg)
+
+
+# zonal_sums_km2 <- zonal_sum_area_combined_sg_df %>%
+#   mutate(habitat = "seagrass",
+#          km2 = (0.934478877011218970**2*sum)) %>% #one cell is equal to ~0.93 km
+#   rename("rgn_id" = "zone") %>%
+#   select(-sum)
+# 
+# sum(zonal_sums_km2$km2)
+# [1] 246956.2
+# st_area(sg_moll_i)*0.000001 # 246964.7 perfect....
+
+
+
+## stack all area values and do zonal stats summed per rgn 
+
+sg_area_raster_files <- list.files(file.path("/home/shares/ohi/git-annex/globalprep/hab_seagrass/v2021/trends/int/species_areas"), 
+                                    pattern = 'sg_area_id_', 
+                                    full.names = TRUE)
+
+sg_area_raster_stack <- raster::stack(sg_area_raster_files)
+
+zonal_sum_area_combined_sg <- raster::zonal(sg_area_raster_stack, 
+                                     ocean_25_mile,
+                                     fun = "sum",
+                                     na.rm = TRUE,
+                                     progress="text") # sum of all seagrass area cells for each ohi zone
+zonal_sum_area_combined_sg_df <- data.frame(zonal_sum_area_combined_sg)
+
+
+zonal_sum_df <- zonal_sum_area_combined_sg_df %>%
+  pivot_longer(cols = starts_with("sg_area"),
+               names_to = "observation",
+               names_prefix = "sg_area_id_", 
+               values_to = "sum", 
+               values_drop_na = TRUE) %>%
+  separate(observation, c("row", "species_id_no", "pop_trend", "gapfill")) %>%
+  mutate(habitat = "seagrass",
+          km2 = (0.934478877011218970**2*sum))
+
+write.csv(zonal_sum_df, "int/seagrass_distributions_area.csv", row.names = FALSE)
+
+
+
+## combine the trends and area together 
+
+zonal_means_df <- read_csv("int/seagrass_trends_no_distribution_area.csv")
+
+zonal_sum_df <- read_csv("int/seagrass_distributions_area.csv")
+
+zonal_combined_area_trends <- zonal_means_df %>%
+  left_join(zonal_sum_df) %>%
+  dplyr::select(-row, -sum)
+
+write.csv(zonal_combined_area_trends, "int/seagrass_trends_distributions_area_final.csv", row.names = FALSE)
+
+## check to see if the numbers are correct.. filter for one polygon (species) and see if the sums match
+# test <- zonal_combined_area_trends %>%
+#   filter(row == 2)
+# 
+# sum(test$km2) # 2269069
+# 
+# test2 <- sg_moll[2, ]
+# 
+# sum(st_area(test2))*0.000001 # 2269069 - matches really well... i think it worked. 
+
+
+```
+
+## Step 5
+Calculate the trend using an area weighted mean per each region. Create a gapfilling flag based on the proportion of species trends that are gapfilled within a region. 
+
+```{r, eval = FALSE}
+## now lets calculate the trend based on a area weighted average
+
+trends_area_weighted <- zonal_combined_area_trends %>%
+  group_by(zone, habitat) %>%
+  dplyr::summarise(trend = weighted.mean(trend_score, km2)) %>%
+  mutate(year = 2021) %>%
+  rename("rgn_id" = "zone") %>%
+  filter(rgn_id <= 250)
+
+write.csv(trends_area_weighted, "int/habitat_trend_seagrass_updated_all_regions.csv", row.names = FALSE)
+
+
+## create a proportion species of gapfilled file
+
+trends_gf <- zonal_combined_area_trends %>%
+  group_by(zone, habitat, gapfill) %>%
+  summarise(n_obs = n()) %>%
+  mutate(total_obs = sum(n_obs)) %>%
+  ungroup() %>%
+  filter(gapfill != "none") %>%
+  group_by(zone, habitat, total_obs) %>%
+  summarise(n_obs = sum(n_obs)) %>%
+  ungroup() %>%
+  mutate(prop_gapfilled = n_obs/total_obs)
+
+trends_no_gf <- zonal_combined_area_trends %>%
+  group_by(zone, habitat, gapfill) %>%
+  summarise(n_obs = n()) %>%
+  mutate(total_obs = sum(n_obs)) %>%
+  ungroup() %>%
+  filter(gapfill == "none") %>%
+  mutate(prop_gapfilled = n_obs/total_obs) %>%
+  filter(prop_gapfilled == 1) %>%
+  mutate(prop_gapfilled = prop_gapfilled - 1) %>%
+  dplyr::select(-gapfill)
+
+trends_gf_final <- rbind(trends_gf, trends_no_gf) %>%
+  dplyr::select("rgn_id" = "zone", habitat, "prop_gapfill" = "prop_gapfilled") %>%
+  mutate(year = 2021) %>%
+  dplyr::filter(rgn_id <= 250) %>%
+  mutate(gapfill_type = ifelse(prop_gapfill != 0, "family average", "none")) %>%
+  mutate(gapfill_type = ifelse(rgn_id == 16, "family and global average", gapfill_type))
+
+write.csv(trends_gf_final, "int/trend_seagrass_gf_all_rgns.csv", row.names = FALSE)
+
+```
+
+## Step 6
+Match to our extent data, and gapfill any region that has extent data but not trend data by georegion. Any of the regions gapfilled here will be have a prop_gapfill = 1.
+
+```{r, eval = FALSE}
+
+## now match to the regions which have extent data and gapfill
+
+regions <- read.csv(file.path(here('globalprep/supplementary_information/v2018/rgn_georegions_wide_2013b.csv'))) ## read in georegions data
+
+
+seagrass_extent <- read_csv("data/habitat_extent_seagrass_updated.csv") %>%
+  dplyr::select(-year)
+
+trends_area_weighted <- read_csv("int/habitat_trend_seagrass_updated_all_regions.csv")
+
+trends_gf_final <- read_csv("int/trend_seagrass_gf_all_rgns.csv")
+
+setdiff(trends_area_weighted$rgn_id, seagrass_extent$rgn_id) # rgns with trend data and not extent
+setdiff(seagrass_extent$rgn_id, trends_area_weighted$rgn_id) # rgns with extnet data and not trend.. only 4, not so bad
+
+
+trends_extent_rgns <- seagrass_extent %>%
+  left_join(trends_area_weighted, by = c("rgn_id", "habitat")) %>% 
+  left_join(regions) %>%
+  group_by(r2) %>%
+  mutate(avg_trend_r2 = mean(trend, na.rm=TRUE)) %>%
+  ungroup() %>%
+  group_by(r1) %>%
+  mutate(avg_trend_r1 = mean(trend, na.rm=TRUE)) %>%
+  ungroup() %>%
+  mutate(trend2 = ifelse(is.na(trend), avg_trend_r2, trend)) %>%
+  mutate(trend3 = ifelse(is.na(trend2), avg_trend_r1, trend2)) %>%
+  mutate(habitat = "seagrass") %>%
+  mutate(gap_fill = ifelse(is.na(trend), "r2_gap_fill", NA)) %>%
+  mutate(gap_fill = ifelse(is.na(trend) & is.na(avg_trend_r2), "r1_gap_fill", gap_fill)) %>%
+  mutate(gap_fill = ifelse(is.na(gap_fill), 0, gap_fill)) %>%
+  dplyr::select(rgn_id, habitat, gap_fill, trend=trend3) %>%
+  mutate(trend = trend*5) # multiply by 5 to get what the decrease/increase will be in 5 years 
+
+
+trends_extent_rgns_gf <- trends_extent_rgns %>%
+  left_join(trends_gf_final) %>%
+  mutate(prop_gapfill = ifelse(is.na(prop_gapfill), 1, prop_gapfill)) %>%
+  mutate(gapfill_type = ifelse(is.na(gapfill_type), gap_fill, gapfill_type)) %>%
+  mutate(year = 2021) %>%
+  dplyr::select(rgn_id, habitat, year, prop_gapfill, "gap_fill" = "gapfill_type")
+
+write.csv(trends_extent_rgns_gf, "data/trend_seagrass_gf.csv", row.names = FALSE)
+
+trends_rgns_final <- trends_extent_rgns %>%
+  mutate(year = 2021) %>%
+  dplyr::select(rgn_id, habitat, year, trend)
+
+write.csv(trends_rgns_final, "data/habitat_trend_seagrass_updated.csv", row.names = FALSE)
+
+
+hist(trends_rgns_final$trend)
+
+ggplot(trends_rgns_final, aes(trend)) +
+  geom_histogram()
+```
+
+```{r, eval = FALSE}
+
+seagrass_trend <- read_csv("data/habitat_trend_seagrass_updated.csv")
+
+old_seagrass_trend <- read_csv(file.path(here(), "globalprep/hab_seagrass/v2012/data/habitat_trend_seagrass_updated.csv"))
+
+compare_habitat_trend <- seagrass_trend %>%
+  left_join(old_seagrass_trend, by = "rgn_id") %>%
+  # mutate(km2.y = ifelse(
+  #   km2.x >0 & is.na(km2.y) ,0, #assign 0 values to old data km2 that have new data so that we can properly graph these differences.
+  #   km2.y
+  # )) %>%
+  mutate(difference = trend.x - trend.y) %>%
+  left_join(rgns_eez)
+```
+
+
+

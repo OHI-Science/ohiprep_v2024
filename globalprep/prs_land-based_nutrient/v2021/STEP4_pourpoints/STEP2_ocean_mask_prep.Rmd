@@ -1,0 +1,144 @@
+---
+title: 'OHI 2021 - Land based nutrient ocean mask prep '
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../workflow/templates/ohi_hdr.html' 
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+
+[REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2021/globalprep/prs_land-based_nutrient/v2021/STEP1_pourpoints_prep.Rmd)
+
+
+# Summary
+This prep does the following:
+ - creates an ocean mask buffered 1km inland to use with the plume model (this way we will grab many pourpoints that would otherwise be masked out in the plume model, but are still coastal).
+ - Create a shapefile of points 1km inland along the coast. We use this in the next prep step to assign any pourpoints that were masked out of the original plume run to their nearest coastal point. This way we won't lose any pourpoints in the diffusion model. 
+ 
+## The following data are used:
+
+* An ocean raster  
+
+
+# Updates from previous assessment
+This is a new layer for the 2021 assessment year.
+
+## Initial set-up code
+
+```{r setup, eval = FALSE}
+library(tidyverse)
+library(raster)
+library(sf)
+library(mapview)
+library(janitor)
+library(here)
+library(parallel)
+library(doParallel)
+
+
+source(here('workflow/R/common.R'))
+
+ww_raw_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/raw"
+ww_intermediate_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/interim"
+prs_int_dir <- "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int"
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+
+
+```
+
+```{r}
+ocean_mask <- raster(file.path("/home/shares/ohi/git-annex/globalprep/cw_nutrient_o_chem/raw", "ocean_mask_landnull.tif"))
+
+
+# ocean_mask <- raster(file.path(prs_int_dir, "ocean_mask_50km.tif"))
+
+plot(ocean_mask)
+
+## Gapfill using mean of surrounding cells that are NA
+gf_raster <- function(x){raster::focal(x, w = matrix(1,3,3), fun = mean, na.rm=TRUE, pad = TRUE, NAonly=TRUE)}
+
+## Repeat 1 time... we want to create a 1km inland buffer
+i <- 0
+while (i < 1){
+r <- gf_raster(ocean_mask)
+i <- i + 1
+print(i)
+}
+
+## write the 1km ocean mask buffered
+writeRaster(r, file.path(prs_int_dir, "ocean_masks/ocean_mask_1km.tif"))
+
+
+## now find the difference between the original ocean mask and the 1km buffer so that we can get a line of 1km inland cells
+
+ocean_mask[ocean_mask ==0] <- 1
+
+r[r == 0] <- 1 
+
+line_1km <- r - ocean_mask
+
+line_1km <- overlay(r,
+                      ocean_mask,
+                      fun=function(r1, r2, na.rm = TRUE){return(r1-r2)})
+
+# 
+# beginCluster(n=8)
+# z <- clusterR(stack(r,ocean_mask), overlay, arg = list(fun = function(r1, r2, na.rm = TRUE){return(r1-r2)}))
+# endCluster()
+
+beginCluster(n=12)
+z2 <- clusterR(stack(r,ocean_mask), overlay, arg = list(fun = sum, na.rm = TRUE))
+endCluster()
+
+z2
+plot(z2)
+
+stacker <- stack(r,ocean_mask)
+
+calc(stacker, fun="sum", na.rm=TRUE, filename = "something")
+
+beginCluster(n=12)
+z <- clusterR(stacker, calc, args=list(sum, na.rm=T))
+endCluster()
+
+cellStats(r, "sum", na.rm = TRUE) # 531466807
+cellStats(ocean_mask, "sum", na.rm = TRUE) # 529550427
+plot(z)
+unique(z) # [1] 0 1 2 ; good
+
+z2 <- z
+
+z2[z2 != 1] <- NA 
+
+z2
+plot(z2)
+test <- raster::select(z2)
+plot(test)
+
+writeRaster(z2, file.path(prs_int_dir, "global_pourpoints_fix/ocean_1km_line_rast.tif"))
+
+
+## now convert to spatial points
+points <- rasterToPoints(z2)
+
+points_sf <- st_as_sf(data.frame(points), coords = c("x", "y"), crs = 4326)
+
+mapview(tail(points_sf, 10000))
+
+
+st_write(points_sf, file.path(prs_int_dir, "global_pourpoints_fix/coastline_1km_points.shp"))
+
+```
+

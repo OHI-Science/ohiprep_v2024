@@ -1,0 +1,75 @@
+---
+title: "Kelp Trends archive"
+author: "Gage Clawson"
+date: "5/18/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Extract the kelp distribution data from here: https://github.com/jorgeassis/marineforestsDB
+```{r}
+source("https://raw.githubusercontent.com/jorgeassis/marineforestsDB/master/sourceMe.R")
+
+dataset <- extractDataset("brownAlgae",pruned=TRUE)
+
+kelp_spp_dataset <- dataset %>%
+  dplyr::select(kingdom, phylum, class, order, family, genus, acceptedName, habitat, countryCode, country, decimalLatitude, decimalLongitude) %>%
+  filter(order == "Laminariales")
+```
+
+Read in the kelp population trends from here: https://nph.onlinelibrary.wiley.com/doi/full/10.1111/nph.16107
+
+```{r}
+pop_trends <- read_csv(here("globalprep/hab_kelp/v2021/raw/smale_kelp_pop_trends.csv"))
+
+pop_trends_multiple <- pop_trends %>%
+  filter(str_detect(Species, ", ")) %>%
+  separate_rows(Species, sep = ", ")
+
+pop_trends_tidy <- pop_trends %>%
+  filter(!str_detect(Species, ", ")) %>%
+  rbind(pop_trends_multiple)
+
+## fix country names 
+pop_trends_country <- pop_trends_tidy %>%
+  mutate(region = str_extract(str = Region, pattern = "[^(]+")) %>%
+  mutate(country = case_when(
+    str_detect(region, "Baja California") ~ "Mexico",
+    str_detect(region, "British Columbia|Nova Scotia") ~ "Canada", 
+    str_detect(region, "California|Gulf of Maine|Rhode Island|Washington State") ~ "United States", 
+    str_detect(region, "East Australia|Southeast Australia|Tasmania|West Australia") ~ "Australia",
+    str_detect(region, "Greenland") ~ "Greenland",
+    str_detect(region, "Ireland") ~ "Ireland",
+    str_detect(region, "Japan") ~ "Japan", 
+    str_detect(region, "New Zealand") ~ "New Zealand",
+    str_detect(region, "Northwest Atlantic") ~ "United States, Canada", 
+    str_detect(region, "Norway|Svalbard") ~ "Norway", 
+    str_detect(region, "Portugal") ~ "Portugal", 
+    str_detect(region, "Spain") ~ "Spain",
+    str_detect(region, "Spain/Portugal") ~ "Spain, Portugal",
+    str_detect(region, "UK") ~ "United Kingdom"
+  )) %>%
+  mutate(country = ifelse(region == "Spain/Portugal ", "Spain, Portugal", country))
+
+pop_trends_country_multiple <- pop_trends_country %>%
+  filter(str_detect(country, ", ")) %>%
+  separate_rows(country, sep = ", ")
+
+pop_trends_tidy_final <- pop_trends_country %>%
+  filter(!str_detect(country, ", ")) %>%
+  rbind(pop_trends_country_multiple) %>%
+  mutate(population_trend = case_when(
+    str_detect(Response, "Increased") ~ "Increasing",
+    str_detect(Response, "Decreased") ~ "Decreasing",
+    str_detect(Response, "Stable") ~ "Stable"
+  )) %>%
+  left_join(rgns_eez, by = c("country" = "rgn_name")) %>%
+  dplyr::select(rgn_id, Region, Ocean, "rgn_name" = "country", Species, population_trend)
+
+setdiff(pop_trends_tidy_final$Species, kelp_spp_dataset$acceptedName)
+setdiff(kelp_spp_dataset$acceptedName, pop_trends_tidy_final$Species)
+```
+

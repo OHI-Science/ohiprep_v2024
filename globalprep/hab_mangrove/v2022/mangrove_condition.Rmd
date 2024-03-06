@@ -1,0 +1,246 @@
+---
+title: 'OHI `r format(Sys.Date(), "%Y")`: Mangrove condition'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Summary
+
+
+## Updates from previous assessment
+We are now using Global Mangrove Watch (GMW) data for extent *and* condition. The latest GMW data release (7/24/2022) includes up to 2020. We are now calculating condition by comparing the 2020 extents from GMW to the 1980 extents found in the FAO Forestry paper referenced below. Previously, condition was calculated by comparing 2005 extents to those of 1980, with all values coming from the FAO paper.
+
+***
+## Data Sources
+
+### FAO
+
+**Reference**: United Nations, 2007. The world’s mangroves 1980-2005. FAO Forestry Paper 153. http://www.fao.org/3/a1427e/a1427e00.htm
+
+**Description**: "The world’s mangroves 1980–2005 was prepared in collaboration with mangrove specialists throughout the world and was cofunded by the International Tropical Timber Organization (ITTO). It builds on a 1980 assessment by FAO and the United Nations Environment Programme (UNEP), on the FAO Global Forest Resources Assessment 2000 (FRA 2000) and 2005 (FRA 2005), and on an extensive literature search and communication with mangrove and forest resources assessment specialists."
+
+**Time range**: 1980 - 2005
+
+### GMW
+
+**Reference**: Bunting, P.; Rosenqvist, A.; Hilarides, L.; Lucas, R.M.; Thomas, T.; Tadono, T.; Worthington, T.A.; Spalding, M.; Murray, N.J.; Rebelo, L-M. Global Mangrove Extent Change 1996 – 2020: Global Mangrove Watch Version 3.0. Remote Sensing. 2022. https://doi.org/10.5281/zenodo.6894273
+
+**Downloaded**: 08/02/2022
+
+**Description**:
+Global Mangrove Watch (1996 - 2020)	
+https://data.unep-wcmc.org/datasets/45
+Reported at spatial cell scale. 
+
+The GMW aims to provide geospatial information about mangrove extent and changes to the Ramsar Convention, national wetland practitioners, decision makers and NGOs. It is part of the Ramsar Science and Technical Review Panel (STRP) work plan for 2016-2018 and a Pilot Project to the Ramsar Global Wetlands Observation System (GWOS), which is implemented under the GEO-Wetlands Initiative. The primary objective of the GMW has been to provide countries lacking a national mangrove monitoring system with first cut mangrove extent and change maps, to help safeguard against further mangrove forest loss and degradation.
+
+The GMW has generated a global baseline map of mangroves for 2010 using ALOS PALSAR and Landsat (optical) data, and changes from this baseline for epochs between 1996 and 2020 derived from JERS-1 SAR, ALOS PALSAR and ALOS-2 PALSAR-2. Annual maps are planned from 2018 and onwards.
+
+**Time range**: 1996 - 2020
+
+***
+# Methods
+
+Mangrove extent per region was calculated using shapefiles from GMW in `mangrove_extent.Rmd`. 1980 extents were scraped from tables in the FAO paper.
+
+Health is calculated for each region by dividing 2020 extents by reference extents. Reference extents are 1980 values from the FAO, and 1996 values from GMW for regions that aren't included in the FAO dataset. 
+
+
+## Setup
+``` {r setup, message = FALSE, warning = FALSE, eval = FALSE}
+library(here)
+library(tidyverse)
+library(ohicore)
+
+source(here("workflow/R/common.R"))
+
+version_year <- "2022"
+
+dir_hab_mangrove <- here(paste0("globalprep/hab_mangrove/v", version_year))
+dir_fao_mangrove <- file.path(dir_M, "git-annex/globalprep/_raw_data/FAO_mangrove")
+region_data()
+
+```
+
+## Creating dataset with reference values
+
+Here we create a set of reference areas from 1980 if the data are available and 1996 if not. These values will be used to calculate health scores based on the change from the reference year to the year in question.
+
+Regions that have extents less than 1 km^2 in 1980 are dropped to prevent them receiving condition scores based on highly granular changes reported in two different datasets.
+
+Additionally, Seychelles and Qatar are removed from the 1980 data and their 1996 extents from the GMW are used instead. These decisions are discussed in the last section of this document.
+
+### Read in FAO and GMW data and join
+
+```{r, eval = FALSE}
+fao_mangrove_raw <- read_csv(file.path(dir_fao_mangrove, "FAO_mangrove_data.csv"))
+
+# cleaning up titles and converting ha to km2
+fao_mangrove <- fao_mangrove_raw %>%
+  mutate(year_1980_ha = str_replace(year_1980_ha, " ", "")) %>%
+  mutate(year_1980_ha = str_replace(year_1980_ha, " ", "")) %>%
+  mutate("km2_1980" = as.numeric(year_1980_ha) * 0.01)
+
+# joining with rgn_ids
+fao_mangrove_rgns <- fao_mangrove %>%
+  left_join(rgns_eez, by = c("country" = "rgn_name")) %>% 
+  dplyr::select(country, "km2_1980", rgn_id) %>% 
+  filter(km2_1980 > 1,
+         !country %in% c("Seychelles", "Qatar"))
+
+# read in and wrangle global mangrove watch data and then join with fao data
+gmw <- read_csv(file.path(dir_hab_mangrove, "data/habitat_extent_mangrove_updated.csv")) %>% 
+  filter(year == 1996) %>% 
+  select(-habitat) %>% 
+  pivot_wider(names_from = "year", values_from = "km2") %>% 
+  rename("km2_1996" = "1996")
+
+fao_gmw <- fao_mangrove_rgns %>% 
+  full_join(gmw, by = "rgn_id")
+
+```
+
+### Deal with grouped and duplicated regions and gapfill missing 1980 values with 1996 GMW values
+
+```{r, eval = FALSE}
+
+# find 1980 countries that differ from OHI regions
+rgn_na <- fao_gmw %>% 
+  filter(is.na(rgn_id)) %>% 
+  select(-c(km2_1996))
+
+rgn_na_id <- rgn_na %>% 
+  select(-rgn_id) %>% 
+  name_2_rgn(fld_name = "country")
+
+# separate OHI regions that are grouped in the FAO data (e.g. Kiribati) will have their constituent regions gapfilled with 1996 GMW values so we only need to work with the duplicated regions by summing their extents
+duplicated_rgns <- rgn_na_id$rgn_id[duplicated(rgn_na_id$rgn_id)]
+
+rgn_na_summarized <- rgn_na_id %>% 
+  filter(rgn_id %in% duplicated_rgns) %>% 
+  group_by(rgn_id) %>% 
+  summarize(km2_1980 = sum(km2_1980))
+
+fao_gmw <- fao_gmw %>% 
+  full_join(rgn_na_summarized, by = "rgn_id") %>% 
+  mutate(km2_1980 = coalesce(km2_1980.x, km2_1980.y)) %>% 
+  select(-c(km2_1980.x, km2_1980.y)) %>% 
+  filter(!is.na(rgn_id))
+
+# use 1996 values from GMW to gapfill missing 1980 values from the FAO
+ref_areas <- fao_gmw %>% 
+  mutate(km2_ref = case_when(!is.na(km2_1980) ~ km2_1980,
+                                 is.na(km2_1980) & !is.na(km2_1996) ~ km2_1996)) %>% 
+  select(rgn_id, km2_ref)
+
+```
+
+## Join extents from all years with reference extents and calculate health
+
+```{r, eval = FALSE}
+
+gmw <- read_csv(file.path(dir_hab_mangrove, "data/habitat_extent_mangrove_updated.csv")) %>% 
+  select(-habitat) %>% 
+  filter(year >= 2015)
+
+gmw_ref <- gmw %>% 
+  left_join(ref_areas, by = "rgn_id")
+
+
+mangrove_health <- gmw_ref %>% 
+  mutate(health = km2 / km2_ref) %>% 
+  filter(!is.nan(health)) %>% 
+  mutate(health = case_when(health > 1 ~ 1,
+                            TRUE ~ health))  # any score over 1 receives a score of 1 - there are a number of these instances due to improved extent data from the GMW compared with the original FAO paper
+
+
+habitat_health_mangrove_updated <- mangrove_health %>% 
+  select(-c("km2", "km2_ref")) %>% 
+  mutate(habitat = "mangrove")
+
+
+write.csv(habitat_health_mangrove_updated, file.path(dir_hab_mangrove, "data/habitat_health_mangrove_updated.csv"), row.names = FALSE)
+```
+
+## Datacheck: compare to old health data
+
+```{r, eval = FALSE}
+# getting previous version year dir name
+dir_version_years <- list.files(here("globalprep/hab_mangrove"), pattern = "v\\d*")
+prev_year <- dir_version_years[length(dir_version_years) - 1]
+
+old_health <- read_csv(file.path(here("globalprep/hab_mangrove/", prev_year, "/data/habitat_health_mangrove_updated.csv"))) %>% 
+  select(-year) %>% 
+  rename(health_prev = health)
+
+compare_health <- habitat_health_mangrove_updated %>%
+  filter(rgn_id <= 250,
+         year == max(year)) %>%
+  left_join(old_health, by = c("rgn_id", "habitat")) %>%
+  mutate(diff = health - health_prev) %>%
+  left_join(rgns_eez[c("rgn_name", "rgn_id")])
+
+ p <- ggplot(compare_health, aes(x = health_prev, y = health)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(title = "Mangrove habitat previous (2005 / 1980) vs new (2020 / 1980)", x = "previous health", y =  "new health") +
+  theme_bw() +
+  scale_y_continuous(limits = c(0, 1)) +
+  scale_x_continuous(limits = c(0, 1))
+
+ plot(p)
+ 
+plotly::ggplotly(p)
+```
+
+
+Based on this comparison plot, health scores have changed a lot across the board. We expect relatively large changes in many regions because current extents have been updated from 2005 to 2020 and were derived using more reliable methods, and some reference extents have changed from 1980 to 1996 - however, we still need to look at drastic changes to see if they reflect real world changes or are primarily artifacts of the new dataset. 
+
+
+#### Certain health scores increased dramatically: Liberia, East Timor, and Oecussi Ambeno.
+
+**Liberia**: 
+
+The FAO data show Liberia's mangrove extent decreasing by ~65% from 193 km^2 in 1980 to 67.5 km^2 in 2005. The GMW data report mangrove extent in Liberia in 2007 as 188 km^2 - a much more modest decrease. After 2008 the GMW data show an upward trend landing at a ~1.8% increase between then and 2020 — which could be explained by increased attention and restoration efforts that have taken place in the country. Mangrove Alliance has started a project there. The large increase in health score is primarily a result of the differences between the FAO and GMW reported extents, and partially based on a reported increase in extent between 2005 and 2020 by GMW.
+
+**East Timor and Oecussi Ambeno**:
+
+The FAO data show Timor-Leste, which encompasses both East Timor and Oecussi Ambeno, decreasing in mangrove extent by ~57% from 42.5 km^2 in 1980 to 18 km^2 in 2005. Because they were coupled in the FAO dataset, East Timor and Oecussi Ambeno were given the same health scores. For this same reason, in the current update condition was calculated using the change between 1996 and 2020 based on the GMW dataset which included both regions separately. 
+
+East Timor showed an increase of 0.87 km^2 from 6.11 km^2 to 6.98 km^2 between 1996 and 2020 based on the GMW data. This is why we see such a dramatic jump in the health score. 
+
+Oecussi Ambeno showed no change between 1996 and 2020, giving it a health score of 1 and a similarly large jump from the last assessment. 
+
+#### Health scores that decreased dramatically: Seychelles and Qatar
+
+
+**Seychelles**:
+
+Seychelles health score went from 1.00 to 0.035. The FAO reported ~25 km^2 in 1980 and our spatial calculation yielded ~0.87 km^2 (the GMW reported ~3km^2 based on their spatial analysis). This [2021 paper by Constance et al.](https://www.sciencedirect.com/science/article/pii/S2351989421001141#bib13) estimates mangrove extent on Aldabra Atoll, which hosts the majority of mangrove coverage in Seychelles. Their findings do not reflect the drastic decrease that comparing 1980 FAO to 2020 GMW extents does. They report far less change. For this reason we will only use GMW data for Seychelles, meaning the reference area will be that of 1996.  
+
+**Qatar**:
+
+Qatar similarly shows a pronounced decrease in health score. [Milani (2018)](https://link.springer.com/chapter/10.1007/978-3-319-73016-5_3#Tab2) reports the opposite: a major increase in extent from 0.16 km^2 in 1977 to 10 km^2 in 2017. For this case we will also use only GMW data, with 1996 being the reference year. 
+
+
+
+
+
+
+
+
+

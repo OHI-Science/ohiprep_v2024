@@ -1,0 +1,196 @@
+---
+title: 'OHI 2021 - Save pourpoints already plumed '
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../workflow/templates/ohi_hdr.html' 
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+
+[REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2021/globalprep/prs_land-based_nutrient/v2021/STEP1_pourpoints_prep.Rmd)
+
+
+# Summary
+
+
+## The following data are used:
+
+* 
+
+
+
+## Initial set-up code
+
+```{r setup, eval = FALSE}
+library(tidyverse)
+library(raster)
+library(sf)
+library(mapview)
+library(janitor)
+library(here)
+library(parallel)
+library(doParallel)
+# install.packages("nngeo")
+library(nngeo)
+
+
+source(here('workflow/R/common.R'))
+
+ww_raw_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/raw"
+ww_intermediate_dir <- "/home/shares/ohi/git-annex/land-based/wastewater/data/interim"
+prs_int_dir <- "/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021/int"
+prep <- file.path("/home/shares/ohi/git-annex/globalprep/prs_land-based_nutrient/v2021")
+
+
+```
+
+
+Save pourpoints file for 2005 - 2008, excluding the pourpoints which are already done.
+
+
+2005 pourpoints
+
+```{r}
+pp_2005_all <- st_read(file.path(prs_int_dir, "pourpoints_FINAL/FIXED_pourpoints_crop_manure_leached_volt_N_2005.shp"))
+
+fils_try2 <- data.frame(x = list.files("/home/sgclawson/plumes/archive/output1_try2/", pattern="tif$", full.names = FALSE, recursive = TRUE))
+
+fils_try1 <- data.frame(x = list.files("/home/sgclawson/plumes/archive/output1_try1/", pattern = "tif$", full.names = FALSE, recursive = TRUE))
+
+all_files_done <- rbind(fils_try2, fils_try1)
+
+pourpoint_names_files <- data.frame(fils = sub('.*plume_effluent_', '', all_files_done$x))
+
+pourpoint_names <- data.frame(basin_id = sub('.tif', '', pourpoint_names_files$fils)) %>%
+  mutate(basin_id = as.character(basin_id)) %>%
+  dplyr::filter(str_detect(basin_id, "subsets", negate = TRUE))
+
+
+pp_2005_remaining <- pp_2005_all %>%
+  filter(!(basin_id %in% pourpoint_names$basin_id))
+
+mapview(pp_2005_remaining)
+st_write(pp_2005_remaining, file.path(prs_int_dir, "pourpoints_retry/pourpoints_crop_manure_leached_volt_N_2005.shp"), delete_dsn = TRUE)
+
+
+
+# top_2005_remaining_effluent <- pp_2005_remaining %>%
+#   arrange(-effluent) %>%
+#   slice_max(effluent, n= 150)
+# sum(top_2005_remaining_effluent$effluent) # 3187646
+# 
+# st_write(top_2005_remaining_effluent, file.path(prs_int_dir, "pourpoints_excluded_test/pourpoints_crop_manure_leached_volt_N_2005.shp"), delete_dsn=TRUE)
+
+```
+
+
+2006 pourpoints
+
+```{r}
+pp_2006_all <- st_read(file.path(prs_int_dir, "pourpoints_FINAL/FIXED_pourpoints_crop_manure_leached_volt_N_2006.shp"))
+
+fils_try2 <- data.frame(x = list.files("/home/sgclawson/plumes/archive/output2_try2/", pattern="tif$", full.names = FALSE, recursive = TRUE))
+
+fils_try1 <- data.frame(x = list.files("/home/sgclawson/plumes/archive/output2_try1/", pattern = "tif$", full.names = FALSE, recursive = TRUE))
+
+all_files_done <- rbind(fils_try2, fils_try1)
+
+pourpoint_names_files <- data.frame(fils = sub('.*plume_effluent_', '', all_files_done$x))
+
+pourpoint_names <- data.frame(basin_id = sub('.tif', '', pourpoint_names_files$fils)) %>%
+  mutate(basin_id = as.character(basin_id)) %>%
+  dplyr::filter(str_detect(basin_id, "subsets", negate = TRUE))
+
+
+pp_2006_remaining <- pp_2006_all %>%
+  filter(!(basin_id %in% pourpoint_names$basin_id))
+
+st_write(pp_2006_remaining, file.path(prs_int_dir, "pourpoints_retry/pourpoints_crop_manure_leached_volt_N_2006.shp"), delete_dsn = TRUE)
+
+```
+
+
+
+2007 pourpoints 
+
+```{r}
+pp_2007_all <- st_read(file.path(prs_int_dir, "pourpoints_FINAL/FIXED_pourpoints_crop_manure_leached_volt_N_2007.shp"))
+
+
+fils_try1 <- data.frame(x = list.files("/home/sgclawson/plumes/archive/output3_try1/", pattern = "tif$", full.names = FALSE, recursive = TRUE))
+
+all_files_done <- fils_try1
+
+pourpoint_names_files <- data.frame(fils = sub('.*plume_effluent_', '', all_files_done$x))
+
+pourpoint_names <- data.frame(basin_id = sub('.tif', '', pourpoint_names_files$fils)) %>%
+  mutate(basin_id = as.character(basin_id)) %>%
+  dplyr::filter(str_detect(basin_id, "subsets", negate = TRUE))
+
+
+pp_2007_remaining <- pp_2007_all %>%
+  filter(!(basin_id %in% pourpoint_names$basin_id))
+
+st_write(pp_2007_remaining, file.path(prs_int_dir, "pourpoints_retry/pourpoints_crop_manure_leached_volt_N_2007.shp"), delete_dsn = TRUE)
+```
+
+
+2008 pourpoints 
+
+```{r}
+pp_2008_all <- st_read(file.path(prs_int_dir, "pourpoints_FINAL/FIXED_pourpoints_crop_manure_leached_volt_N_2008.shp"))
+
+fils_try1 <- data.frame(x = list.files("/home/sgclawson/plumes/archive/output3_try1/", pattern = "tif$", full.names = FALSE, recursive = TRUE))
+
+all_files_done <- fils_try1
+
+pourpoint_names_files <- data.frame(fils = sub('.*plume_effluent_', '', all_files_done$x))
+
+pourpoint_names <- data.frame(basin_id = sub('.tif', '', pourpoint_names_files$fils)) %>%
+  mutate(basin_id = as.character(basin_id)) %>%
+  dplyr::filter(str_detect(basin_id, "subsets", negate = TRUE))
+
+
+pp_2008_remaining <- pp_2008_all %>%
+  filter(!(basin_id %in% pourpoint_names$basin_id))
+
+st_write(pp_2008_remaining, file.path(prs_int_dir, "pourpoints_retry/pourpoints_crop_manure_leached_volt_N_2008.shp"), delete_dsn = TRUE)
+```
+
+
+
+2017 pourpoints 
+
+```{r}
+pp_2017_all <- st_read(file.path(prs_int_dir, "pourpoints_FINAL/pourpoints_crop_manure_leached_volt_N_2017.shp"))
+
+fils_try1 <- data.frame(x = list.files("/home/sgclawson/grassdata/location/PERMANENT/vector", full.names = FALSE))
+
+all_files_done <- fils_try1
+
+pourpoint_names_files <- data.frame(fils = sub('.*pours_', '', all_files_done$x))
+
+pourpoint_names <- data.frame(basin_id = sub('.tif', '', pourpoint_names_files$fils)) %>%
+  mutate(basin_id = as.character(basin_id)) %>%
+  dplyr::filter(str_detect(basin_id, "pours", negate = TRUE))
+
+
+pp_2017_remaining <- pp_2017_all %>%
+  filter(!(basin_id %in% pourpoint_names$basin_id))
+
+st_write(pp_2017_remaining, file.path("/home/sgclawson/plumes/shp/pourpoints_crop_manure_leached_volt_N_2017.shp"), delete_dsn = TRUE)
+```
+
+

@@ -1,0 +1,109 @@
+---
+title: 'OHI 2021: Seagrass health'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+
+```{r setup, include=FALSE, eval = FALSE}
+
+library(readr)      # for read_csv()
+library(raster)
+library(here)
+library(sf)
+library(fasterize)
+library(tidyverse)
+library(broom)
+library(mapview)
+library(ggplot2)
+
+source('http://ohi-science.org/ohiprep_v2021/workflow/R/common.R')
+
+goal     <- 'globalprep/hab_seagrass/v2021'
+dir_git  <- file.path('~/github/ohiprep_v2021', goal)
+dir_waycott <- file.path(dir_git, "waycott_data_extract")
+ohi_rasters()
+regions_shape()
+
+```
+
+
+# Summary
+
+This script generates the health condition of seagrass for each OHI region for the latest year of data. We do this by assigning a global average to those regions with decreasing trends. Any region with a stable or increasing trend receives a condition of 1. 
+
+
+## Updates from previous assessment
+Updated the health with more general values. 
+
+***
+## Data Source 
+
+**Reference**: Waycott, M., Duarte, C.M., Carruthers, T.J.B., Orth, R.J., Dennison, W.C., Olyarnik, S., Calladine, A., Fourqurean, J.W., Heck, K.L., Hughes, A.R., Kendrick, G.A., Kenworthy, W.J., Short, F.T., Williams, S.L., 2009. Accelerating loss of seagrasses across the globe threatens coastal ecosystems. PNAS 106, 12377–12381. https://doi.org/10.1073/pnas.0905620106
+
+**Description**: Contains data regarding the trends of seagrasses since 1879. 
+
+**Time range**: 1879 - 2007
+
+
+
+# Methods
+
+ - Apply a global health value to all decreasing regions. Give a score of 1 to those with increasing or stable trends.
+ 
+ Taken from [Waycott et al. 2009](https://www.pnas.org/content/106/30/12377):
+  - Our comprehensive global assessment of 215 studies found that seagrasses have been disappearing at a rate of 110 km2 yr−1 since 1980 and that 29% of the known areal extent has disappeared since seagrass areas were initially recorded in 1879.
+  
+Based on this, we will score all regions health as 1 - 0.29 = 0.71. 
+
+
+**To add to methods:**
+"This reflects global loss since 1879; however, most of the loss is expected to have occurred since 1990.  There is likely to be much spatial variation that isn't accounted for by using a global value, but we are limited by the availability of data."
+
+
+```{r, eval = FALSE}
+seagrass_trend <- read_csv("data/habitat_trend_seagrass_updated.csv")  ## read in extent data
+
+## give all regions a health score of 0.71
+
+seagrass_health <- seagrass_trend %>%
+  mutate(health = ifelse(trend >=0, 1, 0.71)) %>%
+  mutate(year = 2021) %>%
+  dplyr::select(-trend)
+
+write.csv(seagrass_health, "data/habitat_health_seagrass_updated.csv", row.names = FALSE)
+
+seagrass_health_gf <- seagrass_health %>%
+  mutate(gap_fill = ifelse(health == 0.71, "global value", "none")) %>%
+  dplyr::select(-health)
+
+write.csv(seagrass_health_gf, "data/health_seagrass_gf.csv", row.names = FALSE)
+
+```
+
+```{r, eval = FALSE}
+
+seagrass_health <- read_csv("data/habitat_health_seagrass_updated.csv")
+
+old_seagrass_health <- read_csv(file.path("../v2012/data/habitat_health_seagrass_updated.csv"))
+
+compare_habitat_health <- seagrass_health %>%
+  left_join(old_seagrass_health, by = "rgn_id") %>%
+  # mutate(km2.y = ifelse(
+  #   km2.x >0 & is.na(km2.y) ,0, #assign 0 values to old data km2 that have new data so that we can properly graph these differences.
+  #   km2.y
+  # )) %>%
+  mutate(difference = health.x - health.y) %>%
+  left_join(rgns_eez)
+```
+
+
