@@ -54,11 +54,11 @@ The Worldwide Governance Indicators (WGI) project reports aggregate and individu
 
 ```{r, eval=FALSE}
 
-library(ohicore) # devtools::install_github('ohi-science/ohicore@dev')
+library(ohicore)  #devtools::install_github('ohi-science/ohicore@dev')
 library(tools)
 library(dplyr)
 library(tidyr)
-library(WDI) # install.packages('WDI')  # used to extract World Development Indicator (World Bank) data 
+library(WDI)  # install.packages('WDI')  # used to extract World Development Indicator (World Bank) data 
 library(stringr)
 library(here)
 library(ggplot2)
@@ -210,7 +210,7 @@ countries_no_data <- d_gap_fill %>%
 
 countries_no_data <- unique(countries_no_data$country)
 countries_no_data
-
+ 
 ## In this case, the countries with minimal data (< 4 indicators ever calculated) are deleted.  
 ## These will be gap-filled later on if they are deleted now.
 d_gap_fill <- d_gap_fill %>%
@@ -306,6 +306,8 @@ d_calcs <- d_calcs %>%
   rbind(country_split_data)  %>%
   mutate(country = as.character(country)) %>%
   dplyr::select(-iso3c)
+
+## Maybe some other indicator than the iso3c? 
 
 d_calcs$country[grep("Korea, Dem.", d_calcs$country)] <- "North Korea"
 
