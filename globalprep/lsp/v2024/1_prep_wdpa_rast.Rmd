@@ -172,22 +172,22 @@ rm(df_list, x_0, x_1, x_2)
 
 # create a function to run over list of sf objects
 tidy_wdpa_data <- function(wdpa_poly_object) {
-
+  
   DF <- wdpa_poly_object %>%
-    setNames(tolower(names(.))) %>% #improve?
+    setNames(tolower(names(.))) %>% #improve? # everything()
     dplyr::select(wdpaid, name, orig_name, 
-           desig, desig_eng, desig_type,
-           iucn_cat, 
-           marine, no_take, no_tk_area, 
-           status, status_yr, 
-           mang_auth, mang_plan, verif,
-           sub_loc, parent_iso, iso3) %>%
+                  desig, desig_eng, desig_type,
+                  iucn_cat, 
+                  marine, no_take, no_tk_area, 
+                  status, status_yr, 
+                  mang_auth, mang_plan, verif,
+                  sub_loc, parent_iso, iso3) %>%
     dplyr::mutate(status_yr = as.integer(status_yr))
   
   DF <- DF[DF$status == 'Designated', ]
   DF <- DF[!str_detect(tolower(DF$mang_plan), 'non-mpa program'), ]
   
-return(DF)
+  return(DF)
 }  
 
 # run function over the list
@@ -195,6 +195,7 @@ wdpa_poly_list <- lapply(wdpa_list, tidy_wdpa_data)
 
 # check to see if it worked, we should have 19 columns and fewer observations
 test <- wdpa_poly_list[[1]]
+# curious about the "Not Reported" in mang_plan
 
 # remove test for memory
 rm(test)
@@ -211,20 +212,23 @@ wdpa_poly_fix_2 <- wdpa_poly_list[[3]]
 shp_reorder_0 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_0') # replace month and year with the appropriate month and year
 shp_reorder_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_1') # replace month and year with the appropriate month and year
 shp_reorder_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_2') # replace month and year with the appropriate month and year
+
+
   
 # write the shapefile to the raw_data Mazu folder, warning suppressed, takes about 20 minutes.
 suppressWarnings(st_write(wdpa_poly_fix_0,
-                          dsn = dirname(shp_reorder_0), 
+                          dsn = (shp_reorder_0), 
                           layer = basename(shp_reorder_0),
-                          driver = 'ESRI Shapefile'))
+                          driver = 'ESRI Shapefile',
+                          append = FALSE))
   
 suppressWarnings(st_write(wdpa_poly_fix_1,
-                          dsn = dirname(shp_reorder_1), 
+                          dsn = (shp_reorder_1), 
                           layer = basename(shp_reorder_1),
                           driver = 'ESRI Shapefile'))
   
 suppressWarnings(st_write(wdpa_poly_fix_2,
-                          dsn = dirname(shp_reorder_2), 
+                          dsn = (shp_reorder_2), 
                           layer = basename(shp_reorder_2),
                           driver = 'ESRI Shapefile'))
   
@@ -245,13 +249,15 @@ shp_reorder_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_1')
 shp_reorder_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_2')
 
 # read in those shape files as sf objects to ensure they were written correctly and to use below
-wdpa_poly_0 <- st_read(dsn = dirname(shp_reorder_0), 
-                          layer = basename(shp_reorder_0),
+wdpa_poly_0 <- st_read(dsn = shp_reorder_0, 
+                      #    layer = basename(shp_reorder_0),
                           stringsAsFactors = FALSE)
-wdpa_poly_1 <- st_read(dsn = dirname(shp_reorder_1), 
+
+wdpa_poly_1 <- st_read(dsn = shp_reorder_1, 
                           layer = basename(shp_reorder_1),
                           stringsAsFactors = FALSE)
-wdpa_poly_2 <- st_read(dsn = dirname(shp_reorder_2), 
+
+wdpa_poly_2 <- st_read(dsn = shp_reorder_2, 
                           layer = basename(shp_reorder_2),
                           stringsAsFactors = FALSE)
 
@@ -273,7 +279,7 @@ return(DF)
 wdpa_poly_list <- lapply(wdpa_list, change_crs)
 
 # unlist the items
-wdpa_poly_fix_0 <- wdpa_poly_list[[1]]  
+wdpa_poly_fix_0 <- wdpa_poly_list[[1]]
 wdpa_poly_fix_1 <- wdpa_poly_list[[2]]  
 wdpa_poly_fix_2 <- wdpa_poly_list[[3]]  
 
@@ -286,12 +292,23 @@ shp_xformed_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_1') # rep
 shp_xformed_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_2') # replace month and year with the appropriate month and year
 
 # write the transformed files to Mazu, this will likely take ~7 mins per file, look at the file size on Mazu to check if it is done writing
-st_write(wdpa_poly_fix_0, dsn = dirname(shp_xformed_0), layer = basename(shp_xformed_0),
-           driver = 'ESRI Shapefile', update = TRUE)
-st_write(wdpa_poly_fix_1, dsn = dirname(shp_xformed_1), layer = basename(shp_xformed_1),
-           driver = 'ESRI Shapefile', update = TRUE)
-st_write(wdpa_poly_fix_2, dsn = dirname(shp_xformed_2), layer = basename(shp_xformed_2),
-           driver = 'ESRI Shapefile', update = TRUE)
+st_write(wdpa_poly_fix_0,
+         dsn = (shp_xformed_0),
+         layer = basename(shp_xformed_0),
+         driver = 'ESRI Shapefile',
+         update = TRUE)
+
+st_write(wdpa_poly_fix_1,
+         dsn = (shp_xformed_1),
+         layer = basename(shp_xformed_1),
+         driver = 'ESRI Shapefile',
+         update = TRUE)
+
+st_write(wdpa_poly_fix_2,
+         dsn = (shp_xformed_2),
+         layer = basename(shp_xformed_2),
+         driver = 'ESRI Shapefile',
+         update = TRUE)
 ```
 
 ## Shapefile to Raster: `terra::rasterize()`
