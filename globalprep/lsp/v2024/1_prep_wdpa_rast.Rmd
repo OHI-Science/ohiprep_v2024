@@ -329,7 +329,7 @@ if(!file.exists(rast_wdpa_file)) {
   
   # file paths for vector data created earlier
   # replace month and year with the appropriate month and year
-  shp_xformed_file_0 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_0.shp') 
+  shp_xformed_file_0 <- file.path(dir_data, 'shps', , 'WDPA_May2024_shp_xformed_0', 'WDPA_May2024_shp_xformed_0.shp') 
   shp_xformed_file_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_1.shp') 
   shp_xformed_file_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_2.shp') 
 
