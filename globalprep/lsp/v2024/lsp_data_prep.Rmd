@@ -47,9 +47,9 @@ v2021 Using updated February 2021 data
 
 # Data Source
 
-**Reference**: IUCN and UNEP-WCMC (2022), The World Database on Protected Areas (WDPA) [On-line], June 2022. Cambridge, UK: UNEP-WCMC. Available at: www.protectedplanet.net.
+**Reference**: IUCN and UNEP-WCMC (2022), The World Database on Protected Areas (WDPA) [On-line], May 2024. Cambridge, UK: UNEP-WCMC. Available at: www.protectedplanet.net.
 
-**Downloaded**: June 6, 2022
+**Downloaded**: May 24, 2024
 
 **Description**: Shapefile of World Database on Protected Areas
 
@@ -57,13 +57,14 @@ v2021 Using updated February 2021 data
 
 **Format**: Shapefile
 
-**File location**: `Mazu:home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2022/WDPA_Jun2022_Public_shp/`
+**File location**: `Mazu:home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2024/WDPA_Jun2024_Public_shp/`
 
 ------------------------------------------------------------------------
 
 # Setup
 
-```{r, include=FALSE}
+```{r include=FALSE} 
+# ask Mel
 knitr::opts_chunk$set(eval = FALSE)
 ```
 
@@ -79,10 +80,10 @@ library(tidyverse)
 library(here)
 
 
-source('http://ohi-science.org/ohiprep_v2020/workflow/R/common.R')
+source('http://ohi-science.org/ohiprep_v2020/workflow/R/common.R') # ask Mel
 
 goal     <- 'lsp'
-scenario <- 'v2023'
+scenario <- 'v2024'
 dir_anx       <- file.path(dir_M, 'git-annex/globalprep') 
 dir_goal      <- file.path(here('globalprep', goal, scenario))
 dir_goal_anx  <- file.path(dir_anx, goal, scenario)

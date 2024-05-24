@@ -19,7 +19,7 @@ pdf_document:
 # Summary
 
 -   Setup WDPA shapefile for lasting special places by filtering out non-"Designated" protected areas, and filtering out "non-MPA programmatic management plans" (US protected areas that distort scores).
--   Rasterize the result using `terra::resterize()` (`fasterize()` doesn't work with `SpatRaster` objects) and save to disk using `terra::writeRaster()` (this was formerly done with a function defined in the document: `writeRasterBlocks()` - as of now, it has not been updated to use `terra` functions and objects.)
+-   Rasterize the result using `terra::rasterize()` (`fasterize()` doesn't work with `SpatRaster` objects) and save to disk using `terra::writeRaster()` (this was formerly done with a function defined in the document: `writeRasterBlocks()` - as of now, it has not been updated to use `terra` functions and objects.)
 
 View lsp_data_prep.Rmd for full description of Lasting Special Places data preparation.
 
@@ -76,8 +76,9 @@ knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'Figs/',
                       echo = FALSE, message = FALSE, warning = FALSE, eval=FALSE)
 
 # package list
-library(rgdal)
-library(gdalUtils)
+#library(rgdal)
+#library(gdalUtils)
+
 library(tidyverse)
 library(here)
 library(sf)
@@ -86,15 +87,15 @@ library(terra) # not short for pterodactyl
 library(fasterize)
 
 # source in OHI functions
-source('http://ohi-science.org/ohiprep_v2023/workflow/R/common.R')
+source('http://ohi-science.org/ohiprep_v2024/workflow/R/common.R')
 
 # standard OHI file path management, change year to current OHI year
 goal     <- 'globalprep/lsp'
-scenario <- 'v2023'
+scenario <- 'v2024'
 dir_goal_anx   <- file.path(dir_M, 'git-annex', goal, scenario) 
 dir_goal  <- file.path(here('globalprep', goal, scenario))
 dir_data <- file.path(dir_M, 'git-annex', 'globalprep', '_raw_data',
-                      'wdpa_mpa', 'd2023', 'WDPA_Jun2023_Public_shp')
+                      'wdpa_mpa', 'd2024', 'WDPA_May2024_Public_shp')
 ```
 
 # Methods
@@ -106,9 +107,9 @@ Read in the polygons from the WDPA dataset; filter as needed.
 ```{r read in data}
 
 # create path objects for the 3 different zip files downloaded from source
-shp_raw_0 <- file.path(dir_data, 'WDPA_Jun2023_Public_shp_0', 'WDPA_Jun2023_Public_shp-polygons')
-shp_raw_1 <- file.path(dir_data, 'WDPA_Jun2023_Public_shp_1', 'WDPA_Jun2023_Public_shp-polygons')
-shp_raw_2 <- file.path(dir_data, 'WDPA_Jun2023_Public_shp_2', 'WDPA_Jun2023_Public_shp-polygons')
+shp_raw_0 <- file.path(dir_data, 'WDPA_May2024_Public_shp_0', 'WDPA_May2024_Public_shp-polygons')
+shp_raw_1 <- file.path(dir_data, 'WDPA_May2024_Public_shp_1', 'WDPA_May2024_Public_shp-polygons')
+shp_raw_2 <- file.path(dir_data, 'WDPA_May2024_Public_shp_2', 'WDPA_May2024_Public_shp-polygons')
 
 # read shape files in as sf objects
 wdpa_poly_0 <- st_read(dsn = dirname(shp_raw_0), 
@@ -204,9 +205,9 @@ wdpa_poly_fix_1 <- wdpa_poly_list[[2]]
 wdpa_poly_fix_2 <- wdpa_poly_list[[3]]
 
 # created filepaths for the files, make sure their names alligne with your year's dates
-shp_reorder_0 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_ordered_0') # replace month and year with the appropriate month and year
-shp_reorder_1 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_ordered_1') # replace month and year with the appropriate month and year
-shp_reorder_2 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_ordered_2') # replace month and year with the appropriate month and year
+shp_reorder_0 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_0') # replace month and year with the appropriate month and year
+shp_reorder_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_1') # replace month and year with the appropriate month and year
+shp_reorder_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_2') # replace month and year with the appropriate month and year
   
 # write the shapefile to the raw_data Mazu folder, warning suppressed, takes about 20 minutes.
 suppressWarnings(st_write(wdpa_poly_fix_0,
@@ -277,9 +278,9 @@ wdpa_poly_fix_2 <- wdpa_poly_list[[3]]
 st_crs(wdpa_poly_fix_0)
 
 # set file path for writing, be sure to change these to the correct titles for saving
-shp_xformed_0 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_xformed_0') # replace month and year with the appropriate month and year
-shp_xformed_1 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_xformed_1') # replace month and year with the appropriate month and year
-shp_xformed_2 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_xformed_2') # replace month and year with the appropriate month and year
+shp_xformed_0 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_0') # replace month and year with the appropriate month and year
+shp_xformed_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_1') # replace month and year with the appropriate month and year
+shp_xformed_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_2') # replace month and year with the appropriate month and year
 
 # write the transformed files to Mazu, this will likely take ~7 mins per file, look at the file size on Mazu to check if it is done writing
 st_write(wdpa_poly_fix_0, dsn = dirname(shp_xformed_0), layer = basename(shp_xformed_0),
@@ -308,9 +309,9 @@ if(!file.exists(rast_wdpa_file)) {
   
   # file paths for vector data created earlier
   # replace month and year with the appropriate month and year
-  shp_xformed_file_0 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_xformed_0.shp') 
-  shp_xformed_file_1 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_xformed_1.shp') 
-  shp_xformed_file_2 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_xformed_2.shp') 
+  shp_xformed_file_0 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_0.shp') 
+  shp_xformed_file_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_1.shp') 
+  shp_xformed_file_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_2.shp') 
 
   # create time stamp
   ptm <- proc.time()
@@ -405,9 +406,9 @@ wdpa_poly_all_previous <- rbind(wdpa_poly_21_0, wdpa_poly_21_1, wdpa_poly_21_2)
 
 
 # file paths for current data as SF
-shp_reorder_0 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_ordered_0')
-shp_reorder_1 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_ordered_1')
-shp_reorder_2 <- file.path(dir_data, 'shps', 'WDPA_Jun2023_shp_ordered_2')
+shp_reorder_0 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_0')
+shp_reorder_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_1')
+shp_reorder_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_2')
 
 # read in current data
 wdpa_poly_0 <- st_read(dsn = dirname(shp_reorder_0), 
