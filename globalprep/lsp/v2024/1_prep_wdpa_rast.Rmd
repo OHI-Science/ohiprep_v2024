@@ -62,6 +62,9 @@ Changed data source to 2023. The source data has now been split into 3 different
 
 We updated the script to save 3 separate files for the reordering and transforming, for ease of use and reproducibility.
 
+
+Saving intermediates to `/home/shares/ohi/git-annex/globalprep/lsp/v2024/rast`
+
 ------------------------------------------------------------------------
 
 # Setup
@@ -72,7 +75,7 @@ knitr::opts_chunk$set(eval = FALSE)
 
 ```{r setup, echo = FALSE, message = TRUE, warning = FALSE}
 
-knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'Figs/',
+knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'figs/',
                       echo = FALSE, message = FALSE, warning = FALSE, eval=FALSE)
 
 # package list
@@ -161,7 +164,7 @@ for(i in names(df_list)) {
   }
 }
 
-# remove uneeded objects
+# remove unneeded objects
 rm(df_list, x_0, x_1, x_2)
 ```
 
@@ -204,7 +207,7 @@ wdpa_poly_fix_0 <- wdpa_poly_list[[1]]
 wdpa_poly_fix_1 <- wdpa_poly_list[[2]]  
 wdpa_poly_fix_2 <- wdpa_poly_list[[3]]
 
-# created filepaths for the files, make sure their names alligne with your year's dates
+# created filepaths for the files, make sure their names aligned with your year's dates
 shp_reorder_0 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_0') # replace month and year with the appropriate month and year
 shp_reorder_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_1') # replace month and year with the appropriate month and year
 shp_reorder_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_2') # replace month and year with the appropriate month and year
@@ -237,9 +240,9 @@ Transform ordered polygons to Mollweide and save as new polygons.
 ```{r transform_poly}
 
 # file paths for shape files we just wrote to Mazu
-shp_reorder_0 <- file.path(dir_data, 'shps', 'WDPA_Jun2022_shp_ordered_0')
-shp_reorder_1 <- file.path(dir_data, 'shps', 'WDPA_Jun2022_shp_ordered_1')
-shp_reorder_2 <- file.path(dir_data, 'shps', 'WDPA_Jun2022_shp_ordered_2')
+shp_reorder_0 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_0')
+shp_reorder_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_1')
+shp_reorder_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_2')
 
 # read in those shape files as sf objects to ensure they were written correctly and to use below
 wdpa_poly_0 <- st_read(dsn = dirname(shp_reorder_0), 
@@ -302,7 +305,7 @@ st_write(wdpa_poly_fix_2, dsn = dirname(shp_xformed_2), layer = basename(shp_xfo
 ```{r rasterize_wdpa, eval = FALSE}
 
 # destination filepath for all the new raster file
-rast_wdpa_file <- file.path(dir_goal_anx, 'rast', 'wdpa_2023_moll_500m.tif') 
+rast_wdpa_file <- file.path(dir_goal_anx, 'rast', 'wdpa_2024_moll_500m.tif') 
 
 # function to create raster file or skip process if raster file is present
 if(!file.exists(rast_wdpa_file)) {
@@ -369,7 +372,7 @@ if(!file.exists(rast_wdpa_file)) {
 
 # read in this year and last year's data
 check_current <- terra::rast(rast_wdpa_file)
-check_past <- terra::rast(file.path("/home/shares/ohi/git-annex/globalprep/lsp/v2022/rast/wdpa_2022_moll_500m.tif"))
+check_past <- terra::rast(file.path("/home/shares/ohi/git-annex/globalprep/lsp/v2023/rast/wdpa_2023_moll_500m.tif"))
 
 # visualize both rasters
 plot(check_current, col = 'blue')

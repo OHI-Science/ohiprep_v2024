@@ -445,7 +445,7 @@ lsp_status_plot <- ggplot(lsp_new_old,
 lsp_status_plot #got rid of ggplotly
 
 # save plot to figs folder
-ggsave(file.path(dir_goal, 'Figs/plot_v2022_v2023.png'), 
+ggsave(file.path(dir_goal, 'figs/plot_v2022_v2023.png'), 
        plot = lsp_status_plot, height = 4.5, width = 6)
 
 # create data frame with scores that changed by more than 0.05
