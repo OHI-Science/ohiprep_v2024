@@ -81,7 +81,6 @@ knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'figs/',
 # package list
 #library(rgdal)
 #library(gdalUtils)
-
 library(tidyverse)
 library(here)
 library(sf)
@@ -99,6 +98,7 @@ dir_goal_anx   <- file.path(dir_M, 'git-annex', goal, scenario)
 dir_goal  <- file.path(here('globalprep', goal, scenario))
 dir_data <- file.path(dir_M, 'git-annex', 'globalprep', '_raw_data',
                       'wdpa_mpa', 'd2024', 'WDPA_May2024_Public_shp')
+
 ```
 
 # Methods
