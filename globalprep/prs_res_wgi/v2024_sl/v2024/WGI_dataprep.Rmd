@@ -36,7 +36,7 @@ Potential improvement for future assessments: Explore a better way to gapfill...
 
 **Downloaded**: 
 
-May 24, 2024 (source data updated Sep 2023)
+October 2, 2023 (source data updated Sep 2023)
 
 **Description**:  
 The Worldwide Governance Indicators (WGI) project reports aggregate and individual governance indicators for 215 economies over the period 1996–2022, for six dimensions of governance:
@@ -72,9 +72,6 @@ library(strex)
 yr_start = 1996
 yr_end   = 2022
 
-# scenario year
-# we want this to be 2024
-# data we have may not go to this year
 scen_year <- "2023"
 
 ```
@@ -315,10 +312,9 @@ d_calcs$country[grep("Korea, Dem.", d_calcs$country)] <- "North Korea"
 d_calcs$country[grep("Turkiye", d_calcs$country)] <- "Turkey"
 # Maybe in future update package with country synonym list
 
-# kind of like the OHI version of country code (ISO 3C designations rather than what OHI core hard-coded in)
 
 ## Function to convert to OHI region ID
-d_calcs_rgn <- name_2_rgn(df_in = d_calcs, # converts country names from source data to region IDs
+d_calcs_rgn <- name_2_rgn(df_in = d_calcs, 
                        fld_name='country', 
                        flds_unique=c('year'))
 

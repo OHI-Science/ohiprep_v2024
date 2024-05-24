@@ -25,9 +25,7 @@ This script downloads WGI data and prepares it for a pressures (1 - WGI) and res
 
 # Updates from previous assessment
 
-No methods updates; additional year of data added.  
 
-Potential improvement for future assessments: Explore a better way to gapfill... based on a linear model (~line 166)
 
 ***
 
@@ -72,7 +70,9 @@ library(strex)
 yr_start = 1996
 yr_end   = 2022
 
-scen_year <- "2023"
+scen_year <- "2023" 
+#scenario year, ours will be 2024
+# will always want to change
 
 ```
 
