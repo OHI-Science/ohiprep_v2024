@@ -116,9 +116,9 @@ Comparing the global WDPA raster to the 3 nautical miles offshore and 1 km inlan
 ```{r lsp_zonal_stats, eval = FALSE}
 
 # list intermedite file paths
-zonal_files <- c('zonal_3nm' =  file.path(dir_goal, 'int', 'zonal_stats_3nm.csv'),
-                 'zonal_1km' =  file.path(dir_goal, 'int', 'zonal_stats_1km.csv'),
-                 'zonal_eez' =  file.path(dir_goal, 'int', 'zonal_stats_eez.csv'))
+zonal_files <- c('zonal_3nm' =  file.path(dir_goal, 'intermediate', 'zonal_stats_3nm.csv'),
+                 'zonal_1km' =  file.path(dir_goal, 'intermediate', 'zonal_stats_1km.csv'),
+                 'zonal_eez' =  file.path(dir_goal, 'intermediate', 'zonal_stats_eez.csv'))
 
 # load raster created in 1_prep_wdpa_rast.rmd
 rast_wdpa <- terra::rast(file.path(dir_goal_anx, 'rast', 'wdpa_2023_moll_500m.tif'))
@@ -132,7 +132,7 @@ rgn_rast_list <- c(
   'zonal_1km' = file.path(dir_zones, 'rgn_inland1km_mol_500mcell.tif'),
   'zonal_eez' = file.path(dir_zones, 'rgn_eez_mol_500mcell.tif'))
 
-### Remove all files in `int` if it's the first time working through this data prep for this assessment
+### Remove all files in `intermediate` if it's the first time working through this data prep for this assessment
 ### Filters out finished zonal files: if zonal files don't exist yet, they will be created (comment out to recalculate)
 zonal_files_to_run <- zonal_files[!file.exists(zonal_files)]
 rgn_rast_list <- rgn_rast_list[!file.exists(zonal_files)]
@@ -173,7 +173,7 @@ print('writeRaster elapsed: ', (proc.time() - ptm)[3])
 z <- lsp_crosstab(rgn_rast_list[3], rast_values = rast_wdpa) #~50 min minutes to run #eez
 print('writeRaster elapsed: ', (proc.time() - ptm)[3])
 
-## Save these files to the int folder
+## Save these files to the intermediate folder
 write_csv(x, zonal_files_to_run[1])
 write_csv(y, zonal_files_to_run[2])
 write_csv(z, zonal_files_to_run[3])
@@ -258,10 +258,10 @@ prot_1km <- stats_1km %>% calc_areas()
 prot_3nm <- stats_3nm %>% calc_areas()
 prot_eez <- stats_eez %>% calc_areas()
 
-# write results to int folder as csv
-write_csv(prot_3nm, file.path(dir_goal, 'int', 'area_protected_3nm.csv'))
-write_csv(prot_1km, file.path(dir_goal, 'int', 'area_protected_1km.csv'))
-write_csv(prot_eez, file.path(dir_goal, 'int', 'area_protected_eez.csv'))
+# write results to intermediate folder as csv
+write_csv(prot_3nm, file.path(dir_goal, 'intermediate', 'area_protected_3nm.csv'))
+write_csv(prot_1km, file.path(dir_goal, 'intermediate', 'area_protected_1km.csv'))
+write_csv(prot_eez, file.path(dir_goal, 'intermediate', 'area_protected_eez.csv'))
 ```
 
 ------------------------------------------------------------------------
@@ -275,10 +275,10 @@ From the protected area files, write out the individual layers ready for the Too
 
 ```{r write_layers, eval = FALSE}
 # read in files and rename
-prot_3nm <- read_csv(file.path(dir_goal, 'int', 'area_protected_3nm.csv')) %>%
+prot_3nm <- read_csv(file.path(dir_goal, 'intermediate', 'area_protected_3nm.csv')) %>%
   rename(area = a_tot_km2,
          a_prot_3nm = a_prot_km2)
-prot_1km <- read_csv(file.path(dir_goal, 'int', 'area_protected_1km.csv')) %>%
+prot_1km <- read_csv(file.path(dir_goal, 'intermediate', 'area_protected_1km.csv')) %>%
   rename(area = a_tot_km2,
          a_prot_1km = a_prot_km2)
 
@@ -305,12 +305,12 @@ Some goals require calculation of resilience nearshore (3nm) or entire EEZ.
 
 area_ref = .30 ### 30% of area protected = reference point
 
-# read in regional data csvs from int
-resil_3nm <- read_csv(file.path(dir_goal, 'int', 'area_protected_3nm.csv')) %>%
+# read in regional data csvs from intermediate
+resil_3nm <- read_csv(file.path(dir_goal, 'intermediate', 'area_protected_3nm.csv')) %>%
   mutate(resilience.score = (a_prot_km2 / a_tot_km2) / area_ref,
          resilience.score = ifelse(resilience.score > 1, 1, resilience.score))
 
-resil_eez <- read_csv(file.path(dir_goal, 'int', 'area_protected_eez.csv')) %>%
+resil_eez <- read_csv(file.path(dir_goal, 'intermediate', 'area_protected_eez.csv')) %>%
   mutate(resilience.score = (a_prot_km2 / a_tot_km2) / area_ref,
          resilience.score = ifelse(resilience.score > 1, 1, resilience.score))
 
