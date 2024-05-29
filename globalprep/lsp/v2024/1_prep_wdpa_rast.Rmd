@@ -473,6 +473,9 @@ test_area_current <- wdpa_poly_all_current %>%
   filter(parent_iso == "GBR") %>%
   filter(iso3 == "PCN")
 
+
+# unique(wdpa_poly_all_previous$parent_iso)
+
 test_area_previous <- wdpa_poly_all_previous %>%
   filter(parent_iso == "GBR") %>%
   filter(iso3 == "PCN")
@@ -480,6 +483,10 @@ test_area_previous <- wdpa_poly_all_previous %>%
 
 mapview(test_area_current)
 mapview(test_area_previous)
+# got an error saying "test_area_previous does not contain data"... the previous steps worked and the wdpa_poly_all_previous object does contain data, so that means that this area just doesn't have data...
+
+
+
 
 st_area(test_area_current) 
 # 2021 836075862002 m2 
