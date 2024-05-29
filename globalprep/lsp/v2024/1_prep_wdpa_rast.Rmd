@@ -466,6 +466,7 @@ colnames(wdpa_poly_all_previous) == colnames(wdpa_poly_all_current)
 # check names
 unique(wdpa_poly_all_current$orig_name)
 unique(wdpa_poly_all_previous$orig_name)
+# unique(wdpa_poly_all_previous$parent_iso)
 
 
 # test area to see if things look right
@@ -473,8 +474,6 @@ test_area_current <- wdpa_poly_all_current %>%
   filter(parent_iso == "GBR") %>%
   filter(iso3 == "PCN")
 
-
-# unique(wdpa_poly_all_previous$parent_iso)
 
 test_area_previous <- wdpa_poly_all_previous %>%
   filter(parent_iso == "GBR") %>%
@@ -492,3 +491,9 @@ st_area(test_area_current)
 # 2021 836075862002 m2 
 # 2022 841909966909 m2
 ```
+
+
+
+2024 Note: filtering to parent_iso == "GBR" and iso3 == "PCN" resulted in no data for the previous year's lsp data. 
+
+
