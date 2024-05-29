@@ -313,7 +313,7 @@ st_write(wdpa_poly_fix_2,
 
 ## Shapefile to Raster: `terra::rasterize()`
 
-2023: Here we switch to using the terra package to turn the vector sf objects into rasters. Terra is the most modern package for raster managment and rasterization and there was work in previous years to transition from older packages to the Terra package. To find details of this transition, look at previous notebooks, this notebook has been cleaning and organized to minimize the visibility of that transition and to streamline the work of future OHI fellows.
+2023: Here we switch to using the terra package to turn the vector sf objects into rasters. Terra is the most modern package for raster management and rasterization and there was work in previous years to transition from older packages to the Terra package. To find details of this transition, look at previous notebooks, this notebook has been cleaning and organized to minimize the visibility of that transition and to streamline the work of future OHI fellows.
 
 2022: `terra::rasterize()` is used with two `SpatRaster` objects as input, followed by `terra::writeRaster()`.
 
@@ -322,16 +322,25 @@ st_write(wdpa_poly_fix_2,
 ```{r rasterize_wdpa, eval = FALSE}
 
 # destination filepath for all the new raster file
-rast_wdpa_file <- file.path(dir_goal_anx, 'rast', 'wdpa_2024_moll_500m.tif') 
+# reminder, dir_goal_anx is git-annex/globalprep/lsp/v2024
+rast_wdpa_file <- file.path(dir_goal_anx,
+                            'rast',
+                            'wdpa_2024_moll_500m.tif') 
 
 # function to create raster file or skip process if raster file is present
 if(!file.exists(rast_wdpa_file)) {
   
   # file paths for vector data created earlier
   # replace month and year with the appropriate month and year
-  shp_xformed_file_0 <- file.path(dir_data, 'shps', , 'WDPA_May2024_shp_xformed_0', 'WDPA_May2024_shp_xformed_0.shp') 
-  shp_xformed_file_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_1.shp') 
-  shp_xformed_file_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_xformed_2.shp') 
+  shp_xformed_file_0 <- file.path(dir_data, 'shps',
+                                  'WDPA_May2024_shp_xformed_0', # added this line because we created nested folders to house each shapefile earlier
+                                  'WDPA_May2024_shp_xformed_0.shp') 
+  shp_xformed_file_1 <- file.path(dir_data, 'shps',
+                                  'WDPA_May2024_shp_xformed_1',
+                                  'WDPA_May2024_shp_xformed_1.shp') 
+  shp_xformed_file_2 <- file.path(dir_data, 'shps',
+                                  'WDPA_May2024_shp_xformed_2',
+                                  'WDPA_May2024_shp_xformed_2.shp') 
 
   # create time stamp
   ptm <- proc.time()
@@ -396,9 +405,12 @@ plot(check_current, col = 'blue')
 plot(check_past, col = 'blue')
 ```
 
+
+Noticing a new big blue blob a little ways off the coast of Madagascar (past the other aggregation of points/blob)
+
 ## Data Checking
 
-Compare shapefile 2021 v 2022.
+Compare shapefile from last year vs this year (2023 v 2024).
 
 ```{r}
 
@@ -406,9 +418,9 @@ library(sf)
 library(raster)
 
 # file paths for previous data as SF
-shp_reorder_21_0 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2022/WDPA_Jun2022_Public_shp/shps/WDPA_Jun2022_shp_ordered_0')
-shp_reorder_21_1 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2022/WDPA_Jun2022_Public_shp/shps/WDPA_Jun2022_shp_ordered_0')
-shp_reorder_21_2 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2022/WDPA_Jun2022_Public_shp/shps/WDPA_Jun2022_shp_ordered_0')
+shp_reorder_23_0 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2022/WDPA_Jun2022_Public_shp/shps/WDPA_Jun2022_shp_ordered_0')
+shp_reorder_23_1 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2022/WDPA_Jun2022_Public_shp/shps/WDPA_Jun2022_shp_ordered_0')
+shp_reorder_23_2 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2022/WDPA_Jun2022_Public_shp/shps/WDPA_Jun2022_shp_ordered_0')
 
 # read in previous data
 wdpa_poly_21_0 <- st_read(dsn = dirname(shp_reorder_21_0), 
