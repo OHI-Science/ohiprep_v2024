@@ -241,6 +241,8 @@ gc()
 
 Transform ordered polygons to Mollweide and save as new polygons.
 
+2024 Note: We created a nested folder structure such that each shapefile would have their own appropriately named folder. Because of this, we had to remove the `dirname()` line within the `st_read(dsn = ...)` calls. 
+
 ```{r transform_poly}
 
 # file paths for shape files we just wrote to Mazu
@@ -418,42 +420,44 @@ library(sf)
 library(raster)
 
 # file paths for previous data as SF
-shp_reorder_23_0 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2022/WDPA_Jun2022_Public_shp/shps/WDPA_Jun2022_shp_ordered_0')
-shp_reorder_23_1 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2022/WDPA_Jun2022_Public_shp/shps/WDPA_Jun2022_shp_ordered_0')
-shp_reorder_23_2 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2022/WDPA_Jun2022_Public_shp/shps/WDPA_Jun2022_shp_ordered_0')
+shp_reorder_23_0 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2023/WDPA_Jun2023_Public_shp/shps/WDPA_Jun2023_shp_ordered_0')
+shp_reorder_23_1 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2023/WDPA_Jun2023_Public_shp/shps/WDPA_Jun2023_shp_ordered_0')
+shp_reorder_23_2 <- file.path('/home/shares/ohi/git-annex/globalprep/_raw_data/wdpa_mpa/d2023/WDPA_Jun2023_Public_shp/shps/WDPA_Jun2023_shp_ordered_0')
+
 
 # read in previous data
-wdpa_poly_21_0 <- st_read(dsn = dirname(shp_reorder_21_0), 
-                          layer = basename(shp_reorder_21_0),
+wdpa_poly_23_0 <- st_read(dsn = dirname(shp_reorder_23_0), 
+                          layer = basename(shp_reorder_23_0),
                           stringsAsFactors = FALSE)
-wdpa_poly_21_1 <- st_read(dsn = dirname(shp_reorder_21_1), 
-                          layer = basename(shp_reorder_21_1),
+wdpa_poly_23_1 <- st_read(dsn = dirname(shp_reorder_23_1), 
+                          layer = basename(shp_reorder_23_1),
                           stringsAsFactors = FALSE)
-wdpa_poly_21_2 <- st_read(dsn = dirname(shp_reorder_21_2), 
-                          layer = basename(shp_reorder_21_2),
+wdpa_poly_23_2 <- st_read(dsn = dirname(shp_reorder_23_2), 
+                          layer = basename(shp_reorder_23_2),
                           stringsAsFactors = FALSE)
 
 # bind all into one
-wdpa_poly_all_previous <- rbind(wdpa_poly_21_0, wdpa_poly_21_1, wdpa_poly_21_2)
+wdpa_poly_all_previous <- rbind(wdpa_poly_23_0, wdpa_poly_23_1, wdpa_poly_23_2)
 
 
-# file paths for current data as SF
-shp_reorder_0 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_0')
+# file paths for current data as SF (this is the same exact code from the chunk: transform_poly)
+shp_reorder_0 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_0') # we used May data in the 2024 update... sorry it's not as easy of a fix as the previous years where you could just change the last number!
 shp_reorder_1 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_1')
 shp_reorder_2 <- file.path(dir_data, 'shps', 'WDPA_May2024_shp_ordered_2')
 
-# read in current data
-wdpa_poly_0 <- st_read(dsn = dirname(shp_reorder_0), 
+
+# read in current data (also the same as the earlier chunk)
+wdpa_poly_0 <- st_read(dsn = shp_reorder_0, 
                           layer = basename(shp_reorder_0),
                           stringsAsFactors = FALSE)
-wdpa_poly_1 <- st_read(dsn = dirname(shp_reorder_1), 
+wdpa_poly_1 <- st_read(dsn = shp_reorder_1, 
                           layer = basename(shp_reorder_1),
                           stringsAsFactors = FALSE)
-wdpa_poly_2 <- st_read(dsn = dirname(shp_reorder_2), 
+wdpa_poly_2 <- st_read(dsn = shp_reorder_2, 
                           layer = basename(shp_reorder_2),
                           stringsAsFactors = FALSE)
 
-# bind current data together
+# bind current data together (this is new! before, we just put them in a list)
 wdpa_poly_all_current <- rbind(wdpa_poly_0, wdpa_poly_1, wdpa_poly_2)
 
 # check colnames
