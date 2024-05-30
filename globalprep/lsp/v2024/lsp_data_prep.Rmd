@@ -122,7 +122,7 @@ zonal_files <- c('zonal_3nm' =  file.path(dir_goal, 'intermediate', 'zonal_stats
                  'zonal_eez' =  file.path(dir_goal, 'intermediate', 'zonal_stats_eez.csv'))
 
 # load raster created in 1_prep_wdpa_rast.rmd
-rast_wdpa <- terra::rast(file.path(dir_goal_anx, 'rast', 'wdpa_2023_moll_500m.tif'))
+rast_wdpa <- terra::rast(file.path(dir_goal_anx, 'rast', 'wdpa_2024_moll_500m.tif'))
 
 # point to 500 m rasters for 3 nautical mile coastal regions, and 1 km inland coastal regions.
 dir_zones <- file.path(dir_anx, 'spatial/d2014/data/rgn_mol_raster_500m')
@@ -166,13 +166,13 @@ ptm <- proc.time()
 
 # run the function over the wdpa raster using each of the LSP zones
 x <- lsp_crosstab(rgn_rast_list[1], rast_values = rast_wdpa) #~25 minutes to run #3nm
-print('writeRaster elapsed: ', (proc.time() - ptm)[3])
+cat('writeRaster elapsed: ', (proc.time() - ptm)[3])
 
 y <- lsp_crosstab(rgn_rast_list[2], rast_values = rast_wdpa) #19 minutes to run #1km
-print('writeRaster elapsed: ', (proc.time() - ptm)[3])
+cat('writeRaster elapsed: ', (proc.time() - ptm)[3])
 
 z <- lsp_crosstab(rgn_rast_list[3], rast_values = rast_wdpa) #~50 min minutes to run #eez
-print('writeRaster elapsed: ', (proc.time() - ptm)[3])
+cat('writeRaster elapsed: ', (proc.time() - ptm)[3])
 
 ## Save these files to the intermediate folder
 write_csv(x, zonal_files_to_run[1])
