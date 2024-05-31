@@ -16,15 +16,11 @@ While you are working at your computer at NCEAS, you receive a frantic call from
 
 THEY NEED HELP!
 
-"No problem" you say, "I'll get Melanie or Gage"...but they are no where to be found!
-
-"Hold on, I'll get Jamie or Casey or Courtney"...but they are also gone.
-
 It is clearly going to be up to you to save the day!!
 
 ## You've got this!
 
-Please help them answer the following questions.  You will work from this document, using the code chunks as a work space to work explore the data. Do NOT bother keeping the code chunks neat and organized, we want to see your work process in all its messy glory.  However, I DO recommend including plenty of comments, mostly because I have found this helps me organize my thoughts.   
+Please help them answer the following questions.  You will work from this document, using the code chunks as a work space to work explore the data. Do NOT bother keeping the code chunks neat and organized.   
 
 You can ask us any questions along the way (slack or issues)!
 
@@ -34,12 +30,11 @@ Good luck!
 
 ### Getting the data
 
-*Goal* Read the latest OHI global data into the R working space (call the data object "scores").
+*Goal* Read the latest OHI global data into the R working space (call the data object "scores"). These are the scores that were calculated for the 2023 assessment. This is the final output after running the scripts in ohi-global. Poke around at the data to get a feel for what is there.
 
 *Hint* Here is a link to the data: 
 https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv
 
-*Note* There are scores for 2023, you can ignore these. These are just here as a placeholder until we calculate new ones for 2023 (they are the 2022 scores). 
 
 ```{r, include=FALSE}
 ## Working space
@@ -49,7 +44,9 @@ https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv
 
 ### Region explore
 
-*Question* Why are there N=222 regions (see code below)...aren't there supposed to be 220? Can you make this data more human readable by including the full goal name (vs. the 2 letter abbreviation) and the country name.
+*Question* Why are there N=222 regions (see code below)...aren't there supposed to be 220? 
+
+Can you make this data more human readable by including the full goal name (vs. the 2 letter abbreviation) and the country name.
 
 *Hint 1* Here is a link to the official region list (the rgn_id column in this file matches the region_id column in the scores data): https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv
 
@@ -85,7 +82,7 @@ https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv
 
 ### Dimension explore
 
-*Question* There are 6 dimensions reported in this dataset (future, pressures, resilience, score, status, and trend).  When I look at the number of records in each of these categories, I notice that there are more "score" values reported than "status" values (see working space below). Given that scores are calculated using status, it seems like these should have the same number of records. Can you figure out what is going on here. Is something going wrong?  
+*Question* There are 6 dimensions reported in this dataset (future, pressures, resilience, score, status, and trend).  When I look at the number of records in each of these categories, I notice that there are more "score" values reported than "status" values (see working space below). Given that scores are calculated using status, it seems like these should have the same number of records. Can you figure out what is going on here. Is something going wrong?
 
 *Answer* Write your answer here!
 
@@ -106,7 +103,7 @@ https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv
 
 *Question* Figure out which goals/subgoals have the most NA values for scores in 2021.  Which ones have the least? Can you discern any reason why some goals have lots of missing values and others do not?
 
-*Hint* Include only dimension = score, and year = 2022, and cut region_id = 0.
+*Hint* Include only dimension = score, and year = 2023, and cut region_id = 0.
 
 *Answer* Write your answer here!
 
@@ -155,7 +152,9 @@ year       |  Scenario year               | 2012 to 2022
 
 ### Plot
 
-*Project* Create a scatterplot that compares 2012 and 2022 *scores* for each region for the artisanal opportunities goal. Based on this, do scores for the artisanal opportunities goal appear to have increased or decreased over time? 
+*Project* Create a scatterplot that compares 2012 and 2023 *scores* for each region for the artisanal opportunities goal. Based on this, do scores for the artisanal opportunities goal appear to have increased or decreased over time? 
+
+Why might this be? How could you begin to figure this out?
 
 *Answer* Write your answer here!
 
