@@ -222,11 +222,13 @@ stats_3nm <- read_csv(zonal_files['zonal_3nm'])
 stats_1km <- read_csv(zonal_files['zonal_1km'])
 stats_eez <- read_csv(zonal_files['zonal_eez'])
 
-# assign OHI core reagions to object
+# assign OHI core regions to object
 rgn_eez <- region_data() 
 
-# the WDPA data us published annually, so these should all be the year before the OHI year
-max_year <- max(c(stats_1km$year, stats_3nm$year, stats_eez$year), na.rm = TRUE)
+# the WDPA data is published annually, so these should all be the year before the OHI year.
+# currently 2023, checks out!
+max_year <- max(c(stats_1km$year, stats_3nm$year, stats_eez$year), na.rm = TRUE) 
+
 
 ### Determine total cells per region (n_cells_tot) and then a cumulative
 ### total of cells per region
