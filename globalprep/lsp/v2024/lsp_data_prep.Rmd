@@ -70,7 +70,7 @@ knitr::opts_chunk$set(eval = FALSE)
 
 ```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
 
-knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'Figs/',
+knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'figs/',
                       echo = FALSE, message = FALSE, warning = FALSE, eval=FALSE)
 
 library(raster)
@@ -217,7 +217,7 @@ Finally we can calculate the status of a region for any given year by finding th
 
 ```{r summarize_zonal_stats, eval = FALSE}
 
-# read in LSP zone csvs created abvove
+# read in LSP zone csvs created above
 stats_3nm <- read_csv(zonal_files['zonal_3nm'])
 stats_1km <- read_csv(zonal_files['zonal_1km'])
 stats_eez <- read_csv(zonal_files['zonal_eez'])
@@ -316,6 +316,7 @@ resil_3nm <- read_csv(file.path(dir_goal, 'intermediate', 'area_protected_3nm.cs
 resil_eez <- read_csv(file.path(dir_goal, 'intermediate', 'area_protected_eez.csv')) %>%
   mutate(resilience.score = (a_prot_km2 / a_tot_km2) / area_ref,
          resilience.score = ifelse(resilience.score > 1, 1, resilience.score))
+# ask Mel about using file.path versus here function
 
 ## Save resilience scores for 3 nm and EEZ data in output
   tmp_3nm <- resil_3nm %>%
@@ -336,25 +337,28 @@ There was no gapfilling for these data. Created gapfill files with values of 0.
 
 ```{r}
 library(dplyr)
-
+# gap fill for eez
 res_eez <- read.csv("output/mpa_eez_resilience.csv")%>%
   mutate(resilience.score = 0) %>% 
   rename(gapfilled = resilience.score)
 
 write.csv(res_eez, "output/mpa_eez_resilience_gf.csv", row.names=FALSE)
 
+# gap fill for 3nm
 res_3nm <- read.csv("output/mpa_3nm_resilience.csv")%>%
   mutate(resilience.score = 0) %>% 
   rename(gapfilled = resilience.score)
 
 write.csv(res_3nm, "output/mpa_3nm_resilience_gf.csv", row.names=FALSE)
 
+# gap fill for inland 1km
 inland <- read.csv("output/lsp_prot_area_inland1km.csv") %>%
   mutate(a_prot_1km = 0) %>% 
   rename(gapfilled = a_prot_1km)
 
 write.csv(inland, "output/lsp_prot_area_inland1km_gf.csv", row.names=FALSE)
 
+# gap fill for offshore 3nm
 offshore <- read.csv("output/lsp_prot_area_offshore3nm.csv") %>%
   mutate(a_prot_3nm = 0)%>% 
   rename(gapfilled = a_prot_3nm)
@@ -366,12 +370,12 @@ write.csv(offshore, "output/lsp_prot_area_offshore3nm_gf.csv", row.names=FALSE)
 
 # Data checking
 
-Plot scores for 2020 vs 2019 assessment years
+Plot scores for 2022 vs 2023 assessment years
 
--   2020 AY data goes through March (downloaded on April 1) 2020
--   2021 AY data goes through Jan (downloaded on Feb 2) 2021
+-   2022 AY data goes through December 2022
+-   2023 AY data goes through December (downloaded on May 24, 2024) 2023
 
-```{r plot_scores_vs_v2016, plotly = TRUE, eval = FALSE}
+```{r plot_scores_vs_v2022, plotly = TRUE, eval = FALSE}
 
 library(ggplot2)
 #library(plotly)
@@ -386,7 +390,7 @@ status_3nm_new <- read_csv(file.path(dir_goal, 'output', 'lsp_prot_area_offshore
   filter(year == max(year)) %>%
   dplyr::select(rgn_id, pct_prot_3nm_new, status_3nm_new)
 
-status_3nm_old <- read_csv(file.path(dir_goal, '../v2022/output', 'lsp_prot_area_offshore3nm.csv')) %>%
+status_3nm_old <- read_csv(file.path(dir_goal, '../v2024/output', 'lsp_prot_area_offshore3nm.csv')) %>%
   full_join(read_csv(file.path(dir_goal, 'output', 'rgn_area_offshore3nm.csv')),
             by = 'rgn_id') %>%
   mutate(pct_prot_3nm_old = a_prot_3nm / area,
@@ -405,7 +409,7 @@ status_1km_new <- read_csv(file.path(dir_goal, 'output', 'lsp_prot_area_inland1k
   filter(year == max(year)) %>%
   dplyr::select(rgn_id, pct_prot_1km_new, status_1km_new)
 
-status_1km_old <- read_csv(file.path(dir_goal, '../v2022/output', 'lsp_prot_area_inland1km.csv')) %>%
+status_1km_old <- read_csv(file.path(dir_goal, '../v2024/output', 'lsp_prot_area_inland1km.csv')) %>%
   full_join(read_csv(file.path(dir_goal, 'output', 'rgn_area_inland1km.csv')),
             by = 'rgn_id') %>%
   mutate(pct_prot_1km_old = a_prot_1km / area,
@@ -445,6 +449,7 @@ lsp_status_plot <- ggplot(lsp_new_old,
   facet_wrap( ~ rgn)
 
 lsp_status_plot #got rid of ggplotly
+# looks great!
 
 # save plot to figs folder
 ggsave(file.path(dir_goal, 'figs/plot_v2022_v2023.png'), 
@@ -457,5 +462,6 @@ mjr_score_change <- lsp_new_old %>%
   mutate(abs_diff = abs(diff))
 
 # save major score changes to output folder as csv
-write.csv(mjr_score_change, "output/major_changes_2023.csv")
+# no data was available - ask Mel
+write.csv(mjr_score_change, "output/major_changes_2024.csv")
 ```
