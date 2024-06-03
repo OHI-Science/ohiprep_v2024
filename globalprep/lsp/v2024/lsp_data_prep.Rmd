@@ -145,7 +145,7 @@ rgn_rast_list <- rgn_rast_list[!file.exists(zonal_files)]
       # In FUN(X[[i]], ...) : integer overflow - use sum(as.numeric(.))
   ### zonal() wouldn't work since we want to track the frequency of each
   ### year value within each rgn_id value.
-  
+
   lsp_crosstab <- function(rgn_rast_file, rast_values) {
     rgn_rast <- terra::rast(rgn_rast_file)
     message('Cross tabulating ', rgn_rast_file)
