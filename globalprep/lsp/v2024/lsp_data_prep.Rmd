@@ -169,10 +169,10 @@ ptm <- proc.time()
 x <- lsp_crosstab(rgn_rast_list[1], rast_values = rast_wdpa) #~35 minutes to run #3nm
 cat('writeRaster elapsed: ', (proc.time() - ptm)[3])
 
-y <- lsp_crosstab(rgn_rast_list[2], rast_values = rast_wdpa) #19 minutes to run #1km
+y <- lsp_crosstab(rgn_rast_list[2], rast_values = rast_wdpa) #35 minutes to run #1km
 cat('writeRaster elapsed: ', (proc.time() - ptm)[3])
 
-z <- lsp_crosstab(rgn_rast_list[3], rast_values = rast_wdpa) #~50 min minutes to run #eez
+z <- lsp_crosstab(rgn_rast_list[3], rast_values = rast_wdpa) #~51 min minutes to run #eez
 cat('writeRaster elapsed: ', (proc.time() - ptm)[3])
 
 ## Save these files to the intermediate folder
