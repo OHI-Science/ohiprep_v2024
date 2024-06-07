@@ -172,8 +172,7 @@ all(paste(dest_dir, basename(files), sep="/") %in% files_t)
 
   lsp_crosstab <- function(rgn_rast_file, rast_values) { # rgn_rast_file <- rgn_rast_list[1]
     rgn_rast <- terra::rast(rgn_rast_file)
-    rgn_rast <- raster::raster(rgn_rast_file)
-    terra_rast <- terra::rast(rgn_rast)
+    rgn_rast = rgn_rast+0 ## Adding this in to ensure rgn_id values are correct 
     message('Cross tabulating ', rgn_rast_file)
     rast_df <- terra::crosstab(c(rast_values, rgn_rast), useNA = TRUE) %>%
       as.data.frame() %>%
@@ -186,12 +185,12 @@ all(paste(dest_dir, basename(files), sep="/") %in% files_t)
   }
 
 # Processing & saving zonal statistics for a single raster 
-  
+
 # time stamp
 ptm <- proc.time()
 
 # run the function over the wdpa raster using each of the LSP zones
-x <- lsp_crosstab(rgn_rast_list[1], rast_values = rast_wdpa) #~25 minutes to run #3nm
+x <- lsp_crosstab(rgn_rast_list[1], rast_values = rast_wdpa) #~35 minutes to run #3nm
 cat('writeRaster elapsed: ', (proc.time() - ptm)[3])
 
 y <- lsp_crosstab(rgn_rast_list[2], rast_values = rast_wdpa) #19 minutes to run #1km
