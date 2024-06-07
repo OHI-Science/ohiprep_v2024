@@ -182,6 +182,24 @@ write_csv(z, zonal_files_to_run[3])
 
 ```
 
+### 2024 Issue with lsp layer: checking to ensure that terr::rast() method works. See Issue LSP #286  
+
+```{r 'testing terra::raster function', include=FALSE}
+rgn_rast = terra::rast(rgn_rast_list[1]) ## Create SpatRaster object using 'terra' package 
+rgn_rast  = rgn_rast+0 ## Add zero 
+df = freq(rgn_rast) ## Turns frequency table into a dataframe (should have 3 columns: layer, value, count) 
+
+rgn_rast2 = raster::raster(rgn_rast_list[1]) ##Create RasterLayer object using 'raster' package
+df2 = as.data.frame(rgn_rast2@data@attributes) ## Creates dataframe from attributes (Should have 3 columns: ID, OBJECTID, Count) 
+df$difference_rgn = df$value - df2$ID ## Creating new column in 'df' that is the difference between 'value' and 'ID' to ensure that the region ID's are matched up for both of the rasters
+unique(df$difference_rgn) ## Should return one value: zero 
+
+df$difference_count = df$count - df2$Count ## Creating new column in 'df' that is the difference between the counts for each region. If these are the same then calling unique() on the difference should return one value: zero
+unique(df$difference_count) ## Should return one value: zero
+```
+
+
+
 Once the WDPA raster is cross-tabulated against the OHI region rasters (both 3 nm offshore and 1 km inland) we have the number of protected cells, identified by year of protection, within each region. NA values are unprotected cells.
 
 ### Summary of zonal stats dataframes (3 nm offshore):
@@ -391,7 +409,7 @@ status_3nm_new <- read_csv(file.path(dir_goal, 'output', 'lsp_prot_area_offshore
   filter(year == max(year)) %>%
   dplyr::select(rgn_id, pct_prot_3nm_new, status_3nm_new)
 
-status_3nm_old <- read_csv(file.path(dir_goal, '../v2024/output', 'lsp_prot_area_offshore3nm.csv')) %>%
+status_3nm_old <- read_csv(file.path(dir_goal, '../v2023/output', 'lsp_prot_area_offshore3nm.csv')) %>%
   full_join(read_csv(file.path(dir_goal, 'output', 'rgn_area_offshore3nm.csv')),
             by = 'rgn_id') %>%
   mutate(pct_prot_3nm_old = a_prot_3nm / area,
@@ -410,7 +428,7 @@ status_1km_new <- read_csv(file.path(dir_goal, 'output', 'lsp_prot_area_inland1k
   filter(year == max(year)) %>%
   dplyr::select(rgn_id, pct_prot_1km_new, status_1km_new)
 
-status_1km_old <- read_csv(file.path(dir_goal, '../v2024/output', 'lsp_prot_area_inland1km.csv')) %>%
+status_1km_old <- read_csv(file.path(dir_goal, '../v2023/output', 'lsp_prot_area_inland1km.csv')) %>% 
   full_join(read_csv(file.path(dir_goal, 'output', 'rgn_area_inland1km.csv')),
             by = 'rgn_id') %>%
   mutate(pct_prot_1km_old = a_prot_1km / area,
@@ -444,16 +462,16 @@ lsp_status_plot <- ggplot(lsp_new_old,
   geom_point(alpha = .6) +
   theme(legend.position = 'none') +
   geom_abline(slope = 1, intercept = 0, color = 'red') +
-  labs(x = 'LSP status v2022 (data through Jan 2022)',
-       y = 'LSP status v2023 (data through Jun 2023)',
-       title = 'Comparing LSP status: 2023 vs 2022') +
+  labs(x = 'LSP status v2023 (data through Jan 2022)',
+       y = 'LSP status v2024 (data through Jun 2023)',
+       title = 'Comparing LSP status: 2024 vs 2023') +
   facet_wrap( ~ rgn)
 
 lsp_status_plot #got rid of ggplotly
 # looks great!
 
 # save plot to figs folder
-ggsave(file.path(dir_goal, 'figs/plot_v2022_v2023.png'), 
+ggsave(file.path(dir_goal, 'figs/plot_v2023_v2024.png'), 
        plot = lsp_status_plot, height = 4.5, width = 6)
 
 # create data frame with scores that changed by more than 0.05
