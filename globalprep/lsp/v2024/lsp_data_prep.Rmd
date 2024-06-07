@@ -146,7 +146,31 @@ rgn_rast_list <- rgn_rast_list[!file.exists(zonal_files)]
   ### zonal() wouldn't work since we want to track the frequency of each
   ### year value within each rgn_id value.
 
-  lsp_crosstab <- function(rgn_rast_file, rast_values) {
+# Load necessary library
+library(tools)
+
+# Define the source and destination directories
+source_dir <- "/home/shares/ohi/git-annex/globalprep/spatial/d2014/data/rgn_mol_raster_500m"
+dest_dir <- "/home/shares/ohi/git-annex/globalprep/spatial/d2014/data/rgn_mol_raster_500m_old"
+
+# Create the destination directory if it doesn't already exist
+if (!dir.exists(dest_dir)) {
+  dir.create(dest_dir)
+}
+
+# List all files in the source directory
+files <- list.files(source_dir, full.names = TRUE)
+
+# Copy all files to the destination directory
+file.copy(files, dest_dir)
+
+# Optionally, check if all files have been copied
+files_dest <- list.files(dest_dir, full.names = TRUE)
+all(paste(dest_dir, basename(files), sep="/") %in% files_t)
+
+
+
+  lsp_crosstab <- function(rgn_rast_file, rast_values) { # rgn_rast_file <- rgn_rast_list[1]
     rgn_rast <- terra::rast(rgn_rast_file)
     rgn_rast = rgn_rast+0 ## Adding this in to ensure rgn_id values are correct 
     message('Cross tabulating ', rgn_rast_file)

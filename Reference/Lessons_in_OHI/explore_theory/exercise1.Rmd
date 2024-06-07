@@ -71,13 +71,13 @@ QUESTION: How did a pressure change from 100 to 50 affect the final score?  Was 
 <br>
 5. To calculate the Fishery subgoal, we:
 
-a. Obtain B/Bmsy  scores for each stock that is harvested.   B/Bmsy is defined as: the ratio of observed biomass to the biomass that would provide maximum sustainable yield. When B/BMSY = 1, then biomass equals BMSY. If B/BMSY falls below 1, biomass is too low to provide maximum sustainable yield. For example, if B/BMSY = 0.5, then biomass is only 50% of that needed for maximum sustainable yield. (from: http://www.catchshareindicators.org/wp-content/uploads/2013/12/NE_Biomass_Feb-2014.pdf)
+a. Obtain B/Bmsy  scores for each stock that is harvested.   B/Bmsy is defined as: the ratio of observed biomass to the biomass that would provide maximum sustainable yield. When B/BMSY = 1, then biomass equals BMSY. If B/BMSY falls below 1, we have fished to much and the biomass is too low to provide maximum sustainable yield. For example, if B/BMSY = 0.5, then biomass is only 50% of that needed for maximum sustainable yield. (from: http://www.catchshareindicators.org/wp-content/uploads/2013/12/NE_Biomass_Feb-2014.pdf)
 
-b. Convert B/Bmsy into a stock status score that ranges from 0-1, with one reflecting a perfect score.  The relationship between B/Bmsy values and stock status scores looks like this:
+b. We then convert B/Bmsy into a stock status score that ranges from 0-1, with 1 reflecting a perfect score.  The relationship between B/Bmsy values and stock status scores looks like this:
 
 ![](figures/fis_methods.png)
 
-c. Take some sort of average of the stock status scores within each region (for the global we use a geometric mean weighted by catch).
+c. Finally we average the stock status scores within each region (for the global we use a geometric mean weighted by catch).
 
 QUESTION: B/Bmsy scores greater than 1 indicate the stock is doing well, but is underharvested!  Given this, do you think we should penalize underharvesting? Why? Do you have any ideas for how we could account for underharvesting without unduly penalizing regions that are trying to let stocks recover? 
 
@@ -129,7 +129,7 @@ Find the Lasting Special Places function.  See if you can reconcile the model de
 <br>
 <br>
 
-9. We are going to walk through a trend calculation.  If R is installed on your computer, follow along.
+9. We are going to walk through a trend calculation.  Using R, foollow along with the calculations.
 
 Status data for a region's Tourism and Recreation goal:
 
@@ -175,7 +175,7 @@ QUESTION: Can you think of any scenarios when we would not use 5 years of data t
 ### Goal pressure and resilience
 <br>
 
-10. The pressure dimension plays a relatively small role in goal scores (see figure 4.1), but it takes a lot of effort to prepare the data!
+10. The pressure dimension plays a relatively small role in goal scores (see figure 4.1), but it takes a lot of effort to prepare these data!
 
 The final pressure dimension is calculated for each region and goal using a function from the ohicore package.  The function requires several pieces of information:
 
