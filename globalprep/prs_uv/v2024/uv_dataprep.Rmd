@@ -18,56 +18,58 @@ pdf_document:
 
 # Summary
 
-The Ultraviolet Radiation pressure layer is generated from daily data on Local Noon Erythemal UV Irradiance (mW/m2) derived from satellite observations. 
+The Ultraviolet Radiation pressure layer is generated from daily data on Local Noon Erythemal UV Irradiance (mW/m2) derived from satellite observations.
 
-1. Average the data for each week/year/cell  
-2. For each week/year/cell, calculate the mean and sd, so each cell would have ~624 (12*52) values (2004-2016)  
-3. Determine which of these were anomalous, defined as greater than the mean plus 1 standard deviation  
-4. Sum weekly anomalies for each year/cell (for a total of 52 possible anomalies per year/cell)  
-5. Calculate the total number of anomalies in the reference period (in our case, 2004-2009, for a total of 52*5 anomalies per cell)  
-6. Calculate the total number of anomalies in 5-year periods (e.g. 2014-2018, 2013 - 2017, etc.)    
-7. then for each cell, get the difference between current anomalies and reference anomalies (total over the reference period 2005-2009)    
-8. Rescale the data to be between 0-1 by using the 99.99th quantile as the reference point
+1.  Average the data for each week/year/cell\
+2.  For each week/year/cell, calculate the mean and sd, so each cell would have \~624 (12\*52) values (2004-2016)\
+3.  Determine which of these were anomalous, defined as greater than the mean plus 1 standard deviation\
+4.  Sum weekly anomalies for each year/cell (for a total of 52 possible anomalies per year/cell)\
+5.  Calculate the total number of anomalies in the reference period (in our case, 2004-2009, for a total of 52\*5 anomalies per cell)\
+6.  Calculate the total number of anomalies in 5-year periods (e.g. 2014-2018, 2013 - 2017, etc.)\
+7.  then for each cell, get the difference between current anomalies and reference anomalies (total over the reference period 2005-2009)\
+8.  Rescale the data to be between 0-1 by using the 99.99th quantile as the reference point
 
 # Updates from previous assessment
 
-- One additional year of data was added to Mazu 
-- Converted more functions to use the `terra` package instead of `raster`
-- Added more tic/tocs
+-   One additional year of data was added to Mazu
+-   Converted more functions to use the `terra` package instead of `raster`
+-   Added more tic/tocs
 
-***
+------------------------------------------------------------------------
 
-# Data Source  
+# Data Source
 
-**Data Summary**: https://disc.gsfc.nasa.gov/datasets/OMUVBd_V003/summary  
+**Data Summary**: <https://disc.gsfc.nasa.gov/datasets/OMUVBd_V003/summary>
 
-**Download Link**: https://acdisc.gesdisc.eosdis.nasa.gov/data/Aura_OMI_Level3/OMUVBd.003/  
+**Download Link**: <https://acdisc.gesdisc.eosdis.nasa.gov/data/Aura_OMI_Level3/OMUVBd.003/>
 
-**Reference**: The Ultraviolet Radiation pressures layer uses the [Aura OMI Global Surface UVB Data Product](https://disc.gsfc.nasa.gov/datasets?page=1&source=AURA%20OMI). 
+**Reference**: The Ultraviolet Radiation pressures layer uses the [Aura OMI Global Surface UVB Data Product](https://disc.gsfc.nasa.gov/datasets?page=1&source=AURA%20OMI).
 
-**Native Data Resolution**: 1 degree  
+**Native Data Resolution**: 1 degree
 
-**Values**: Level-3 OMI Surface UV Irradiance and Erythemal Dose- OMUVBd  
+**Values**: Level-3 OMI Surface UV Irradiance and Erythemal Dose- OMUVBd
 
-**Time Range**: Daily data from 2005 - 2022 (10/1/2004 through 06/26/2023, but only full years of data are used)  
-**Format**: NetCDF HDF5 (.he5.nc)  
+**Time Range**: Daily data from 2005 - 2023 (10/1/2004 through 06/06/2024, but only full years of data are used)
 
-**Downloaded**: June 26, 2023 (three files manually replaced on June 28, 2023)
+\
+**Format**: NetCDF HDF5 (.he5.nc)
 
-# Data citation information  
+**Downloaded**: June 10, 2024
 
-Jari Hovila, Antii Arola, and Johanna Tamminen (2013), OMI/Aura Surface UVB Irradiance and Erythemal Dose Daily L3 Global Gridded 1.0 degree x 1.0 degree V3, NASA Goddard Space Flight Center, Goddard Earth Sciences Data and Information Services Center (GES DISC), Accessed: June 26, 2023, 10.5067/Aura/OMI/DATA3009
+# Data citation information
 
-***
-  
-# Methods  
+Jari Hovila, Antii Arola, and Johanna Tamminen (2013), OMI/Aura Surface UVB Irradiance and Erythemal Dose Daily L3 Global Gridded 1.0 degree x 1.0 degree V3, NASA Goddard Space Flight Center, Goddard Earth Sciences Data and Information Services Center (GES DISC), Accessed: June 10, 2024, 10.5067/Aura/OMI/DATA3009
+
+------------------------------------------------------------------------
+
+# Methods
 
 ## Setup
 
 ```{r setup, message = F, warning = F, eval=F}
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 
-current_yr <- 2023  ############## UPDATE ME
+current_yr <- 2024  ############## UPDATE ME
 data_yr <- paste0("d", current_yr)
 version_yr <- paste0("v", current_yr)
 
@@ -131,52 +133,51 @@ mollCRS <- crs("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs
 cols <- rev(colorRampPalette(brewer.pal(9, "Spectral"))(255))
 ```
 
+## Downloading the NetCDF (.he5.nc) Files
 
-## Downloading the NetCDF (.he5.nc) Files 
+Data files can be found in the [GES DISC EARTHDATA Data Archive](https://disc.gsfc.nasa.gov/datasets/OMUVBd_003/summary).
 
-Data files can be found in the [GES DISC EARTHDATA Data Archive](https://disc.gsfc.nasa.gov/datasets/OMUVBd_003/summary). 
+**Steps:**
 
-__Steps:__  
+1.  An EarthData account will be required, and will need to be linked to the GES DISC data archive.
 
-1. An EarthData account will be required, and will need to be linked to the GES DISC data archive.  
+-   [Instructions here](https://disc.gsfc.nasa.gov/earthdata-login).
 
-- [Instructions here](https://disc.gsfc.nasa.gov/earthdata-login). 
+2.  Download a links list for the variable "ErythemalDailyDose", in NetCDF format.
 
-2. Download a links list for the variable "ErythemalDailyDose", in NetCDF format. 
+-   [Navigate here](https://disc.gsfc.nasa.gov/datasets/OMUVBd_003/summary), and click on "Subset / Get Data".
 
-- [Navigate here](https://disc.gsfc.nasa.gov/datasets/OMUVBd_003/summary), and click on "Subset / Get Data". 
+-   For the download method, select "Get File Subsets using OPeNDAP";
 
-- For the download method, select "Get File Subsets using OPeNDAP"; 
+    -   You don't need to change the date range (that will happen in the code below) and you don't need to change the region.
 
-  - You don't need to change the date range (that will happen in the code below) and you don't need to change the region. 
-  
-- From the variables drop down select just the "ErythemalDailyDose: Erythemal Daily Dose" option 
+-   From the variables drop down select just the "ErythemalDailyDose: Erythemal Daily Dose" option
 
-- From the file format choose netCDF. 
+-   From the file format choose netCDF.
 
-- __Note:__ this list is valid for only __2 days__. A new list must be generated if data is to be downloaded after that time frame. 
+-   **Note:** this list is valid for only **2 days**. A new list must be generated if data is to be downloaded after that time frame.
 
-3. Download the links list _.txt_ file  
-  
-- Rename the file to `file_list.txt`
+3.  Download the links list *.txt* file
 
-- Make 2 new folders 
+-   Rename the file to `file_list.txt`
 
-  - `/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/<version_year>`
+-   Make 2 new folders
 
-  - and a `/data` subfolder (See below)
+    -   `/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/<version_year>`
 
-- Place `file_list.txt` in `/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/<version_year>` 
+    -   and a `/data` subfolder (See below)
 
-4. Run the code below to download the data. 
+-   Place `file_list.txt` in `/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/<version_year>`
 
-- This will use the list and earthdata login info (username and password) to download the new data files into the raw data directory. The naming convention of the downloaded files: 'OMI-Aura' refers to the instrument, 'L3' means it is a level 3 data product, 'OMUVBd' is the measurement, the first date is when the data was recorded, the second date and time corresponds to modification/upload of the data.
+4.  Run the code below to download the data.
+
+-   This will use the list and earthdata login info (username and password) to download the new data files into the raw data directory. The naming convention of the downloaded files: 'OMI-Aura' refers to the instrument, 'L3' means it is a level 3 data product, 'OMUVBd' is the measurement, the first date is when the data was recorded, the second date and time corresponds to modification/upload of the data.
 
 Create new folders for the raw data, intermediate files, and output files
 
 ```{bash create new empty folders,eval=F}
-## Added v2023
-YEAR=2023 ###### UPDATE ME
+## Added v2024
+YEAR=2024 ###### UPDATE ME
 
 # make raw data folder for new year
 cd /home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/
@@ -187,7 +188,6 @@ mkdir -p ./v$YEAR/{output,int}
 cd v$YEAR/int
 mkdir {annual_anomalies_diff,rescaled,weekly_climatologies,weekly_mean_sd,weekly_means,weekly_sd} # v2023: add weekly_mean_sd
 ```
-
 
 ```{r earthdata login info, eval = F}
 ## need  username and password, define in console when prompted (or read from secure file), don't save here!!
@@ -579,10 +579,10 @@ toc()
 # v2023: 413.808 sec elapsed
 ```
 
-***
+------------------------------------------------------------------------
 
 # Results
- 
+
 ```{r view_output, eval=F}
 mol1km_masked <- list.files(out_dir, pattern = "uv_.*_mol_1km.tif", full.names = TRUE)
 out <- terra::rast(mol1km_masked[length(mol1km_masked)])
@@ -692,7 +692,7 @@ uv_data_selected <- uv_data %>%
 write.csv(uv_data_selected, "output/uv.csv", row.names = FALSE)
 ```
 
-## Data Check 
+## Data Check
 
 ```{r compare_previous_year, eval=F}
 ## This top part was added in 2022 to help with data checks to be able to keep track of the 
@@ -764,5 +764,4 @@ ggplotly(plot_diff_3)
 # ggplot(combined %>% mutate(difference = new_pressure - old_pressure), aes(difference)) + geom_histogram(binwidth = 0.002)
 ```
 
-
-***
+------------------------------------------------------------------------
