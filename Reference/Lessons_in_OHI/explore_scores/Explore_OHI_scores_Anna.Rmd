@@ -319,7 +319,7 @@ ggplot(data = year_diff) +
   geom_vline(xintercept = 0,
              alpha = 0.7, linetype = "dashed") +
 #  facet_wrap(~year) +
-  theme_bw() +
+  theme_minimal() +
   labs(y = "Region ID",
        x = "Difference in Scores",
        title = "Difference between Artisinal Opportunity (AO) Scores in 2012 vs. 2023"
@@ -340,6 +340,46 @@ Create a plot that shows the distribution (e.g., histogram or barplot or ??) of 
 
 ## Code to create a plot showing distribution of country Index scores
 
+# Create subset of Index scores (dropping NAs for plotting purposes)
+year_plot_df <- scores %>% 
+  filter(goal == "Index",
+         dimension == "score") %>% 
+  drop_na()
+
+# Finding mean scores for each year
+year_means <- year_plot_df %>% 
+  group_by(year) %>% 
+  summarize(mean = mean(score, na.rm = TRUE))
+
+
+ggplot(year_plot_df, aes(x = score)) + 
+  geom_histogram(color = "black",
+                 fill = "seagreen",
+                 binwidth = 2) + 
+  geom_vline(xintercept = (mean(year_plot_df$score)),
+             linetype = "dashed",
+             color = "cyan") +
+  theme_bw() + 
+  labs(x = "Score",
+       y = "Frequency",
+       title = "Distribution of OHI scores across all countries",
+       subtitle = "(2012-2023)")
+
+
+
+ggplot(year_plot_df, aes(x = score)) + 
+  geom_histogram(color = "black",
+                 fill = "seagreen",
+                 binwidth = 2) + 
+  facet_wrap(~year) + 
+  geom_vline(data = year_means, aes(xintercept = mean),
+             linetype = "dashed",
+             color = "cyan") +
+  theme_bw() + 
+  labs(x = "Score",
+       y = "Frequency",
+       title = "Distribution of OHI scores across all countries",
+       subtitle = "from 2012-2023")
 
 
 ```
