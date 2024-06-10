@@ -1,0 +1,308 @@
+---
+title: "Learning about OHI scores"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+## loading packages.. you might need to install them first
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+## OH NO!
+
+While you are working at your computer at NCEAS, you receive a frantic call from someone working on an OHI project:
+
+THEY NEED HELP!
+
+It is clearly going to be up to you to save the day!!
+
+## You've got this!
+
+Please help them answer the following questions. You will work from this document, using the code chunks as a work space to work explore the data. Do NOT bother keeping the code chunks neat and organized.
+
+You can ask us any questions along the way (slack or issues)!
+
+Good luck!
+
+## Questions
+
+### Getting the data
+
+*Goal* Read the latest OHI global data into the R working space (call the data object "scores"). These are the scores that were calculated for the 2023 assessment. This is the final output after running the scripts in ohi-global. Poke around at the data to get a feel for what is there.
+
+*Hint* Here is a link to the data: <https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv>
+
+```{r, include=FALSE}
+## Working space
+scores <- read.csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv")
+head(scores)
+unique(scores$dimension) # there are 6 different dimensions for the scores 
+length(unique(scores$region_id)) # 222 diff regions
+```
+
+### Region explore
+
+*Question* Why are there N=222 regions (see code below)...aren't there supposed to be 220?
+
+Can you make this data more human readable by including the full goal name (vs. the 2 letter abbreviation) and the country name.
+
+*Hint 1* Here is a link to the official region list (the rgn_id column in this file matches the region_id column in the scores data): <https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv>
+
+*Hint 2* Here is a table that includes goal names: <https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/metadata_documentation/ohi_model/tables/ten_goals.csv>
+
+*Hint 3* Which region has all NA values for scores?
+
+*Answer* Based on the "ten_goals" csv, it looks like Antarctica is not included in the global assessment, giving it all NAs for all the goals. It seems there is a region id #0 within the regions_list but not within the scores, which is where the global average is! That is why there are 222 and not 220.
+
+```{r, include=FALSE}
+## Working space
+rgn_id <- read.csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv")
+goals <- read.csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/metadata_documentation/ohi_model/tables/ten_goals.csv") %>% janitor::clean_names()
+
+# based on the "ten_goals" csv, it looks like Antarctica is not included in the global assessment, giving it all NAs for all the goals.
+
+# there are 222 because regions are within the same country 
+length(unique(rgn_id$rgn_id)) # 221 regions
+length(unique(rgn_id$admin_rgn_id)) # 152 countries
+
+scores_group <- scores %>%
+  filter(dimension == "score") %>%
+  select(goal, region_id, score) %>%
+  group_by(region_id, goal) %>%
+  filter(is.na(score)) %>%
+  summarize()
+
+# checking scores_group
+unique(scores_group$score)
+
+# joining to make a more readable 
+join_scores <- scores %>%
+  left_join(rgn_id, join_by("region_id" == "rgn_id")) %>%
+  group_by(region_id)
+
+join_goal <- join_scores %>%
+  rename() %>%
+  left_join(goals, join_by("goal" == "abbreviation")) %>%
+  select(goal, goal.y, rgn_name, score)
+
+```
+
+*Question* Which region id corresponds to the United States?
+
+163! Memorize, can use this to check things because it always has the data!
+
+```{r}
+us <- rgn_id %>%
+  filter(admin_country_name == "United States")
+```
+
+### Goal explore
+
+*Question* When I look at the number of goals, N=19 show up....I thought there were supposed to be 10 goals!!! Can you explain what all these are? Also, why do some of the goal abbreviations have 2 letters and others 3 letters?
+
+*Hint 1* Review the methods doc here: <https://raw.githack.com/OHI-Science/ohi-global/published/documents/methods/Supplement.html>
+
+*Answer* It is because of the subgoals!! There is also the "Index" which is the country average from the equal weighted. Goals have two letters and subgoals have three.
+
+```{r, include=FALSE}
+## Working space
+
+
+```
+
+### Dimension explore
+
+*Question* There are 6 dimensions reported in this dataset (future, pressures, resilience, score, status, and trend). When I look at the number of records in each of these categories, I notice that there are more "score" values reported than "status" values (see working space below). Given that scores are calculated using status, it seems like these should have the same number of records. Can you figure out what is going on here. Is something going wrong?
+
+*Answer* Write your answer here!
+
+```{r, include=FALSE}
+## Working space
+
+# unique(scores$dimension)
+# table(scores$dimension)
+# 
+# table(scores$goal)
+# table(scores$goal, scores$dimension)
+
+scores_dropna <- scores %>%
+  filter(!is.na(score))
+
+unique(scores_dropna$dimension)
+table(scores_dropna$dimension)
+
+table(scores_dropna$goal)
+
+# the status for the index is not calculated, and does not have pressures, resilience, status, or trend calculated. 
+
+# why are status and future not equal in number? 
+```
+
+### Missing data
+
+*Question* Figure out which goals/subgoals have the most NA values for scores in 2021. Which ones have the least? Can you discern any reason why some goals have lots of missing values and others do not?
+
+*Hint* Include only dimension = score, and year = 2023, and cut region_id = 0.
+
+*Answer* TR has the most NA values, at 58, and many have the least at 1. It is possible that there isn't data for certain indices because for some goals there were no values associated with them. It might not be publicly available information.
+
+```{r, include=FALSE}
+## Working space
+
+scores_2021 <- scores %>%
+  filter(year == "2021" & dimension == "score" & region_id != "0") %>%
+  group_by(goal) %>%
+  filter(is.na(score)) %>%
+  summarize(count_na = n())
+
+scores_most_nas <- scores_2021 %>%
+  filter(count_na %in% max(count_na))
+
+scores_least_nas <- scores_2021 %>%
+  filter(count_na %in% min(count_na))
+
+table(scores_least_nas)
+  
+# scores_2021[which.max(scores_2021$n), ]
+
+#
+```
+
+### Scores
+
+*Question* If we have a goal with a future status of 80 and status of 90...what is the score?
+
+*Hint* Isolate the future, status, and score values for one region and one goal and see if you can identify a pattern.
+
+*Answer* If you have a goal with a future status of 80 and a status of 90, the score would be an average between the two (as seen over patterns and in Mel's presentation about how scores work).
+
+```{r, include=FALSE}
+## Working space
+
+isolated <- scores %>%
+  filter(goal == "FIS" & region_id == "163") %>%
+  filter(dimension == c("future", "status", "score"))
+  
+scores_func <- function(future, status){
+  score = ((future) + (status))/2
+  return(score)
+}
+
+scores_func(80, 90)
+
+#the score is 85!
+```
+
+### Metadata
+
+*Project* Based on your data exploration and other resources, provide some metadata that describes each variable. Write it so it would be useful to you in the future as you are looking through these data.
+
+Write it in the following table. NOTE: Knit the document to see if the table is formatting correctly (but don't bother if you do not know how to knit a document or if you are running into errors!).
+
+| Variable  | Description                                                                                         | Values                                                                         |
+|-----------------|----------------------------------|---------------------|
+| goal      | Abbreviation for a goal (two letters) or subgoal (three letters)                                    | FP, AO, NP, CS, CP, SP, LE, TR, CW, BE, FIS, MAR, LIV, ECO, ICO, LSP, HAB, SPP |
+| dimension | Parameters used to calculate scores, and score itself                                               | future, pressures, resilience, score, status, trend                            |
+| region_id | Unique values for each region                                                                       | 222 unique values (1-250)                                                      |
+| score     | The quantitative value for each goal and region. Included is the index, which is a weighted average | 0-100                                                                          |
+| year      | Scenario year                                                                                       | 2012 to 2022                                                                   |
+
+```{r, include=FALSE}
+## Working space
+
+unique(scores$dimension)
+```
+
+### Plot
+
+*Project* Create a scatterplot that compares 2012 and 2023 *scores* for each region for the artisanal opportunities goal. Based on this, do scores for the artisanal opportunities goal appear to have increased or decreased over time?
+
+Why might this be? How could you begin to figure this out?
+
+*Answer* Write your answer here!
+
+```{r, include=FALSE}
+## Working space
+
+# filter the data to only include the AO scores for 2012 and 2023
+ao_2021_2023 <- scores %>%
+  filter(goal == "AO" & dimension == "score") %>%
+  filter(year %in% c("2012", "2023")) %>%
+  filter(!is.na(score)) %>%
+  pivot_wider(names_from = year, values_from = score) %>%
+  mutate(change = `2023` - `2012`)
+```
+
+```{r}
+#| fig-cap: "Change in Artisanal Opportunities Scores from 2012 to 2023 depicted using a scatterplot. The higher the percent change in score, the more the score increased from 2012 to 2023."
+#| label: fig-plot1
+
+ggplot(ao_2021_2023) +
+  geom_point(aes(x = change, 
+                 y = region_id, 
+                 color = change)) +
+  labs(title = "Change in Artisanal Opportunities Scores from 2012 to 2023",
+       x = "Percent change in score",
+       y = "Region ID") +
+  scale_color_viridis_c(option = "seaborn") +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.7) +
+  theme_minimal() +
+  theme(legend.position = "none") 
+```
+
+```{r}
+#| fig-cap: "Change in Artisanal Opportunities Scores from 2012 to 2023 depicted as a lineplot. The higher the percent change in score, the more the score increased from 2012 to 2023."
+#| label: fig-plot2
+
+ggplot(ao_2021_2023) +
+  geom_line(aes(x = region_id, y = change, color = change)) +
+  labs(title = "Artisanal Opportunities Scores in 2012 and 2023",
+       x = "Region ID",
+       y = "Score") +
+  scale_color_viridis_c(option = "seaborn") +
+  geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.7) +
+  theme_minimal() +
+  theme(legend.position = "none") 
+```
+
+```{r}
+#| fig-cap: "Change in Artisanal Opportunities Scores from 2012 to 2023. The higher the percent change in score, the more the score increased from 2012 to 2023."
+#| label: fig-plot3
+
+ggplot(ao_2021_2023) +
+  geom_col(aes(x = region_id, y = change, fill = change)) +
+  labs(title = "Change in Artisanal Opportunities Scores from 2012 to 2023",
+       x = "Region ID",
+       y = "Percent change in score") +
+  scale_fill_viridis_c(option = "seaborn") +
+  theme_minimal() +
+  theme(legend.position = "none") 
+```
+
+```{r}
+#| fig-cap: "Number of Regions that Increased, Decreased, or Stayed the Same in Artisanal Opportunities Scores from 2012 to 2023."
+#| label: fig-plot4
+
+# plot of the number of regions that increased, decreased, or stayed the same
+
+library(stringr)
+library(forcats)
+
+title <- "Number of Regions that Increased, Decreased, or Stayed the Same in Artisanal Opportunities Scores from 2012 to 2023"
+
+ao_2021_2023 %>%
+  summarize(increased = sum(change > 0),
+            decreased = sum(change < 0),
+            unchanged = sum(change == 0)) %>%
+  pivot_longer(cols = c(increased, decreased, unchanged), names_to = "change", values_to = "count") %>%
+  ggplot(aes(x = fct_rev(fct_reorder(change, count)), y = count, fill = change)) +
+  geom_col() +
+  labs(title = str_wrap(title, width = 50),
+       x = "Change in Score",
+       y = "Number of Regions") +
+  scale_fill_viridis_d() +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
