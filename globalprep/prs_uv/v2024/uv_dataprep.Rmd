@@ -196,10 +196,13 @@ usrname <- readline("Type earthdata username: ")
 pass <- readline("Type earthdata password: ")
 ```
 
+2024 note: I used the same login information as last year. See the GitHub issue [#289](https://github.com/OHI-Science/globalfellows-issues/issues/289)
+
 ```{r download the data, eval = F}
 ## This took 103.5 minutes in 2019... 
 ## This took like 6 hours in 2022 for some reason... You can leave this running after hours if need be, and it should keep going
 ## v2023: 8261.674 sec elapsed (137.7 minutes)
+
 tic()
 ## read in file list .text, downloaded from earthdata & saved in destination folder (same as raw_data_dir)
 file_list_raw <- read_delim(
