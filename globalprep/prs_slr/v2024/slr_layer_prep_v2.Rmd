@@ -14,6 +14,8 @@ output:
       in_header: '../../../workflow/templates/ohi_hdr.html'
 pdf_document:
   toc: true
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Summary
@@ -89,7 +91,7 @@ source('../../../workflow/R/common.R')
 library(here)
  
 ## define paths and variables to use throughout data prep
-scen_year <- 2023 # change to reflect assessment year!
+scen_year <- 2024 # change to reflect assessment year!
 dir_anx_aviso <- file.path(dir_M, "git-annex/globalprep/_raw_data/AVISO_slr") 
 dir_prs_slr <-  sprintf("%s/git-annex/globalprep/prs_slr/v%s", dir_M, scen_year)
 
@@ -123,12 +125,12 @@ If you don't want to go through the trouble of running the download process in R
 
 ## need AVISO username and password, define the following line of code in console (as is), then when prompted, enter the username and password string, don't save the login information here in the script
 ## if either password or username contain the @ symbol, replace with '%40' (percent-encoding for reserved characters)
-userpasswd <- readline("Type AVISO username and password, separated by colon no space:") 
+userpasswd <- readline("Type AVISO username and password, separated by colon no space:")
 ```
 
 Define file paths for data download:
 ```{r download_data, eval=FALSE}
-year <- 2021 # data year to download; lags by 2 years, since 2022 only goes to may as of now... v2023
+year <- 2022 # data year to download; lags by 2 years. 2023 goes to May as of now, and we need a full year's worth of data for v2024
 months <- str_pad(1:12, 2, pad = "0") #if they upload the rest just change the numbers here to reflect rest of months
 
 ## download data from FTP and collect each month/year in raster stack
@@ -150,7 +152,7 @@ for (mo in months){
   
   ## retrieve the data (compressed, gzipped files prior to 2021 data, and just .nc files starting with 2021 data)
   # sprintf() contains %s in two places, which represent the two spots that will get filled with the two strings specified in the following arguments `ub` and `mo`
-  u <- sprintf("%s/dt_global_allsat_msla_h_y2021_m%s.nc", ub, mo)
+  u <- sprintf("%s/dt_global_allsat_msla_h_y2022_m%s.nc", ub, mo)
   u_filename <- file.path(dir_anx_aviso, paste0("d", scen_year), substr(u, 121, 156)) # this directs the file into the correct data folder (d202?) and names the file with the value of substr(u, 121, 156)
   res <- httr::GET(u, write_disk(u_filename))
 }
