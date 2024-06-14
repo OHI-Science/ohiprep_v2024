@@ -15,7 +15,7 @@ output:
 pdf_document:
   toc: true
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 # Summary
@@ -41,13 +41,13 @@ This process is completed entirely within this script. The raw data is downloade
 
 # Data
 
-The source data are monthly mean sea level anomalies, in meters. These anomalies are calculated by subtracting the current absolute sea level for each month from the average sea level for that month calculated from 1993 - 2015.
+The source data are monthly mean sea level anomalies, in meters. These anomalies are calculated by subtracting the current absolute sea level for each month from the average sea level for that month calculated from 1993 - 2022.
 
 **Reference**: The altimeter products were produced and distributed by Aviso (http://www.aviso.altimetry.fr/), as part of the Ssalto ground processing segment. [AVISO MSLA heights, monthly means](https://www.aviso.altimetry.fr/en/data/products/sea-surface-height-products/global/gridded-sea-level-anomalies-mean-and-climatology.html#c10358)  
-**Downloaded**: June 01, 2023  
+**Downloaded**: June 14, 2024  
 **Description**: Monthly mean sea level anomaly (meters above mean sea level) (msla_h)
 **Native data resolution**: 0.25 degree grid cells   
-**Time range**: January 1993 - December 2021
+**Time range**: January 1993 - December 2022
 **Format**: NetCDF   
 **Citation information**  The altimeter products were produced and distributed by Aviso (http://www.aviso.altimetry.fr/), as part of the Ssalto ground processing segment. [AVISO MSLA heights, monthly means](https://www.aviso.altimetry.fr/en/data/products/sea-surface-height-products/global/gridded-sea-level-anomalies-mean-and-climatology.html#c10358)
 
@@ -153,7 +153,7 @@ for (mo in months){
   ## retrieve the data (compressed, gzipped files prior to 2021 data, and just .nc files starting with 2021 data)
   # sprintf() contains %s in two places, which represent the two spots that will get filled with the two strings specified in the following arguments `ub` and `mo`
   u <- sprintf("%s/dt_global_allsat_msla_h_y2022_m%s.nc", ub, mo)
-  u_filename <- file.path(dir_anx_aviso, paste0("d", scen_year), substr(u, 121, 156)) # this directs the file into the correct data folder (d202?) and names the file with the value of substr(u, 121, 156)
+  u_filename <- file.path(dir_anx_aviso, paste0("d", scen_year), substr(u, 121, 157)) # this directs the file into the correct data folder (d202?) and names the file with the value of substr(u, 121, 156)
   res <- httr::GET(u, write_disk(u_filename))
 }
 closeAllConnections()
@@ -179,7 +179,9 @@ All NetCDF files for each month are rasterized.
 ```{r clip, eval=FALSE}
 ## d2016/msla_monthly_mean has data for 1993-2015
 ## also include list.files for d2017 through the data folder for current scenario year
-nc_files <- c(list.files(file.path(dir_anx_aviso, "d2023"),
+nc_files <- c(list.files(file.path(dir_anx_aviso, "d2024"),
+                       full.names = TRUE, pattern = ".nc"),
+              list.files(file.path(dir_anx_aviso, "d2023"),
                        full.names = TRUE, pattern = ".nc"),
               list.files(file.path(dir_anx_aviso, "d2022"),
                        full.names = TRUE, pattern = ".nc"),
@@ -246,7 +248,7 @@ for (i in seq_along(nc_files)){
 }
 
 toc()
-# v2023 - 197.377 sec elapsed
+# v2024 - 410.867 sec elapsed
 ```
 
 ## Annual mean sea level anomalies
@@ -275,7 +277,7 @@ foreach(yr = c(1993:maxyr)) %dopar% {
                 overwrite = TRUE)
 }
 toc()
-# v2023 - 71.646 sec elapsed
+# v2024 - 10.983 sec elapsed
 ```
 
 ## Changing the projection and masking
@@ -299,7 +301,9 @@ if(file.exists(ocean_mask_prev)){
   terra::writeRaster(s, sprintf("%s/int/ocean_mask.tif", dir_prs_slr, scen_year))
 }
 s <- terra::rast(sprintf("%s/int/ocean_mask.tif", dir_prs_slr, scen_year))
-plot(s, col = "red")
+plot(s, col = "red") 
+#Error in plot.xy(xy, type, ...) : 
+  # invalid type passed to graphics function
 
 annual_means <- list.files(file.path(dir_prs_slr, "int/msla_annual_mean"), full = TRUE)
 
