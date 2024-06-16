@@ -32,10 +32,8 @@ This process is completed entirely within this script. The raw data is downloade
 
 # Updates from previous assessment
 
-- One additional year of data, 2021, was added 
-- Added in code to automatically create folders when applicable
-- Added in some more tic/tocs
-- Had to change `terra` code back to `raster` for one chunk (making the histograms) to get it to work; later, commented out this code and added a version of histograms that works with `terra`
+- One additional year of data, 2022, was added.
+- Added new comparative plots, along with a .csv of the 2024 major pressure score changes between v2024 (2022 data) and v2023 (2021 data).
 
 ***
 
