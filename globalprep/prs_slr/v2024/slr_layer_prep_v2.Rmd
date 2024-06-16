@@ -302,12 +302,10 @@ if(file.exists(ocean_mask_prev)){
 }
 s <- terra::rast(sprintf("%s/int/ocean_mask.tif", dir_prs_slr, scen_year))
 plot(s, col = "red") 
-#Error in plot.xy(xy, type, ...) : 
-  # invalid type passed to graphics function
 
 annual_means <- list.files(file.path(dir_prs_slr, "int/msla_annual_mean"), full = TRUE)
 
-# v2022 - tried to use foreach with terra: Error in x@ptr$nrow() : external pointer is not valid
+# v2022 - tried to use for each with terra: Error in x@ptr$nrow() : external pointer is not valid
 ```
 
 ```{r, eval=FALSE}
@@ -331,7 +329,7 @@ for(i in seq_along(annual_means)) {
 
 }
 toc()
-# v2024 - 2099.743 sec elapsedd
+# v2024 - 2099.743 sec elapsed
 ```
 
 ```{r, eval=FALSE}
@@ -368,35 +366,36 @@ coastal_rasts <- list.files(file.path(dir_prs_slr, "int/msla_annual_mol_coastal"
 ## script was updated in 2022 to convert from raster to terra, so terra functions were added to the following loop but not run because no reason to believe source updated past years data
 # tic()
 # registerDoParallel(8)
-
-vals <- foreach(i = 1993:2015, .combine = c) %dopar% { # i = 1993
-  coastal_rasts[which(str_sub(coastal_rasts, -8, -5) == i)] %>%
-    #raster() %>%
-    terra::rast() %>%
-    #getValues() %>%
-    terra::values() #%>%
-    #na.omit()
-}
-
-# possibly better code, used by Gage in v2023:
-tic()
-vals <- foreach(i = 1993:2015, .combine = c) %dopar% { # i = 1993
-  coastal_rasts[which(str_sub(coastal_rasts, -8, -5) == i)] %>%
-    terra::rast() %>%
-    terra::values() %>%
-    as.data.frame() %>%
-    filter(!is.na(layer))
-
-    # na.omit()
-}
-toc()
+# 
+# # vals <- foreach(i = 1993:2015, .combine = c) %dopar% { # i = 1993
+# #   coastal_rasts[which(str_sub(coastal_rasts, -8, -5) == i)] %>%
+# #     #raster() %>%
+# #     terra::rast() %>%
+# #     #getValues() %>%
+# #     terra::values() #%>%
+# #     #na.omit()
+# # }
+# 
+# # possibly better code, used by Gage in v2023:
+# vals <- foreach(i = 1993:2015, .combine = c) %dopar% { # i = 1993
+#   coastal_rasts[which(str_sub(coastal_rasts, -8, -5) == i)] %>%
+#     terra::rast() %>%
+#     terra::values() %>%
+#     as.data.frame() %>%
+#     filter(!is.na(layer))
+# 
+#     # na.omit()
+# }
+# toc()
 
 # for first code option:
 # ref_point_slr <- quantile(vals, 0.9999)
 # for second code option:
-ref_point_slr <- quantile(unlist(vals), 0.9999)
+# ref_point_slr <- quantile(unlist(vals), 0.9999)
 
 # v2023 - we recalculated ref_point_slr and were getting varying numbers, but a lot similar to the v2019 reference point below and the source does not seem to have been updated, so we will continue with the ref_point_slr below
+
+# v2024 - even with parallel computing and utilizing multiple cores, my R session would abnormally terminate every time it was run (three times, each taking about 20 minutes).  I will assume the reference point is correct as the source data has no indication of change.  I will continue to use the v2019 reference point (0.335938483476639). -SL
 
 ## If not rerunning the above, use this (taken from v2019 reference point csv)
 ref_point_slr <- 0.335938483476639
@@ -413,15 +412,16 @@ if(file.exists(sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, scen_
 ref_tab$ref_point[ref_tab$pressure == "Sea Level Rise"] <- ref_point_slr # set sea level rise reference to the 99.99 percentile
 
 # create v20?? folder in supplementary_information (only use if needed)
-# folder_name_supplementary_information_v_scen_year <- paste0("v", scen_year)
-# folder_path_supplementary_information_v_scen_year <- file.path(dir_refpt, folder_name_supplementary_information_v_scen_year)
-# dir.create(folder_path_supplementary_information_v_scen_year)
+# used to create v2024
+folder_name_supplementary_information_v_scen_year <- paste0("v", scen_year)
+folder_path_supplementary_information_v_scen_year <- file.path(dir_refpt, folder_name_supplementary_information_v_scen_year)
+dir.create(folder_path_supplementary_information_v_scen_year)
 
 # write to reference_points_pressures.csv
 write.csv(ref_tab, sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, scen_year), row.names = FALSE)
 
 ## grab reference value from the supp_info csv
-ref <- read_csv(sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, "2023")) %>%
+ref <- read_csv(sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, "2024")) %>%
        filter(pressure == "Sea Level Rise") %>%
        .$ref_point %>%
         as.numeric()
