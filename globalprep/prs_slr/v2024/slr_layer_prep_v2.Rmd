@@ -413,9 +413,9 @@ ref_tab$ref_point[ref_tab$pressure == "Sea Level Rise"] <- ref_point_slr # set s
 
 # create v20?? folder in supplementary_information (only use if needed)
 # used to create v2024
-folder_name_supplementary_information_v_scen_year <- paste0("v", scen_year)
-folder_path_supplementary_information_v_scen_year <- file.path(dir_refpt, folder_name_supplementary_information_v_scen_year)
-dir.create(folder_path_supplementary_information_v_scen_year)
+# folder_name_supplementary_information_v_scen_year <- paste0("v", scen_year)
+# folder_path_supplementary_information_v_scen_year <- file.path(dir_refpt, folder_name_supplementary_information_v_scen_year)
+# dir.create(folder_path_supplementary_information_v_scen_year)
 
 # write to reference_points_pressures.csv
 write.csv(ref_tab, sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, scen_year), row.names = FALSE)
@@ -458,7 +458,7 @@ for(i in seq_along(coastal_rasts)) { # i = coastal_rasts[26]
   }
 }
 toc()
-# v2023 - 3937.095 sec elapsed
+# v2024 - 4259.81 sec elapsed
 ```
 
 # Results
@@ -490,9 +490,9 @@ r_new_old_terra <- terra::rast(sprintf("%s/output/slr_%s.tif", dir_prs_slr, scen
 # get previous scenario year most recent year of data IN COMMON (ie. will likely be one more year back)
 r_old_terra <- terra::rast(sprintf("%s/git-annex/globalprep/prs_slr/v%s/output/slr_%s.tif", dir_M, scen_year - 1, scen_year - 3))
 
-terra::hist(r_new_terra, main = sprintf("Sea Level Pressure %s current version (v%s) data", scen_year - 2, scen_year), breaks = 70) # v2023 - plots v2023 2021 data
-terra::hist(r_new_old_terra, main = sprintf("Sea Level Pressure %s current version (v%s) data", scen_year - 3, scen_year), breaks = 70) # v2023 - plots v2023 2020 data
-terra::hist(r_old_terra, main = sprintf("Sea Level Pressure %s previous version (v%s) data", scen_year - 3, scen_year - 1), breaks = 70) # v2023 - plots v2022 2020 data
+terra::hist(r_new_terra, main = sprintf("Sea Level Pressure %s current version (v%s) data", scen_year - 2, scen_year), breaks = 70) # v2024 - plots v2024 2022 data
+terra::hist(r_new_old_terra, main = sprintf("Sea Level Pressure %s current version (v%s) data", scen_year - 3, scen_year), breaks = 70) # v2024 - plots v2024 2021 data
+terra::hist(r_old_terra, main = sprintf("Sea Level Pressure %s previous version (v%s) data", scen_year - 3, scen_year - 1), breaks = 70) # v2024 - plots v2023 2021 data
 ```
 
 ```{r extract regions, eval=FALSE}
@@ -515,7 +515,7 @@ rgn_data <- read_sf(file.path(dir_M, "git-annex/globalprep/spatial/v2017"), "reg
 tic()
 regions_stats <- zonal(stack_slr, zones, fun = "mean", na.rm = TRUE, progress = "text") %>% data.frame() 
 toc()
-# v2023 - 3786.449 sec elapsed
+# v2024 - 3188.695 sec elapsed
 
 setdiff(regions_stats$zone, rgn_data$rgn_id) # High Seas regions are in there, makes sense....no land
 #[1] 260 261 262 263 264 266 267 269 270 272 273 274 275 276 277
@@ -566,6 +566,66 @@ old_data <- read.csv(sprintf("../v%s/output/slr.csv", scen_year - 1)) %>%
 
 plot(old_data$pressure_score, old_data$new_pressure_score, ylab = "new score", xlab = "old score")
 abline(0, 1, col = "red")
+```
+
+```{r mjr_score_change, eval=FALSE}
+# create data frame with scores that changed by more than 0.05
+old_data_pscore <- old_data %>%
+  filter(year == "2021") %>%
+  select(rgn_id, year, pressure_score)
+
+new_data_pscore <- new_data %>%
+  filter(year == "2022")
+
+slr_new_old <- new_data_pscore %>%
+  left_join(old_data_pscore, by = 'rgn_id')
+
+mjr_score_change <- slr_new_old %>%
+  mutate(diff = new_pressure_score - pressure_score) %>%
+  filter(abs(diff) > 0.05) %>%
+  mutate(abs_diff = abs(diff))
+
+# save major score changes to output folder as csv
+write.csv(mjr_score_change, "output/major_changes_2024.csv")
+```
+
+```{r score_change_plots}
+slr_status_plot <- ggplot(slr_new_old, 
+                        aes(x = pressure_score, y = new_pressure_score, key = rgn_id)) +
+  geom_point(alpha = .6) +
+  theme(legend.position = 'none') +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(x = 'SLR status v2023 (data through Dec 2021)',
+       y = 'SLR status v2024 (data through Dec 2022)',
+       title = 'Comparing SLR status: 2024 vs 2023')
+
+slr_status_plot 
+
+library(plotly)
+interactive_plot <- ggplotly(slr_status_plot)
+interactive_plot 
+
+bar_plot <- ggplot(mjr_score_change, aes(x = factor(rgn_id), y = diff)) +
+  geom_bar(stat = 'identity', fill = 'cornflowerblue', alpha = 0.8) +
+  labs(x = 'Region ID',
+       y = 'Difference in Pressure Score',
+       title = 'Major Score changes between New (v2024) and Old (v2023) Pressure Scores') +
+  theme_minimal(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90, size = 5, margin = margin(t = 0, r = -3, b = 0, l = -3)),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+bar_plot # bar plot of all 118 major score changes
+
+boxplot_diff <- ggplot(mjr_score_change, aes(y = diff)) +
+  geom_boxplot(fill = 'cornflowerblue', alpha = 0.7) +
+  labs(y = 'Difference in Pressure Score (v2024 vs v2023)',
+       title = 'Distribution of Differences between New and Old Pressure Scores') +
+  theme_minimal(base_size = 11) +
+  theme(axis.title.y = element_text(size = 9))
+boxplot_diff
 ```
 
 # Gapfill csv
