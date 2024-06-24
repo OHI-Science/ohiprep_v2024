@@ -14,6 +14,8 @@ output:
       in_header: '../../../workflow/templates/ohi_hdr.html'
 pdf_document:
   toc: true
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Summary
@@ -96,7 +98,7 @@ librarian::shelf(
   ggplot2,
   RColorBrewer,
   foreach,
-  doParallel,
+  doParallel, # for using multiple cores
   dplyr,
   readr,
   stringr,
@@ -198,7 +200,13 @@ pass <- readline("Type earthdata password: ")
 
 2024 note: I used the same login information as last year (under Erika Egg's name). See the GitHub issue [#289](https://github.com/OHI-Science/globalfellows-issues/issues/289)
 
+NOTE: updated to OHIfellows.2024! in 2024 to troubleshoot authentication error.
+
 ```{r download the data, eval = F}
+
+# registerDoParallel(70)
+
+
 ## This took 103.5 minutes in 2019... 
 ## This took like 6 hours in 2022 for some reason... You can leave this running after hours if need be, and it should keep going
 ## v2023: 8261.674 sec elapsed (137.7 minutes)
@@ -211,8 +219,11 @@ file_list_raw <- read_delim(
 
 file_list <- file_list_raw %>% 
   mutate(url_str = as.character(X1)) %>% 
+  # check if file name is a NetCDF file
   mutate(check_netcdf = str_match(url_str, pattern = "http.*OMI-Aura_L3-OMUVBd.*nc4")) %>% 
+  # only keep NetCDF files
   filter(!is.na(check_netcdf)) %>% 
+  # keep character version of urls
   select(url_str)
 
 ## set up timekeeping for data download
@@ -226,6 +237,7 @@ for(i in 1:nrow(file_list)){
   url = as.character(file_list[i,])
   
   name_raw_file = substr(url, 88, 146) # v2023: check that this is grabbing the full name (should end with .he5.nc4)
+                                      # v2024: checked & working!
   
   if(file.exists(file.path(raw_data_dir, "data", name_raw_file)) != TRUE){
     
@@ -246,6 +258,7 @@ for(i in 1:nrow(file_list)){
 }
 
 ## tip: after downloading, check all .he5.nc4 files are about the same size i.e. they all downloaded properly/fully 
+# v2024: all files were 27..... definitely didn't download properly
 
 toc()
 
@@ -256,6 +269,88 @@ toc()
 
 **2024:** Ran into timeout/crash issue when downloading the data. Process stopped after 
 OMI-Aura_L3-OMUVBd_2021m0212_v003-2021m0216t093002.he5.nc4
+
+
+https://acdisc.gesdisc.eosdis.nasa.gov/opendap/HDF-EOS5/Aura_OMI_Level3/OMUVBd.003/2004/OMI-Aura_L3-OMUVBd_2004m1001_v003-2016m0525t164359.he5.nc4?Er…
+```{r}
+# ============ TEST single file extraction ================
+
+test_url <- as.character(file_list[1, ])
+
+name_raw_file_test <- substr(test_url, 88, 146) # v2023: check that this is grabbing the full name (should end with .he5.nc4)
+# v2024: checked & working!
+# 
+# if (file.exists(file.path(raw_data_dir, "data", name_raw_file_test)) != TRUE) {
+#   
+test_get <- httr::GET(test_url, authenticate(usrname, pass, type = "basic"), verbose(info = TRUE, ssl = TRUE))
+test_bin <- httr::content(test_get, as = "raw")
+#writeBin(test_bin, file.path(raw_data_dir, "data", name_raw_file_test))
+
+
+
+test_files <- list.files(file.path(raw_data_dir, "data"), pattern = "OMI-Aura_L3-OMUVBd.*.he5.nc4$", full.names = TRUE) # netcdf not hdf
+test_files <- files[substr(files, 96, 99) %in% yrs] # select only files for yrs we want
+
+test_files %>% data.frame()
+
+#   writeBin(bin, file.path(raw_data_dir, "data", name_raw_file_test)) # gnutls_handshake() failed: Handshake failed
+# } # END test download
+
+
+# ============= TEST httr2 package implementation ================
+
+token <- "eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6Im9oaWZlbGxvd3MiLCJleHAiOjE3MjQ0MzU4NzQsImlhdCI6MTcxOTI1MTg3NCwiaXNzIjoiRWFydGhkYXRhIExvZ2luIn0.urGThYmIF40ARtO_yUyybcF0IkkFiaFal8slGffz9Uw5m4n9omfbthKhMBIAsgEOHJ_hC7aBmrAjlvQ42B3x7dMUkCkpt05h7n4MoUynHHXT7KEo2iArdCM_RrPbHin6tVhukZ8jjcjkDP0GMJVBQ-Hay2z3CDFmTjYGT6lCbXeoG2hsUujEARZP_GqoLE35fHRt4NR-q75cm4jyThMMO3yByiSRAiybfDqgD_Gl1tC-6gWQItJrR_B7rLgz_aNQtlMisyTLXuiqObGeIvk6Zw8aWrjvz3dOP6gBMIb9M_toGJYKqvYoDKCFJ7amXk3r8NGr7W7SXPFUxx1kVuVDlQ"
+
+
+
+
+
+```
+
+
+```{r}
+tic()
+file_list_raw <- read_delim(
+  file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV", data_yr, "file_list.txt"), 
+  delim = "\\", col_names = FALSE)
+
+file_list <- file_list_raw %>% 
+  mutate(url_str = as.character(X1)) %>% 
+  mutate(check_netcdf = str_match(url_str, pattern = "http.*OMI-Aura_L3-OMUVBd.*nc4")) %>% 
+  filter(!is.na(check_netcdf)) %>% 
+  select(url_str)
+
+## set up timekeeping for data download
+t0 = Sys.time()
+n.pym = length(file_list$url_str)
+i.pym = 0
+for(i in 1:3){
+  #i = 1
+  url = as.character(file_list[i,])
+  
+  name_raw_file = substr(url, 88, 146) # v2023: check that this is grabbing the full name (should end with .he5.nc4)
+                                      # v2024: checked & working!
+  
+  if(file.exists(file.path(raw_data_dir, "data", name_raw_file)) != TRUE){
+    
+    x = httr::GET(url, authenticate(usrname, pass, type = "basic"), verbose(info = TRUE, ssl = TRUE))
+    bin = content(x, "raw")
+    writeBin(bin, file.path(raw_data_dir, "data", name_raw_file)) # gnutls_handshake() failed: Handshake failed
+    
+    i.pym <- i.pym + 1
+    min.done <- as.numeric(difftime(Sys.time(), t0, units="mins"))
+    min.togo <- (n.pym - i.pym) * min.done/i.pym
+    print(sprintf("Retrieving %s of %s. Minutes done=%0.1f, to go=%0.1f",
+                  i.pym, n.pym, min.done, min.togo)) # approx time remaining for data download
+    
+  } else {
+    print(sprintf("Skipping %s of %s. Already done.",
+                  i.pym, n.pym))
+  }
+}
+
+toc()
+```
 
 Creating an additional row index column to only download new files (after OMI-Aura_L3-OMUVBd_2021m0212_v003-2021m0216t093002.he5.nc4)
 
