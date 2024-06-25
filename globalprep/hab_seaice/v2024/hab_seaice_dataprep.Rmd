@@ -162,7 +162,7 @@ to do this.
 
 Now move all of the xml files to the xml folder that your have created:
 
--   `mv **/*.xml`
+-   `mv **/*.xml ../xml`
 
 And do the same with the North files and South files:
 
@@ -228,6 +228,8 @@ assessment year (v) in setup code chunk.
 
 ```{r setup, eval=FALSE}
 ## Install R packages where necessary
+rm(list = ls())
+doParallel::registerDoParallel(cores=30)
 pkg <- c("raster", "fasterize", "sf", "sp", "rgdal", "fields", "here", "tictoc", "dplyr", "ggplot2") # "fields" for colors in Status_Trend.R
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)){install.packages(new.pkg)}
@@ -237,7 +239,7 @@ if (!("ohicore" %in% installed.packages())){devtools::install_github("ohi-scienc
 lapply(c(pkg, "ohicore"), require, character.only = TRUE)
 
 ## UPDATE THESE!
-current_year <- 2023
+current_year <- 2024
 last_year <- 2022 # final year of data (all months)
 
 assess_year <- paste0("v", current_year) # assessment year for file paths
@@ -245,7 +247,8 @@ previous_year <- paste0("v", last_year)  # previous assessment year
 ```
 
 ```{r source common and spatial_common}
-source("../../../workflow/R/common.R") # directory locations
+source("workflow/R/common.R")
+# source("../../../workflow/R/common.R") # directory locations - this directory was copied into ohiprep_v2024 so modified to this directory's workflow
 ```
 
 ## Location of Maps
@@ -265,6 +268,113 @@ git-annex/globalprep/\_raw_data/NSIDC_SeaIce/v2023.
 ```{r define file path to ohi region maps (polygons), eval=FALSE}
 maps <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assess_year)
 ```
+
+```{r}
+## Install R packages where necessary
+pkg <- c("raster", "fasterize", "sf", "sp", "rgdal", "fields", # "fields" for colors in Status_Trend.R
+         "ncdf4","openair","ggplot2","reshape2","scales","lubridate",
+         "cmocean","maps","mapdata", "RColorBrewer", "here")
+new.pkg <- pkg[!(pkg %in% installed.packages())]
+if (length(new.pkg)){install.packages(new.pkg)}
+if (!("ohicore" %in% installed.packages())){devtools::install_github("ohi-science/ohicore")}
+
+## Load libraries, set directories
+lapply(c(pkg, "ohicore"), require, character.only = TRUE)
+
+## UPDATE THESE!
+assessYear <- "v2024" # change to reflect assessment year
+previous_yr <- "v2023" # previous assessment year
+final.year <- 2023 # final year of data (all months)
+
+source("workflow/R/common.R") # directory locations
+fp.n <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assessYear, "north/")
+fp.s <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assessYear, "south/")
+
+# Download the lat-lon grid
+# Use the dataset id 'nsidcCDRice_nh_grid' and the default axis extent values
+
+url <- 'https://polarwatch.noaa.gov/erddap/griddap/'
+
+grid_id <- 'nsidcCDRice_nh_grid'
+
+grid_urlcall <- paste0(
+  url, grid_id,
+  '.nc?longitude[(5812500.0):1:(-5337500.0)][(-3837500.0):1:(3737500.0)]',
+  ',latitude[(5812500.0):1:(-5337500.0)][(-3837500.0):1:(3737500.0)]')
+
+## need to make new file in the mazu filezilla 
+  # command is 'mkdir + name of new folder' in terminal
+  # EX: if making new file called 'v2024', type: 
+  # "mkdir v2024"
+grid_file <- paste0(fp.n,"grid.nc")
+
+grid_nc <- download.file(
+  grid_urlcall,
+  destfile = grid_file,
+  mode='wb')
+
+# Read the grid file
+gridFid <- nc_open(grid_file)
+ygrid <- ncvar_get(gridFid, varid="ygrid")
+xgrid <- ncvar_get(gridFid, varid="xgrid")
+longitude <- ncvar_get(gridFid, varid="longitude")
+latitude <- ncvar_get(gridFid, varid="latitude")
+nc_close(gridFid)
+
+inds = which(latitude > 40, arr.ind=TRUE)
+rowrange <- range(inds[,1])
+colrange <- range(inds[,2])
+
+#Generate a data request URL using the indices from the grid
+dataid <- 'nsidcG02202v4nhmday'
+varnames <- c('cdr_seaice_conc_monthly')
+# Change the date here to end on the last date that the date is available (per the NSIDC data access tool)
+datestring <- '[(1978-11-01T00:00:00Z):1:(2023-09-30T00:00:00Z)]'
+coordstring <- paste0('[',colrange[1],':1:',colrange[2],'][',rowrange[1],':1:',rowrange[2]-1,']')
+
+urlcall <- paste0(url,dataid,'.nc?',varnames[1],datestring,coordstring)
+
+ice_file <- paste0(fp.n,"data.nc")
+#Download the netCDF file  (this will take a few minutes, 20 years of data)
+data_nc <- download.file(urlcall,destfile=ice_file,mode='wb')
+
+dataFid <- nc_open(ice_file)
+
+datatime <- ncvar_get(dataFid, varid="time")
+datatime <- as.Date(as.POSIXlt(datatime,origin='1970-01-01',tz= "GMT"))
+
+ygrid <- ncvar_get(dataFid, varid="ygrid")
+xgrid <- ncvar_get(dataFid, varid="xgrid")
+
+seaiceCDR <- ncvar_get(dataFid, varid=varnames)
+
+nc_close(dataFid)
+
+library(stringr)
+time_vec <- dataFid$dim$time$vals %>% 
+  as.vector() %>% 
+  lubridate::as_datetime() %>% 
+  lubridate::as_date() %>% 
+  as.character() %>%
+  str_replace_all(pattern = "-", replacement = "_")
+
+time_vec <- paste("cdr_seaice_conc", time_vec, sep = "_")
+
+df <- terra::rast(ice_file)#, crs = "EPSG:3411"
+dim(df)
+length(names(df)) == (2023 - 1978) * 12 + 2
+# names(df)
+# plot(df)
+
+names(df) <- time_vec
+
+terra::crs(df) <- prj.n
+
+plot(df)
+```
+
+
+
 
 ## Establish Parameters
 
@@ -288,6 +398,7 @@ prj.mol = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m 
 fp.n <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assess_year, "north")
 fp.s <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assess_year, "south")
 
+## Potential for the need to modify this if there are not data available for all 12 months of the most recent year. For example, this year (2024), there are only data up to september (month 09) rather than to december (month 12)
 poles = c("n","s")
 years = c(1979:last_year) # full range of data
 months = 1:12
@@ -297,6 +408,8 @@ i.pym = 0
 
 ## Function 1
 
+**This should be updated to account for already having read in the data and receiving an error or something else. Its re-reading in all data from mazu whereas there should be a "backup" function that says if the ...rgns_pts.x files already exist to just stack them to create the .rdata**
+
 Collects the data for each month/year from mazu and add to raster stack
 that is saved in tmp folder as: `n_rasters_points.rdata` or
 `s_rasters_points.rdata`. And, if it doesn't already exist, it converts
@@ -304,10 +417,12 @@ the region shapefile into a raster points file. See `ObtainingData.R`
 script for more details.
 
 ```{r function 1: source obtaining data script, eval=FALSE}
+doParallel::registerDoParallel(cores=30)
 tic()
 ## Previously (<2022) update to some file paths with the correct assessment year in ObtainingData.R was needed
 ## Currently (2023) this is automatic from this script with `assess_year` variable
-source("ObtainingData.R")
+
+source("globalprep/hab_seaice/v2024/ObtainingData.R") ## This has changed (2024) to account for the current working directory being ohiprep_v2024 rather than 'hab_seaice/v2024'
 toc()
 ## should take ~30 minutes to completely run 
 ```
@@ -326,7 +441,7 @@ shoreline ice and ice edge habitat. Data is saved in intermediate
 ```{r function 2: source status trend script, eval=FALSE}
 tic()
 ref.years <- 1979:2000
-source("Status_Trend.R") # calculates status and trend for shoreline ice and ice edge habitat
+source("globalprep/hab_seaice/v2024/Status_Trend.R") # calculates status and trend for shoreline ice and ice edge habitat
 toc()
 ```
 
