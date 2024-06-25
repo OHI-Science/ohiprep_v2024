@@ -272,15 +272,23 @@ toc()
 
 Creating file structure following [this](https://urs.earthdata.nasa.gov/documentation/for_users/data_access/r) guide and [this](https://disc.gsfc.nasa.gov/information/howto?title=How%20to%20Generate%20Earthdata%20Prerequisite%20Files) guide (note that the second guide is for python applications)
 ```{r}
-netrc_path <- "/path/to/.netrc"
-cookie_path <- "/path/to/.urs_cookies"
-downloaded_file_path <- "/path/to/filename"
+netrc_path <- "~/.netrc"
+cookie_path <- "~/.urs_cookies"
+downloaded_file_path <- "/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2024/wget_test"
 # Before using the script
 #Set up your ~/.netrc file as listed here: https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+cURL+And+Wget
-set_config(config(followlocation=1,netrc=1,netrc_file=netrc_path,cookie=cookie_path,cookiefile=cookie_path,cookiejar=cookie_path))
-httr::GET(url = "https://disc2.gesdisc.eosdis.nasa.gov/data/TRMM_RT/TRMM_3B42RT_Daily.7/2000/03/3B42RT_Daily.20000301.7.nc4",
+set_config(config(followlocation=1, netrc=1, netrc_file=netrc_path, cookie=cookie_path, cookiefile=cookie_path, cookiejar=cookie_path))
+httr::GET(url = file_list[1, ],
                   write_disk(downloaded_file_path, overwrite = TRUE))
 ```
+
+
+Trying https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+cURL+And+Wget 
+
+curl -O -b ~/.urs_cookies -c ~/.urs_cookies -L -n  sftp://ramji@mazu.nceas.ucsb.edu/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2024/wget_test
+
+
+wget --load-cookies ~/.urs_cookies --save-cookies ~/.urs_cookies --keep-session-cookies sftp://ramji@mazu.nceas.ucsb.edu/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2024/wget_test
 
 
 
