@@ -14,6 +14,8 @@ output:
       in_header: '../../../workflow/templates/ohi_hdr.html'
 pdf_document:
   toc: true
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Summary
@@ -96,7 +98,7 @@ librarian::shelf(
   ggplot2,
   RColorBrewer,
   foreach,
-  doParallel,
+  doParallel, # for using multiple cores
   dplyr,
   readr,
   stringr,
@@ -198,7 +200,13 @@ pass <- readline("Type earthdata password: ")
 
 2024 note: I used the same login information as last year (under Erika Egg's name). See the GitHub issue [#289](https://github.com/OHI-Science/globalfellows-issues/issues/289)
 
+NOTE: updated to OHIfellows.2024! in 2024 to troubleshoot authentication error.
+
 ```{r download the data, eval = F}
+
+# registerDoParallel(70)
+
+
 ## This took 103.5 minutes in 2019... 
 ## This took like 6 hours in 2022 for some reason... You can leave this running after hours if need be, and it should keep going
 ## v2023: 8261.674 sec elapsed (137.7 minutes)
@@ -211,8 +219,11 @@ file_list_raw <- read_delim(
 
 file_list <- file_list_raw %>% 
   mutate(url_str = as.character(X1)) %>% 
+  # check if file name is a NetCDF file
   mutate(check_netcdf = str_match(url_str, pattern = "http.*OMI-Aura_L3-OMUVBd.*nc4")) %>% 
+  # only keep NetCDF files
   filter(!is.na(check_netcdf)) %>% 
+  # keep character version of urls
   select(url_str)
 
 ## set up timekeeping for data download
@@ -226,6 +237,7 @@ for(i in 1:nrow(file_list)){
   url = as.character(file_list[i,])
   
   name_raw_file = substr(url, 88, 146) # v2023: check that this is grabbing the full name (should end with .he5.nc4)
+                                      # v2024: checked & working!
   
   if(file.exists(file.path(raw_data_dir, "data", name_raw_file)) != TRUE){
     
@@ -246,16 +258,40 @@ for(i in 1:nrow(file_list)){
 }
 
 ## tip: after downloading, check all .he5.nc4 files are about the same size i.e. they all downloaded properly/fully 
+# v2024: all files were 27..... definitely didn't download properly
 
 toc()
 
 # v2023: all look good; later, 3 cannot be read in, and I manually added those to Mazu using Cyberduck on 6/28/2023
 ```
 
+## 2024 Download Issues 
+
+### Testing out different solutions
 
 
-**2024:** Ran into timeout/crash issue when downloading the data. Process stopped after 
-OMI-Aura_L3-OMUVBd_2021m0212_v003-2021m0216t093002.he5.nc4
+Creating file structure following [this](https://urs.earthdata.nasa.gov/documentation/for_users/data_access/r) guide and [this](https://disc.gsfc.nasa.gov/information/howto?title=How%20to%20Generate%20Earthdata%20Prerequisite%20Files) guide (note that the second guide is for python applications)
+```{r}
+netrc_path <- "~/.netrc"
+cookie_path <- "~/.urs_cookies"
+downloaded_file_path <- "/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2024/wget_test"
+# Before using the script
+#Set up your ~/.netrc file as listed here: https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+cURL+And+Wget
+set_config(config(followlocation=1, netrc=1, netrc_file=netrc_path, cookie=cookie_path, cookiefile=cookie_path, cookiejar=cookie_path))
+httr::GET(url = file_list[1, ],
+                  write_disk(downloaded_file_path, overwrite = TRUE))
+```
+
+
+Trying https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+cURL+And+Wget 
+
+curl -O -b ~/.urs_cookies -c ~/.urs_cookies -L -n  sftp://ramji@mazu.nceas.ucsb.edu/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2024/wget_test
+
+
+wget --load-cookies ~/.urs_cookies --save-cookies ~/.urs_cookies --keep-session-cookies sftp://ramji@mazu.nceas.ucsb.edu/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2024/wget_test
+
+
+
 
 Creating an additional row index column to only download new files (after OMI-Aura_L3-OMUVBd_2021m0212_v003-2021m0216t093002.he5.nc4)
 
@@ -343,6 +379,142 @@ toc()
 
 # v2024
 ```
+
+
+
+**2024:** Ran into timeout/crash issue when downloading the data. Process stopped after 
+OMI-Aura_L3-OMUVBd_2021m0212_v003-2021m0216t093002.he5.nc4
+
+
+https://acdisc.gesdisc.eosdis.nasa.gov/opendap/HDF-EOS5/Aura_OMI_Level3/OMUVBd.003/2004/OMI-Aura_L3-OMUVBd_2004m1001_v003-2016m0525t164359.he5.nc4?Er…
+```{r}
+# ============ TEST single file extraction ================
+
+test_url <- as.character(file_list[1, ])
+
+name_raw_file_test <- substr(test_url, 88, 146) # v2023: check that this is grabbing the full name (should end with .he5.nc4)
+# v2024: checked & working!
+# 
+# if (file.exists(file.path(raw_data_dir, "data", name_raw_file_test)) != TRUE) {
+#   
+test_get <- httr::GET(test_url, authenticate(usrname, pass, type = "basic"), verbose(info = TRUE, ssl = TRUE))
+test_bin <- httr::content(test_get, as = "raw")
+#writeBin(test_bin, file.path(raw_data_dir, "data", name_raw_file_test))
+
+
+
+test_files <- list.files(file.path(raw_data_dir, "data"), pattern = "OMI-Aura_L3-OMUVBd.*.he5.nc4$", full.names = TRUE) # netcdf not hdf
+test_files <- files[substr(files, 96, 99) %in% yrs] # select only files for yrs we want
+
+test_files %>% data.frame()
+
+#   writeBin(bin, file.path(raw_data_dir, "data", name_raw_file_test)) # gnutls_handshake() failed: Handshake failed
+# } # END test download
+
+
+# ============= TEST httr2 package implementation ================
+
+token <- "eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6Im9oaWZlbGxvd3MiLCJleHAiOjE3MjQ0NTAxMzksImlhdCI6MTcxOTI2NjEzOSwiaXNzIjoiRWFydGhkYXRhIExvZ2luIn0.e8ixlxSh2QDjiLbw85puaGPTYTnjO26GgnnsoJwi93jopeM9dFxgGe-gosJrVn8-0ge-6d8BboU2Dz6w6PXKTlqTpDY_rjPTdkm2SqxJlNUvcp0GztRCekEu6zv5mPAzJyqapKLx7in9BQ1x80vspBpjHAMGCCxx5J0hOxZmCzcyVl2mFg1P2rhQin1UkgLT7xiZOlql8IzF0F-LgqWwmJmKyXP3ylTpOB-xDb_1Z_SXkKziZMDxAnvW5l6wHHodH60u-cd-XXRwJPs_KSOnHK9JSZ0ezhaZQB32059CByHg6Rsi4jtRyF4LtCh66sZVdanEICJnuiq9gi1r5ximPg"
+
+
+old_user <- "ohifellows"
+old_pass <- "OHIfellows.2024!"
+
+req <- httr2::request(test_url) %>%
+  httr2::req_auth_basic(usrname, pass) %>%
+  httr2::req_perform()
+
+
+req2 <- httr2::request(test_url) %>%
+  httr2::req_auth_basic(old_user, token) %>%
+  httr2::req_perform()
+
+
+test2_get <- httr::GET(test_url, authenticate(old_user, token, type = "basic"),
+                       verbose(info = TRUE, ssl = TRUE))
+test2_bin <- httr::content(test2_get, as = "raw")
+# using token failed too....
+# keeps returning 27 ASCII code that translates to "HTTP Error: Access denied."
+```
+
+
+
+### June 24th: Using new file list 
+
+
+```{r}
+tic()
+## read in file list .text, downloaded from earthdata & saved in destination folder (same as raw_data_dir)
+file_list_raw <- read_delim(
+  file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV", data_yr, "file_list_06-24.txt"), 
+  delim = "\\", col_names = FALSE)
+
+file_list <- file_list_raw %>% 
+  mutate(url_str = as.character(X1)) %>% 
+  # check if file name is a NetCDF file
+  mutate(check_netcdf = str_match(url_str, pattern = "http.*OMI-Aura_L3-OMUVBd.*nc4")) %>% 
+  # only keep NetCDF files
+  filter(!is.na(check_netcdf)) %>% 
+  # keep character version of urls
+  select(url_str)
+
+## set up timekeeping for data download
+t0 = Sys.time()
+n.pym = length(file_list$url_str)
+i.pym = 0
+
+# test download for 1 link
+test_url <- as.character(file_list[1, ])
+
+name_raw_file_test <- substr(test_url, 88, 146) # v2023: check that this is grabbing the full name (should end with .he5.nc4)
+# v2024: checked & working!
+# 
+# if (file.exists(file.path(raw_data_dir, "data", name_raw_file_test)) != TRUE) {
+#   
+test_get <- httr::GET(test_url, authenticate(usrname, pass, type = "basic"), verbose(info = TRUE, ssl = TRUE))
+test_bin <- httr::content(test_get, as = "raw")
+```
+This still failed...
+
+
+Hardcoded downloading:
+```{r}
+doParallel::registerDoParallel(cores = 30)
+# get list of files from previous year's download
+file_list_23 <- list.files("/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2023/data", full.names = TRUE,)
+
+# copy over files 
+file.copy(from = file_list_23, to = "/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2024/data_copy")
+
+```
+
+Copied over data ending with /home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2024/data_copy/OMI-Aura_L3-OMUVBd_2023m0502_v003-2023m0506t093001.he5.nc4
+
+aka 2023 May 2nd
+
+Considering that the "date updated" listed on the data website (https://acdisc.gesdisc.eosdis.nasa.gov/data/Aura_OMI_Level3/OMUVBd.003/) has stayed consistent (hasn't been updated after the 2023 data was downloaded last year) I am assuming that the methodology hasn't changed (otherwise they would show that the "date updated" was a more recent date). Thus, I can go ahead and continue downloading data starting after May 2nd, 2023.
+
+
+
+
+## download.file method (not ideal, come back to this)
+
+https://stat.ethz.ch/R-manual/R-devel/library/utils/html/download.file.html
+
+```{r}
+download.file(url = as.character(file_list[1, ]), destfile = "/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2024/test.he5.nc4",
+              method = "curl",
+              cacheOK = TRUE,
+              extra = "-L")
+
+# Find index position
+
+
+test_file <- file.path("/home/shares/ohi/git-annex/globalprep/_raw_data/NASA_OMI_AURA_UV/d2024/test.he5.nc4")
+
+test_df <- test_file[1] %>% data.frame()
+```
+
 
 
 

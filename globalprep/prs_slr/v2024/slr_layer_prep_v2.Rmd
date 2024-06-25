@@ -15,7 +15,7 @@ output:
 pdf_document:
   toc: true
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 # Summary
@@ -83,10 +83,14 @@ library(rasterVis)
 library(terra)
 library(tictoc)
 library(plotly)
+library(ggplot2)
 setGDALconfig("GDAL_PAM_ENABLED", "FALSE")
 
-source('../../../workflow/R/common.R')
-library(here)
+# 2024 update: switched to use here() for reproducibility (throughout the document when working from/with products saved in this repository)
+#source('../../../workflow/R/common.R')
+
+library(here) # sets working directory to project (ohiprep_v202X) base directory
+source(here("workflow", "R", "common.R"))
  
 ## define paths and variables to use throughout data prep
 scen_year <- 2024 # change to reflect assessment year!
@@ -298,12 +302,17 @@ if(file.exists(ocean_mask_prev)){
   s <- calc(s, fun = function(x) {ifelse(x > 0, 1, NA)})
   terra::writeRaster(s, sprintf("%s/int/ocean_mask.tif", dir_prs_slr, scen_year))
 }
-s <- terra::rast(sprintf("%s/int/ocean_mask.tif", dir_prs_slr, scen_year))
+s <- terra::rast(sprintf("%s/int/ocean_mask.tif", dir_prs_slr 
+                         #, scen_year # 2024 note: redundant information, as "v2024" is already part of the dir_prs_slr file path ("/home/shares/ohi/git-annex/globalprep/prs_slr/v2024")
+                         ))
+# plot to confirm that the ocean mask tif is being read in properly
 plot(s, col = "red") 
 
 annual_means <- list.files(file.path(dir_prs_slr, "int/msla_annual_mean"), full = TRUE)
 
 # v2022 - tried to use for each with terra: Error in x@ptr$nrow() : external pointer is not valid
+
+# v2024: running annual_means in the console shows that we have msla annual mean tifs from 1993 through 2022 
 ```
 
 ```{r, eval=FALSE}
@@ -398,14 +407,17 @@ coastal_rasts <- list.files(file.path(dir_prs_slr, "int/msla_annual_mol_coastal"
 ## If not rerunning the above, use this (taken from v2019 reference point csv)
 ref_point_slr <- 0.335938483476639
 
-dir_refpt <- "../../supplementary_information"
-if(file.exists(sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, scen_year))){
+dir_refpt <- "globalprep/supplementary_information"
+
+# 2024 update: using here() instead of sprintf() for reproducibility
+if(file.exists(here(dir_refpt, scen_year, "reference_points_pressures.csv"))){
   ## if already created and been partially updated for this assessment, don't want to overwrite with v2016 csv...
-  ref_tab <- read_csv(sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, scen_year))
+  ref_tab <- read_csv(here(dir_refpt, scen_year, "reference_points_pressures.csv")) # v2-24: reproducible file path update: using here() instead of sprintf()
 } else {
   ## grab ref file from v2016 if doesn't exist yet in current assessment 'supplementary information' folder
   ref_tab <- read_csv(file.path(dir_refpt, "v2016/reference_points_pressures.csv"))
 }
+
 
 ref_tab$ref_point[ref_tab$pressure == "Sea Level Rise"] <- ref_point_slr # set sea level rise reference to the 99.99 percentile
 
@@ -416,13 +428,20 @@ ref_tab$ref_point[ref_tab$pressure == "Sea Level Rise"] <- ref_point_slr # set s
 # dir.create(folder_path_supplementary_information_v_scen_year)
 
 # write to reference_points_pressures.csv
-write.csv(ref_tab, sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, scen_year), row.names = FALSE)
+write.csv(ref_tab,
+          here(dir_refpt, scen_year, "reference_points_pressures.csv"),
+          row.names = FALSE)
 
 ## grab reference value from the supp_info csv
-ref <- read_csv(sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, "2024")) %>%
+ref <- read_csv(here(dir_refpt, "v2024", "reference_points_pressures.csv")) %>%
        filter(pressure == "Sea Level Rise") %>%
        .$ref_point %>%
         as.numeric()
+
+# ref <- read_csv("globalprep/supplementary_information/v2024/reference_points_pressures.csv") %>%
+#        filter(pressure == "Sea Level Rise") %>%
+#        .$ref_point %>%
+#         as.numeric()
 ```     
 
 ## Rescale 
@@ -463,7 +482,7 @@ toc()
 
 ```{r plot_results, eval=FALSE}
 r <- terra::rast(sprintf("%s/output/slr_%s.tif", dir_prs_slr, scen_year - 2))
-plot(ocean, col = "cornsilk2", axes = FALSE, box = FALSE, main = "Sea Level Rise Pressure 2020", legend = FALSE)		
+plot(ocean, col = "cornsilk2", axes = FALSE, box = FALSE, main = "Sea Level Rise Pressure 2022", legend = FALSE)		
 plot(r, col = cols, axes = FALSE, box = FALSE, add = TRUE)
 
 # # get current scenario year most recent year of data
@@ -526,9 +545,10 @@ regions_stats_clean <- regions_stats %>%
   mutate(year = as.numeric(as.character(substring(year, 7, 8)))) %>%
   mutate(year = 1993 + year - 1) # convert from numbers to actual years
 
-write.csv(regions_stats_clean, "output/slr.csv", row.names = FALSE)
+# 2024 note: updated to use here() for reproducibility
+write.csv(regions_stats_clean, here("globalprep", "prs_slr", "v2024", "output", "slr.csv"), row.names = FALSE)
 
-regions_stats_clean <- read_csv("output/slr.csv")
+regions_stats_clean <- read_csv(here("globalprep", "prs_slr", "v2024", "output", "slr.csv"))
 
 ## visualize data
 plotData <- regions_stats_clean %>%
@@ -556,17 +576,21 @@ htmlwidgets::saveWidget(line_plot, file = "slr.html")
 ```
 
 ```{r compare, eval=FALSE}
-new_data <- read.csv("output/slr.csv") %>%
+new_data <- read_csv(here("globalprep", "prs_slr", "v2024", "output", "slr.csv")) %>%
   dplyr::select(rgn_id, year, new_pressure_score = pressure_score)
 
-old_data <- read.csv(sprintf("../v%s/output/slr.csv", scen_year - 1)) %>%
+# define higher level prs_slr file path 
+prs_fp <- file.path(here("globalprep", "prs_slr"))
+# 2024 note: keeping sprintf here so that the year arithmetic and "v" concatenation work
+
+old_data <- read.csv(sprintf("%s/v%s/output/slr.csv", prs_fp, scen_year - 1)) %>%
   left_join(new_data, by = c("year", "rgn_id"))
 
 plot(old_data$pressure_score, old_data$new_pressure_score, ylab = "new score", xlab = "old score")
 abline(0, 1, col = "red")
 ```
 
-```{r mjr_score_change, eval=FALSE}
+```{r all_mjr_score_change, eval=FALSE}
 # create data frame with scores that changed by more than 0.05
 old_data_pscore <- old_data %>%
   filter(year == "2021") %>%
@@ -578,16 +602,19 @@ new_data_pscore <- new_data %>%
 slr_new_old <- new_data_pscore %>%
   left_join(old_data_pscore, by = 'rgn_id')
 
+all_score_changes <- slr_new_old %>%
+  mutate(diff = new_pressure_score - pressure_score)
+
 mjr_score_change <- slr_new_old %>%
   mutate(diff = new_pressure_score - pressure_score) %>%
   filter(abs(diff) > 0.05) %>%
   mutate(abs_diff = abs(diff))
 
 # save major score changes to output folder as csv
-write.csv(mjr_score_change, "output/major_changes_2024.csv")
+write.csv(mjr_score_change, here("globalprep", "prs_slr", "v2024", "output", "major_changes_2024.csv"))
 ```
 
-```{r score_change_plots}
+```{r score_change_plots, eval=FALSE}
 slr_status_plot <- ggplot(slr_new_old, 
                         aes(x = pressure_score, y = new_pressure_score, key = rgn_id)) +
   geom_point(alpha = .6) +
@@ -603,7 +630,7 @@ library(plotly)
 interactive_plot <- ggplotly(slr_status_plot)
 interactive_plot 
 
-bar_plot <- ggplot(mjr_score_change, aes(x = factor(rgn_id), y = diff)) +
+bar_plot_mjr_change <- ggplot(mjr_score_change, aes(x = factor(rgn_id), y = diff)) +
   geom_bar(stat = 'identity', fill = 'cornflowerblue', alpha = 0.8) +
   labs(x = 'Region ID',
        y = 'Difference in Pressure Score',
@@ -615,7 +642,21 @@ bar_plot <- ggplot(mjr_score_change, aes(x = factor(rgn_id), y = diff)) +
         axis.title.y = element_text(face = "bold"),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
-bar_plot # bar plot of all 118 major score changes
+bar_plot_mjr_change # bar plot of all 118 major score changes
+
+bar_plot_all_change <- ggplot(all_score_changes, aes(x = factor(rgn_id), y = diff)) +
+  geom_bar(stat = 'identity', fill = 'cornflowerblue', alpha = 0.8) +
+  labs(x = 'Region ID',
+       y = 'Difference in Pressure Score',
+       title = 'Major Score changes between New (v2024) and Old (v2023) Pressure Scores') +
+  theme_minimal(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90, size = 5, margin = margin(t = 0, r = -3, b = 0, l = -3)),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+bar_plot_all_change
 
 boxplot_diff <- ggplot(mjr_score_change, aes(y = diff)) +
   geom_boxplot(fill = 'cornflowerblue', alpha = 0.7) +
@@ -626,16 +667,29 @@ boxplot_diff <- ggplot(mjr_score_change, aes(y = diff)) +
 boxplot_diff
 ```
 
+# Visual representation of the difference between this year and last year's rasters
+
+```{r}
+# refer back to line 503 for the rasterized output for current year and last year. v2024 update
+
+raster_diff <- r_new_terra - r_new_old_terra
+plot(raster_diff)
+
+# takes a while, not necessary but interesting:
+table(values(raster_diff))
+```
+
+
 # Gapfill csv
 
 There was no gapfilling for these data. Created gapfill files with values of 0.
 
 ```{r, eval=FALSE}
-slr_gf <- read.csv("output/slr.csv")%>%
+slr_gf <- read.csv(here("globalprep", "prs_slr", "v2024", "output", "slr.csv"))%>%
   mutate(pressure_score = 0) %>% 
   rename(gapfilled = pressure_score)
 
-write.csv(slr_gf, "output/slr_gf.csv", row.names=FALSE)
+write.csv(slr_gf, here("globalprep", "prs_slr", "v2024", "output", "slr_gf.csv"), row.names=FALSE)
 ```
 
 
