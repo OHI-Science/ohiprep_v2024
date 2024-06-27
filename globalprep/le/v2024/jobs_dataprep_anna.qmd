@@ -52,6 +52,7 @@ un_pivot_clean <- un_jobs_pivot %>%
   mutate(year = str_remove_all(year, "x"))
 
 # using countrycode::countrycode
+# and following this example on Rpubs: https://rpubs.com/Teal_Emery/cleaning_intl_data_tips_and_tricks 
 
 library(countrycode)
 
@@ -123,5 +124,53 @@ ggplot(jobs_plot_df) +
   ) +
   theme(legend.position = "none")
 
+```
+
+```{r}
+plotly::plot_ly(jobs_plot_df, x = ~year, y = ~thousand_jobs, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Number of Tourism Jobs per Country over Time", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of people working in the tourism sector"))
+```
+
+
+India is seriously skewing the scales of this plot -- this, among general curiosity and conversation about how we should weight the number of jobs by the size of countries led us to create a proportional employment variable.
+
+
+
+
+```{r}
+
+jobs_wages_join <- left_join(jobs_rgn_2012, pop_ppp_converted, by = c("rgn_id", "year"))
+
+jobs_wages_proportional_employment <- jobs_wages_join %>% 
+  mutate(total_tourism_employees = thousand_employees*1000) %>% 
+  dplyr::relocate(total_tourism_employees, .before = total_population) %>% 
+  mutate(proportional_tourism_employment = total_tourism_employees/total_population) %>% 
+  select(-c(notes.x, notes.y))
+  
+proportional_employement_nona <- jobs_wages_proportional_employment %>% 
+  na.omit() %>% 
+  mutate(year = as.numeric(year))
+
+ggplot(proportional_employement_nona, aes(x = year, y = proportional_tourism_employment, color = rgn_id)) + 
+  geom_line()
+
+line_plot <- plotly::plot_ly(proportional_employement_nona, x = ~year, y = ~proportional_tourism_employment, color = ~admin_country_name.x, type = "scatter", mode = "lines")
+  layout(title = "All Regions: Proportional Employment Line Chart", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of people employed by the tourism sector"))
+
+line_plot
+
+
+penona_pivot <- proportional_employement_nona %>% 
+  pivot_longer(cols = c(proportional_tourism_employment, yearly_wages_ppp_adjusted_by_year), names_to = "metric", values_to = "value") 
+# %>% 
+  filter(admin_country_name.x %in% c("Indonesia", "Brazil", "Cyprus", "Argentina", "India"))
+
+ggplot(penona_pivot, aes(x = as.numeric(year), y = value, color = admin_country_name.x)) +
+  geom_line() + 
+  facet_wrap(~metric, scales = "free", ncol = 1)
 ```
 

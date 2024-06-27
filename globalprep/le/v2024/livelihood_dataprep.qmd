@@ -1,26 +1,28 @@
 ---
+title: "Livelihood Dataprep: Tourism Jobs & Service Sector Wages"
+format: html
+---
+
+---
 title: "World Bank Service Earnings Data Prep"
 
 ---
 
-# Read in Data from Mazu
 
+#### Setup
 ```{r}
-# load packages
-library(tidyverse)
-library(readxl)
-library(here)
-library(janitor)
+# load packages ----
+library(tidyverse) # <3 
+library(readxl) # for reading in excel data
+library(here) # for reproducible file paths
+library(janitor) # for cleaning column names
+library(countrycode) # for cleaning country codes
 
 
+# source common.R
 source(here("workflow/R/common.R"))
-```
 
-
-
-```{r}
-# set file paths to data in Mazu
-
+# set file paths to data in Mazu ----
 raw_data_path <- file.path(here(dir_M, #"/home/shares/ohi"
                                 "git-annex", 
                                 "globalprep",
@@ -30,19 +32,25 @@ un_wto_path <- file.path(here(raw_data_path, "UNWTO", "d2024"))
 
 service_data <- file.path(un_wto_path, "join_database_w_definitions.xlsx")
 
+un_job_data <- file.path(dir_M, "git-annex/globalprep/_raw_data/UNWTO/d2024/unwto-all-data-download_0.xlsx")
+
 ```
 
 
+# Wage Data
+
+### Read in wage data from World Bank
+
+[](https://www.unwto.org/tourism-statistics/key-tourism-statistics)
+
+Downloaded June 26, 2024. Last updated (according to the website): January 31, 2024
+
 
 ```{r}
-# read in .xlsx
-
+# read in .xlsx wage data from Mazu
 service_data_raw <- read_xlsx(service_data, skip = 3, col_names = TRUE)
 
-
 # quick view:
-
-
 head(service_data_raw)
 ```
 
@@ -174,37 +182,6 @@ ppp_service_clean
 
 
 # --------- Calculating Adjusted Wages -------------
-# make PPP subset
-# using PPP PRC:
-# the PPP for Household Final Consumption (or Private Consumption) covers the expenditure by households on individual consumption of goods and services, including those sold at prices that are not economically significant.
-ppp_prc <- ppp_service_clean %>% 
-  filter(transact %in% c("PPPPRC"))
-
-# check: number of unique countries, regions:
-unique(ppp_prc$admin_country_name)
-cat("Number of unique countries in this subset", length(unique(ppp_prc$admin_country_name)))
-# 37
-
-unique(ppp_prc$rgn_name)
-cat("Number of unique regions in this subset", length(unique(ppp_prc$rgn_name)))
-# 43
-
-
-# make new column of adjusted wages (by year by country)!
-
-# divide annual wage in local currency by PPP (local / USD, adjusted)
-
-adjusted_prc <- ppp_prc %>% 
-  mutate(adjusted_wages = median_annual_service_local_wages / value)
-
-
-# subset for viewing
-
-adjusted_prc %>% select(admin_country_name, rgn_name, year, value, median_annual_service_local_wages, adjusted_wages)
-
-
-max(adjusted_prc$adjusted_wages)
-
 
 # --------- PPP GDP -------------
 # make PPP subset
@@ -238,56 +215,12 @@ adjusted_gdp %>% select(admin_country_name, rgn_name, year, value, median_annual
 max(adjusted_gdp$adjusted_wages)
 mean(adjusted_gdp$adjusted_wages)
 
-
-
-# --------- PPP P41 -------------
-# make PPP subset
-# using PPP P41: 
-# or PPP for actual individual consumption covers all households consumption expenditure and that part of government final expenditure which covers services it supplies to individual households, for example housing, health, education, social protection etc ... (in other words, it does not include government final expenditure on those services it supplies to households collectively such as defense, police, environment protection ...)
-
-ppp_p41 <- ppp_service_clean %>% 
-  filter(transact %in% c("PPPP41"))
-
-# check: number of unique countries, regions:
-unique(ppp_p41$admin_country_name)
-cat("Number of unique countries in this subset", length(unique(ppp_p41$admin_country_name)))
-# 31
-
-unique(ppp_p41$rgn_name)
-cat("Number of unique regions in this subset", length(unique(ppp_p41$rgn_name)))
-# 35
-
-
-# make new column of adjusted wages (by year by country)!
-
-# divide annual wage in local currency by PPP (local / USD, adjusted)
-
-adjusted_p41 <- ppp_p41 %>% 
-  mutate(adjusted_wages = median_annual_service_local_wages / value)
-
-
-# subset for viewing
-
-adjusted_p41 %>% select(admin_country_name, rgn_name, year, value, median_annual_service_local_wages, adjusted_wages)
-
-
-max(adjusted_p41$adjusted_wages)
-mean(adjusted_p41$adjusted_wages)
 ```
 
 
 Super basic exploratory plots
 
 ```{r}
-prc_plot <- adjusted_prc %>% 
-  ggplot() +
-  geom_line(aes(x = year, y = adjusted_wages,
-                color = admin_country_name)) +
-  theme_bw() +
-  labs(title = "Adjusted Service Wages using PPP PRC",
-       x = "Year",
-       y = "Adjusted Wages"
-       )
 
 gdp_plot <- adjusted_gdp %>% 
   ggplot() +
@@ -298,20 +231,7 @@ gdp_plot <- adjusted_gdp %>%
        x = "Year",
        y = "Adjusted Wages")
 
-p41_plot <- adjusted_p41 %>% 
-  ggplot() +
-  geom_line(aes(x = year, y = adjusted_wages,
-                color = admin_country_name)) +
-  theme_bw() +
-  labs(title = "Adjusted Service Wages using PPP P41",
-       x = "Year",
-       y = "Adjusted Wages")
-
-
-
-prc_plot
 gdp_plot
-p41_plot
 ```
 
 
@@ -349,5 +269,170 @@ line_plot <- plot_ly(gdp_year_subset, x = ~as.numeric(year),
          yaxis = list(title = "PPP GDP Adjusted Median Annual Wages (USD)"))
 
 line_plot
+```
+
+
+
+
+
+# Employment Data
+
+```{r}
+
+
+un_jobs_data_raw <- read_xlsx(un_job_data, col_names = TRUE, sheet = "Employment", skip = 2, na = c("", "..")) %>%
+  janitor::clean_names() 
+
+un_jobs_clean <- un_jobs_data_raw %>%
+  select(-c(1:3)) %>%
+  fill(1, .direction = "down") %>%
+  select(-c(x5)) %>% 
+  select(-c(3:6)) %>% 
+  filter(x6 %in% c("Total")) %>% 
+  select(-c(x6, x38))
+
+# Now we can pivot our data from wide to long -- get yeras in 1 column, values in another!
+un_jobs_pivot <- un_jobs_clean %>% 
+  pivot_longer(cols = 2:28,
+               names_to = "year", 
+               values_to = "thousand_jobs"
+               )
+
+
+# We still have a lot of tidying to do....
+
+# -------- Tidy ----------
+
+un_pivot_clean <- un_jobs_pivot %>% 
+  # clean country names
+  rename(country = basic_data_and_indicators) %>% 
+  mutate(country = str_to_title(country)) %>% 
+  # clean up years (still in the format of x2020)
+  mutate(year = str_remove_all(year, "x"))
+
+# using countrycode::countrycode
+# and following this example on Rpubs: https://rpubs.com/Teal_Emery/cleaning_intl_data_tips_and_tricks 
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+
+
+# adding iso3 codes
+un_pivot_clean_codes <- un_pivot_clean %>% 
+  mutate(iso3c = country_regex_to_iso3c(country))
+
+
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  janitor::clean_names()
+
+
+jobs_rgn_join <- left_join(region_names, un_pivot_clean_codes, by = c("eez_iso3" = "iso3c")) %>% 
+  select(-c(notes))
+
+
+# test: drop rows where thousand_jobs is na
+
+jobs_no_na <- jobs_rgn_join %>% 
+  drop_na(thousand_jobs)
+
+
+length(unique(jobs_no_na$country))
+length(unique(jobs_no_na$rgn_name))
+
+
+# drop country column
+jobs_rgn_join_ohi <- jobs_no_na %>% 
+  select(-country)
+```
+
+
+Preliminary plot
+
+```{r}
+jobs_data_final <- jobs_rgn_join_ohi %>% 
+  mutate(year = as.numeric(year))
+
+
+ggplot(jobs_data_final) +
+  geom_line(aes(x = year, y = thousand_jobs,
+                 color = rgn_name)) +
+  theme_bw() +
+  theme(legend.position = "none")
+  
+
+jobs_plot_df <- jobs_data_final %>% 
+  filter(year >= 2013) %>% 
+  mutate(year = as.integer(year))
+
+length(unique(jobs_plot_df$rgn_id))
+
+ggplot(jobs_plot_df) +
+  geom_line(aes(x = year, y = thousand_jobs,
+                 color = rgn_name)) +
+  theme_bw() +
+  labs(
+    title = "Preliminary plot of jobs (thousands) over time (2013-2021)",
+    x = "Year",
+    y = "Jobs (Thousands)"
+  ) +
+  theme(legend.position = "none")
+
+```
+
+
+Interactive `plotly` version:
+```{r}
+plotly::plot_ly(jobs_plot_df, x = ~year, y = ~thousand_jobs, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Number of Tourism Jobs per Country over Time", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of people working in the tourism sector"))
+```
+
+
+
+India is seriously skewing the scales of this plot -- this, among general curiosity and conversation about how we should weight the number of jobs by the size of countries led us to create a proportional employment variable.
+
+
+
+# COME BACK 
+(update names -- copied from other doc w diff variable names so this chunk won't work)
+
+
+```{r}
+
+jobs_wages_join <- left_join(jobs_rgn_2012, pop_ppp_converted, by = c("rgn_id", "year"))
+
+jobs_wages_proportional_employment <- jobs_wages_join %>% 
+  mutate(total_tourism_employees = thousand_employees*1000) %>% 
+  dplyr::relocate(total_tourism_employees, .before = total_population) %>% 
+  mutate(proportional_tourism_employment = total_tourism_employees/total_population) %>% 
+  select(-c(notes.x, notes.y))
+  
+proportional_employement_nona <- jobs_wages_proportional_employment %>% 
+  na.omit() %>% 
+  mutate(year = as.numeric(year))
+
+ggplot(proportional_employement_nona, aes(x = year, y = proportional_tourism_employment, color = rgn_id)) + 
+  geom_line()
+
+line_plot <- plotly::plot_ly(proportional_employement_nona, x = ~year, y = ~proportional_tourism_employment, color = ~admin_country_name.x, type = "scatter", mode = "lines")
+  layout(title = "All Regions: Proportional Employment Line Chart", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of people employed by the tourism sector"))
+
+line_plot
+
+
+penona_pivot <- proportional_employement_nona %>% 
+  pivot_longer(cols = c(proportional_tourism_employment, yearly_wages_ppp_adjusted_by_year), names_to = "metric", values_to = "value") 
+# %>% 
+  filter(admin_country_name.x %in% c("Indonesia", "Brazil", "Cyprus", "Argentina", "India"))
+
+ggplot(penona_pivot, aes(x = as.numeric(year), y = value, color = admin_country_name.x)) +
+  geom_line() + 
+  facet_wrap(~metric, scales = "free", ncol = 1)
 ```
 
