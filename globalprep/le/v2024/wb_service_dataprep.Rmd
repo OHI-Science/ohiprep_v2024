@@ -1,0 +1,101 @@
+---
+title: "World Bank Service Earnings Data Prep"
+
+---
+
+# Read in Data from Mazu
+
+```{r}
+# load packages
+library(tidyverse)
+library(readxl)
+library(here)
+library(janitor)
+
+
+source(here("workflow/R/common.R"))
+```
+
+
+
+```{r}
+# set file paths to data in Mazu
+
+data_path <- "/home/shares/ohi/git-annex/globalprep/_raw_data/UNWTO/d2024"
+
+service_data <- file.path(data_path, "join_database_w_definitions.xlsx")
+
+```
+
+
+
+```{r}
+# read in .xlsx
+
+service_data_raw <- read_xlsx(service_data, skip = 3, col_names = TRUE)
+
+
+# quick view:
+
+
+head(service_data_raw)
+```
+
+The income column we're interested in is:
+Median Earnings for wage workers per month in service, local nominal currency
+
+
+First, let's tidy the data and select the columns we're interested in. Then we'll join with OHI regions to see what we're working with.
+
+```{r}
+# ---------- Tidy Data ------------------------
+service_data_clean <- service_data_raw %>% 
+  select("Country Name", "Country Code", "Region Code", "Year of survey", 
+         "Total population", "Median Earnings for wage workers per month in service, local nominal currency") %>% 
+  janitor::clean_names()
+
+# quick look
+head(service_data_clean)
+
+# ----------- Join with OHI Regions -----------
+
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv")
+
+
+# prep column names for joining
+service_clean <- service_data_clean %>% 
+  rename(eez_iso3 = country_code,
+         admin_country_name = country_name)
+
+
+# join by country_code and eez_iso3
+service_join <- inner_join(x = service_clean, region_names, by = c("eez_iso3", "admin_country_name"))
+
+# note: many-to-many relationship bc. admin country name applies to multiple regions from region_names -- would need to note this in analysis etc.
+
+
+service_join
+```
+
+Preliminary plot of wage data
+
+```{r}
+
+
+# 
+# ggplot(data = service_join) +
+#   geom_line(aes(x = year_of_survey, y = median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency)) +
+#   
+```
+
+
+Now we'll check out how many years (and how many countries have recent years)
+
+
+```{r}
+
+
+
+```
+
