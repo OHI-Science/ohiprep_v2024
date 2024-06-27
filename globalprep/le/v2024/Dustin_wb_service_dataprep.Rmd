@@ -156,14 +156,36 @@ jobs_rgn_2012 <- jobs_rgn_nona %>%
   mutate(year = as.character(year),
          rgn_id = as.character(rgn_id))
 
-wages_ppp_converted <- wages_ppp_converted %>% 
-  # rename(year = date) %>% 
+pop_ppp_converted <- wages_ppp_converted %>% 
+  rename(year = date) %>%
   mutate(year = as.character(year),
-         rgn_id = as.character(rgn_id))
+         rgn_id = as.character(rgn_id)) %>% 
+  select(rgn_id, admin_country_name.x, total_population, year, unit, yearly_wages_ppp_adjusted_by_year) %>% 
+  rename(admin_country_name = admin_country_name.x)
 
 jobs_rgn_2012$rgn
 
-jobs_wages_join <- left_join(jobs_rgn_2012, wages_ppp_converted, by = c("rgn_id", "year"))
+jobs_wages_join <- left_join(jobs_rgn_2012, pop_ppp_converted, by = c("rgn_id", "year"))
+
+jobs_wages_proportional_employment <- jobs_wages_join %>% 
+  mutate(total_tourism_employees = thousand_employees*1000) %>% 
+  dplyr::relocate(total_tourism_employees, .before = total_population) %>% 
+  mutate(proportional_tourism_employment = total_tourism_employees/total_population) %>% 
+  select(-c(notes.x, notes.y))
+  
+proportional_employement_nona <- jobs_wages_proportional_employment %>% 
+  na.omit() %>% 
+  mutate(year = as.numeric(year))
+
+ggplot(proportional_employement_nona, aes(x = year, y = proportional_tourism_employment, color = rgn_id)) + 
+  geom_line()
+
+line_plot <- plotly::plot_ly(proportional_employement_nona, x = ~year, y = ~proportional_tourism_employment, color = ~admin_country_name.x, type = "scatter", mode = "lines")
+  layout(title = "All Regions: Proportional Employment Line Chart", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of people employed by the tourism sector"))
+
+line_plot
 ```
 
 
