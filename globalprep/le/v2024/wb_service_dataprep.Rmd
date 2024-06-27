@@ -251,11 +251,11 @@ ppp_p41 <- ppp_service_clean %>%
 # check: number of unique countries, regions:
 unique(ppp_p41$admin_country_name)
 cat("Number of unique countries in this subset", length(unique(ppp_p41$admin_country_name)))
-# 37
+# 31
 
 unique(ppp_p41$rgn_name)
 cat("Number of unique regions in this subset", length(unique(ppp_p41$rgn_name)))
-# 43
+# 35
 
 
 # make new column of adjusted wages (by year by country)!
