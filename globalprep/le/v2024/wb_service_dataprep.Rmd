@@ -21,9 +21,14 @@ source(here("workflow/R/common.R"))
 ```{r}
 # set file paths to data in Mazu
 
-data_path <- "/home/shares/ohi/git-annex/globalprep/_raw_data/UNWTO/d2024"
+raw_data_path <- file.path(here(dir_M, #"/home/shares/ohi"
+                                "git-annex", 
+                                "globalprep",
+                                "_raw_data"))
 
-service_data <- file.path(data_path, "join_database_w_definitions.xlsx")
+un_wto_path <- file.path(here(raw_data_path, "UNWTO", "d2024"))
+
+service_data <- file.path(un_wto_path, "join_database_w_definitions.xlsx")
 
 ```
 
@@ -50,9 +55,13 @@ First, let's tidy the data and select the columns we're interested in. Then we'l
 ```{r}
 # ---------- Tidy Data ------------------------
 service_data_clean <- service_data_raw %>% 
-  select("Country Name", "Country Code", "Region Code", "Year of survey", 
+  select("Country Name", "Country Code", "Region Code", "Year of survey", "Subsample",
          "Total population", "Median Earnings for wage workers per month in service, local nominal currency") %>% 
-  janitor::clean_names()
+  janitor::clean_names() %>% 
+  mutate(year_of_survey = as.integer(year_of_survey),
+         country_name = as.factor(country_name)) %>% 
+  filter(subsample %in% c("All")) %>% # filtering to All because data also contains "Urban", "Young", etc.
+  select(-subsample)
 
 # quick look
 head(service_data_clean)
@@ -60,7 +69,8 @@ head(service_data_clean)
 # ----------- Join with OHI Regions -----------
 
 # read in OHI regions for joining
-region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv")
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  janitor::clean_names()
 
 
 # prep column names for joining
@@ -76,19 +86,97 @@ service_join <- inner_join(x = service_clean, region_names, by = c("eez_iso3", "
 
 
 service_join
+
+
+
+# Filter out NAs for service wages
+
+service_no_na <- service_join %>% 
+  drop_na(median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency)
+
+service_no_na
 ```
 
 Preliminary plot of wage data
 
 ```{r}
+# find most recent year of data
+service_newest <- service_join %>% 
+  group_by(admin_country_name) %>% 
+  summarize(max_year = max(year_of_survey))
+
+# filter to years >= 2013
+
+post_2013_data <- service_join %>% 
+  filter((year_of_survey) >= 2013)
 
 
-# 
-# ggplot(data = service_join) +
-#   geom_line(aes(x = year_of_survey, y = median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency)) +
-#   
+
+ggplot(data = post_2013_data) +
+  geom_line(aes(x = year_of_survey, y = median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency)) +
+#  facet_wrap(~admin_country_name) +
+  theme_bw()
+
 ```
 
+
+
+Adjust service wage data to be PPP USD using OECD data
+```{r}
+# read in ppp data
+oecd_data <- read_csv(file.path(here(un_wto_path, "SNA_TABLE4_27062024190625956.csv"))) %>% 
+  janitor::clean_names()
+
+```
+
+Join oecd and joined service data
+```{r}
+
+service_yearly <- service_no_na %>% 
+  mutate(annual_service_local_wages = median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency 
+* 12) %>% 
+  select(-notes)
+  
+ppp_service_join <- left_join(service_yearly, oecd_data, by = c("year_of_survey" = "year", "eez_iso3" = "location"))
+
+
+# filter to ones we have "value" (conversion) for
+
+ppp_service <- ppp_service_join %>% 
+  drop_na(value) %>% 
+  rename(year = year_of_survey)
+
+# selecting relevant columns
+ppp_service_clean <- ppp_service %>% 
+  select(
+    # country info
+    eez_iso3, admin_country_name, rgn_name, rgn_id, admin_rgn_id,
+    # currency info
+    unit_code, unit,
+    # year
+    year,
+    # wages info
+    median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency,
+    annual_service_local_wages,
+    # conversion per country
+    value,
+    
+    # type of PPP operation
+    transact,
+    transaction,
+    
+    # socio-demographic info
+    total_population
+  )
+
+ppp_service_clean
+
+
+
+# adjusted wages
+# make PPP subset
+# make new column of adjusted wages (by year by country)!
+```
 
 Now we'll check out how many years (and how many countries have recent years)
 
