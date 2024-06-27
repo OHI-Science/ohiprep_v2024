@@ -1,0 +1,127 @@
+---
+title: "wage_service_dataprep"
+format: html
+editor: visual
+---
+
+
+# Read in Data from Mazu
+
+```{r}
+# load packages
+library(tidyverse)
+library(readxl)
+library(here)
+library(janitor)
+
+
+source(here("workflow/R/common.R"))
+```
+
+```{r}
+un_job_data <- file.path(dir_M, "git-annex/globalprep/_raw_data/UNWTO/d2024/unwto-all-data-download_0.xlsx")
+
+un_jobs_data_raw <- read_xlsx(un_job_data, col_names = TRUE, sheet = "Employment", skip = 2, na = c("", "..")) %>%
+  janitor::clean_names() 
+
+un_jobs_clean <- un_jobs_data_raw %>%
+  select(-c(1:3)) %>%
+  fill(1, .direction = "down") %>%
+  select(-c(x5)) %>% 
+  select(-c(3:6)) %>% 
+  filter(x6 %in% c("Total")) %>% 
+  select(-c(x6, x38))
+
+# Now we can pivot our data from wide to long -- get yeras in 1 column, values in another!
+un_jobs_pivot <- un_jobs_clean %>% 
+  pivot_longer(cols = 2:28,
+               names_to = "year", 
+               values_to = "thousand_jobs"
+               )
+
+
+# We still have a lot of tidying to do....
+
+# -------- Tidy ----------
+
+un_pivot_clean <- un_jobs_pivot %>% 
+  # clean country names
+  rename(country = basic_data_and_indicators) %>% 
+  mutate(country = str_to_title(country)) %>% 
+  # clean up years (still in the format of x2020)
+  mutate(year = str_remove_all(year, "x"))
+
+# using countrycode::countrycode
+
+library(countrycode)
+
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+
+
+# adding iso3 codes
+un_pivot_clean_codes <- un_pivot_clean %>% 
+  mutate(iso3c = country_regex_to_iso3c(country))
+
+
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  janitor::clean_names()
+
+
+jobs_rgn_join <- left_join(region_names, un_pivot_clean_codes, by = c("eez_iso3" = "iso3c")) %>% 
+  select(-c(notes))
+
+
+# test: drop rows where thousand_jobs is na
+
+jobs_no_na <- jobs_rgn_join %>% 
+  drop_na(thousand_jobs)
+
+
+length(unique(jobs_no_na$country))
+length(unique(jobs_no_na$rgn_name))
+
+
+# drop country column
+jobs_rgn_join_ohi <- jobs_no_na %>% 
+  select(-country)
+```
+
+
+Preliminary plot
+
+```{r}
+jobs_data_final <- jobs_rgn_join_ohi %>% 
+  mutate(year = as.numeric(year))
+
+
+ggplot(jobs_data_final) +
+  geom_line(aes(x = year, y = thousand_jobs,
+                 color = rgn_name)) +
+  theme_bw() +
+  theme(legend.position = "none")
+  
+
+jobs_plot_df <- jobs_data_final %>% 
+  filter(year >= 2013) %>% 
+  mutate(year = as.integer(year))
+
+length(unique(jobs_plot_df$rgn_id))
+
+ggplot(jobs_plot_df) +
+  geom_line(aes(x = year, y = thousand_jobs,
+                 color = rgn_name)) +
+  theme_bw() +
+  labs(
+    title = "Preliminary plot of jobs (thousands) over time (2013-2021)",
+    x = "Year",
+    y = "Jobs (Thousands)"
+  ) +
+  theme(legend.position = "none")
+
+```
+
