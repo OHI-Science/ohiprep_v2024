@@ -74,11 +74,13 @@ jobs_plot <- jobs_rgn_join %>%
   labs(title = "Number of people employed by the tourism sector")
 
 line_plot <- plot_ly(jobs_rgn_join, x = ~as.numeric(year), y = ~jobs, color = ~admin_country_name, type = "scatter", mode = "lines") %>%
-  layout(title = "All Regions: Job Line Chart",
+  layout(title = "All Regions: Tourism Jobs",
          xaxis = list(title = "Year"),
          yaxis = list(title = "Number of people employed by the tourism sector"))
 
 line_plot
+
+htmlwidgets::saveWidget(line_plot, file = "liv_jobs.html")
 ```
 
 ```{r}

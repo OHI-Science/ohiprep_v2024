@@ -180,12 +180,15 @@ proportional_employement_nona <- jobs_wages_proportional_employment %>%
 ggplot(proportional_employement_nona, aes(x = year, y = proportional_tourism_employment, color = rgn_id)) + 
   geom_line()
 
-line_plot <- plotly::plot_ly(proportional_employement_nona, x = ~year, y = ~proportional_tourism_employment, color = ~admin_country_name.x, type = "scatter", mode = "lines")
+library(plotly)
+line_plot <- plot_ly(proportional_employement_nona, x = ~year, y = ~proportional_tourism_employment, color = ~admin_country_name.x, type = "scatter", mode = "lines") %>%
   layout(title = "All Regions: Proportional Employment Line Chart", 
          xaxis = list(title = "Year"),
          yaxis = list(title = "Number of people employed by the tourism sector"))
 
 line_plot
+
+htmlwidgets::saveWidget(line_plot, file = "proportional_jobs.html")
 
 
 penona_pivot <- proportional_employement_nona %>% 
