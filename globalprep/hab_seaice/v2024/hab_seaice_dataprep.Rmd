@@ -228,9 +228,7 @@ assessment year (v) in setup code chunk.
 
 ```{r setup, eval=FALSE}
 ## Install R packages where necessary
-rm(list = ls())
-doParallel::registerDoParallel(cores=30)
-pkg <- c("raster", "fasterize", "sf", "sp", "rgdal", "fields", "here", "tictoc", "dplyr", "ggplot2") # "fields" for colors in Status_Trend.R
+pkg <- c("raster", "fasterize", "sf", "sp", "rgdal", "fields", "here", "tictoc", "dplyr", "ggplot2", "foreach") # "fields" for colors in Status_Trend.R
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)){install.packages(new.pkg)}
 if (!("ohicore" %in% installed.packages())){devtools::install_github("ohi-science/ohicore")}
@@ -268,6 +266,9 @@ git-annex/globalprep/\_raw_data/NSIDC_SeaIce/v2023.
 ```{r define file path to ohi region maps (polygons), eval=FALSE}
 maps <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assess_year)
 ```
+
+
+## This chunk is the method for acquiring the data through R. As the full 2023 data is not currently (06/25/2024) available for access, this might need to be updated when the data becomes available so that the comparisons can be made. Currently leaving it in because I (Dustin) will be attempting to update this method once the data becomes available to facilitate the process for the next OHI fellows. 
 
 ```{r}
 ## Install R packages where necessary
@@ -417,12 +418,13 @@ the region shapefile into a raster points file. See `ObtainingData.R`
 script for more details.
 
 ```{r function 1: source obtaining data script, eval=FALSE}
-doParallel::registerDoParallel(cores=30)
+## Soft limit to running 5 cores per dataprep script. For this process running additional cores did not decrease the runtime. 
 tic()
 ## Previously (<2022) update to some file paths with the correct assessment year in ObtainingData.R was needed
 ## Currently (2023) this is automatic from this script with `assess_year` variable
 
-source("globalprep/hab_seaice/v2024/ObtainingData.R") ## This has changed (2024) to account for the current working directory being ohiprep_v2024 rather than 'hab_seaice/v2024'
+## WRap within evalWithTimeout
+source("globalprep/hab_seaice/v2024/ObtainingData_Parallel.R") ## This has changed (2024) to account for the current working directory being ohiprep_v2024 rather than 'hab_seaice/v2024'
 toc()
 ## should take ~30 minutes to completely run 
 ```
@@ -441,7 +443,7 @@ shoreline ice and ice edge habitat. Data is saved in intermediate
 ```{r function 2: source status trend script, eval=FALSE}
 tic()
 ref.years <- 1979:2000
-source("globalprep/hab_seaice/v2024/Status_Trend.R") # calculates status and trend for shoreline ice and ice edge habitat
+source(here("globalprep/hab_seaice/v2024/Status_Trend.R")) # calculates status and trend for shoreline ice and ice edge habitat
 toc()
 ```
 
@@ -454,8 +456,8 @@ health, extent, trend, and extent data.
 
 ```{r final data wrangling and save, eval=FALSE}
 
-n_edge <- read.csv("int/n_IceEdgeHabitat_ref1979to2000.csv")
-s_edge <- read.csv("int/s_IceEdgeHabitat_ref1979to2000.csv")
+n_edge <- read.csv("globalprep/hab_seaice/v2024/int/n_IceEdgeHabitat_ref1979to2000.csv")
+s_edge <- read.csv("globalprep/hab_seaice/v2024/int/s_IceEdgeHabitat_ref1979to2000.csv")
 edge <- rbind(n_edge, s_edge)
 edge  <- edge %>%
   dplyr::filter(Reference_avg1979to2000monthlypixels != 0) %>%
@@ -464,8 +466,8 @@ edge  <- edge %>%
   dplyr::filter(rgn_nam != "DISPUTED") %>%
   dplyr::mutate(habitat="seaice_edge")
 
-n_shore <- read.csv("int/n_IceShoreProtection_ref1979to2000.csv")
-s_shore <- read.csv("int/s_IceShoreProtection_ref1979to2000.csv")
+n_shore <- read.csv("globalprep/hab_seaice/v2024/int/n_IceShoreProtection_ref1979to2000.csv")
+s_shore <- read.csv("globalprep/hab_seaice/v2024/int/s_IceShoreProtection_ref1979to2000.csv")
 shore <- rbind(n_shore, s_shore)
 shore <- shore %>%
   dplyr::filter(Reference_avg1979to2000monthlypixels != 0) %>%
@@ -477,7 +479,7 @@ data <- rbind(edge, shore)
 data  <- data %>%
   dplyr::mutate(km2 = Reference_avg1979to2000monthlypixels/12 * (pixel/1000)^2)
 
-write.csv(data, "int/sea_ice.csv", row.names = FALSE)
+write.csv(data, "globalprep/hab_seaice/v2024/int/sea_ice.csv", row.names = FALSE)
 
 ## Health data
 health <- data %>%
@@ -488,7 +490,7 @@ health <- data %>%
   dplyr::mutate(year = as.numeric(year)) %>%
   dplyr::mutate(health = ifelse(health > 1, 1, health))
 
-write.csv(health, "output/hab_ice_health_eez.csv", row.names = FALSE) # save sea ice health data
+write.csv(health, "globalprep/hab_seaice/v2024/output/hab_ice_health_eez.csv", row.names = FALSE) # save sea ice health data
 
 ## Trend data
 trend <- data %>%
@@ -501,7 +503,7 @@ trend <- data %>%
   dplyr::mutate(trend = ifelse(trend > 1, 1, trend)) %>%
   dplyr::mutate(trend = ifelse(trend < (-1), -1, trend))
 
-write.csv(trend, "output/hab_ice_trend_eez.csv", row.names = FALSE) # save sea ice trend data
+write.csv(trend, "globalprep/hab_seaice/v2024/output/hab_ice_trend_eez.csv", row.names = FALSE) # save sea ice trend data
 
 ## Sea ice extent data
 extent <- data %>%
@@ -509,7 +511,7 @@ extent <- data %>%
    dplyr::mutate(year = 2016) %>% # extent not updated each year (historic extent of the sea ice habitat); updated last 2016 bc of source methods
   dplyr::select(rgn_id, habitat, year, km2)
 
-write.csv(extent, "output/hab_ice_extent_eez.csv", row.names = FALSE) # save sea ice extent data
+write.csv(extent, "globalprep/hab_seaice/v2024/output/hab_ice_extent_eez.csv", row.names = FALSE) # save sea ice extent data
 
 ```
 
@@ -522,15 +524,20 @@ write.csv(extent, "output/hab_ice_extent_eez.csv", row.names = FALSE) # save sea
 ```{r data checks, eval=FALSE}
 ## Health comparison
 
+## Because the last full year of data is 2022, 'previous_year' reflects 2022 instead of 2023. Changing the variable to that of previous assessment rather than previous year of full data. This wont change anything for 2024 because 2023 uses 2022 data year (last full data year) instead of 2023 data.
+previous_assessment_full_data <- 2023
+previous_year <- paste0("v", previous_assessment_full_data)
+
 #compare same years with different version year 
-health <- read.csv("output/hab_ice_health_eez.csv")
-ice_health_eez <- read.csv(sprintf("../%s/output/hab_ice_health_eez.csv", previous_year)) %>% # compare to last year's data
+health <- read.csv("globalprep/hab_seaice/v2024/output/hab_ice_health_eez.csv") # Current year
+
+ice_health_eez <- read.csv(sprintf("globalprep/hab_seaice/%s/output/hab_ice_health_eez.csv", previous_year)) %>% # compare to last year's data
   dplyr::rename(health_prev_assess = health) %>%
   dplyr::left_join(health, by = c("rgn_id", "habitat", "year")) %>% 
-  na.omit("health")
+  na.omit("health") 
 
-comp_plot <-ggplot() + geom_point(data = ice_health_eez, aes(x = health_prev_assess, y = health)) + labs(x = "previous health (2012-2021)", y = "health (2012-2021)") + geom_abline(slope = 1, intercept = 0, col = "red")
-ggplotly(comp_plot)
+comp_plot <- ggplot() + geom_point(data = ice_health_eez, aes(x = health_prev_assess, y = health)) + labs(x = "previous health (2012-2021)", y = "health (2012-2022)") + geom_abline(slope = 1, intercept = 0, col = "red")
+plotly::ggplotly(comp_plot)
 
 
 ### let's compare the data year 2022 to data year 2021 (current data year vs the year before)
@@ -540,12 +547,17 @@ regions <- rgn_master %>%
   dplyr::select(rgn_id = rgn_id_2013, rgn_name = rgn_nam_2013) %>%
   unique()
 
+## Changing current year back to 2022 because that's the last full year of data.
+current_year = 2022
 
 health_2022 <- health %>%
-  dplyr::filter(year == current_year-1)
+  dplyr::filter(year == current_year)
+
+## Changing last year to 2021 because that's the 'last year of data' provided that the current year is using 2022 as its data 
+last_year = 2021
 
 health_2021 <- ice_health_eez %>%
-  dplyr::filter(year == last_year-1) %>%
+  dplyr::filter(year == last_year) %>%
   dplyr::select(-year, -health)
 
 health_old_new <-  dplyr::left_join(health_2022, health_2021) %>% mutate(difference = (health - health_prev_assess)) %>% left_join(regions)
@@ -556,10 +568,11 @@ year_change_plot <-ggplot() +
              aes(x = health_prev_assess,
                  y = health, text = paste("Region ID:", rgn_id, "<br>Habitat:", habitat))) + labs(x = "previous assessment health", y = "current health") + geom_abline(slope = 1, intercept = 0, col = "red")
 
-ggplotly(year_change_plot, tooltip = "text")
+plotly::ggplotly(year_change_plot, tooltip = "text")
+
 ## Trend comparison
-trend <- read.csv("output/hab_ice_trend_eez.csv")
-ice_trend_eez <- read.csv(sprintf("../%s/output/hab_ice_trend_eez.csv", previous_year)) %>% # compare to last year's data
+trend <- read.csv("globalprep/hab_seaice/v2024/output/hab_ice_trend_eez.csv")
+ice_trend_eez <- read.csv(sprintf("globalprep/hab_seaice/%s/output/hab_ice_trend_eez.csv", previous_year)) %>% # compare to last year's data
   dplyr::rename(trend_prev_assess = trend) %>%
   dplyr::left_join(trend, by = c("rgn_id", "habitat", "year")) %>% 
   na.omit("trend")
@@ -567,26 +580,26 @@ ice_trend_eez <- read.csv(sprintf("../%s/output/hab_ice_trend_eez.csv", previous
 #update label years 
 trend_comp <- ggplot() + geom_point(data = ice_trend_eez, aes(x = trend_prev_assess, y = trend)) + labs(x = "previous assessment trend (2016-2021)", y= "current assessment trend (2016-2021)") + geom_abline(slope = 1, intercept = 0, col = "red")
 
-ggplotly(trend_comp)
+plotly::ggplotly(trend_comp)
 
 ### let's compare the data year 2022 to data year 2021 (current data year vs the year before)
 
 trend_2022 <- trend %>%
-  dplyr::filter(year == (current_year - 1))
+  dplyr::filter(year == (current_year))
 
 trend_2021 <- ice_trend_eez %>%
-  dplyr::filter(year == last_year -1) %>%
+  dplyr::filter(year == last_year) %>%
   dplyr::select(-year, -trend)
 
 trend_old_new <- dplyr::left_join(trend_2022, trend_2021) %>% mutate(difference = (trend - trend_prev_assess)) %>% left_join(regions)
 
-year_trend_change_plot <-ggplot() + geom_point(data = trend_old_new, aes(x = trend_prev_assess, y = trend, text = paste("Region ID:", rgn_id, "<br>Habitat:", habitat))) + labs(x = "previous year trend", y = "current trend") + geom_abline(slope = 1, intercept = 0, col = "red")
+year_trend_change_plot <-ggplot() + geom_point(data = trend_old_new, aes(x = trend_prev_assess, y = trend, text = paste("Region ID:", rgn_id, "<br>Habitat:", habitat))) + labs(x = "previous data year trend (2021)", y = "current data year trend (2022)") + geom_abline(slope = 1, intercept = 0, col = "red")
 
-ggplotly(year_trend_change_plot, tooltip = "text")
+plotly::ggplotly(year_trend_change_plot, tooltip = "text")
 
 ## Extent comparison
-extent <- read.csv("output/hab_ice_extent_eez.csv", stringsAsFactors = FALSE)
-ice_extent_eez <- read.csv(sprintf("../%s/output/hab_ice_extent_eez.csv", previous_year), stringsAsFactors = FALSE) %>% # compare to last year's data
+extent <- read.csv("globalprep/hab_seaice/v2024/output/hab_ice_extent_eez.csv", stringsAsFactors = FALSE)
+ice_extent_eez <- read.csv(sprintf("globalprep/hab_seaice/%s/output/hab_ice_extent_eez.csv", previous_year), stringsAsFactors = FALSE) %>% # compare to last year's data
   dplyr::rename(km2_prev_assess = km2) %>% left_join(extent)
 
 ggplot(data = ice_extent_eez) +geom_point(aes(x =km2_prev_assess, y = km2)) + geom_abline(slope = 1, intercept = 0, col = "red")
@@ -610,7 +623,7 @@ regions <- rgn_master %>%
   unique()
 
 ## Make sure sea ice health across regions makes intuitive sense...
-data <- read.csv("output/hab_ice_health_eez.csv") %>%
+data <- read.csv("globalprep/hab_seaice/v2024/output/hab_ice_health_eez.csv") %>%
   dplyr::left_join(regions, by = "rgn_id") %>%
   dplyr::arrange(habitat, health)
 
@@ -645,25 +658,25 @@ gapfilling. In this case the gapfill value is 0 for every region.
 ```{r, eval=FALSE}
 
 ## Health gapfill
-hab_ice_health_gf <- read.csv("output/hab_ice_health_eez.csv")%>%
+hab_ice_health_gf <- read.csv("globalprep/hab_seaice/v2024/output/hab_ice_health_eez.csv")%>%
   dplyr::mutate(gapfilled = 0) %>% 
   dplyr::select(rgn_id, year, gapfilled)
 
-write.csv(hab_ice_health_gf, "output/hab_ice_health_eez_gf.csv", row.names=FALSE) # save sea ice health gapfill file
+write.csv(hab_ice_health_gf, "globalprep/hab_seaice/v2024/output/hab_ice_health_eez_gf.csv", row.names=FALSE) # save sea ice health gapfill file
 
 ## Extent gapfill
-hab_ice_extent_gf <- read.csv("output/hab_ice_extent_eez.csv")%>%
+hab_ice_extent_gf <- read.csv("globalprep/hab_seaice/v2024/output/hab_ice_extent_eez.csv")%>%
   dplyr::mutate(gapfilled = 0) %>% 
   dplyr::select(rgn_id, year, gapfilled)
 
-write.csv(hab_ice_health_gf, "output/hab_ice_extent_eez_gf.csv", row.names=FALSE) # save sea ice extent gapfill file
+write.csv(hab_ice_health_gf, "globalprep/hab_seaice/v2024/output/hab_ice_extent_eez_gf.csv", row.names=FALSE) # save sea ice extent gapfill file
 
 ## Trend gapfill
-hab_ice_trend_gf <- read.csv("output/hab_ice_trend_eez.csv")%>%
+hab_ice_trend_gf <- read.csv("globalprep/hab_seaice/v2024/output/hab_ice_trend_eez.csv")%>%
   dplyr::mutate(gapfilled = 0) %>% 
   dplyr::select(rgn_id, year, gapfilled)
 
-write.csv(hab_ice_health_gf, "output/hab_ice_trend_eez_gf.csv", row.names=FALSE) # save sea ice trend gapfill file
+write.csv(hab_ice_health_gf, "globalprep/hab_seaice/v2024/output/hab_ice_trend_eez_gf.csv", row.names=FALSE) # save sea ice trend gapfill file
 
 ```
 
