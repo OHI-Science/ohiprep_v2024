@@ -133,7 +133,7 @@ Join oecd and joined service data
 ```{r}
 
 service_yearly <- service_no_na %>% 
-  mutate(annual_service_local_wages = median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency 
+  mutate(median_annual_service_local_wages = median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency 
 * 12) %>% 
   select(-notes)
   
@@ -157,7 +157,7 @@ ppp_service_clean <- ppp_service %>%
     year,
     # wages info
     median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency,
-    annual_service_local_wages,
+    median_annual_service_local_wages,
     # conversion per country
     value,
     
@@ -173,17 +173,137 @@ ppp_service_clean
 
 
 
-# adjusted wages
+# --------- Calculating Adjusted Wages -------------
 # make PPP subset
+# using PPP PRC:
+# the PPP for Household Final Consumption (or Private Consumption) covers the expenditure by households on individual consumption of goods and services, including those sold at prices that are not economically significant.
+ppp_prc <- ppp_service_clean %>% 
+  filter(transact %in% c("PPPPRC"))
+
+# check: number of unique countries, regions:
+unique(ppp_prc$admin_country_name)
+cat("Number of unique countries in this subset", length(unique(ppp_prc$admin_country_name)))
+# 37
+
+unique(ppp_prc$rgn_name)
+cat("Number of unique regions in this subset", length(unique(ppp_prc$rgn_name)))
+# 43
+
+
 # make new column of adjusted wages (by year by country)!
+
+# divide annual wage in local currency by PPP (local / USD, adjusted)
+
+adjusted_prc <- ppp_prc %>% 
+  mutate(adjusted_wages = median_annual_service_local_wages / value)
+
+
+# subset for viewing
+
+adjusted_prc %>% select(admin_country_name, rgn_name, year, value, median_annual_service_local_wages, adjusted_wages)
+
+
+max(adjusted_prc$adjusted_wages)
+
+
+# --------- PPP GDP -------------
+# make PPP subset
+# using PPP GDP: covers both final consumption expenditure (household and government) and gross capital formation
+ppp_gdp <- ppp_service_clean %>% 
+  filter(transact %in% c("PPPGDP"))
+
+# check: number of unique countries, regions:
+unique(ppp_gdp$admin_country_name)
+cat("Number of unique countries in this subset", length(unique(ppp_gdp$admin_country_name)))
+# 37
+
+unique(ppp_gdp$rgn_name)
+cat("Number of unique regions in this subset", length(unique(ppp_gdp$rgn_name)))
+# 43
+
+
+# make new column of adjusted wages (by year by country)!
+
+# divide annual wage in local currency by PPP (local / USD, adjusted)
+
+adjusted_gdp <- ppp_gdp %>% 
+  mutate(adjusted_wages = median_annual_service_local_wages / value)
+
+
+# subset for viewing
+
+adjusted_gdp %>% select(admin_country_name, rgn_name, year, value, median_annual_service_local_wages, adjusted_wages)
+
+
+max(adjusted_gdp$adjusted_wages)
+mean(adjusted_gdp$adjusted_wages)
+
+
+
+# --------- PPP P41 -------------
+# make PPP subset
+# using PPP P41: 
+# or PPP for actual individual consumption covers all households consumption expenditure and that part of government final expenditure which covers services it supplies to individual households, for example housing, health, education, social protection etc ... (in other words, it does not include government final expenditure on those services it supplies to households collectively such as defense, police, environment protection ...)
+
+ppp_p41 <- ppp_service_clean %>% 
+  filter(transact %in% c("PPPP41"))
+
+# check: number of unique countries, regions:
+unique(ppp_p41$admin_country_name)
+cat("Number of unique countries in this subset", length(unique(ppp_p41$admin_country_name)))
+# 37
+
+unique(ppp_p41$rgn_name)
+cat("Number of unique regions in this subset", length(unique(ppp_p41$rgn_name)))
+# 43
+
+
+# make new column of adjusted wages (by year by country)!
+
+# divide annual wage in local currency by PPP (local / USD, adjusted)
+
+adjusted_p41 <- ppp_p41 %>% 
+  mutate(adjusted_wages = median_annual_service_local_wages / value)
+
+
+# subset for viewing
+
+adjusted_p41 %>% select(admin_country_name, rgn_name, year, value, median_annual_service_local_wages, adjusted_wages)
+
+
+max(adjusted_p41$adjusted_wages)
+mean(adjusted_p41$adjusted_wages)
 ```
 
-Now we'll check out how many years (and how many countries have recent years)
 
+Super basic exploratory plots
 
 ```{r}
+prc_plot <- adjusted_prc %>% 
+  ggplot() +
+  geom_line(aes(x = year, y = adjusted_wages,
+                color = admin_country_name)) +
+  theme_bw() +
+  labs(title = "Adjusted Service Wages using PPP PRC")
+
+gdp_plot <- adjusted_gdp %>% 
+  ggplot() +
+  geom_line(aes(x = year, y = adjusted_wages,
+                color = admin_country_name)) +
+  theme_bw() +
+  labs(title = "Adjusted Service Wages using PPP GDP")
+
+p41_plot <- adjusted_p41 %>% 
+  ggplot() +
+  geom_line(aes(x = year, y = adjusted_wages,
+                color = admin_country_name)) +
+  theme_bw() +
+  labs(title = "Adjusted Service Wages using PPP P41")
 
 
 
+prc_plot
+gdp_plot
+p41_plot
 ```
 
