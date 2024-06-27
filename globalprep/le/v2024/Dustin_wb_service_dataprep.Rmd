@@ -1,0 +1,169 @@
+---
+title: "World Bank Service Earnings Data Prep"
+
+---
+
+
+```{r}
+# rm(list=ls())
+library(tidyverse)
+library(readr)
+library(readxl)
+library(here)
+library(janitor)
+library(readxl)
+library(zoo)
+library(tidyr)
+library(dplyr)
+library(reshape2)
+```
+
+
+```{r}
+current_year <- 2024
+assess_year <- paste0("v", current_year)
+
+## Workflow/R/common.R loaded to obtain dir_M 
+source(here("workflow/R/common.R"))
+
+fp_join <- file.path(dir_M, "git-annex/globalprep/_raw_data/UNWTO/d2024/join_database_w_definitions.xlsx")
+fp_ppp <- file.path(dir_M, "git-annex/globalprep/_raw_data/UNWTO/d2024/SNA_TABLE4_27062024190625956.csv")
+
+wages <- read_excel(fp_join, 
+                   skip = 3, col_names = TRUE) %>% 
+  janitor::clean_names()
+
+wages_2018 = wages %>% 
+  filter(year_of_survey >= 2012)
+
+# column_names <- as.list(colnames(wages_2018))
+
+wages_filtered <- wages_2018 %>%  
+  dplyr::select(1:10, total_population, 25, 61, 66, 72:74, 75, 79, 81, 83) %>% 
+  filter(subsample == "All") %>% 
+  mutate(country_name = as.factor(country_name)) %>% 
+  arrange(desc(real_median_hourly_wages_in_usd_base_2011_ppp_adjusted)) %>% 
+    filter(!is.na(median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency)) %>% 
+  rename(median_service_wage_local = median_earnings_for_wage_workers_per_month_in_service_local_nominal_currency )
+
+ggplot(wages_filtered, aes(y = reorder(country_name, median_service_wage_local), x = median_service_wage_local)) +
+  geom_boxplot() + 
+  theme(axis.text.y = element_text(size = 10))
+
+## We want to convert the median monthly wages median_service_wage_local for each country for each year 
+wages_subset <- wages_filtered %>% 
+  dplyr::select(1:3, 7, total_population, median_service_wage_local) %>% 
+  mutate(yearly_local_wage = median_service_wage_local*12) %>% 
+  rename(date = year_of_survey) %>% 
+  mutate(date = as.character(date))
+
+# ----------- Join with OHI Regions -----------
+
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  janitor::clean_names()
+
+# prep column names for joining
+wages_clean <- wages_subset %>% 
+  rename(eez_iso3 = country_code,
+         admin_country_name = country_name)
+
+
+# join by country_code and eez_iso3
+wages_merge <- inner_join(x = wages_clean, region_names, by = c("eez_iso3", "admin_country_name"))
+
+wages_merge <- wages_merge %>% 
+  dplyr::relocate(rgn_id, .before = admin_country_name) %>% 
+  select(-notes)
+
+# ------------- Bring in in PPP data conversion factors ----------------
+ppp_conversion <- read_csv(fp_ppp) %>% 
+  janitor::clean_names()
+
+ppp_prc = ppp_conversion %>% 
+  filter(transact == "PPPGDP") %>% 
+  filter(time >= 2012) %>% 
+  rename(date = year) %>% 
+  mutate(date = as.character(date))
+
+ppp_clean <- ppp_prc %>% 
+  dplyr::select(c(location, country, transact, date, unit, value)) %>% 
+  rename(eez_iso3 = location,
+         admin_country_name = country)
+
+ppp_merge <- inner_join(x = ppp_clean, region_names, by = c("eez_iso3", "admin_country_name"))
+
+ppp_merge <- ppp_merge %>% 
+  dplyr::relocate(rgn_id, .before = eez_iso3)
+
+wages_ppp <- inner_join(x = wages_merge, ppp_merge, by = c("rgn_id", "date"))
+
+wages_ppp_converted <- wages_ppp %>% 
+  mutate(yearly_wages_ppp_adjusted_by_year = yearly_local_wage/value) %>% 
+  mutate(rgn_id = as.character(rgn_id))
+
+ggplot(wages_ppp_converted, aes(y = yearly_wages_ppp_adjusted_by_year, x = as.numeric(date), color = rgn_id)) + 
+  geom_line()
+```
+
+```{r}
+fp_unwto <- file.path(dir_M, "/git-annex/globalprep/_raw_data/UNWTO/d2024/unwto-all-data-download_0.xlsx")
+
+unwto <- read_excel(fp_unwto, col_names = TRUE, sheet = "Employment", skip = 2, na = c("..")) %>% 
+  janitor::clean_names()
+
+unwto_subset <- unwto %>% 
+  dplyr::select(-c(c,s,c_s, x5, x7, x8, x38)) %>% 
+  fill(basic_data_and_indicators, .direction = "down") %>% 
+  filter(x6 == "Total")
+
+unwto_long <- unwto_subset %>% 
+  pivot_longer(cols = c(5:31), names_to = "year", values_to = "thousand_employees") %>% 
+  mutate(year = str_remove_all(year, "x")) %>% 
+  rename(country = basic_data_and_indicators) %>% 
+  mutate(country = str_to_title(country))
+
+# using countrycode::countrycode
+
+# install.packages("countrycode")
+library(countrycode)
+
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+
+# adding iso3 codes
+unwto_clean_codes <- unwto_long %>% 
+  mutate(iso3c = country_regex_to_iso3c(country))
+
+
+
+ggplot(unwto_clean_codes, aes(x = as.numeric(year), y = thousand_employees, color = country)) + 
+  geom_line() + 
+  # ylim(0,10000) +
+  theme(legend.position = "none")
+
+jobs_rgn_join <- left_join(region_names, unwto_clean_codes, by = c("eez_iso3" = "iso3c"))
+
+jobs_rgn_nona <- jobs_rgn_join %>% 
+  filter(!is.na(thousand_employees))
+
+jobs_rgn_2012 <- jobs_rgn_nona %>% 
+  mutate(year = as.numeric(year)) %>% 
+  filter(year >= 2012) %>% 
+  mutate(year = as.character(year),
+         rgn_id = as.character(rgn_id))
+
+wages_ppp_converted <- wages_ppp_converted %>% 
+  # rename(year = date) %>% 
+  mutate(year = as.character(year),
+         rgn_id = as.character(rgn_id))
+
+jobs_rgn_2012$rgn
+
+jobs_wages_join <- left_join(jobs_rgn_2012, wages_ppp_converted, by = c("rgn_id", "year"))
+```
+
+
