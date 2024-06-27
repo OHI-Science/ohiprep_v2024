@@ -276,27 +276,34 @@ mean(adjusted_p41$adjusted_wages)
 ```
 
 
-Super basic exploratory
+Super basic exploratory plots
 
 ```{r}
-
-adjusted_prc %>% 
+prc_plot <- adjusted_prc %>% 
   ggplot() +
   geom_line(aes(x = year, y = adjusted_wages,
                 color = admin_country_name)) +
-  theme_bw()
+  theme_bw() +
+  labs(title = "Adjusted Service Wages using PPP PRC")
 
-
-adjusted_gdp %>% 
+gdp_plot <- adjusted_gdp %>% 
   ggplot() +
   geom_line(aes(x = year, y = adjusted_wages,
                 color = admin_country_name)) +
-  theme_bw()
+  theme_bw() +
+  labs(title = "Adjusted Service Wages using PPP GDP")
 
-adjusted_p41 %>% 
+p41_plot <- adjusted_p41 %>% 
   ggplot() +
   geom_line(aes(x = year, y = adjusted_wages,
                 color = admin_country_name)) +
-  theme_bw()
+  theme_bw() +
+  labs(title = "Adjusted Service Wages using PPP P41")
+
+
+
+prc_plot
+gdp_plot
+p41_plot
 ```
 
