@@ -186,6 +186,16 @@ line_plot <- plotly::plot_ly(proportional_employement_nona, x = ~year, y = ~prop
          yaxis = list(title = "Number of people employed by the tourism sector"))
 
 line_plot
+
+
+penona_pivot <- proportional_employement_nona %>% 
+  pivot_longer(cols = c(proportional_tourism_employment, yearly_wages_ppp_adjusted_by_year), names_to = "metric", values_to = "value") 
+# %>% 
+  filter(admin_country_name.x %in% c("Indonesia", "Brazil", "Cyprus", "Argentina", "India"))
+
+ggplot(penona_pivot, aes(x = as.numeric(year), y = value, color = admin_country_name.x)) +
+  geom_line() + 
+  facet_wrap(~metric, scales = "free", ncol = 1)
 ```
 
 
