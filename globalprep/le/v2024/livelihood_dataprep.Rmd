@@ -1,15 +1,33 @@
 ---
-title: "Livelihood Dataprep (master doc) 2024"
+title: "OHI `r format(Sys.Date(), '%Y')` - Livelilihoods Data Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
 ---
 
-
+# Labor Force Data
 
 Labor Force data from World Bank (downloaded June 28. 2024)
 
 - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
 
 
-## Setup
+### Setup
 
 ```{r}
 # load packages
@@ -49,21 +67,22 @@ raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
 ```
 
-## Read in Data
+### Read in Data
 
 ```{r}
-# Labor Force -------
-
-
+# Labor Force ----
 labor_raw <- readxl::read_xls(here(wb_dir, "worldbank_labor_force_raw.xls"),
                                skip = 3,
                                na = "")
+
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
 
 
 ```
 
 
-## Tidy Data
+### Tidy Data
 
 ```{r}
 labor_clean <- labor_raw %>% 
@@ -82,8 +101,11 @@ labor_clean <- labor_raw %>%
          country_name = as.factor(country_name),
          thousand_jobs = as.numeric(thousand_jobs))
   
-
-
+# clean region 
+region_clean <- region_names %>% 
+  janitor::clean_names() %>% 
+  # 
+  select(-c(("notes")))
 
 ```
 
