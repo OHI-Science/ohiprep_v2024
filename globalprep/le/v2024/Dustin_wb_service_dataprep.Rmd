@@ -39,7 +39,7 @@ wages_2018 = wages %>%
 # column_names <- as.list(colnames(wages_2018))
 
 wages_filtered <- wages_2018 %>%  
-  dplyr::select(1:10, total_population, 25, 61, 66, 72:74, 75, 79, 81, 83) %>% 
+  dplyr::select(1:10, total_population, labor_force_aged_15_64, 25, 61, 66, 72:74, 75, 79, 81, 83) %>% 
   filter(subsample == "All") %>% 
   mutate(country_name = as.factor(country_name)) %>% 
   arrange(desc(real_median_hourly_wages_in_usd_base_2011_ppp_adjusted)) %>% 
@@ -52,7 +52,7 @@ ggplot(wages_filtered, aes(y = reorder(country_name, median_service_wage_local),
 
 ## We want to convert the median monthly wages median_service_wage_local for each country for each year 
 wages_subset <- wages_filtered %>% 
-  dplyr::select(1:3, 7, total_population, median_service_wage_local) %>% 
+  dplyr::select(1:3, 7, total_population, labor_force_aged_15_64, median_service_wage_local) %>% 
   mutate(yearly_local_wage = median_service_wage_local*12) %>% 
   rename(date = year_of_survey) %>% 
   mutate(date = as.character(date))
@@ -160,7 +160,7 @@ pop_ppp_converted <- wages_ppp_converted %>%
   rename(year = date) %>%
   mutate(year = as.character(year),
          rgn_id = as.character(rgn_id)) %>% 
-  select(rgn_id, admin_country_name.x, total_population, year, unit, yearly_wages_ppp_adjusted_by_year) %>% 
+  select(rgn_id, admin_country_name.x, total_population, labor_force_aged_15_64, year, unit, yearly_wages_ppp_adjusted_by_year) %>% 
   rename(admin_country_name = admin_country_name.x)
 
 jobs_rgn_2012$rgn
@@ -170,18 +170,19 @@ jobs_wages_join <- left_join(jobs_rgn_2012, pop_ppp_converted, by = c("rgn_id", 
 jobs_wages_proportional_employment <- jobs_wages_join %>% 
   mutate(total_tourism_employees = thousand_employees*1000) %>% 
   dplyr::relocate(total_tourism_employees, .before = total_population) %>% 
-  mutate(proportional_tourism_employment = total_tourism_employees/total_population) %>% 
+  mutate(proportional_tourism_employment_total_pop = total_tourism_employees/total_population,
+         proportional_tourism_employment_labor_force = total_tourism_employees/labor_force_aged_15_64) %>% 
   select(-c(notes.x, notes.y))
   
 proportional_employement_nona <- jobs_wages_proportional_employment %>% 
   na.omit() %>% 
   mutate(year = as.numeric(year))
 
-ggplot(proportional_employement_nona, aes(x = year, y = proportional_tourism_employment, color = rgn_id)) + 
+ggplot(proportional_employement_nona, aes(x = year, y = proportional_tourism_employment_labor_force, color = rgn_id)) + 
   geom_line()
 
 library(plotly)
-line_plot <- plot_ly(proportional_employement_nona, x = ~year, y = ~proportional_tourism_employment, color = ~admin_country_name.x, type = "scatter", mode = "lines") %>%
+line_plot <- plot_ly(proportional_employement_nona, x = ~year, y = ~proportional_tourism_employment_labor_force, color = ~admin_country_name.x, type = "scatter", mode = "lines") %>%
   layout(title = "All Regions: Proportional Employment Line Chart", 
          xaxis = list(title = "Year"),
          yaxis = list(title = "Number of people employed by the tourism sector"))
@@ -192,13 +193,61 @@ htmlwidgets::saveWidget(line_plot, file = "proportional_jobs.html")
 
 
 penona_pivot <- proportional_employement_nona %>% 
-  pivot_longer(cols = c(proportional_tourism_employment, yearly_wages_ppp_adjusted_by_year), names_to = "metric", values_to = "value") 
+  pivot_longer(cols = c(proportional_tourism_employment_labor_force, yearly_wages_ppp_adjusted_by_year), names_to = "metric", values_to = "value") 
 # %>% 
-  filter(admin_country_name.x %in% c("Indonesia", "Brazil", "Cyprus", "Argentina", "India"))
+  # filter(admin_country_name.x %in% c("Indonesia", "Brazil", "Cyprus", "Argentina", "India"))
 
 ggplot(penona_pivot, aes(x = as.numeric(year), y = value, color = admin_country_name.x)) +
   geom_line() + 
   facet_wrap(~metric, scales = "free", ncol = 1)
+length(unique(penona_pivot$admin_country_name.x))
+length(unique(wages_ppp_converted$rgn_id))
 ```
 
+```{r}
+fp.newwage <- file.path(dir_M,
+                        "git-annex/globalprep/_raw_data/UNWTO/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv")
+
+new_wage_data <- read_csv(fp.newwage)
+
+new_wage_data_ppp <- new_wage_data %>% 
+  rename(monthly_wage = obs_value) %>% 
+  filter(classif2.label == "Currency: 2017 PPP $") %>% 
+  group_by(ref_area.label) 
+
+country <- as.data.frame(unique(new_wage_data_ppp$ref_area.label))
+
+countries = sample_n(country, size = 15)
+
+countries = as.list(countries[,1])
+
+test <- new_wage_data_ppp[new_wage_data_ppp$ref_area.label %in% countries[,1], ]
+
+range(new_wage_data$time) ## 2014-2024 
+length(unique(new_wage_data$ref_area.label)) ## 150 countries
+
+ggplot(test, aes(x = time, y = monthly_wage, color = ref_area.label)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  ylim(0, 10000)
+```
+
+
+```{r}
+fp.lbr_frc <- file.path(dir_M, "git-annex/globalprep/_raw_data/WorldBank/d2024/worldbank_labor_force_raw.xls")
+
+lbr_frc <- read_excel(fp.lbr_frc, skip = 3, na = "") %>% 
+  janitor::clean_names()
+
+lbr_long <- lbr_frc %>% 
+  pivot_longer(cols = c(5:68), names_to = "year", values_to = "labor_force") %>% 
+  mutate(year = str_remove_all(year, pattern = "x"),
+         year = as.numeric(year))
+
+lbr_rgn <- left_join(lbr_long, region_names, by =c("country_code" = "eez_iso3"))
+
+lbr_rgn_nona <- lbr_rgn %>% 
+  filter(!is.na(admin_rgn_id)) %>% 
+  filter(year >= 1991)
+```
 
