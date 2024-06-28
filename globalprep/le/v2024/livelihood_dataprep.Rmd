@@ -129,4 +129,68 @@ labor_regions <- labor_regions_join %>%
 
 # Employment Data
 
-(put this within previous chunk, read in data etc. for number of tourism jobs, join wiht labor_regions, make new proportion of tourism jobs column, group by year, do prelim plotting etc. and evaluate data quality etc.)
+(put this within previous chunk, read in data etc. for number of tourism jobs, join with labor_regions, make new proportion of tourism jobs column, group by year, do prelim plotting etc. and evaluate data quality etc.)
+
+```{r}
+# total number of people employed by the tourism sector, in thousands (remember this!)
+un_job_data <- file.path(dir_M, "git-annex/globalprep/_raw_data/UNWTO/d2024/unwto-all-data-download_0.xlsx")
+
+# take in .xlsx and read it in, clean it
+un_jobs_data_raw <- read_xlsx(un_job_data, skip = 2, sheet = "Employment", col_names = TRUE, na = c("","..")) %>%
+  janitor::clean_names() %>%
+  select(-c(1:3)) %>%
+  fill(1, .direction = "down") %>%
+  select(-c(x5, x7:units, notes, x38)) %>%
+  filter(x6 %in% "Total") %>%
+  select(-x6)
+
+# pivot longer so that we can see how many jobs per year, per country!
+un_jobs_data_piv <- un_jobs_data_raw %>%
+  pivot_longer(cols = 2:28, names_to = "year", values_to = "jobs") %>%
+  mutate(year = str_remove_all(year, 'x')) %>%
+  rename(country = basic_data_and_indicators) %>%
+  mutate()
+
+# install.packages("countrycode")
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+
+# adding iso3 codes, converting number to thousands to be consistent and prep for the left_join with labor_regions
+un_jobs_cc <- un_jobs_data_piv %>% 
+  mutate(iso3c = country_regex_to_iso3c(country)) %>%
+  mutate(tourism_jobs = jobs*1000) %>%
+  mutate(country = str_to_title(country)) %>%
+  select(-jobs) %>%
+  mutate(year = as.numeric(year))
+# warning: ! Some values were not matched unambiguously: BONAIRE, SABA, SERBIA AND MONTENEGRO, SINT EUSTATIUS
+
+# join w OHI regions
+tourism_un_jobs_ohi <- left_join(region_clean, un_jobs_cc, by = c("eez_iso3" = "iso3c"))
+
+
+# ----------Join with Labor Force Data--------------
+tourism_labor_join <- left_join(labor_regions, tourism_un_jobs_ohi, by = c("rgn_id", "year")) 
+```
+
+Create the proportion between tourism jobs and the total labor force
+```{r}
+tourism_job_proportion <- tourism_labor_join %>%
+  dplyr::relocate(tourism_jobs, .before = thousand_jobs) %>%
+  mutate(tourism_proportion = tourism_jobs/thousand_jobs) %>%
+  rename(labor_force_total = thousand_jobs) %>%
+  select(rgn_id, rgn_name.x, country, year, labor_force_total, tourism_jobs, tourism_proportion)
+
+# plot it, interactively!
+line_plot <- plotly::plot_ly(tourism_job_proportion, x = ~year, y = ~tourism_proportion, color = ~country, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Proportional Tourism Employment Within Total Labor Force", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percent of people by region employed by the tourism sector"))
+
+line_plot
+```
+
+
