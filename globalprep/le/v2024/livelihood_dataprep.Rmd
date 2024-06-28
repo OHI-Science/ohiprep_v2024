@@ -191,6 +191,8 @@ line_plot <- plotly::plot_ly(tourism_job_proportion, x = ~year, y = ~tourism_pro
          yaxis = list(title = "Percent of people by region employed by the tourism sector"))
 
 line_plot
+
+htmlwidgets::saveWidget(line_plot, file = "prop_tourism_laborforce.html")
 ```
 
 
