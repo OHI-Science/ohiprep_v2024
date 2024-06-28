@@ -1,0 +1,132 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - Livelilihoods Data Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
+---
+
+# Livelihoods: Proportion of Tourism Jobs per Country/Region per Year
+
+## Overview
+
+* **Data:** Labor Force & Employment Data
+
+  * Labor Force data from World Bank (downloaded June 28. 2024)
+
+- https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+
+
+### Setup
+
+```{r}
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  janitor,
+  terra,
+  readxl,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  tidyverse, 
+  httr,
+  plotly,
+  zoo # for gapfilling
+  
+)
+
+# source 
+source(here("workflow/R/common.R"))
+
+# set year and file path info
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- paste0("globalprep/le/", version_year)
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# world bank raw data directory
+wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+```
+
+### Read in Data
+
+```{r}
+# ===================== Read in Data ==============================
+
+
+# Labor force data ----
+labor_raw <- readxl::read_xls(here(wb_dir, "worldbank_labor_force_raw.xls"),
+                               skip = 3,
+                               na = "")
+
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
+
+
+# ==================== Tidy Data ===================================
+
+# Labor force data -----------------------------------
+labor_clean <- labor_raw %>% 
+  # conver to lower_snake_case
+  janitor::clean_names() %>% 
+  # tidy data from wide to long (years are currently columns)
+  pivot_longer(cols = 5:length(names(labor_raw)),
+               names_to = "year", 
+               values_to = "thousand_jobs") %>% 
+  # remove unnecessary columns
+  select(-c(indicator_name, indicator_code)) %>% 
+  # clean up year column (currently in the form of xYYYY)
+  mutate(year = str_remove_all(year, pattern = "x")) %>% 
+  # fix data types
+  mutate(year = as.numeric(year),
+         country_name = as.factor(country_name),
+         thousand_jobs = as.numeric(thousand_jobs))
+  
+
+# clean regions data --------------
+region_clean <- region_names %>% 
+  janitor::clean_names() %>% 
+  # drop notes column
+  select(-c(("notes")))
+
+
+
+# ============== Join labor force + OHI regions =============================
+
+labor_regions_join <- left_join(region_clean, labor_clean,
+                                by = c("eez_iso3" = "country_code"))
+# note: many-to-many warning is not a cause for concern here because for countries in the labor dataset that match admin countries (but not region names) in the region dataset, it'll populate the rows of region-admin country pairs where there is only a match between admin and labor country names with that country's admin-country-level labor data. It will be important to mention this in the data gaps or analysis, however.
+
+
+labor_regions <- labor_regions_join %>% 
+  select(-c(country_name)) %>% 
+  filter(year >= 2009) # starting 5 years back from first year of evaluation
+
+```
+
+# Employment Data
+
+(put this within previous chunk, read in data etc. for number of tourism jobs, join wiht labor_regions, make new proportion of tourism jobs column, group by year, do prelim plotting etc. and evaluate data quality etc.)

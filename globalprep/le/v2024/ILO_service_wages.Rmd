@@ -1,0 +1,30 @@
+---
+title: "Service Wages ILO"
+output: html_notebook
+---
+
+# ILO service wages 
+
+```{r setup}
+# load packages
+library(tidyverse)
+library(readxl)
+library(here)
+library(janitor)
+
+
+source(here("workflow/R/common.R"))
+```
+
+```{r}
+ilo_wage_data_fp <- file.path(dir_M, "git-annex/globalprep/_raw_data/UNWTO/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv") 
+
+ilo_wage_data_raw <- read_csv(ilo_wage_data_fp) %>%
+  janitor::clean_names()
+
+head(ilo_wage_data_raw)
+
+range(ilo_wage_data_raw$time)
+length(unique(ilo_wage_data_raw$ref_area_label))
+```
+
