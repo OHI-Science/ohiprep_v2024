@@ -13,6 +13,7 @@ library(tidyverse)
 library(readxl)
 library(here)
 library(janitor)
+library(zoo)
 
 
 source(here("workflow/R/common.R"))
@@ -127,11 +128,33 @@ ggplot(jobs_plot_df) +
 ```
 
 ```{r}
+library(plotly)
 plotly::plot_ly(jobs_plot_df, x = ~year, y = ~thousand_jobs, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
   layout(title = "All Regions: Number of Tourism Jobs per Country over Time", 
          xaxis = list(title = "Year"),
          yaxis = list(title = "Number of people working in the tourism sector"))
 ```
+
+
+# Table of number of regions & countries that we have data for per year
+
+```{r}
+job_countries_per_year <- jobs_data_final %>% 
+  group_by(year) %>% 
+  summarize(n_countries = length(unique(rgn_name)))
+
+job_countries_per_year
+
+library(gt)
+
+job_countries_per_year %>% gt()
+```
+
+
+
+
+
+
 
 
 India is seriously skewing the scales of this plot -- this, among general curiosity and conversation about how we should weight the number of jobs by the size of countries led us to create a proportional employment variable.
