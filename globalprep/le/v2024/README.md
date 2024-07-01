@@ -142,6 +142,7 @@ Labor Force: used to find proportion of working-eligible population employed in 
 -   Downloaded July 1st, 2024, along with Metadata, stored in UNWTO folder
 
     -   raw data file name `Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx`
+    -   metadata file name `metadata_unwto_economies_tourism.Rmd` 
 
 ### Percent of Population within 25 miles of coast
 
