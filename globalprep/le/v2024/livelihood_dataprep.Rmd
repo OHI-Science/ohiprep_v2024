@@ -15,7 +15,7 @@ output:
 pdf_document:
   toc: true
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
   markdown: 
     wrap: 72
 ---
@@ -53,6 +53,9 @@ librarian::shelf(
   zoo # for gapfilling
   
 )
+#remotes::install_github("skgrange/threadr") # for na_extrapolate
+library(threadr)
+
 
 # source 
 source(here("workflow/R/common.R"))
@@ -82,8 +85,18 @@ labor_raw <- readxl::read_xls(here(wb_dir, "worldbank_labor_force_raw.xls"),
                                skip = 3,
                                na = "")
 
+# OHI regions data ----
 # read in OHI regions for joining
 region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
+
+
+# ILO wage data ----
+# define file path to ILO wage data 
+ilo_fp <- file.path(dir_M,
+                        "git-annex/globalprep/_raw_data/UNWTO/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv")
+
+# read in ILO wage data
+ilo_wage_data <- read_csv(ilo_fp)
 
 
 # ==================== Tidy Data ===================================
@@ -192,7 +205,147 @@ line_plot <- plotly::plot_ly(tourism_job_proportion, x = ~year, y = ~tourism_pro
 
 line_plot
 
-htmlwidgets::saveWidget(line_plot, file = "prop_tourism_laborforce.html")
+# htmlwidgets::saveWidget(line_plot, file = "prop_tourism_laborforce.html")
 ```
 
+
+## ILO wage data
+  - note: this data came from many sources and was compiled by ILO
+
+```{r}
+# preliminary cleanings
+wage_data_clean <- ilo_wage_data %>% 
+  # lower_snake_case
+  janitor::clean_names() %>% 
+  # more intuitive value name
+  rename(monthly_wage = obs_value) %>% 
+  # filter to PPP adjusted data (this accounts for inflation, diff in currencies globally, cost of living etc.)
+  filter(classif2_label == "Currency: 2017 PPP $") %>% 
+  # group by country/region
+  group_by(ref_area_label) %>% 
+  # set column name to year
+  rename(year = time) %>% 
+  # filter to the cap date range from the jobs data -- 2019
+  filter(year %in% c(2014:2019)) %>%  
+  # add iso3 column, tourism sector label
+  mutate(iso3 = country_regex_to_iso3c(ref_area_label),
+         sector = "tour") %>% 
+  select(c(ref_area_label, iso3, year, monthly_wage, classif2_label))
+  
+
+
+# make sequence of years for gapfilling ----
+# note: data does not have wage data for some years in some countries -- we want to account for that by leaving them as NAs, then gapfilling with the average between the pre and post years
+
+years_df <- tibble(iso3 = wage_data_clean$iso3) %>% 
+  group_by(iso3) %>% 
+  summarize(year = seq(2014, 2019))
+
+
+wage_data_years <- left_join(years_df, wage_data_clean, by = c("iso3", "year"))
+
+# filling in country names when possible --- 
+wage_years_filled <- wage_data_years %>% 
+  group_by(iso3) %>% 
+  fill(ref_area_label, .direction = "downup") %>% 
+  ungroup()
+
+# =================
+
+# test gapfilling
+gap_fill_test <- wage_years_filled %>% 
+  mutate(ref_area_label = as.factor(ref_area_label)) %>% 
+  mutate(lm_est = list(lm(monthly_wage ~ year + ref_area_label)))
+
+
+lm_test <- lm(monthly_wage ~ year + ref_area_label, data = wage_years_filled)
+summary(lm_test)
+
+lm_test$coefficients 
+
+# wage_years_filled$lm_values <- lm_test$fitted.values
+
+# gap filling  ----
+wage_gf <- wage_years_filled %>% 
+  group_by(ref_area_label) %>% 
+  # interpolate (fill missing values between 2 values)
+  mutate(appx_wage = zoo::na.approx(monthly_wage, # using values in this column
+                                    na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
+                                    #  extrapolate using rule = 2 from approx(), uses closest data extreme to extrapolate for leading and trailing NAs
+                                    rule = 2))
+  
+# note: need more than 1 data point to do any approximation. 
+# also, extremes (leading and trailing) are just copied data points from nearest extreme
+
+```
+
+Note for each region that only has 1 value, can gap fill using fill(.direction = "downup") -- want to take note of every region that this applies to.
+
+
+```{r}
+# find regions with only 1 data point (still have NAs in appx_wage column)
+
+na_regions <- wage_gf %>% 
+  filter(is.na(appx_wage))
+
+
+unique(na_regions$ref_area_label)
+num_na <- length(unique(na_regions$ref_area_label))
+num_tot <- length(unique(wage_gf$ref_area_label))
+
+paste0("proportion of countries/regions with only 1 data point: ", round(((num_na / num_tot) * 100), 3), "%")
+```
+
+
+#### Gapfilling: populate NAs with copied value
+
+```{r}
+wage_filled <- wage_gf %>%
+  # mutate to change wage values into character data type to use fill()
+  mutate(appx_wage = as.character(appx_wage)) %>% 
+  mutate(appx_wage_fill = fill(appx_wage, .direction = "up")) %>% 
+  mutate(appx_wage = as.numeric(appx_wage),
+         appx_wage_fill = as.numeric(appx_wage_fill))
+
+
+```
+
+
+```{r}
+# preliminary plotting ----
+# select random countries for preliminary plot
+country <- as.data.frame(unique(wage_data_ppp$ref_area_label))
+
+countries = sample_n(country, size = 15)
+
+#countries = as.list(countries[,1])
+
+test <- wage_data_ppp[wage_data_ppp$ref_area_label %in% countries[,1], ]
+
+range(wage_data_ppp$time) ## 2014-2024 
+length(unique(wage_data_ppp$ref_area_label)) ## 150 countries
+
+# preliminary plot of random countries
+ggplot(test, aes(x = time, y = monthly_wage, color = ref_area_label)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  ylim(0, 10000)
+```
+
+
+Clean up ILO data, join with OHI regions
+
+```{r}
+# clean data
+wages_clean <- wage_data_ppp %>% 
+   %>% 
+  relocate(iso3, .after = ref_area_label) %>% 
+  # remove unwanted columns
+  select(-c(note_classif_label, obs_status_label))
+
+
+# join with OHI regions
+wage_region_join <- left_join(region_clean, wages_clean, by = c("eez_iso3" = "iso3"))
+
+```
 
