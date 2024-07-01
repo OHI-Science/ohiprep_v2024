@@ -238,6 +238,72 @@ years <- tibble(iso3 = as.character(region_names$eez_iso3)) %>%
 
 
 ```{r}
+# preliminary cleanings
+wage_data_clean <- new_wage_data %>% 
+  # lower_snake_case
+  janitor::clean_names() %>% 
+  # more intuitive value name
+  rename(monthly_wage = obs_value) %>% 
+  # filter to PPP adjusted data (this accounts for inflation, diff in currencies globally, cost of living etc.)
+  filter(classif2_label == "Currency: 2017 PPP $") %>% 
+  # group by country/region
+  group_by(ref_area_label) %>% 
+  # set column name to year
+  rename(year = time) %>% 
+  # filter to the cap date range from the jobs data -- 2019
+  filter(year %in% c(2014:2019)) %>%  
+  # add iso3 column, tourism sector label
+  mutate(iso3 = country_regex_to_iso3c(ref_area_label),
+         sector = "tour") %>% 
+  select(c(ref_area_label, iso3, year, monthly_wage, classif2_label))
+  
+
+
+# make sequence of years for gapfilling ----
+# note: data does not have wage data for some years in some countries -- we want to account for that by leaving them as NAs, then gapfilling with the average between the pre and post years
+
+years_df <- tibble(iso3 = wage_data_clean$iso3) %>% 
+  group_by(iso3) %>% 
+  summarize(year = seq(2014, 2019))
+
+
+wage_data_years <- left_join(years_df, wage_data_clean, by = c("iso3", "year"))
+
+# filling in country names when possible --- 
+wage_years_filled <- wage_data_years %>% 
+  group_by(iso3) %>% 
+  fill(ref_area_label, .direction = "downup") %>% 
+  ungroup()
+
+# =================
+
+# test gapfilling
+gap_fill_test <- wage_years_filled %>% 
+  mutate(ref_area_label = as.factor(ref_area_label)) %>% 
+  mutate(lm_est = list(lm(monthly_wage ~ year + ref_area_label)))
+
+
+lm_test <- lm(monthly_wage ~ year + ref_area_label, data = wage_years_filled)
+summary(lm_test)
+
+lm_test$coefficients 
+
+# wage_years_filled$lm_values <- lm_test$fitted.values
+
+# gap filling  ----
+wage_gf <- wage_years_filled %>% 
+  group_by(ref_area_label) %>% 
+  # interpolate (fill missing values between 2 values)
+  mutate(appx_wage = zoo::na.approx(monthly_wage, # using values in this column
+                                    na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
+                                    #  extrapolate using rule = 2 from approx(), uses closest data extreme to extrapolate for leading and trailing NAs
+                                    rule = 2))
+  
+# note: need more than 1 data point to do any approximation. 
+# also, extremes (leading and trailing) are just copied data points from nearest extreme
+```
+
+```{r}
 fp.lbr_frc <- file.path(dir_M, "git-annex/globalprep/_raw_data/WorldBank/d2024/worldbank_labor_force_raw.xls")
 
 lbr_frc <- read_excel(fp.lbr_frc, skip = 3, na = "") %>% 
