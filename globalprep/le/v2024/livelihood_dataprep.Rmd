@@ -93,7 +93,7 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
 # ILO wage data ----
 # define file path to ILO wage data 
 ilo_fp <- file.path(dir_M,
-                        "git-annex/globalprep/_raw_data/UNWTO/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv")
+                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv")
 
 # read in ILO wage data
 ilo_wage_data <- read_csv(ilo_fp)
