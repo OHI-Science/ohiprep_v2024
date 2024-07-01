@@ -98,7 +98,7 @@ Data for revenue from tourism was not finalized in 2023. One potential option is
     -   To download this data navigate to the [UNWTO Website](https://www.unwto.org/tourism-statistics/key-tourism-statistics), click on inbound tourism, and scroll to expenditure data.
     -   [metadata](https://www.unwto.org/glossary-tourism-terms)
 
-#### v2024: Tourism Livelihood data
+#### v2024: Tourism – Livelihood data
 
 Jobs: Number of jobs (employed in the tourism sector) per country/region per year
 
@@ -132,6 +132,16 @@ Labor Force: used to find proportion of working-eligible population employed in 
     -   Then click "Export", and for the file type option (appears as a drop-down menu), select "csv".
 
     -   Raw data file name used in 2024: `EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv`
+
+#### v2024: Tourism – Economies data: 
+
+-   Tourism direct GDP as a proportion of total GDP (indicator 8.9.1 on UN Tourism page)
+
+-   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG>
+
+-   Downloaded July 1st, 2024, along with Metadata, stored in UNWTO folder
+
+    -   raw data file name `Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx`
 
 ### Percent of Population within 25 miles of coast
 
