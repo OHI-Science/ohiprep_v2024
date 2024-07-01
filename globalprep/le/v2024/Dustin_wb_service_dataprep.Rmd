@@ -189,7 +189,7 @@ line_plot <- plot_ly(proportional_employement_nona, x = ~year, y = ~proportional
 
 line_plot
 
-htmlwidgets::saveWidget(line_plot, file = "proportional_jobs.html")
+# htmlwidgets::saveWidget(line_plot, file = "proportional_jobs.html")
 
 
 penona_pivot <- proportional_employement_nona %>% 
@@ -220,9 +220,7 @@ country <- as.data.frame(unique(new_wage_data_ppp$ref_area.label))
 
 countries = sample_n(country, size = 15)
 
-countries = as.list(countries[,1])
-
-test <- new_wage_data_ppp[new_wage_data_ppp$ref_area.label %in% countries, ]
+test <- new_wage_data_ppp[new_wage_data_ppp$ref_area.label %in% countries[, 1], ]
 
 range(new_wage_data$time) ## 2014-2024 
 length(unique(new_wage_data$ref_area.label)) ## 150 countries
@@ -231,6 +229,11 @@ ggplot(test, aes(x = time, y = monthly_wage, color = ref_area.label)) +
   geom_point() + 
   geom_smooth(method = "lm") +
   ylim(0, 10000)
+
+years <- tibble(iso3 = as.character(region_names$eez_iso3)) %>% 
+  group_by(iso3) %>% 
+  mutate(year = seq(2014, 2019))
+?na.approx
 ```
 
 
