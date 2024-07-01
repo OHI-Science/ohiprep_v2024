@@ -43,10 +43,10 @@ if (!require(librarian)){
 }
 librarian::shelf(
   ohicore,
+  pdftools,
   modelr,
   WDI,
   tidyverse,
-  plotly,
   here,
   janitor,
   foreach,
@@ -63,22 +63,15 @@ librarian::shelf(
 
 # load libraries, set directories
 library(ohicore)  #devtools::install_github('ohi-science/ohicore@dev')
-library(tidyverse)
-library(plotly)
-library(here)
-library(janitor)
-library(pdftools)
-library(modelr)
-library(WDI)
+
 source(here('workflow/R/common.R')) # directory locations
 
 source(here('workflow/R/fao_fxn.R')) # function for cleaning old version of FAO data 
 
 source(here('workflow/R/fao_online_portal_clean.R'))
 
-current_year <- 2023
+current_year <- 2024
 version_year <- paste0("v",current_year)
-
 data_path <- paste0("globalprep/le/",version_year)
 ```
 
