@@ -93,7 +93,7 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
 # ILO wage data ----
 # define file path to ILO wage data 
 ilo_fp <- file.path(dir_M,
-                        "git-annex/globalprep/_raw_data/UNWTO/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv")
+                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv")
 
 # read in ILO wage data
 ilo_wage_data <- read_csv(ilo_fp)
@@ -271,15 +271,21 @@ wage_gf <- wage_years_filled %>%
   # interpolate (fill missing values between 2 values)
   mutate(appx_wage = zoo::na.approx(monthly_wage, # using values in this column
                                     na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
-                                    #  extrapolate using rule = 2 from approx(), uses closest data extreme to extrapolate for leading and trailing NAs
-                                    rule = 2))
+                                    #  extrapolate using rule = 2 from approx(),
+                                    # uses closest data extreme to extrapolate 
+                                    # for leading and trailing NAs
+                                    rule = 2)) %>% 
   
-# note: need more than 1 data point to do any approximation. 
+  # fill NA values with the only other observed value (making sure to note the list of countries/regions we did this for)
+  mutate(appx_wage_fill = zoo::na.aggregate(appx_wage, by = 1, FUN = mean, na.rm = FALSE))
+# note: made this a new column so that we can still identify each country that we are using this fill (na.aggregate function) method for.
+  
+# other notes: 
+# need more than 1 data point to do any approximation. 
 # also, extremes (leading and trailing) are just copied data points from nearest extreme
 
 ```
 
-Note for each region that only has 1 value, can gap fill using fill(.direction = "downup") -- want to take note of every region that this applies to.
 
 
 ```{r}
@@ -297,18 +303,9 @@ paste0("proportion of countries/regions with only 1 data point: ", round(((num_n
 ```
 
 
-#### Gapfilling: populate NAs with copied value
-
-```{r}
-wage_filled <- wage_gf %>%
-  # mutate to change wage values into character data type to use fill()
-  mutate(appx_wage = as.character(appx_wage)) %>% 
-  mutate(appx_wage_fill = fill(appx_wage, .direction = "up")) %>% 
-  mutate(appx_wage = as.numeric(appx_wage),
-         appx_wage_fill = as.numeric(appx_wage_fill))
 
 
-```
+
 
 
 ```{r}
@@ -336,16 +333,16 @@ ggplot(test, aes(x = time, y = monthly_wage, color = ref_area_label)) +
 Clean up ILO data, join with OHI regions
 
 ```{r}
-# clean data
-wages_clean <- wage_data_ppp %>% 
-   %>% 
-  relocate(iso3, .after = ref_area_label) %>% 
-  # remove unwanted columns
-  select(-c(note_classif_label, obs_status_label))
-
-
 # join with OHI regions
-wage_region_join <- left_join(region_clean, wages_clean, by = c("eez_iso3" = "iso3"))
+wage_region_join <- left_join(region_clean, wage_gf, by = c("eez_iso3" = "iso3"))
+
+# come back ---- stopping point for Mel to take a look!
+
+# Currency: 2017 PPP $
+
+wage_regions <- wage_region_join %>% 
+  mutate(unit = "Currency: 2017 PPP $") %>% 
+  select(-classif2_label)
 
 ```
 

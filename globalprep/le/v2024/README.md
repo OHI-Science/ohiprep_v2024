@@ -34,6 +34,7 @@ Value in each of these data sets is the total estimated revenue per country in u
 
 -   We used the indicator "All ocean and offshore energy (offshore wind + ocean energy) RD&D, million USD 2021 PPP" from the [OECD: Sustainable Ocean Economy](https://stats.oecd.org/Index.aspx?QueryId=95228#) dataset.
     -   Metadata is available for download through the portal. This platform is being retired, this data set will likely be located in the [OECD Data Explorer](https://data-explorer.oecd.org/) in future years.
+    -   v2024: new link to the Ocean Sustainability data on [OECD Data Explorer](https://data-explorer.oecd.org/vis?df[ds]=DisseminateFinalDMZ&df[id]=DSD_SOE%40DF_SOE&df[ag]=OECD.ENV.EPI&dq=AUS.A....&pd=2017%2C&to[TIME_PERIOD]=false)
 -   The ocean energy data from OECD is actually the amount country and state governments budget for ocean energy, and is not specifically revenue. However, it is included as this was the only comprehensive data set available with monetary amounts related to ocean energy, it will likely need to be modified before being used as a proxy for revenue.
 -   This dataset only contains 32 countries, so gap filling will be needed.
 
@@ -96,6 +97,41 @@ Data for revenue from tourism was not finalized in 2023. One potential option is
 -   "Tourism spending in the country", "Inbound Tourism-Expenditure", from the UNWTO.
     -   To download this data navigate to the [UNWTO Website](https://www.unwto.org/tourism-statistics/key-tourism-statistics), click on inbound tourism, and scroll to expenditure data.
     -   [metadata](https://www.unwto.org/glossary-tourism-terms)
+
+#### v2024: Tourism Livelihood data
+
+Jobs: Number of jobs (employed in the tourism sector) per country/region per year
+
+-   UN Tourism (UNWTO)
+
+Labor Force: used to find proportion of working-eligible population employed in tourism sector
+
+-   World Bank (downloaded June 28. 2024)
+
+    -   <https://data.worldbank.org/indicator/SL.TLF.TOTL.IN>
+
+"Quality": wages
+
+-   "Average monthly earnings of employees by sex and economic activity - Annual"
+
+```{=html}
+<!-- -->
+```
+-   ILO via ILOSTAT explorer <https://rshiny.ilo.org/dataexplorer30/?lang=en&id=EMP_TEMP_SEX_OCU_INS_NB_A>
+
+    -   navigate to ILOSTAT explorer, select:
+
+        -   "Sex": select "none" (to un-select all options), then select "Total"
+
+        -   "Economic Activity": select "none" and then select "ISIC-Rev.4: I. Accommodation and food service activities"
+
+        -   "Currency": keep all selected (we end up filtering this in R)
+
+        -   set Time Frame (sliding range bar) to 2009-present year (for us it would have been 2024, but we ended up ending our time frame at 2019 due to data constraints in the employment dataset)
+
+    -   Then click "Export", and for the file type option (appears as a drop-down menu), select "csv".
+
+    -   Raw data file name used in 2024: `EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv`
 
 ### Percent of Population within 25 miles of coast
 
