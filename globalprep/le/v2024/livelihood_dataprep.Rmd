@@ -65,13 +65,16 @@ current_year <- 2024 # Update this!!
 
 version_year <- paste0("v",current_year)
 data_dir_version_year <- paste0("d", current_year)
-data_path <- paste0("globalprep/le/", version_year)
+data_path <- here("globalprep", "le", version_year)
 
 # Raw data directory (on Mazu)
 raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
 # world bank raw data directory
 wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
 ```
 
 ### Read in Data
@@ -372,3 +375,12 @@ plotly::plot_ly(wage_regions_no_sp, x = ~year, y = ~monthly_wage, color = ~admin
 ```
 
 Dropping Sao Tome and Principe (STP) adjusted the y-axis scale significantly to better visualize the monthly service wage data (USD) for other geographic areas.  Investigating further, it looks as though the Sao Tome and Principe observation from 2017 (133814.9 USD) may have been inputted incorrectly, measured as annual income instead of monthly, or there was an error when it was adjusted by PPP.  Dustin noticed that the data source from this observation was "HIES - Household Budget Survey".  This was the only observation from this data source. Upon further investigation, we discovered the average annual income in STP is ~2,400 USD [WorldData]("https://www.worlddata.info/africa/sao-tome-and-principe/index.php#:~:text=With%20an%20average%20annual%20income,the%20lower%20middle%2Dincome%20countries") and a GDP per capita of ~2,817 USD [World Bank]("https://www.worldbank.org/en/country/saotome/overview"). Therefore, we have decided to drop it for the intermediate data set.
+
+
+## Saving intermediate data products
+
+```{r}
+# write_csv(wage_regions_no_sp, here(int_dir, "tour_quality.csv"))
+
+```
+
