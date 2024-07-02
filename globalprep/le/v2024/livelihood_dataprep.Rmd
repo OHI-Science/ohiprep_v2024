@@ -65,13 +65,16 @@ current_year <- 2024 # Update this!!
 
 version_year <- paste0("v",current_year)
 data_dir_version_year <- paste0("d", current_year)
-data_path <- paste0("globalprep/le/", version_year)
+data_path <- here("globalprep", "le", version_year)
 
 # Raw data directory (on Mazu)
 raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
 # world bank raw data directory
 wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
 ```
 
 ### Read in Data
@@ -93,7 +96,7 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
 # ILO wage data ----
 # define file path to ILO wage data 
 ilo_fp <- file.path(dir_M,
-                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv")
+                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02.csv")
 
 # read in ILO wage data
 ilo_wage_data <- read_csv(ilo_fp)
@@ -226,7 +229,7 @@ wage_data_clean <- ilo_wage_data %>%
   # set column name to year
   rename(year = time) %>% 
   # filter to the cap date range from the jobs data -- 2019
-  filter(year %in% c(2014:2019)) %>%  
+  filter(year %in% c(2009:2019)) %>%  
   # add iso3 column, tourism sector label
   mutate(iso3 = country_regex_to_iso3c(ref_area_label),
          sector = "tour") %>% 
@@ -239,7 +242,7 @@ wage_data_clean <- ilo_wage_data %>%
 
 years_df <- tibble(iso3 = wage_data_clean$iso3) %>% 
   group_by(iso3) %>% 
-  summarize(year = seq(2014, 2019))
+  summarize(year = seq(2009, 2019))
 
 
 wage_data_years <- left_join(years_df, wage_data_clean, by = c("iso3", "year"))
@@ -253,15 +256,15 @@ wage_years_filled <- wage_data_years %>%
 # =================
 
 # test gapfilling
-gap_fill_test <- wage_years_filled %>% 
-  mutate(ref_area_label = as.factor(ref_area_label)) %>% 
-  mutate(lm_est = list(lm(monthly_wage ~ year + ref_area_label)))
-
-
-lm_test <- lm(monthly_wage ~ year + ref_area_label, data = wage_years_filled)
-summary(lm_test)
-
-lm_test$coefficients 
+# gap_fill_test <- wage_years_filled %>% 
+#   mutate(ref_area_label = as.factor(ref_area_label)) %>% 
+#   mutate(lm_est = list(lm(monthly_wage ~ year + ref_area_label)))
+# 
+# 
+# lm_test <- lm(monthly_wage ~ year + ref_area_label, data = wage_years_filled)
+# summary(lm_test)
+# 
+# lm_test$coefficients 
 
 # wage_years_filled$lm_values <- lm_test$fitted.values
 
@@ -305,29 +308,23 @@ paste0("proportion of countries/regions with only 1 data point: ", round(((num_n
 
 
 
-
-
-
 ```{r}
-# preliminary plotting ----
-# select random countries for preliminary plot
-country <- as.data.frame(unique(wage_data_ppp$ref_area_label))
+# preliminary plot 
+line_plot <- plotly::plot_ly(wage_gf, x = ~year, y = ~appx_wage_fill, color = ~ref_area_label, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: monthly Service Wages (USD (2017) PPP-Adjusted)", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "monthly Wages (USD)"))
 
-countries = sample_n(country, size = 15)
+line_plot
 
-#countries = as.list(countries[,1])
+# htmlwidgets::saveWidget(line_plot, file = "prop_tourism_laborforce.html")
 
-test <- wage_data_ppp[wage_data_ppp$ref_area_label %in% countries[,1], ]
-
-range(wage_data_ppp$time) ## 2014-2024 
-length(unique(wage_data_ppp$ref_area_label)) ## 150 countries
-
-# preliminary plot of random countries
-ggplot(test, aes(x = time, y = monthly_wage, color = ref_area_label)) + 
-  geom_point() + 
-  geom_smooth(method = "lm") +
-  ylim(0, 10000)
 ```
+
+
+
+
+In this plot we can see that Sao Tome and Principe is a clear high outlier with no variation -- it is one of the countries for which we gapfilled with copied values from a single observation. We will continue to join the data with the OHI regions, then plot again and reinvestigate.
 
 
 Clean up ILO data, join with OHI regions
@@ -342,7 +339,48 @@ wage_region_join <- left_join(region_clean, wage_gf, by = c("eez_iso3" = "iso3")
 
 wage_regions <- wage_region_join %>% 
   mutate(unit = "Currency: 2017 PPP $") %>% 
-  select(-classif2_label)
+  select(-classif2_label) %>% 
+  mutate(sector = "tour",
+         data_source = "ILO")
+
+```
+
+
+Plot
+
+```{r}
+# interactive plot after joining with OHI Regions
+plotly::plot_ly(wage_regions, x = ~year, y = ~appx_wage_fill, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Monthly Service Wages (USD)", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Monthly Wages (USD)"))
+
+```
+
+We can see that Sao Tome and Principe is still included and is still this high, unvarying outlier. 
+This lack of data combined with how high of an outlier is led us to reconsider our methods for this country and consider dropping it from this intermediate data product. 
+
+Let's drop & plot what that looks like. 
+
+```{r}
+wage_regions_no_sp <- wage_regions %>% 
+  filter(!ref_area_label %in% c("Sao Tome and Principe"))
+
+# plot to see what it looks like after dropping Sao Tome and Principe
+plotly::plot_ly(wage_regions_no_sp, x = ~year, y = ~monthly_wage, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Monthly Service Wages (USD)", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Monthly Wages (USD)"))
+
+```
+
+Dropping Sao Tome and Principe (STP) adjusted the y-axis scale significantly to better visualize the monthly service wage data (USD) for other geographic areas.  Investigating further, it looks as though the Sao Tome and Principe observation from 2017 (133814.9 USD) may have been inputted incorrectly, measured as annual income instead of monthly, or there was an error when it was adjusted by PPP.  Dustin noticed that the data source from this observation was "HIES - Household Budget Survey".  This was the only observation from this data source. Upon further investigation, we discovered the average annual income in STP is ~2,400 USD [WorldData]("https://www.worlddata.info/africa/sao-tome-and-principe/index.php#:~:text=With%20an%20average%20annual%20income,the%20lower%20middle%2Dincome%20countries") and a GDP per capita of ~2,817 USD [World Bank]("https://www.worldbank.org/en/country/saotome/overview"). Therefore, we have decided to drop it for the intermediate data set.
+
+
+## Saving intermediate data products
+
+```{r}
+# write_csv(wage_regions_no_sp, here(int_dir, "tour_quality.csv"))
 
 ```
 

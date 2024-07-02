@@ -114,9 +114,7 @@ Labor Force: used to find proportion of working-eligible population employed in 
 
 -   "Average monthly earnings of employees by sex and economic activity - Annual"
 
-<!-- -->
-
--   ILO via ILOSTAT explorer <https://rshiny.ilo.org/dataexplorer30/?lang=en&id=EMP_TEMP_SEX_OCU_INS_NB_A>
+-   ILO via ILOSTAT explorer <https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A>
 
     -   navigate to ILOSTAT explorer, select:
 
@@ -130,7 +128,7 @@ Labor Force: used to find proportion of working-eligible population employed in 
 
     -   Then click "Export", and for the file type option (appears as a drop-down menu), select "csv".
 
-    -   Raw data file name used in 2024: `EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv` (change this to be updated name COME BACK)
+    -   Raw data file name used in 2024: `EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02.csv` 
 
 #### v2024: Tourism – Economies data:
 
@@ -236,6 +234,7 @@ The optimal data source for revenue from tourism was not finalized in 2023. Ther
 -   A cleaning script was created for this data in the exploratory phase of the 2023 tourism update `~/OHI_repositories/ohiprep_v2023/globalprep/tr/v2023/unused_R/process_UNWTO_employ.R`
 
 **Ilostat**: [Employment by sex and occupation - ISCO level 2 (thousands) - Annual](https://www.ilo.org/shinyapps/bulkexplorer9/?lang=en&id=EMP_TEMP_SEX_OC2_NB_A)
+
 
 -   Latest version from 2023 is located on Mazu
 
