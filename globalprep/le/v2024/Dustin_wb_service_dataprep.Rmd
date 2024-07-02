@@ -5,7 +5,7 @@ title: "World Bank Service Earnings Data Prep"
 
 
 ```{r}
-# rm(list=ls())
+rm(list=ls())
 library(tidyverse)
 library(readr)
 library(readxl)
@@ -77,33 +77,33 @@ wages_merge <- wages_merge %>%
   select(-notes)
 
 # ------------- Bring in in PPP data conversion factors ----------------
-ppp_conversion <- read_csv(fp_ppp) %>% 
-  janitor::clean_names()
-
-ppp_prc = ppp_conversion %>% 
-  filter(transact == "PPPGDP") %>% 
-  filter(time >= 2012) %>% 
-  rename(date = year) %>% 
-  mutate(date = as.character(date))
-
-ppp_clean <- ppp_prc %>% 
-  dplyr::select(c(location, country, transact, date, unit, value)) %>% 
-  rename(eez_iso3 = location,
-         admin_country_name = country)
-
-ppp_merge <- inner_join(x = ppp_clean, region_names, by = c("eez_iso3", "admin_country_name"))
-
-ppp_merge <- ppp_merge %>% 
-  dplyr::relocate(rgn_id, .before = eez_iso3)
-
-wages_ppp <- inner_join(x = wages_merge, ppp_merge, by = c("rgn_id", "date"))
-
-wages_ppp_converted <- wages_ppp %>% 
-  mutate(yearly_wages_ppp_adjusted_by_year = yearly_local_wage/value) %>% 
-  mutate(rgn_id = as.character(rgn_id))
-
-ggplot(wages_ppp_converted, aes(y = yearly_wages_ppp_adjusted_by_year, x = as.numeric(date), color = rgn_id)) + 
-  geom_line()
+# ppp_conversion <- read_csv(fp_ppp) %>% 
+#   janitor::clean_names()
+# 
+# ppp_prc = ppp_conversion %>% 
+#   filter(transact == "PPPGDP") %>% 
+#   filter(time >= 2012) %>% 
+#   rename(date = year) %>% 
+#   mutate(date = as.character(date))
+# 
+# ppp_clean <- ppp_prc %>% 
+#   dplyr::select(c(location, country, transact, date, unit, value)) %>% 
+#   rename(eez_iso3 = location,
+#          admin_country_name = country)
+# 
+# ppp_merge <- inner_join(x = ppp_clean, region_names, by = c("eez_iso3", "admin_country_name"))
+# 
+# ppp_merge <- ppp_merge %>% 
+#   dplyr::relocate(rgn_id, .before = eez_iso3)
+# 
+# wages_ppp <- inner_join(x = wages_merge, ppp_merge, by = c("rgn_id", "date"))
+# 
+# wages_ppp_converted <- wages_ppp %>% 
+#   mutate(yearly_wages_ppp_adjusted_by_year = yearly_local_wage/value) %>% 
+#   mutate(rgn_id = as.character(rgn_id))
+# 
+# ggplot(wages_ppp_converted, aes(y = yearly_wages_ppp_adjusted_by_year, x = as.numeric(date), color = rgn_id)) + 
+#   geom_line()
 ```
 
 ```{r}
@@ -156,16 +156,16 @@ jobs_rgn_2012 <- jobs_rgn_nona %>%
   mutate(year = as.character(year),
          rgn_id = as.character(rgn_id))
 
-pop_ppp_converted <- wages_ppp_converted %>% 
-  rename(year = date) %>%
-  mutate(year = as.character(year),
-         rgn_id = as.character(rgn_id)) %>% 
-  select(rgn_id, admin_country_name.x, total_population, labor_force_aged_15_64, year, unit, yearly_wages_ppp_adjusted_by_year) %>% 
-  rename(admin_country_name = admin_country_name.x)
+# pop_ppp_converted <- wages_ppp_converted %>% 
+#   rename(year = date) %>%
+#   mutate(year = as.character(year),
+#          rgn_id = as.character(rgn_id)) %>% 
+#   select(rgn_id, admin_country_name.x, total_population, labor_force_aged_15_64, year, unit, yearly_wages_ppp_adjusted_by_year) %>% 
+#   rename(admin_country_name = admin_country_name.x)
 
-jobs_rgn_2012$rgn
+# jobs_rgn_2012$rgn
 
-jobs_wages_join <- left_join(jobs_rgn_2012, pop_ppp_converted, by = c("rgn_id", "year"))
+# jobs_wages_join <- left_join(jobs_rgn_2012, pop_ppp_converted, by = c("rgn_id", "year"))
 
 jobs_wages_proportional_employment <- jobs_wages_join %>% 
   mutate(total_tourism_employees = thousand_employees*1000) %>% 
@@ -207,9 +207,12 @@ length(unique(wages_ppp_converted$rgn_id))
 ```{r}
 ## 
 fp.newwage <- file.path(dir_M,
-                        "git-annex/globalprep/_raw_data/UNWTO/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv")
+                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv")
 
 new_wage_data <- read_csv(fp.newwage)
+
+new_wage_data2 <- new_wage_data %>% 
+  filter(source.label == "HIES - Household Budget Survey")
 
 new_wage_data_ppp <- new_wage_data %>% 
   rename(monthly_wage = obs_value) %>% 
@@ -230,10 +233,10 @@ ggplot(test, aes(x = time, y = monthly_wage, color = ref_area.label)) +
   geom_smooth(method = "lm") +
   ylim(0, 10000)
 
-years <- tibble(iso3 = as.character(region_names$eez_iso3)) %>% 
-  group_by(iso3) %>% 
-  mutate(year = seq(2014, 2019))
-?na.approx
+# years <- tibble(iso3 = rep(as.character(region_names$eez_iso3), 6)) %>% 
+#   group_by(iso3) %>% 
+#   mutate(year = rep(2014:2019))
+
 ```
 
 
