@@ -66,13 +66,16 @@ current_year <- 2024 # Update this!!
 
 version_year <- paste0("v",current_year)
 data_dir_version_year <- paste0("d", current_year)
-data_path <- paste0("globalprep/le/", version_year)
+data_path <- here("globalprep", "le", version_year)
 
 # Raw data directory (on Mazu)
 raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
 # UNWTO raw data directory
 unwto_dir <- here(raw_data_dir, "UNWTO", data_dir_version_year)
+
+# Output data directory -- for intermediate data products
+int_dir <- here(data_path, "int")
 ```
 
 
@@ -270,21 +273,28 @@ region_names <- region_names_raw %>% select(-Notes)
 
 
 # join regions & tourism GDP prop ----
-gdp_regions_join <- left_join(region_names, gdp_filled, by = c("eez_iso3" = "iso3")) %>% 
+gdp_regions_join <- left_join(region_names, gdp_filled, by = c("eez_iso3" = "iso3"))
   
-
-
 
 head(gdp_regions_join)
 str(gdp_regions_join)
-
-
-
 
 ```
 
 
 Note: remember to add
   mutate(sector = "tour", data_source = "UNWTO Dept. of Statistics")
-  
+
   at the end
+
+# Saving intermediate data 
+
+```{r}
+#--------Prepping data for int saving -------
+
+tour_revenue_int <- gdp_filled %>% 
+  mutate(sector = "tour", data_source = "UNWTO Dept. of Statistics")
+
+write_csv(tour_revenue_int, here(int_dir, "tour_revenue.csv"))
+```
+

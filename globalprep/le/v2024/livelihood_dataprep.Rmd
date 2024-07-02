@@ -211,6 +211,12 @@ line_plot
 # htmlwidgets::saveWidget(line_plot, file = "prop_tourism_laborforce.html")
 ```
 
+### Saving intermediate data
+
+```{r}
+#write_csv(tourism_job_proportion, here(int_dir, "tour_jobs.csv"))
+```
+
 
 ## ILO wage data
   - note: this data came from many sources and was compiled by ILO
