@@ -88,7 +88,7 @@ unwto_dir <- here(raw_data_dir, "UNWTO", data_dir_version_year)
 gdp_prop_raw <- readxl::read_xlsx(here(unwto_dir, "Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx"))
 
 # OHI regions data ----
-region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
+region_names_raw <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
 ```
 
 
@@ -194,7 +194,7 @@ paste0("Proportion of geo areas with only 1 data point: ", round(((num_na / num_
 #### Preliminary Plotting
 
 ```{r}
-
+# plot of all geographic areas ---- 
 prelim_gf_plot <- plot_ly(data = gdp_filled, x = ~year, y = ~appx_gdp_fill, color = ~geo_area_name,
                           type = "scatter", mode = "lines") 
 
@@ -203,7 +203,6 @@ prelim_gf_plot
 # top_tourism_countries <- gdp_filled %>% 
 #   group_by(geo_area_name, year) %>% 
 #   summarize()
-
 
 
 # subset without Macao for plotting ----
@@ -266,12 +265,17 @@ htmlwidgets::saveWidget(top_diff_gdp_plot, file = "tour_gdp_top_diff_gf_plot.htm
 ```{r}
 
 # tidy up regions dataset ----
-region_names <- region_names %>% select(-Notes)
+region_names <- region_names_raw %>% select(-Notes)
 
 
 # join regions & tourism GDP prop ----
-gdp_regions_join <- left_join(region_names, gdp_filled, by = c("eez_iso3" = "iso3"))
+gdp_regions_join <- left_join(region_names, gdp_filled, by = c("eez_iso3" = "iso3")) %>% 
+  
 
+
+
+head(gdp_regions_join)
+str(gdp_regions_join)
 
 
 

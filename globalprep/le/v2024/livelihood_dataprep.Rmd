@@ -93,7 +93,7 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
 # ILO wage data ----
 # define file path to ILO wage data 
 ilo_fp <- file.path(dir_M,
-                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv")
+                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02.csv")
 
 # read in ILO wage data
 ilo_wage_data <- read_csv(ilo_fp)
@@ -252,16 +252,16 @@ wage_years_filled <- wage_data_years %>%
 
 # =================
 
-# test gapfilling
-gap_fill_test <- wage_years_filled %>% 
-  mutate(ref_area_label = as.factor(ref_area_label)) %>% 
-  mutate(lm_est = list(lm(monthly_wage ~ year + ref_area_label)))
-
-
-lm_test <- lm(monthly_wage ~ year + ref_area_label, data = wage_years_filled)
-summary(lm_test)
-
-lm_test$coefficients 
+# # test gapfilling
+# gap_fill_test <- wage_years_filled %>% 
+#   mutate(ref_area_label = as.factor(ref_area_label)) %>% 
+#   mutate(lm_est = list(lm(monthly_wage ~ year + ref_area_label)))
+# 
+# 
+# lm_test <- lm(monthly_wage ~ year + ref_area_label, data = wage_years_filled)
+# summary(lm_test)
+# 
+# lm_test$coefficients 
 
 # wage_years_filled$lm_values <- lm_test$fitted.values
 
@@ -328,7 +328,8 @@ wage_region_join <- left_join(region_clean, wage_gf, by = c("eez_iso3" = "iso3")
 
 wage_regions <- wage_region_join %>% 
   mutate(unit = "Currency: 2017 PPP $") %>% 
-  select(-classif2_label)
+  select(-classif2_label) %>% 
+  mutate(sector = "tour")
 
 ```
 
