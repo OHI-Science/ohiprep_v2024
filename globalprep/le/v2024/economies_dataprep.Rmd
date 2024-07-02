@@ -1,0 +1,88 @@
+---
+title: "OHI Economies Dataprep"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+---
+
+------------------------------------------------------------------------
+
+
+# Economies Dataprep (Measures the amount of revenue produced)
+
+## Overview
+
+-   **Data:**
+
+    -   Tourism: UNWTO Dept. of Statistics (UN Tourism)
+        -   https://www.unwto.org/tourism-statistics/economic-contribution-SDG 
+
+### Setup
+
+```{r}
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  janitor,
+  terra,
+  readxl,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  tidyverse, 
+  httr,
+  plotly,
+  zoo # for gapfilling
+  
+)
+#remotes::install_github("skgrange/threadr") # for na_extrapolate
+library(threadr)
+
+
+# source 
+source(here("workflow/R/common.R"))
+
+# set year and file path info
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- paste0("globalprep/le/", version_year)
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# UNWTO raw data directory
+unwto_dir <- here(raw_data_dir, "UNWTO", data_dir_version_year)
+```
+
+
+### Tourism
+
+#### Read in Data
+
+```{r}
+# ===================== Read in Data ==============================
+
+
+# Tourism revenue data ----
+revenue_raw <- readxl::read_xlsx(here(unwto_dir, "Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx"))
+```
