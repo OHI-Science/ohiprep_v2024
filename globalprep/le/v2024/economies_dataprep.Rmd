@@ -109,7 +109,6 @@ country_regex_to_iso3c <- function(country_string) {
 gdp_prop_clean <- gdp_prop_raw %>% 
   janitor::clean_names() %>% 
   select(c(geo_area_name, year = time_period, gdp_prop_percent = total)) %>% 
-  mutate(sector = "tour", data_source = "UNWTO Dept. of Statistics") %>% 
   # add iso3 column
   mutate(iso3 = country_regex_to_iso3c(geo_area_name))
 
@@ -126,18 +125,106 @@ prelim_plot
 htmlwidgets::saveWidget(prelim_plot, file = "gdp_prelim_plot_all_years.html")
 ```
 
+Really interesting to see how the proportions drop in 202 -- intuition check: makes sense because of Covid.... especially interesting to note how extremely Macau was impacted!
+
+
+## Gapfilling
+
+More data cleaning & prep for gapfilling, then gapfilling
+
+```{r}
+
+# filter tourism GDP data for year range (2009-2019) ----
+gdp_prop_filter <- gdp_prop_clean %>% 
+  filter(year %in% c(2009:2019))
+
+
+# some geo areas are missing data for some years ----
+years_df <- tibble(iso3 = gdp_prop_filter$iso3) %>% # copy iso3 column
+  group_by(iso3) %>% # for each geo region, 
+  summarize(year = seq(2009, 2019)) # have sequence of years from 2009-2019 
+# (fragile and R warns you about preferring `reframe()`)
+
+
+# join years df and tourism GDP df ----
+gdp_year_join <- left_join(years_df, gdp_prop_filter, by = c("iso3", "year"))
+
+
+# fill in geo area names for NA years ----
+gdp_years <- gdp_year_join %>% 
+  group_by(iso3) %>% 
+  fill(geo_area_name, .direction = "downup") %>% 
+  ungroup()
+
+
+# gapfilling ----
+# estimate tourism GDP proportion for geo areas with missing data
+gdp_filled <- gdp_years %>% 
+  group_by(geo_area_name) %>% 
+  # interpolate (fill missing values between 2 values)
+  mutate(appx_gdp = zoo::na.approx(gdp_prop_percent, # using values in this column
+                                    na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
+                                    #  extrapolate using rule = 2 from approx(),
+                                    # uses closest data extreme to extrapolate 
+                                    # for leading and trailing NAs
+                                    rule = 2)) %>% 
+  
+  # fill NA values with the only other observed value (making sure to note the list of countries/regions we did this for)
+  mutate(appx_gdp_fill = zoo::na.aggregate(appx_gdp, by = 1, FUN = mean, na.rm = FALSE))
+```
+
+
+Assess how many countries we are gapfilling more extremely for
+
+```{r}
+# find number of regions that only have 1 data point (wouldn't be filled by na.approx if only 1 datapoint, left as NAs)
+na_regions <- gdp_filled %>% 
+  filter(is.na(appx_gdp))
+
+# print which geo areas only had 1 datapoint
+unique(na_regions$geo_area_name)
+
+# calculate proportion of 1 point-filled geo areas to total geo areas
+num_na <- length(unique(na_regions$geo_area_name))
+num_tot <- length(unique(gdp_filled$geo_area_name))
+
+paste0("Proportion of geo areas with only 1 data point: ", round(((num_na / num_tot) * 100), 3), "%")
+```
+
+#### Preliminary Plotting
+
+```{r}
+prelim_gf_plot <- plot_ly(data = gdp_filled, x = ~year, y = ~appx_gdp_fill, color = ~geo_area_name,
+                          type = "scatter", mode = "lines") 
+
+
+top_tourism_countries <- 
+
+prelim_gf_plot
+```
+
 
 
 ### Join with OHI regions
 
+
 ```{r}
+
 # tidy up regions dataset ----
 region_names <- region_names %>% select(-Notes)
 
+
 # join regions & tourism GDP prop ----
-gdp_regions_join <- left_join(region_names, gdp_prop_clean, by = c("eez_iso3" = "iso3"))
+gdp_regions_join <- left_join(region_names, gdp_filled, by = c("eez_iso3" = "iso3"))
+
+
 
 
 
 ```
 
+
+Note: remember to add
+  mutate(sector = "tour", data_source = "UNWTO Dept. of Statistics")
+  
+  at the end
