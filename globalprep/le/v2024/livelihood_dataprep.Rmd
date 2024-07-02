@@ -226,7 +226,7 @@ wage_data_clean <- ilo_wage_data %>%
   # set column name to year
   rename(year = time) %>% 
   # filter to the cap date range from the jobs data -- 2019
-  filter(year %in% c(2014:2019)) %>%  
+  filter(year %in% c(2009:2019)) %>%  
   # add iso3 column, tourism sector label
   mutate(iso3 = country_regex_to_iso3c(ref_area_label),
          sector = "tour") %>% 
@@ -239,7 +239,7 @@ wage_data_clean <- ilo_wage_data %>%
 
 years_df <- tibble(iso3 = wage_data_clean$iso3) %>% 
   group_by(iso3) %>% 
-  summarize(year = seq(2014, 2019))
+  summarize(year = seq(2009, 2019))
 
 
 wage_data_years <- left_join(years_df, wage_data_clean, by = c("iso3", "year"))
@@ -308,7 +308,7 @@ paste0("proportion of countries/regions with only 1 data point: ", round(((num_n
 ```{r}
 # preliminary plot 
 line_plot <- plotly::plot_ly(wage_gf, x = ~year, y = ~appx_wage_fill, color = ~ref_area_label, type = "scatter", mode = "lines") %>% 
-  layout(title = "All Regions: monthly Service Wages (USD)", 
+  layout(title = "All Regions: monthly Service Wages (USD (2017) PPP-Adjusted)", 
          xaxis = list(title = "Year"),
          yaxis = list(title = "monthly Wages (USD)"))
 
