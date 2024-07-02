@@ -41,6 +41,7 @@ if (!require(librarian)){
 }
 librarian::shelf(
   here,
+  countrycodes,
   janitor,
   terra,
   readxl,
@@ -84,5 +85,59 @@ unwto_dir <- here(raw_data_dir, "UNWTO", data_dir_version_year)
 
 
 # Tourism revenue data ----
-revenue_raw <- readxl::read_xlsx(here(unwto_dir, "Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx"))
+gdp_prop_raw <- readxl::read_xlsx(here(unwto_dir, "Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx"))
+
+# OHI regions data ----
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
 ```
+
+
+## Data cleaning
+
+"Tourism direct GDP as a proportion of total GDP (%)"
+
+
+```{r}
+# make countrycode -- iso3 function ----
+# following this example on Rpubs: https://rpubs.com/Teal_Emery/cleaning_intl_data_tips_and_tricks 
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+
+# GDP proportion dataset cleaning ----
+gdp_prop_clean <- gdp_prop_raw %>% 
+  janitor::clean_names() %>% 
+  select(c(geo_area_name, year = time_period, gdp_prop_percent = total)) %>% 
+  mutate(sector = "tour") %>% 
+  # add iso3 column
+  mutate(iso3 = country_regex_to_iso3c(geo_area_name))
+
+
+# preliminary plotting ----
+prelim_plot <- plot_ly(data = gdp_prop_clean, x = ~year, y = ~gdp_prop_percent, color = ~geo_area_name, 
+                       type = "scatter", mode = "lines") %>% 
+  layout(title = "Tourism direct GDP as a proportion of total GDP (%) for All Geo Regions",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Tourism Contribution to GDP (%)"))
+
+prelim_plot
+
+htmlwidgets::saveWidget(prelim_plot, file = "gdp_prelim_plot_all_years.html")
+```
+
+
+
+### Join with OHI regions
+
+```{r}
+# tidy up regions dataset ----
+region_names <- region_names %>% select(-Notes)
+
+# join regions & tourism GDP prop ----
+gdp_regions_join <- left_join(region_names, gdp_prop_clean, by = c("eez_iso3" = "iso3"))
+
+
+
+```
+

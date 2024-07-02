@@ -34,7 +34,7 @@ Value in each of these data sets is the total estimated revenue per country in u
 
 -   We used the indicator "All ocean and offshore energy (offshore wind + ocean energy) RD&D, million USD 2021 PPP" from the [OECD: Sustainable Ocean Economy](https://stats.oecd.org/Index.aspx?QueryId=95228#) dataset.
     -   Metadata is available for download through the portal. This platform is being retired, this data set will likely be located in the [OECD Data Explorer](https://data-explorer.oecd.org/) in future years.
-    -   v2024: new link to the Ocean Sustainability data on [OECD Data Explorer](https://data-explorer.oecd.org/vis?df[ds]=DisseminateFinalDMZ&df[id]=DSD_SOE%40DF_SOE&df[ag]=OECD.ENV.EPI&dq=AUS.A....&pd=2017%2C&to[TIME_PERIOD]=false)
+    -   v2024: new link to the Ocean Sustainability data on [OECD Data Explorer](https://data-explorer.oecd.org/vis?df%5Bds%5D=DisseminateFinalDMZ&df%5Bid%5D=DSD_SOE%40DF_SOE&df%5Bag%5D=OECD.ENV.EPI&dq=AUS.A....&pd=2017%2C&to%5BTIME_PERIOD%5D=false)
 -   The ocean energy data from OECD is actually the amount country and state governments budget for ocean energy, and is not specifically revenue. However, it is included as this was the only comprehensive data set available with monetary amounts related to ocean energy, it will likely need to be modified before being used as a proxy for revenue.
 -   This dataset only contains 32 countries, so gap filling will be needed.
 
@@ -114,9 +114,8 @@ Labor Force: used to find proportion of working-eligible population employed in 
 
 -   "Average monthly earnings of employees by sex and economic activity - Annual"
 
-```{=html}
 <!-- -->
-```
+
 -   ILO via ILOSTAT explorer <https://rshiny.ilo.org/dataexplorer30/?lang=en&id=EMP_TEMP_SEX_OCU_INS_NB_A>
 
     -   navigate to ILOSTAT explorer, select:
@@ -131,18 +130,18 @@ Labor Force: used to find proportion of working-eligible population employed in 
 
     -   Then click "Export", and for the file type option (appears as a drop-down menu), select "csv".
 
-    -   Raw data file name used in 2024: `EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv`
+    -   Raw data file name used in 2024: `EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-06-28.csv` (change this to be updated name COME BACK)
 
-#### v2024: Tourism – Economies data: 
+#### v2024: Tourism – Economies data:
 
 -   Tourism direct GDP as a proportion of total GDP (indicator 8.9.1 on UN Tourism page)
 
--   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG>
+    -   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG>
 
 -   Downloaded July 1st, 2024, along with Metadata, stored in UNWTO folder
 
     -   raw data file name `Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx`
-    -   metadata file name `metadata_unwto_economies_tourism.Rmd` 
+    -   metadata file name `metadata_unwto_economies_tourism.Rmd (change this to updated name)`
 
 ### Percent of Population within 25 miles of coast
 

@@ -305,29 +305,15 @@ paste0("proportion of countries/regions with only 1 data point: ", round(((num_n
 
 
 
-
-
-
 ```{r}
-# preliminary plotting ----
-# select random countries for preliminary plot
-country <- as.data.frame(unique(wage_data_ppp$ref_area_label))
+# preliminary plot 
 
-countries = sample_n(country, size = 15)
 
-#countries = as.list(countries[,1])
-
-test <- wage_data_ppp[wage_data_ppp$ref_area_label %in% countries[,1], ]
-
-range(wage_data_ppp$time) ## 2014-2024 
-length(unique(wage_data_ppp$ref_area_label)) ## 150 countries
-
-# preliminary plot of random countries
-ggplot(test, aes(x = time, y = monthly_wage, color = ref_area_label)) + 
-  geom_point() + 
-  geom_smooth(method = "lm") +
-  ylim(0, 10000)
 ```
+
+
+
+
 
 
 Clean up ILO data, join with OHI regions
