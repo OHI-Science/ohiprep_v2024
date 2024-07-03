@@ -450,6 +450,8 @@ Sustainable Ocean Economy</a> dataset.
 <li>Metadata is available for download through the portal. This platform
 is being retired, this data set will likely be located in the <a href="https://data-explorer.oecd.org/">OECD Data Explorer</a> in future
 years.</li>
+<li>v2024: new link to the Ocean Sustainability data on <a href="https://data-explorer.oecd.org/vis?df%5Bds%5D=DisseminateFinalDMZ&amp;df%5Bid%5D=DSD_SOE%40DF_SOE&amp;df%5Bag%5D=OECD.ENV.EPI&amp;dq=AUS.A....&amp;pd=2017%2C&amp;to%5BTIME_PERIOD%5D=false">OECD
+Data Explorer</a></li>
 </ul></li>
 <li>The ocean energy data from OECD is actually the amount country and
 state governments budget for ocean energy, and is not specifically
@@ -472,6 +474,12 @@ data from the FAO Global Commodities database for ‘Ornamental fish’ for
 all available years, ornamental freshwater fish were excluded. The
 global commodities database is a component of the Global Aquatic Trade
 Statistic Collection published by FAO.</li>
+<li>v2024: downloaded using on July 3rd, 2024:</li>
+<li><a href="https://www.fao.org/fishery/statistics-query/en/trade_partners/trade_partners_value">Global
+aquatic trade - By partner country Value (2019 - 2021)</a></li>
+<li>click “download full dataset” (all years – 2019, 2020, and 2021 are
+selected by default, no countries or commodities etc. are selected for
+any filtering)</li>
 <li><a href="https://www.fao.org/fishery/en/collection/global_commodity_prod">Metadata</a></li>
 </ul>
 </div>
@@ -603,6 +611,64 @@ data.</li>
 <li><a href="https://www.unwto.org/glossary-tourism-terms">metadata</a></li>
 </ul></li>
 </ul>
+<div id="v2024-tourism-livelihood-data" class="section level4">
+<h4>v2024: Tourism – Livelihood data</h4>
+<p>Jobs: Number of jobs (employed in the tourism sector) per
+country/region per year</p>
+<ul>
+<li>UN Tourism (UNWTO)</li>
+</ul>
+<p>Labor Force: used to find proportion of working-eligible population
+employed in tourism sector</p>
+<ul>
+<li><p>World Bank (downloaded June 28. 2024)</p>
+<ul>
+<li><a href="https://data.worldbank.org/indicator/SL.TLF.TOTL.IN" class="uri">https://data.worldbank.org/indicator/SL.TLF.TOTL.IN</a></li>
+</ul></li>
+</ul>
+<p>“Quality”: wages</p>
+<ul>
+<li><p>“Average monthly earnings of employees by sex and economic
+activity - Annual”</p></li>
+<li><p>ILO via ILOSTAT explorer <a href="https://rshiny.ilo.org/dataexplorer46/?lang=en&amp;id=EAR_4MTH_SEX_ECO_CUR_NB_A" class="uri">https://rshiny.ilo.org/dataexplorer46/?lang=en&amp;id=EAR_4MTH_SEX_ECO_CUR_NB_A</a></p>
+<ul>
+<li><p>navigate to ILOSTAT explorer, select:</p>
+<ul>
+<li><p>“Sex”: select “none” (to un-select all options), then select
+“Total”</p></li>
+<li><p>“Economic Activity”: select “none” and then select “ISIC-Rev.4:
+I. Accommodation and food service activities”</p></li>
+<li><p>“Currency”: keep all selected (we end up filtering this in
+R)</p></li>
+<li><p>set Time Frame (sliding range bar) to 2009-present year (for us
+it would have been 2024, but we ended up ending our time frame at 2019
+due to data constraints in the employment dataset)</p></li>
+</ul></li>
+<li><p>Then click “Export”, and for the file type option (appears as a
+drop-down menu), select “csv”.</p></li>
+<li><p>Raw data file name used in 2024:
+<code>EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02-tour-wage.csv</code></p></li>
+</ul></li>
+</ul>
+</div>
+<div id="v2024-tourism-economies-data" class="section level4">
+<h4>v2024: Tourism – Economies data:</h4>
+<ul>
+<li><p>Tourism direct GDP as a proportion of total GDP (indicator 8.9.1
+on UN Tourism page)</p>
+<ul>
+<li><a href="https://www.unwto.org/tourism-statistics/economic-contribution-SDG" class="uri">https://www.unwto.org/tourism-statistics/economic-contribution-SDG</a></li>
+</ul></li>
+<li><p>Downloaded July 1st, 2024, along with Metadata, stored in UNWTO
+folder</p>
+<ul>
+<li>raw data file name
+<code>Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx</code></li>
+<li>metadata file name
+<code>metadata_unwto_economies_tourism.Rmd (change this to updated name)</code></li>
+</ul></li>
+</ul>
+</div>
 </div>
 <div id="percent-of-population-within-25-miles-of-coast" class="section level3">
 <h3>Percent of Population within 25 miles of coast</h3>
@@ -627,6 +693,38 @@ the WDI package. Example code is given below.</p>
 <li><p>A possible alternative to the WDI package is calculating total
 population based on a similar method to mar_prs_population.</p></li>
 </ul>
+<div id="v2024-fishing---livelihood-data" class="section level4">
+<h4>v2024: Fishing - Livelihood data</h4>
+<p>“Number”: jobs</p>
+<ul>
+<li>(ILO? FAO? aggregate: look into whether their methodology is
+compatible, whether the values match/make sense)</li>
+</ul>
+<p>“Quality”: wages</p>
+<ul>
+<li><p>“Average monthly earnings of employees by sex and economic
+activity - Annual”</p></li>
+<li><p>ILO via ILOSTAT explorer <a href="https://rshiny.ilo.org/dataexplorer48/?lang=en&amp;id=EAR_4MTH_SEX_ECO_CUR_NB_A" class="uri">https://rshiny.ilo.org/dataexplorer48/?lang=en&amp;id=EAR_4MTH_SEX_ECO_CUR_NB_A</a></p>
+<ul>
+<li><p>navigate to ILOSTAT explorer, select:</p>
+<ul>
+<li><p>“Sex”: select “none” (to un-select all options), then select
+“Total”</p></li>
+<li><p>“Economic Activity”: select “none” and then select “ISIC-Rev.3.1:
+B. Fishing”</p></li>
+<li><p>“Currency”: keep all selected (we end up filtering this in
+R)</p></li>
+<li><p>set Time Frame (sliding range bar) to 2009-present year (for us
+it would have been 2024, but we ended up ending our time frame at 2019
+due to data constraints in the employment dataset)</p></li>
+</ul></li>
+<li><p>Then click “Export”, and for the file type option (appears as a
+drop-down menu), select “csv”.</p></li>
+<li><p>Raw data file name used in 2024:
+<code>EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-03-cf-wage.csv</code></p></li>
+</ul></li>
+</ul>
+</div>
 </div>
 </div>
 </div>
