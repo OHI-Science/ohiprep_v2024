@@ -131,7 +131,7 @@ Labor Force: used to find proportion of working-eligible population employed in 
 
     -   Then click "Export", and for the file type option (appears as a drop-down menu), select "csv".
 
-    -   Raw data file name used in 2024: `EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02.csv` 
+    -   Raw data file name used in 2024: `EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02-tour-wage.csv` 
 
 #### v2024: Tourism – Economies data:
 
@@ -167,6 +167,33 @@ In order to calculate percent of a country's population within a 25 mile inland 
     `filter(!eez_iso3 == "")`
 
 -   A possible alternative to the WDI package is calculating total population based on a similar method to mar_prs_population.
+
+#### v2024: Fishing - Livelihood data
+
+"Number": jobs
+
+- (ILO? FAO? aggregate: look into whether their methodology is compatible, whether the values match/make sense)
+
+"Quality": wages
+
+-   "Average monthly earnings of employees by sex and economic activity - Annual"
+
+-   ILO via ILOSTAT explorer <https://rshiny.ilo.org/dataexplorer48/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A>
+
+    -   navigate to ILOSTAT explorer, select:
+
+        -   "Sex": select "none" (to un-select all options), then select "Total"
+
+        -   "Economic Activity": select "none" and then select "ISIC-Rev.3.1: B. Fishing"
+
+        -   "Currency": keep all selected (we end up filtering this in R)
+
+        -   set Time Frame (sliding range bar) to 2009-present year (for us it would have been 2024, but we ended up ending our time frame at 2019 due to data constraints in the employment dataset)
+
+    -   Then click "Export", and for the file type option (appears as a drop-down menu), select "csv".
+
+    -   Raw data file name used in 2024: `EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-03-cf-wage.csv` 
+
 
 # Jobs
 

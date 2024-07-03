@@ -28,7 +28,11 @@ editor_options:
 
   * Labor Force data from World Bank (downloaded June 28. 2024)
 
-- https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+      - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+      
+  * ILOSTAT (downloaded July 2, 2024) -- for tour/cf wage data
+  
+      - https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A 
 
 
 ### Setup
@@ -96,7 +100,7 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
 # ILO wage data ----
 # define file path to ILO wage data 
 ilo_fp <- file.path(dir_M,
-                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02.csv")
+                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02-tour-wage.csv")
 
 # read in ILO wage data
 ilo_wage_data <- read_csv(ilo_fp)
