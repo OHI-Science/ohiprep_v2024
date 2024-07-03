@@ -42,6 +42,9 @@ Value in each of these data sets is the total estimated revenue per country in u
 
 -   The original data source for aquarium fishing revenue had been updated since this goal was originally calculated: [FAO global trade value data.](https://www.fao.org/fishery/en/collection/global_commodity_prod)
 -   Revenue data was prepared as is described in the methods: export data from the FAO Global Commodities database for 'Ornamental fish' for all available years, ornamental freshwater fish were excluded. The global commodities database is a component of the Global Aquatic Trade Statistic Collection published by FAO.
+-  v2024: downloaded using  on July 3rd, 2024:
+  - [Global aquatic trade - By partner country Value (2019 - 2021)](https://www.fao.org/fishery/statistics-query/en/trade_partners/trade_partners_value)
+  - click "download full dataset" (all years -- 2019, 2020, and 2021 are selected by default, no countries or commodities etc. are selected for any filtering)
 -   [Metadata](https://www.fao.org/fishery/en/collection/global_commodity_prod)
 
 ## Fishing
