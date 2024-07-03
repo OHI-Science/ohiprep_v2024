@@ -76,7 +76,7 @@ raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
 # world bank raw data directory
 wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
-fao_dir
+fao_comm_dir <- here(raw_data_dir, "FAO_commodities", data_dir_version_year)
 
 
 # output data dir for intermediate data products
@@ -93,6 +93,44 @@ int_dir <- here(data_path, "int")
 region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
   janitor::clean_names() %>% 
   select(-notes)
+
+# labor force from World Bank (cleaned, joined with OHI regions)
+labor_force <- read_csv(here(int_dir, "labor_force.csv"))
+
+# Aquarium Fishing FAO data 
+commodities_value <- read_csv(here(fao_comm_dir, "query_portal", "trade_partners_value.csv"))
+
+```
+
+
+## Data cleaning
+
+```{r}
+# mostly copied from the v2023 livelihood_economies_dataprep.Rmd
+fao_latest_data_year <- 2021 #update to the last year available in FAO data, likely the same for all FAO data included. 
+#clean up data for ornamental fishing revenue
+ornamental_value <- commodities_value %>%
+  filter(str_detect(`Commodity Name En`, "Ornamental")) %>% 
+   rename(country = 'Reporting country Name En',
+          commodity = `Commodity Name En`,
+           trade = `Trade flow Name En`) %>%
+    filter(trade == "Exports" & commodity != "Ornamental freshwater fish") %>% #remove imports and all other fish besides ornamentals 
+  fao_online_portal_clean (initial_data_year = 1976, last_data_year = 2021) %>% #function to clean and pivot the data 
+  mutate(value = (value * 1000), #convert from thousands to single dollar 
+         unit = "USD (1)")
+
+#sum for each country 
+ornamental_revenue <-
+  ornamental_value %>% 
+  group_by(country, year) %>% 
+  summarize(value = sum(value, na.rm = TRUE), unit = first(unit)) %>% 
+  mutate(sector = "aqf",#code for aquarium fishing sector
+         data_source = "FAO global trade") %>% 
+  select(country, year, value, unit, sector, data_source)
+
+#write as intermediate file
+write_csv(ornamental_revenue, here(data_path, "int/aqf_revenue.csv"))
+
 
 ```
 
