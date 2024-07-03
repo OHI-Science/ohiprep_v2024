@@ -121,7 +121,7 @@ commodities_value_raw %>% filter(`2021 Flag` == "N")
 ```
 
 
-## Data cleaning
+## Data cleaning & Wrangling
 
 ```{r}
 # adapted from the v2023 livelihood_economies_dataprep.Rmd
@@ -132,7 +132,8 @@ ornamental_value <- commodities_value_raw %>%
   janitor::clean_names() %>% 
   # filter to ornamental commodities 
   filter(str_detect(commodity_name_en, "Ornamental")) %>% 
-  rename(country = "reporting_country_name_en", # COME BACK -- not sure about this
+  rename(country = "reporting_country_name_en", 
+         partner_country = "partner_country_name_en",
          commodity = "commodity_name_en",
          trade = "trade_flow_name_en") %>%
   filter(trade == "Exports" & commodity != "Ornamental freshwater fish") %>% # remove all other fish (commodities) that are not ornamentals (bc aquarium = ornamental), don't include the freshwater ornamental fish (interested in saltwater/ocean only)
@@ -142,18 +143,26 @@ ornamental_value <- commodities_value_raw %>%
   mutate(value = (value * 1000), # convert from thousands to single dollar 
          unit = "USD (1)") %>% 
   # add iso3 column
-  mutate(iso3 = country_regex_to_iso3c(country)) # COME BACK
+  mutate(iso3 = country_regex_to_iso3c(country)) # get iso3 code of reporting country
+```
 
-# fao_query_data_tidy()# sum for each country 
-ornamental_revenue <- ornamental_value_raw %>% 
+
+
+```{r}
+# sum for each country 
+ornamental_revenue <- ornamental_value %>% 
   group_by(country, year) %>% 
-  summarize(value = sum(value, na.rm = TRUE), unit = first(unit)) %>% 
-  mutate(sector = "aqf", #c ode for aquarium fishing sector
+  summarize(value = sum(value, na.rm = TRUE),
+            unit = first(unit)) %>% 
+  mutate(sector = "aqf", # code for aquarium fishing sector
          data_source = "FAO global trade") %>% 
-  select(country, year, value, unit, sector, data_source)
+  select(country, year, value, unit, sector, data_source) %>% 
+  # add iso3 column
+  mutate(iso3 = country_regex_to_iso3c(country)) %>%  # get iso3 code of reporting country
+  relocate(iso3, .after = country)
 
 # write as intermediate file
-write_csv(ornamental_revenue, here(data_path, "int", "aqf_revenue.csv"))
+write_csv(ornamental_revenue, here(int_dir, "aqf_revenue.csv"))
 
 
 ```
