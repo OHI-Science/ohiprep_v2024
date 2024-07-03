@@ -115,7 +115,7 @@ labor_clean <- labor_raw %>%
   # tidy data from wide to long (years are currently columns)
   pivot_longer(cols = 5:length(names(labor_raw)),
                names_to = "year", 
-               values_to = "thousand_jobs") %>% 
+               values_to = "labor_force_total") %>% 
   # remove unnecessary columns
   select(-c(indicator_name, indicator_code)) %>% 
   # clean up year column (currently in the form of xYYYY)
@@ -123,7 +123,8 @@ labor_clean <- labor_raw %>%
   # fix data types
   mutate(year = as.numeric(year),
          country_name = as.factor(country_name),
-         thousand_jobs = as.numeric(thousand_jobs))
+         labor_force_total = as.numeric(labor_force_total)) %>% 
+  filter(year >= 2009) # starting 5 years back from first year of evaluation
   
 
 # clean regions data --------------
@@ -142,9 +143,17 @@ labor_regions_join <- left_join(region_clean, labor_clean,
 
 
 labor_regions <- labor_regions_join %>% 
-  select(-c(country_name)) %>% 
-  filter(year >= 2009) # starting 5 years back from first year of evaluation
+  select(-c(country_name)) 
 
+
+labor_export <- labor_regions %>% 
+  # adding "no data" values in the year column for countries that we have no data for 
+  mutate(data_status = ifelse(is.na(year), "no_data", "yes_data"),
+         admin_rgn_id = as.character(admin_rgn_id),
+         rgn_id = as.character(rgn_id))
+
+# save csv for use in other livelihood dataprep
+#write_csv(labor_export, here(int_dir, "labor_force.csv"))
 ```
 
 # Employment Data
@@ -199,9 +208,9 @@ tourism_labor_join <- left_join(labor_regions, tourism_un_jobs_ohi, by = c("rgn_
 Create the proportion between tourism jobs and the total labor force
 ```{r}
 tourism_job_proportion <- tourism_labor_join %>%
-  dplyr::relocate(tourism_jobs, .before = thousand_jobs) %>%
-  mutate(tourism_proportion = tourism_jobs/thousand_jobs) %>%
-  rename(labor_force_total = thousand_jobs) %>%
+  dplyr::relocate(tourism_jobs, .before = labor_force_total) %>%
+  mutate(tourism_proportion = tourism_jobs/labor_force_total) %>%
+  rename(labor_force_total = labor_force_total) %>%
   select(rgn_id, rgn_name.x, country, year, labor_force_total, tourism_jobs, tourism_proportion)
 
 # plot it, interactively!
