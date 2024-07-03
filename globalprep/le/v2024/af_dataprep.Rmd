@@ -76,7 +76,7 @@ raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
 # world bank raw data directory
 wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
-fao_dir
+fao_dir <- here
 
 
 # output data dir for intermediate data products
@@ -93,6 +93,9 @@ int_dir <- here(data_path, "int")
 region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
   janitor::clean_names() %>% 
   select(-notes)
+
+
+
 
 ```
 
