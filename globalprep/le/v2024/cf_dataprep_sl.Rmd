@@ -87,10 +87,22 @@ ilo_dir <- here(raw_data_dir, "ILOSTAT", data_dir_version_year)
 # FAO raw data directory
 fao_dir <- here(raw_data_dir, "FAO", data_dir_version_year)
 
+# OECD raw data directory
+oecd_dir <- here(raw_data_dir, "OECD", data_dir_version_year)
+
 # output data dir for intermediate data products
 int_dir <- here(data_path, "int")
 ```
 
+Create country code --> iso3 function
+```{r}
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+```
 
 ## Read in Data
 
@@ -101,26 +113,15 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
   janitor::clean_names() %>% 
   select(-notes)
 
+#----------Labor Force Data (from earlier)-----
+labor_force <- read_csv(here(data_path, "int", "labor_force.csv"))
+
 ############################################
 # Livelihoods: Number of fisher jobs
 ############################################
 
-#----------OECD data---------------------------
-oecd_raw <- read_csv(file.path(dir_M, "/git-annex/globalprep/_raw_data/OECD/d2023/ocean_economy.csv")) %>% 
-  select(Country, Year, VARIABLE, Variable, Unit, Value, PowerCode) 
-
-#----------cf OECD number of fishers data------
-#note that this is data for the same category as the FAO fishers data, FAO data will be used to gapfill
-oecd_fisher_jobs <- oecd_raw %>% 
-  filter(VARIABLE == "FISH_EMP_MARINE_FISH_TOT")  %>% 
-  select(- c(PowerCode, VARIABLE)) %>% 
-  filter(!Country == "OECD - Total") %>% 
-  clean_names() %>% 
-  mutate(unit = ("persons (1)"),
-         value = (value * 1000),
-         sector = "cf",
-         data_source = "oecd sustainable economies") %>% 
-  select(country, year, value, unit, sector, data_source)
+#---------- cf OECD data---------------------------
+oecd_cf_job_raw <- read_csv(here(oecd_dir, "OECD.TAD.ARP,DSD_FISH_EMP@DF_FISH_EMPL,1.0+.A...._T._T.csv"))
 
 #------cf FAO Yearbook Number of Fishers-------
 # turn the number of fishers table from the FAO yearbook into a data frame and clean.
@@ -160,41 +161,6 @@ fao_fisher_jobs <- fishers_table %>%
 cf_ilo_wage_raw <- read_csv(here(ilo_dir, "EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-03-cf-wage.csv"))
 ```
 
-#### FAO Yearbook Number of Fishers
-
-Turn the number of fishers table from the FAO yearbook into a data frame
-and clean.
-
-```{r, eval = FALSE}
-
-```
-
-### Read in Data
-
-```{r}
-# ===================== Read in Data ==============================
-
-
-# Labor force data ----
-labor_raw <- readxl::read_xls(here(wb_dir, "worldbank_labor_force_raw.xls"),
-                               skip = 3,
-                               na = "")
-
-# OHI regions data ----
-# read in OHI regions for joining
-region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
-
-
-# ILO wage data ----
-# define file path to ILO wage data 
-ilo_fp <- file.path(dir_M,
-                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02-tour-wage.csv")
-
-# read in ILO wage data
-ilo_wage_data <- read_csv(ilo_fp)
-
-```
-
 # Livelihood: Number of Jobs -- cf
 
 (put this within previous chunk, read in data etc. for number of tourism jobs, join with labor_regions, make new proportion of tourism jobs column, group by year, do prelim plotting etc. and evaluate data quality etc.)
@@ -203,11 +169,69 @@ Cleaning and wrangling data
 ```{r}
 # total number of people employed by the fishing (previously commercial fishing, cf -- see README.md) sector
 
+# no NAs, which means it may have been gapfilled already
+unique(is.na(oecd_cf_job_raw$OBS_VALUE))
+
+#----------cf OECD number of fishers data------
+#note that this is data for the same category as the FAO fishers data, FAO data will be used to gapfill
+oecd_fisher_jobs <- oecd_cf_job_raw %>% 
+  janitor::clean_names() %>% 
+  select(ref_area, reference_area, working_domain, time_period, obs_value, unit_of_measure) %>% 
+  filter(working_domain %in% c("Inland waters fishing","Marine fishing, nei","Fishing sector","Marine deep-sea fishing", "Marine coastal fishing","Subsistence"))  %>% 
+  mutate(year = as.numeric(time_period),
+         value = obs_value,
+         unit = ("persons (1)"),
+         sector = "cf",
+         data_source = "oecd sustainable economies") %>% 
+  select(-c(unit_of_measure, obs_value, time_period, working_domain))
 ```
+
+It should be noted that for the OECD number of fishers data, it has no NAs. For example, for the reference area of the Philippines, for 2009-2020 the observed value is consistently 120,000.  Therefore, the values have either been rounded or there has already been some sort of gapfilling. Within `oecd_cf_job_raw`, there is a column named "DECIMAL", which could allude to some sort of rounding.  Investigation was done to find OECD's metadata, however the link failed (below).  WILL RETURN!
+
+Page with metadata: <https://www.oecd-ilibrary.org/economics/data/oecd-stat/data-warehouse_data-00900-en?parentId=http%3A%2F%2Finstance.metastore.ingenta.com%2Fcontent%2Fcollection%2Fdata-00285-en>
+Failed link: <https://stats.oecd.org/wbos/default.aspx?checksum=40e0edc46aec7aee1cce210b898d5bd6&timestamp=1720045544&cid=id5845&oecdstat=data-00285-en&doi=data-00900-en&return_url=https%3A%2F%2Fwww.oecd-ilibrary.org%3A443%2Fcontent%2Fdata%2Fdata-00900-en&institution_name=UC+at+Santa+Barbara&lang=en>
+
+Preliminary plot
+```{r}
+plotly::plot_ly(oecd_fisher_jobs, x = ~year, y = ~value, color = ~reference_area, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Marine Fishing Employment", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of people by region employed by the fishing sector"))
+```
+
 
 Create the proportion between tourism jobs and the total labor force
 ```{r}
+# prep OECD to join with labor force
+cf_job_countrycode <- oecd_fisher_jobs %>% 
+  mutate(iso3c = country_regex_to_iso3c(reference_area))
 
+all(cf_job_countrycode$ref_area == cf_job_countrycode$iso3c) # TRUE, so did not need to use countrycode func
+
+# make ref_area the same column name as labor_force, to join cleanly
+cf_job_iso <- oecd_fisher_jobs %>% 
+  rename(eez_iso3 = ref_area)
+
+# join labor force data with cf employment
+cf_job_labor_join <- left_join(cf_job_iso, labor_force, by = c("eez_iso3", "year"))
+
+# !!! need to fix join to preserve rgn_id, but not have double years!! Come back w fresh eyes :) 
+
+# make proportion of people employed in the commercial
+cf_job_prop <- cf_job_labor_join %>% 
+  dplyr::relocate(labor_force_total, .before = unit) %>%
+  mutate(cf_prop_percent = (value/labor_force_total)*100) %>%
+  select(rgn_id, admin_country_name, year, value, labor_force_total, cf_prop_percent)
+```
+
+Preliminary plot of the percent of labor force working in the fishing sector (cf)
+```{r}
+plotly::plot_ly(cf_job_prop, x = ~year, y = ~cf_prop_percent, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Percent of Labor Force Employed by Marine Fishing Sector", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percent by region employed by the fishing sector"))
+
+ggplot(data = cf_job_prop, aes(x = year, y = cf_prop_percent)) + geom_line(aes(color = admin_country_name))
 ```
 
 Saving intermediate data

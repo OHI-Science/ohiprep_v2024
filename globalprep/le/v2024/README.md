@@ -182,12 +182,6 @@ In order to calculate percent of a country's population within a 25 mile inland 
 
 OECD Data Explorer:
 
-- Sustainable Ocean Economy (2017 - 2021) <https://data-explorer.oecd.org/vis?tm=sustainable&pg=0&snb=42&vw=tb&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_SOE%40DF_SOE&df[ag]=OECD.ENV.EPI&df[vs]=1.0&dq=.A....&pd=2009%2C&to[TIME_PERIOD]=false>'
-
-  - `Apply filter: "Time period" to the years desired.  In this case, it was after 2009. Download as filtered csv.`
-  
-  - `/home/shares/ohi/git-annex/globalprep/_raw_data/OECD/d2024/OECD.ENV.EPI,DSD_SOE@DF_SOE,1.0+.A.....csv`
-
 - Employment in fisheries, aquaculture and processing (2009 - 2021) <https://data-explorer.oecd.org/vis?fs[0]=Topic%2C1%7CAgriculture%20and%20fisheries%23AGR%23%7CFisheries%20and%20aquaculture%23AGR_FSA%23&pg=0&fc=Topic&bp=true&snb=6&vw=tb&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_FISH_EMP%40DF_FISH_EMPL&df[ag]=OECD.TAD.ARP&df[vs]=1.0&dq=.A...._T._T&pd=2009%2C&to[TIME_PERIOD]=false>
 
   - `Apply filter: "Time period" to the years desired.  In this case, it was after 2009. Download as filtered csv.`
