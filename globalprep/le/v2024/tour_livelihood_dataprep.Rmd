@@ -47,6 +47,7 @@ librarian::shelf(
   here,
   janitor,
   terra,
+  countrycode,
   readxl,
   RColorBrewer,
   foreach,
@@ -62,7 +63,7 @@ library(threadr)
 
 
 # source 
-source(here("workflow/R/common.R"))
+source(here("workflow", "R", "common.R"))
 
 # set year and file path info
 current_year <- 2024 # Update this!!
@@ -79,6 +80,17 @@ wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
 
 # output data dir for intermediate data products
 int_dir <- here(data_path, "int")
+```
+
+Create country code --> iso3 function
+
+```{r}
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
 ```
 
 ### Read in Data
@@ -180,13 +192,6 @@ un_jobs_data_piv <- un_jobs_data_raw %>%
   rename(country = basic_data_and_indicators) %>%
   mutate()
 
-# install.packages("countrycode")
-library(countrycode)
-
-country_regex_to_iso3c <- function(country_string) {
-  country_string %>%
-    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
-}
 
 # adding iso3 codes, converting number to thousands to be consistent and prep for the left_join with labor_regions
 un_jobs_cc <- un_jobs_data_piv %>% 

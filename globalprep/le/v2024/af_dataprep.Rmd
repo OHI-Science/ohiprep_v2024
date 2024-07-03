@@ -47,6 +47,7 @@ librarian::shelf(
   here,
   janitor,
   terra,
+  countrycode,
   readxl,
   RColorBrewer,
   foreach,
@@ -62,7 +63,10 @@ library(threadr)
 
 
 # source 
-source(here("workflow/R/common.R"))
+source(here("workflow", "R", "common.R"))
+# used to clean FAO online portal data
+# source(here("workflow", "R", "fao_online_portal_clean.R")) # old function
+source(here("workflow", "R", "fao_query_data_tidy.R")) # new function
 
 # set year and file path info
 current_year <- 2024 # Update this!!
@@ -84,6 +88,16 @@ int_dir <- here(data_path, "int")
 ```
 
 
+Create country code --> iso3 function
+
+```{r}
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+```
 
 ## Read in Data
 
@@ -98,38 +112,48 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
 labor_force <- read_csv(here(int_dir, "labor_force.csv"))
 
 # Aquarium Fishing FAO data 
-commodities_value <- read_csv(here(fao_comm_dir, "query_portal", "trade_partners_value.csv"))
+commodities_value_raw <- read_csv(here(fao_comm_dir, "query_portal", "trade_partners_value.csv"))
 
+```
+```{r}
+# check and see if any values are considered negligible
+commodities_value_raw %>% filter(`2021 Flag` == "N")
 ```
 
 
 ## Data cleaning
 
 ```{r}
-# mostly copied from the v2023 livelihood_economies_dataprep.Rmd
-fao_latest_data_year <- 2021 #update to the last year available in FAO data, likely the same for all FAO data included. 
-#clean up data for ornamental fishing revenue
-ornamental_value <- commodities_value %>%
-  filter(str_detect(`Commodity Name En`, "Ornamental")) %>% 
-   rename(country = 'Reporting country Name En',
-          commodity = `Commodity Name En`,
-           trade = `Trade flow Name En`) %>%
-    filter(trade == "Exports" & commodity != "Ornamental freshwater fish") %>% #remove imports and all other fish besides ornamentals 
-  fao_online_portal_clean (initial_data_year = 1976, last_data_year = 2021) %>% #function to clean and pivot the data 
-  mutate(value = (value * 1000), #convert from thousands to single dollar 
-         unit = "USD (1)")
+# adapted from the v2023 livelihood_economies_dataprep.Rmd
+fao_latest_data_year <- 2021 # update to the last year available in FAO data, likely the same for all FAO data included.
 
-#sum for each country 
-ornamental_revenue <-
-  ornamental_value %>% 
+# clean up commodities value data for ornamental fishing revenue
+ornamental_value <- commodities_value_raw %>%
+  janitor::clean_names() %>% 
+  # filter to ornamental commodities 
+  filter(str_detect(commodity_name_en, "Ornamental")) %>% 
+  rename(country = "reporting_country_name_en", # COME BACK -- not sure about this
+         commodity = "commodity_name_en",
+         trade = "trade_flow_name_en") %>%
+  filter(trade == "Exports" & commodity != "Ornamental freshwater fish") %>% # remove all other fish (commodities) that are not ornamentals (bc aquarium = ornamental), don't include the freshwater ornamental fish (interested in saltwater/ocean only)
+  # fao cleaning function found in workflow/R
+  fao_query_data_tidy(initial_data_year = 2019,
+                          last_data_year = 2021) %>% # used function to clean and pivot data, remove Flag columns (definitely check out this script!)
+  mutate(value = (value * 1000), # convert from thousands to single dollar 
+         unit = "USD (1)") %>% 
+  # add iso3 column
+  mutate(iso3 = country_regex_to_iso3c(country)) # COME BACK
+
+# fao_query_data_tidy()# sum for each country 
+ornamental_revenue <- ornamental_value_raw %>% 
   group_by(country, year) %>% 
   summarize(value = sum(value, na.rm = TRUE), unit = first(unit)) %>% 
-  mutate(sector = "aqf",#code for aquarium fishing sector
+  mutate(sector = "aqf", #c ode for aquarium fishing sector
          data_source = "FAO global trade") %>% 
   select(country, year, value, unit, sector, data_source)
 
-#write as intermediate file
-write_csv(ornamental_revenue, here(data_path, "int/aqf_revenue.csv"))
+# write as intermediate file
+write_csv(ornamental_revenue, here(data_path, "int", "aqf_revenue.csv"))
 
 
 ```
