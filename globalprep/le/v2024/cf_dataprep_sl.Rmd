@@ -1,0 +1,273 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - CF Data Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+---
+
+# CF Livelihoods: Proportion of Tourism Jobs per Country/Region per Year
+
+## Overview
+
+* **Data:** Labor Force & Employment Data
+
+  * Labor Force data from World Bank (downloaded June 28. 2024)
+
+      - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+      
+  * OECD
+  
+  * FAO Yearbook
+      
+  * ILOSTAT (downloaded July 2, 2024) -- for cf wage data
+  
+      - https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A 
+
+
+### Setup
+
+```{r}
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  janitor,
+  terra,
+  readxl,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  tidyverse, 
+  httr,
+  plotly,
+  zoo, # for gapfilling
+  pdftools
+)
+#remotes::install_github("skgrange/threadr") # for na_extrapolate
+library(threadr)
+
+
+# source 
+source(here("workflow/R/common.R"))
+
+# set year and file path info
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- here("globalprep", "le", version_year)
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# world bank raw data directory
+wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+
+# ILO raw data directory
+ilo_dir <- here(raw_data_dir, "ILOSTAT", data_dir_version_year)
+
+# FAO raw data directory
+fao_dir <- here(raw_data_dir, "FAO", data_dir_version_year)
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
+```
+
+
+## Read in Data
+
+```{r}
+#----------OHI regions data--------------------
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  janitor::clean_names() %>% 
+  select(-notes)
+
+############################################
+# Livelihoods: Number of fisher jobs
+############################################
+
+#----------OECD data---------------------------
+oecd_raw <- read_csv(file.path(dir_M, "/git-annex/globalprep/_raw_data/OECD/d2023/ocean_economy.csv")) %>% 
+  select(Country, Year, VARIABLE, Variable, Unit, Value, PowerCode) 
+
+#----------cf OECD number of fishers data------
+#note that this is data for the same category as the FAO fishers data, FAO data will be used to gapfill
+oecd_fisher_jobs <- oecd_raw %>% 
+  filter(VARIABLE == "FISH_EMP_MARINE_FISH_TOT")  %>% 
+  select(- c(PowerCode, VARIABLE)) %>% 
+  filter(!Country == "OECD - Total") %>% 
+  clean_names() %>% 
+  mutate(unit = ("persons (1)"),
+         value = (value * 1000),
+         sector = "cf",
+         data_source = "oecd sustainable economies") %>% 
+  select(country, year, value, unit, sector, data_source)
+
+#------cf FAO Yearbook Number of Fishers-------
+# turn the number of fishers table from the FAO yearbook into a data frame and clean.
+# note: world total includes countries and regions not within the table.  Unsure of where that data comes from; look for methodology.
+fao_pdf <- pdf_text(here(fao_dir, "fao_statistics_yearbook_07_03_24.pdf"))
+
+fishers_table <- fao_pdf[[169]] %>% #page number of the pdf
+  as.data.frame()
+
+#specify columns 
+columns <- c("country", "1995", "2000", "2005", "2010", "2015", "2016", "2017", "2018", "2019", "2020","2021")
+
+#turn the pdf page into a clean dataframe
+fao_fisher_jobs <- fishers_table %>%
+  separate_rows('.', sep = "\n") %>% #separate rows based on line breaks
+  rename(main_column = ".") %>%
+  mutate(main_column = str_remove_all(main_column, "\\*")) %>% #remove the * 
+  mutate(main_column = str_replace_all(main_column, "E(?!\\p{L})", " ")) %>% #replace all the Es not followed by letters (used to indicate estimate)
+  slice(7:69) %>% #remove all rows not in the table
+  separate(main_column, into = columns, sep = " {2,}", extra = "merge") %>% #separate into columns based on double spaces
+  pivot_longer(cols = -c("country"), names_to = "year") %>% 
+  mutate(value = str_squish(value)) %>% #remove extra spaces
+  mutate(value = str_remove_all(value, " ")) %>% 
+  mutate(value = if_else(value == "…" , NA, value)) %>% 
+  mutate(value = as.numeric(value)) %>% 
+  mutate(unit = "persons (1)",
+         sector = "cf",
+         data_source = "FAO number of fishers") %>% 
+  slice(-c(1:44))
+
+############################################
+# Livelihoods: Quality of fisher jobs
+############################################
+
+#-------cf ILO wage data (2009 - 2021) -------
+# this data has limited entries, so local currency will need to be ppp adjusted to increase the number of observations per geo area
+cf_ilo_wage_raw <- read_csv(here(ilo_dir, "EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-03-cf-wage.csv"))
+```
+
+#### FAO Yearbook Number of Fishers
+
+Turn the number of fishers table from the FAO yearbook into a data frame
+and clean.
+
+```{r, eval = FALSE}
+
+```
+
+### Read in Data
+
+```{r}
+# ===================== Read in Data ==============================
+
+
+# Labor force data ----
+labor_raw <- readxl::read_xls(here(wb_dir, "worldbank_labor_force_raw.xls"),
+                               skip = 3,
+                               na = "")
+
+# OHI regions data ----
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
+
+
+# ILO wage data ----
+# define file path to ILO wage data 
+ilo_fp <- file.path(dir_M,
+                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02-tour-wage.csv")
+
+# read in ILO wage data
+ilo_wage_data <- read_csv(ilo_fp)
+
+```
+
+# Livelihood: Number of Jobs -- cf
+
+(put this within previous chunk, read in data etc. for number of tourism jobs, join with labor_regions, make new proportion of tourism jobs column, group by year, do prelim plotting etc. and evaluate data quality etc.)
+
+Cleaning and wrangling data
+```{r}
+# total number of people employed by the fishing (previously commercial fishing, cf -- see README.md) sector
+
+```
+
+Create the proportion between tourism jobs and the total labor force
+```{r}
+
+```
+
+Saving intermediate data
+```{r}
+
+```
+
+
+# Livelihood: Quality of Jobs -- cf
+
+  - note: this data came from many sources and was compiled by ILO
+
+Cleaning and wrangling data
+```{r}
+
+
+```
+
+
+Gapfilling if necessary
+```{r}
+
+```
+
+
+```{r}
+# find regions with only 1 data point (still have NAs in appx_wage column)
+
+```
+
+
+```{r}
+# # preliminary plot 
+# line_plot <- plotly::plot_ly(wage_gf, x = ~year, y = ~appx_wage_fill, color = ~ref_area_label, type = "scatter", mode = "lines") %>% 
+#   layout(title = "All Regions: monthly Service Wages (USD (2017) PPP-Adjusted)", 
+#          xaxis = list(title = "Year"),
+#          yaxis = list(title = "monthly Wages (USD)"))
+# 
+# line_plot
+# 
+# # htmlwidgets::saveWidget(line_plot, file = "prop_tourism_laborforce.html")
+```
+
+
+Clean up ILO data, join with OHI regions
+```{r}
+# join with OHI regions
+
+```
+
+
+Plot
+```{r}
+# # interactive plot after joining with OHI Regions
+# plotly::plot_ly(wage_regions, x = ~year, y = ~appx_wage_fill, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+#   layout(title = "All Regions: Monthly Service Wages (USD)", 
+#          xaxis = list(title = "Year"),
+#          yaxis = list(title = "Monthly Wages (USD)"))
+
+```
+
+
+
