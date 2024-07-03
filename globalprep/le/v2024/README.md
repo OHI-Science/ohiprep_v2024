@@ -48,7 +48,7 @@ Value in each of these data sets is the total estimated revenue per country in u
   - scroll to the bottom of the page, click the "download" button/icon, then select "csv", "Flag enabled" (we clean this later), then "Yes" for "Include null values"
   - select "Preferences", then:
       - for "Show unavailable values" select "NA"
-      - for ""
+      - for "Thousands separator" select "No space"
     - (all years -- 2019, 2020, and 2021 are selected by default, no countries or commodities etc. are selected for any filtering)
     - © FAO 2024. Global Aquatic Trade Statistics. In: Fisheries and Aquaculture. Rome. [Cited Wednesday, July 3rd 2024]. 
 https://www.fao.org/fishery/en/collection/global_commodity_prod
