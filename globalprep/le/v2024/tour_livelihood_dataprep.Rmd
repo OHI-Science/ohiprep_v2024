@@ -105,6 +105,11 @@ ilo_fp <- file.path(dir_M,
 # read in ILO wage data
 ilo_wage_data <- read_csv(ilo_fp)
 
+# Tourism employment data ----
+# total number of people employed by the tourism sector, (not actually in thousands like the title claimed (remember this!)) from UNWTO
+un_job_data <- file.path(dir_M, "git-annex/globalprep/_raw_data/UNWTO/d2024/unwto-all-data-download_0.xlsx")
+
+
 
 # ==================== Tidy Data ===================================
 
@@ -152,8 +157,6 @@ labor_regions <- labor_regions_join %>%
 (put this within previous chunk, read in data etc. for number of tourism jobs, join with labor_regions, make new proportion of tourism jobs column, group by year, do prelim plotting etc. and evaluate data quality etc.)
 
 ```{r}
-# total number of people employed by the tourism sector, in thousands (remember this!)
-un_job_data <- file.path(dir_M, "git-annex/globalprep/_raw_data/UNWTO/d2024/unwto-all-data-download_0.xlsx")
 
 # take in .xlsx and read it in, clean it
 un_jobs_data_raw <- read_xlsx(un_job_data, skip = 2, sheet = "Employment", col_names = TRUE, na = c("","..")) %>%
@@ -193,16 +196,15 @@ tourism_un_jobs_ohi <- left_join(region_clean, un_jobs_cc, by = c("eez_iso3" = "
 
 
 # ----------Join with Labor Force Data--------------
-tourism_labor_join <- left_join(labor_regions, tourism_un_jobs_ohi, by = c("rgn_id", "year")) 
+tourism_labor_join <- left_join(labor_regions, tourism_un_jobs_ohi, by = c("rgn_id", "rgn_name", "eez_iso3", "admin_country_name", "year")) 
 ```
 
 Create the proportion between tourism jobs and the total labor force
 ```{r}
 tourism_job_proportion <- tourism_labor_join %>%
-  dplyr::relocate(tourism_jobs, .before = thousand_jobs) %>%
-  mutate(tourism_proportion = tourism_jobs/thousand_jobs) %>%
-  rename(labor_force_total = thousand_jobs) %>%
-  select(rgn_id, rgn_name.x, country, year, labor_force_total, tourism_jobs, tourism_proportion)
+  dplyr::relocate(tourism_jobs, .before = labor_force_total) %>%
+  mutate(tourism_proportion = tourism_jobs/labor_force_total) %>%
+  select(rgn_id, rgn_name, eez_iso3, country, year, labor_force_total, tourism_jobs, tourism_proportion)
 ```
 
 ### Plot
@@ -221,8 +223,15 @@ line_plot
 
 ### Saving intermediate data
 
+
+Save data to `int` folder in le/vCurrentYear
 ```{r}
-#write_csv(tourism_job_proportion, here(int_dir, "tour_jobs.csv"))
+tourism_jobs_int <- tourism_job_proportion %>% 
+  mutate(sector = "tour", # add on sector
+         data_source = "UNWTO") # and data source columns
+
+# uncomment to save data to int folder
+#write_csv(tourism_jobs_int, here(int_dir, "tour_jobs.csv"))
 ```
 
 
