@@ -53,7 +53,7 @@ Value in each of these data sets is the total estimated revenue per country in u
     - © FAO 2024. Global Aquatic Trade Statistics. In: Fisheries and Aquaculture. Rome. [Cited Wednesday, July 3rd 2024]. 
 https://www.fao.org/fishery/en/collection/global_commodity_prod
 -   [Metadata](https://www.fao.org/fishery/en/collection/global_commodity_prod)
-- I also downloaded the full dataset, which showed up as a folder titled "FI_Trade_Partners"
+- I also downloaded the full dataset, which showed up as a folder titled "FI_Trade_Partners" and contained other metadata-adjacent documents on what different symbols represented, as well as several other tables describing country codes, UN codes, and terms of usage and licensing. 
 
 ## Fishing
 
