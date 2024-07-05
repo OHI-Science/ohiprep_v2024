@@ -180,19 +180,73 @@ ornamental_revenue <- ornamental_value %>%
   # add iso3 column
   mutate(iso3 = country_regex_to_iso3c(country)) %>%  # get iso3 code of reporting country
   relocate(iso3, .after = country)
+
+# tidy up a couple of country names
+ornamental_revenue_renamed <- ornamental_revenue %>% 
+  # rename to "United Kingdom" (mostly for plotting)
+  mutate(country = str_remove_all(country,
+                                  pattern = " of Great Britain and Northern Ireland")) %>% 
+  # renamed to "Netherlands"
+  mutate(country = str_replace_all(country,
+                                   # using fixed() here is important
+                                   pattern = fixed("Netherlands (Kingdom of the)"),
+                                   replacement = "Netherlands"))
+
+
+# why do we need fixed()? Not entirely sure, but the following 3 methods didn't work as intended. I think it may have to do with the punctuation ()
+# mutate(country = str_remove_all(country, pattern = "(Kingdom of the)")) 
+# yields "Netherlands ()"
+# str_replace_all(country, pattern = " (Kingdom of the)", replacement = "")
+# does nothing
+# str_replace_all(country, pattern = "Netherlands (Kingdom of the)", replacement = "Netherlands")
+# does nothing
+
+
+```
+
+## Join & Save
+
+Join with OHI Regions
+
+```{r}
+aqf_ohi_join <- left_join(region_names, ornamental_revenue_renamed, by = c("eez_iso3" = "iso3")) %>% 
+  # fill in aqf for countries without data
+  mutate(sector = "aqf")
+
+# leaving in "country" column for easy processing later (if "country" is NA, we know that the FAO didn't have any data on that country/region or didn't include that country in its dataset at all)
+
+```
+Save intermediate data (revenue table joined with OHI regions) as csv in `int` folder
+
+```{r}
+# write as intermediate file
+#write_csv(aqf_ohi_join, here(int_dir, "aqf_revenue.csv"))
+
+
 ```
 
 
-### Preliminary plotting
+## Preliminary plotting
+
+### Interactive line plot
 
 ```{r}
-aqf_plot <- plot_ly(data = ornamental_revenue,
+m <- list(
+  l = 60,
+ # r = 5,
+  b = 80,
+  t = 80,
+  pad = 4
+)
+
+aqf_plot <- plot_ly(data = ornamental_revenue_renamed,
                     x = ~year,
                     y = ~value,
                     color = ~country,
                     type = "scatter",
                     mode = "lines") %>% 
   layout(title = "Aquarium Fishing Annual Revenue (USD)", 
+         margin = m,
          xaxis = list(title = "Year"),
          yaxis = list(title = "Revenue (USD)"))
 
@@ -207,8 +261,9 @@ Aquarium fishing (AQF) revenue in Spain appears to far exceed any other country.
 Let's look at a comparison of the countries that have the highest revenue from aquarium fishing: 
 
 ```{r fig.height=4, fig.width=8}
+# ============ Data exploration, wrangling, subsetting =======================
 # first: view top 10 revenue over all 3 years
-ornamental_revenue %>% 
+ornamental_revenue_renamed %>% 
   ungroup() %>% 
   slice_max(value, n = 10) %>% # select top 10 rows based on "value" column
   select(country, year, value) %>% # simplify for readability
@@ -217,8 +272,9 @@ ornamental_revenue %>%
                 full_width = F, position = "left",
                 html_font = "Cambria")
 
-# top revenue per year
-top_10_revenue_yearly <- ornamental_revenue %>% 
+# top revenue per year -------------------------------------------
+# top 10
+top_10_revenue_yearly <- ornamental_revenue_renamed %>% 
   ungroup() %>% 
   group_by(year) %>% 
   slice_max(value, n = 10) %>% 
@@ -226,30 +282,62 @@ top_10_revenue_yearly <- ornamental_revenue %>%
 #  mutate(year = as.factor(year)) %>% 
 #  mutate(year = fct_relevel(year, "2019", "2020", "2021"))
 
-top_5_revenue_yearly <- ornamental_revenue %>% 
+# top 5 
+top_5_revenue_yearly <- ornamental_revenue_renamed %>% 
   ungroup() %>% 
   group_by(year) %>% 
   slice_max(value, n = 5) %>% 
-  select(country, year, value) %>% 
-  # COME BACK TO THIS -- tried 8 variations, not sure why it isn't working
-  mutate(country = str_replace_all(country, pattern = " (Kingdom of the)", replacement = ""))
-# str_remove_all(country, pattern = " (Kingdom of the)"))
-# str_replace_all(country, pattern = "Netherlands (Kingdom of the)", replacement = "Netherlands")
+  select(country, year, value)
+  
+
 # check:
-# unique(top_5_revenue_yearly$country)
+unique(top_5_revenue_yearly$country)
 
 # pull out names of top 5 countries
 top_5_countries <- c(unique(top_5_revenue_yearly$country))
 
 
-top_5_plot <- ggplot(data = top_5_revenue_yearly,
-       aes(x = as.numeric(year), 
+
+# ================= Plotting ==================================
+# ---------- plot of top 10 countries over time ---------------
+top_10_plot <- ggplot(data = top_10_revenue_yearly,
+       aes(x = as.numeric(year), # needs to be numeric, otherwise geom_line() won't work
            y = value,
            color = country,
            fill = country)) +
   geom_point() +
   geom_line() + 
 #  geom_col(position = "dodge") +
+  # custom colorblind-friendly palette
+  paletteer::scale_color_paletteer_d(palette = "colorBlindness::paletteMartin") +
+  scale_fill_paletteer_d(palette = "colorBlindness::paletteMartin") +
+#  paletteer::scale_color_paletteer_d("rcartocolor::Safe") +
+#  scale_fill_paletteer_d("rcartocolor::Safe") +
+#  geom_line() +
+  theme_minimal() +
+  labs(x = "",
+       y = "",
+       color = "",
+       fill = "",
+       title = "Top 10 Countries: Total Annual Value of Aquarium Fishing Exports (USD) (2019-2021)",
+       subtitle = "Data Source: FAO (2024)") +
+  
+  # axis breaks & lables
+  scale_y_continuous(labels = scales::label_dollar(scale = 0.000001, suffix = "M")
+                   #  , breaks = c(25000, 50000, 75000, 100000, 125000)
+                     ) +
+  scale_x_continuous(breaks = c(2019, 2020, 2021))
+
+
+# --------- plot of top 5 countries over time -----------------
+top_5_plot <- ggplot(data = top_5_revenue_yearly,
+       aes(x = as.numeric(year), # needs to be numeric, otherwise geom_line() won't work
+           y = value,
+           color = country,
+           fill = country)) +
+  geom_point() +
+  geom_line() + 
+#  geom_col(position = "dodge") + # couldn't get this to play nicely with fct_reorder() for the 3 years
   # custom colorblind-friendly palette
   paletteer::scale_color_paletteer_d("rcartocolor::Safe") +
   scale_fill_paletteer_d("rcartocolor::Safe") +
@@ -268,19 +356,44 @@ top_5_plot <- ggplot(data = top_5_revenue_yearly,
                      ) +
   scale_x_continuous(breaks = c(2019, 2020, 2021))
 
+
+
+
+# ------- show plots --------
+top_10_plot
 top_5_plot
 ```
 
 
-
-Save intermediate data as csv in `int` folder
-
-```{r}
-# write as intermediate file
-#write_csv(ornamental_revenue, here(int_dir, "aqf_revenue.csv"))
-
-
+```{r fig.height=4, fig.width=8}
+ggplot(data = top_5_revenue_yearly,
+       aes(x = fct_reorder(country, value), 
+           y = value,
+           color = country,
+           fill = country)) +
+  geom_col(position = "dodge") +
+  # custom colorblind-friendly palette
+  paletteer::scale_color_paletteer_d("rcartocolor::Safe") +
+  scale_fill_paletteer_d("rcartocolor::Safe") +
+  facet_wrap(~year) +
+   scale_y_continuous(labels = scales::label_dollar(scale = 0.000001, suffix = "M")
+                   #  , breaks = c(25000, 50000, 75000, 100000, 125000)
+                     ) +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = "", 
+       y = "", 
+       color = "",
+       fill = "",
+       title = "Top 5 Aquarium Fishing Countries by Exports (USD) (2019-2021)") +
+  theme(
+    legend.position = "none"
+  )
 ```
+
+
+
+
 
 
 
