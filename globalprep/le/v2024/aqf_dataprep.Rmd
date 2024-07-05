@@ -35,7 +35,7 @@ editor_options:
       - https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A 
 
 
-### Setup
+## Setup
 
 ```{r}
 # load packages
@@ -55,6 +55,7 @@ librarian::shelf(
   tidyverse, 
   httr,
   plotly,
+  kableExtra, # for more aesthetically pleasing tables
   zoo # for gapfilling
   
 )
@@ -99,7 +100,7 @@ country_regex_to_iso3c <- function(country_string) {
 }
 ```
 
-## Read in Data
+### Read in Data
 
 ```{r}
 # OHI regions data ----
@@ -146,7 +147,9 @@ ornamental_value <- commodities_value_raw %>%
   mutate(iso3 = country_regex_to_iso3c(country)) # get iso3 code of reporting country
 ```
 
+## Revenue
 
+Sum annual revenue for each country
 
 ```{r}
 # sum for each country 
@@ -160,10 +163,58 @@ ornamental_revenue <- ornamental_value %>%
   # add iso3 column
   mutate(iso3 = country_regex_to_iso3c(country)) %>%  # get iso3 code of reporting country
   relocate(iso3, .after = country)
+```
 
+
+### Preliminary plotting
+
+```{r}
+aqf_plot <- plot_ly(data = ornamental_revenue,
+                    x = ~year,
+                    y = ~value,
+                    color = ~country,
+                    type = "scatter",
+                    mode = "lines") %>% 
+  layout(title = "Aquarium Fishing Annual Revenue (USD)", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Revenue (USD)"))
+
+aqf_plot
+
+```
+
+
+Aquarium fishing (AQF) revenue in Spain appears to far exceed any other country. From what little exposure to the aquarium hobbyist world I've had, I expected to see Thailand, Indonesia, Philippines, and the US & UK in the top 10. I'm interested in learning more about how and why the AQF revenue is so high in Spain and the Netherlands. I know that Spain is one of the world's biggest players in the fish and seafood export market, but I have no knowledge about why their aquarium fish imports are showing up as such high values in this dataset.
+
+### Highest AQF Revenue 
+Let's look at a comparison of the countries that have the highest revenue from aquarium fishing: 
+
+```{r}
+# first: view top 10 revenue over all 3 years
+ornamental_revenue %>% 
+  ungroup() %>% 
+ # arrange(desc(value)) %>% 
+  slice_max(value, n = 10) %>% 
+  select(country, year, value) %>% 
+  kableExtra::kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"), full_width = F, position = "left")
+  #kableExtra::kable_classic(full_width = F, html_font = "Cambria")
+  
+
+
+#
+```
+
+
+
+Save intermediate data as csv in `int` folder
+
+```{r}
 # write as intermediate file
-write_csv(ornamental_revenue, here(int_dir, "aqf_revenue.csv"))
+#write_csv(ornamental_revenue, here(int_dir, "aqf_revenue.csv"))
 
 
 ```
+
+
 

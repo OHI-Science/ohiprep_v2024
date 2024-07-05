@@ -47,7 +47,6 @@ librarian::shelf(
   here,
   janitor,
   terra,
-  countrycode,
   readxl,
   RColorBrewer,
   foreach,
@@ -63,7 +62,7 @@ library(threadr)
 
 
 # source 
-source(here("workflow", "R", "common.R"))
+source(here("workflow/R/common.R"))
 
 # set year and file path info
 current_year <- 2024 # Update this!!
@@ -80,17 +79,6 @@ wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
 
 # output data dir for intermediate data products
 int_dir <- here(data_path, "int")
-```
-
-Create country code --> iso3 function
-
-```{r}
-library(countrycode)
-
-country_regex_to_iso3c <- function(country_string) {
-  country_string %>%
-    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
-}
 ```
 
 ### Read in Data
@@ -127,7 +115,7 @@ labor_clean <- labor_raw %>%
   # tidy data from wide to long (years are currently columns)
   pivot_longer(cols = 5:length(names(labor_raw)),
                names_to = "year", 
-               values_to = "labor_force_total") %>% 
+               values_to = "thousand_jobs") %>% 
   # remove unnecessary columns
   select(-c(indicator_name, indicator_code)) %>% 
   # clean up year column (currently in the form of xYYYY)
@@ -135,8 +123,7 @@ labor_clean <- labor_raw %>%
   # fix data types
   mutate(year = as.numeric(year),
          country_name = as.factor(country_name),
-         labor_force_total = as.numeric(labor_force_total)) %>% 
-  filter(year >= 2009) # starting 5 years back from first year of evaluation
+         thousand_jobs = as.numeric(thousand_jobs))
   
 
 # clean regions data --------------
@@ -155,17 +142,9 @@ labor_regions_join <- left_join(region_clean, labor_clean,
 
 
 labor_regions <- labor_regions_join %>% 
-  select(-c(country_name)) 
+  select(-c(country_name)) %>% 
+  filter(year >= 2009) # starting 5 years back from first year of evaluation
 
-
-labor_export <- labor_regions %>% 
-  # adding "no data" values in the year column for countries that we have no data for 
-  mutate(data_status = ifelse(is.na(year), "no_data", "yes_data"),
-         admin_rgn_id = as.character(admin_rgn_id),
-         rgn_id = as.character(rgn_id))
-
-# save csv for use in other livelihood dataprep
-#write_csv(labor_export, here(int_dir, "labor_force.csv"))
 ```
 
 # Employment Data
@@ -192,6 +171,13 @@ un_jobs_data_piv <- un_jobs_data_raw %>%
   rename(country = basic_data_and_indicators) %>%
   mutate()
 
+# install.packages("countrycode")
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
 
 # adding iso3 codes, converting number to thousands to be consistent and prep for the left_join with labor_regions
 un_jobs_cc <- un_jobs_data_piv %>% 
@@ -213,11 +199,15 @@ tourism_labor_join <- left_join(labor_regions, tourism_un_jobs_ohi, by = c("rgn_
 Create the proportion between tourism jobs and the total labor force
 ```{r}
 tourism_job_proportion <- tourism_labor_join %>%
-  dplyr::relocate(tourism_jobs, .before = labor_force_total) %>%
-  mutate(tourism_proportion = tourism_jobs/labor_force_total) %>%
-  rename(labor_force_total = labor_force_total) %>%
+  dplyr::relocate(tourism_jobs, .before = thousand_jobs) %>%
+  mutate(tourism_proportion = tourism_jobs/thousand_jobs) %>%
+  rename(labor_force_total = thousand_jobs) %>%
   select(rgn_id, rgn_name.x, country, year, labor_force_total, tourism_jobs, tourism_proportion)
+```
 
+### Plot
+
+```{r}
 # plot it, interactively!
 line_plot <- plotly::plot_ly(tourism_job_proportion, x = ~year, y = ~tourism_proportion, color = ~country, type = "scatter", mode = "lines") %>% 
   layout(title = "All Regions: Proportional Tourism Employment Within Total Labor Force", 
@@ -331,7 +321,7 @@ paste0("proportion of countries/regions with only 1 data point: ", round(((num_n
 
 
 
-
+#### Plot
 ```{r}
 # preliminary plot 
 line_plot <- plotly::plot_ly(wage_gf, x = ~year, y = ~appx_wage_fill, color = ~ref_area_label, type = "scatter", mode = "lines") %>% 
@@ -351,7 +341,7 @@ line_plot
 In this plot we can see that Sao Tome and Principe is a clear high outlier with no variation -- it is one of the countries for which we gapfilled with copied values from a single observation. We will continue to join the data with the OHI regions, then plot again and reinvestigate.
 
 
-Clean up ILO data, join with OHI regions
+### Clean up ILO data, join with OHI regions
 
 ```{r}
 # join with OHI regions
@@ -370,7 +360,7 @@ wage_regions <- wage_region_join %>%
 ```
 
 
-Plot
+#### Plot
 
 ```{r}
 # interactive plot after joining with OHI Regions
