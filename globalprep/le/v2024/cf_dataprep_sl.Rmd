@@ -30,13 +30,21 @@ editor_options:
 
       - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
       
-  * OECD
+  * OECD (Employment in fisheries, aquaculture and processing, 2009 - 2021) (downloaded July 2, 2024) -- for cf job data
   
-  * FAO Yearbook
+    - <https://data-explorer.oecd.org/vis?fs[0]=Topic%2C1%7CAgriculture%20and%20fisheries%23AGR%23%7CFisheries%20and%20aquaculture%23AGR_FSA%23&pg=0&fc=Topic&bp=true&snb=6&vw=ov&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_FISH_EMP%40DF_FISH_EMPL&df[ag]=OECD.TAD.ARP&df[vs]=1.0&dq=.A...._T._T&pd=2009%2C&to[TIME_PERIOD]=false&ly[cl]=TIME_PERIOD&ly[rs]=REF_AREA&ly[rw]=DOMAIN>
+    
+  * FAO Yearbook (downloaded July 2, 2024) -- for cf job gapfilling if needed
+  
+    - <https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content>
       
   * ILOSTAT (downloaded July 2, 2024) -- for cf wage data
   
       - https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A 
+      - select Rev 3.1.B: Fishing
+      
+  * Ex-Vessel Price Data (downloaded August 24, 2023) -- for cf wage data
+      - from emlab, see README.md
 
 
 ### Setup
@@ -68,6 +76,10 @@ library(threadr)
 # source 
 source(here("workflow/R/common.R"))
 
+source(here('workflow/R/fao_fxn.R')) # function for cleaning old version of FAO data 
+
+source(here('workflow/R/fao_online_portal_clean.R'))
+
 # set year and file path info
 current_year <- 2024 # Update this!!
 
@@ -89,6 +101,12 @@ fao_dir <- here(raw_data_dir, "FAO", data_dir_version_year)
 
 # OECD raw data directory
 oecd_dir <- here(raw_data_dir, "OECD", data_dir_version_year)
+
+# FAO capture raw data directory
+fao_capture_dir <- here(raw_data_dir, "FAO_capture", data_dir_version_year)
+
+# Ex-vessel raw data directory
+ex_vess_dir <- here(raw_data_dir, "ex-vessel-price-database-updated")
 
 # output data dir for intermediate data products
 int_dir <- here(data_path, "int")
@@ -159,6 +177,16 @@ fao_fisher_jobs <- fishers_table %>%
 #-------cf ILO wage data (2009 - 2021) -------
 # this data has limited entries, so local currency will need to be ppp adjusted to increase the number of observations per geo area
 cf_ilo_wage_raw <- read_csv(here(ilo_dir, "EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-03-cf-wage.csv"))
+
+cf_wage_ppp_raw <- read_csv(here(oecd_dir, "OECD.SDD.NAD,DSD_NAMAIN10@DF_TABLE4,1.0+A.AUS+AUT+BEL+CAN+CHL+COL+CRI+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ISR+ITA+JPN+KOR+LVA+LTU+LUX+MEX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+TUR+GBR+USA...PPP_B1GQ........csv"))
+
+############################################
+# Economies: Revenue of commercial fishing
+############################################
+
+fao_capture_raw <- read_csv(here(fao_capture_dir, "Global_capture_production_Quantity_1950-2021.csv"))
+
+exvessel_prices_raw <- read_csv(here(ex_vess_dir, "price-db-results", "exvessel_price_database_1976_2019.csv"))
 ```
 
 # Livelihood: Number of Jobs -- cf
@@ -177,13 +205,16 @@ unique(is.na(oecd_cf_job_raw$OBS_VALUE))
 oecd_fisher_jobs <- oecd_cf_job_raw %>% 
   janitor::clean_names() %>% 
   select(ref_area, reference_area, working_domain, time_period, obs_value, unit_of_measure) %>% 
-  filter(working_domain %in% c("Inland waters fishing","Marine fishing, nei","Fishing sector","Marine deep-sea fishing", "Marine coastal fishing","Subsistence"))  %>% 
+  filter(working_domain %in% c("Marine fishing, nei","Marine deep-sea fishing", "Marine coastal fishing","Subsistence"))  %>% 
   mutate(year = as.numeric(time_period),
          value = obs_value,
          unit = ("persons (1)"),
          sector = "cf",
          data_source = "oecd sustainable economies") %>% 
   select(-c(unit_of_measure, obs_value, time_period, working_domain))
+
+unique(is.na(oecd_fisher_jobs$value))
+# FALSE -- no NAs
 ```
 
 It should be noted that for the OECD number of fishers data, it has no NAs. For example, for the reference area of the Philippines, for 2009-2020 the observed value is consistently 120,000.  Therefore, the values have either been rounded or there has already been some sort of gapfilling. Within `oecd_cf_job_raw`, there is a column named "DECIMAL", which could allude to some sort of rounding.  Investigation was done to find OECD's metadata, however the link failed (below).  WILL RETURN!
@@ -200,7 +231,7 @@ plotly::plot_ly(oecd_fisher_jobs, x = ~year, y = ~value, color = ~reference_area
 ```
 
 
-Create the proportion between tourism jobs and the total labor force
+Begin to create the proportion between tourism jobs and the total labor force
 ```{r}
 # prep OECD to join with labor force
 cf_job_countrycode <- oecd_fisher_jobs %>% 
@@ -211,6 +242,8 @@ all(cf_job_countrycode$ref_area == cf_job_countrycode$iso3c) # TRUE, so did not 
 # make ref_area the same column name as labor_force, to join cleanly
 cf_job_iso <- oecd_fisher_jobs %>% 
   rename(eez_iso3 = ref_area)
+
+length(unique(cf_job_iso$eez_iso3)) # 44
 
 # join labor force data with cf employment
 cf_job_labor_join <- left_join(cf_job_iso, labor_force, by = c("eez_iso3", "year"))
@@ -253,13 +286,17 @@ cf_job_iso_agg <- cf_job_iso %>%
   group_by(eez_iso3, year) %>%
   summarize(value = sum(value))
 
-cf_job_labor_join_2 <- inner_join(labor_force, cf_job_iso_agg, by = c("eez_iso3", "year")) %>% 
+length(unique(cf_job_iso_agg$eez_iso3)) # 44
+
+cf_job_labor_join_2 <- left_join(labor_force, cf_job_iso_agg, by = c("eez_iso3", "year")) %>% 
   dplyr::relocate(value, .before = labor_force_total)
 
 # make proportion of people employed in the commercial fishing sector
 cf_job_prop_agg <- cf_job_labor_join_2 %>% 
-  mutate(cf_prop_percent = (value/labor_force_total)*100) %>%
-  select(rgn_id, admin_country_name, year, value, labor_force_total, cf_prop_percent)
+  mutate(cf_prop_percent = (value/labor_force_total)*100) %>% 
+  select(-data_status)
+
+length(is.na(cf_job_labor_join_2$value))
 ```
 
 Prelim plot using aggregated data by year and geo area
@@ -290,11 +327,38 @@ plotly::plot_ly(cf_job_prop_lim, x = ~year, y = ~cf_prop_percent, color = ~admin
 
 # Livelihood: Quality of Jobs -- cf
 
-  - note: this data came from many sources and was compiled by ILO
+  - note: this data came from many sources and was compiled by ILO.  PPP GDP adjustments come from OECD
 
 Cleaning and wrangling data
 ```{r}
+# separating into the different currencies
+cf_ilo_wage <- cf_ilo_wage_raw %>% 
+  janitor::clean_names() %>% 
+  rename(currency = classif2_label, 
+         year = time) %>% 
+  select(ref_area_label, year, currency,obs_value, note_indicator_label, source_label)
 
+length(unique(cf_ilo_wage$ref_area_label))
+
+unique(cf_ilo_wage$currency)
+
+################ "Currency: Local currency" "Currency: 2017 PPP $"     "Currency: U.S. dollars" 
+
+# Local currency -- needs to be PPP adjusted
+cf_wage_local <- cf_ilo_wage %>% 
+  filter(currency %in% "Currency: Local currency")
+
+# Currency: U.S. dollars -- needs to be PPP adjusted
+cf_wage_usd <- cf_ilo_wage %>% 
+  filter(currency %in% "Currency: U.S. dollars")
+
+# 2017 PPP $
+cf_wage_2017ppp <- cf_ilo_wage %>% 
+  filter(currency %in% "Currency: 2017 PPP $")
+
+############# Bring in OECD data to adjust monthly earnings to 2017 PPP
+cf_wage_ppp <- cf_wage_ppp_raw %>% 
+  
 
 ```
 
@@ -306,21 +370,8 @@ Gapfilling if necessary
 
 
 ```{r}
-# find regions with only 1 data point (still have NAs in appx_wage column)
+## preliminary plot 
 
-```
-
-
-```{r}
-# # preliminary plot 
-# line_plot <- plotly::plot_ly(wage_gf, x = ~year, y = ~appx_wage_fill, color = ~ref_area_label, type = "scatter", mode = "lines") %>% 
-#   layout(title = "All Regions: monthly Service Wages (USD (2017) PPP-Adjusted)", 
-#          xaxis = list(title = "Year"),
-#          yaxis = list(title = "monthly Wages (USD)"))
-# 
-# line_plot
-# 
-# # htmlwidgets::saveWidget(line_plot, file = "prop_tourism_laborforce.html")
 ```
 
 
@@ -333,13 +384,39 @@ Clean up ILO data, join with OHI regions
 
 Plot
 ```{r}
-# # interactive plot after joining with OHI Regions
-# plotly::plot_ly(wage_regions, x = ~year, y = ~appx_wage_fill, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
-#   layout(title = "All Regions: Monthly Service Wages (USD)", 
-#          xaxis = list(title = "Year"),
-#          yaxis = list(title = "Monthly Wages (USD)"))
+
 
 ```
 
+# Economies: Revenue -- cf
+
+```{r}
+# read in cf revenue data from v2023, using FAO Capture data, Ex-vessel data, 
+cf_revenue <- read_csv(here("globalprep", "le", "v2023", "int", "cf_revenue.csv"))
+
+# Bring in imports and exports from FAO yearbook
+imp_table <- fao_pdf[[190]] %>% #page number of the pdf
+  as.data.frame()
+
+#specify columns 
+columns <- c("blank", "aggregate_geo_area", "2000", "2005", "2010", "2015", "2016", "2017", "2018", "2019", "2020","2021")
+
+#turn the pdf page into a clean dataframe
+cf_fao_imports <- imp_table %>%
+  separate_rows('.', sep = "\n") %>% #separate rows based on line breaks
+  rename(main_column = ".") %>%
+  mutate(main_column = str_remove_all(main_column, "\\*")) %>% #remove the *
+  slice(13:49) %>% #remove all rows not in the table
+  separate(main_column, into = columns, sep = " {3,}", extra = "merge") %>% #separate into columns based on double spaces
+  pivot_longer(cols = -c("country"), names_to = "year") %>% 
+  mutate(value = str_squish(value)) %>% #remove extra spaces
+  mutate(value = str_remove_all(value, " ")) %>% 
+  mutate(value = if_else(value == "…" , NA, value)) %>% 
+  mutate(value = as.numeric(value)) %>% 
+  mutate(unit = "persons (1)",
+         sector = "cf",
+         data_source = "FAO number of fishers") %>% 
+  slice(-c(1:44))
+```
 
 
