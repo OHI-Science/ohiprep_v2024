@@ -156,7 +156,29 @@ fp_clean <- processing_clean %>%
   filter(working_domain %in% c("Processing")) %>% 
   # add iso3 column
   mutate(eez_iso3 = country_regex_to_iso3c(reference_area))
+```
 
+
+```{r}
+# check names
+fp_rgn <- name_2_rgn(df_in = fp_clean, 
+                       fld_name='reference_area',
+                      flds_unique = c("year"))
+
+fp_clean <- fp_clean %>%
+  mutate(reference_area = case_when(
+    reference_area == "China (People’s Republic of)" ~ "China",
+    reference_area == "Korea" ~ "South Korea",
+    TRUE ~ reference_area # Everything else, leave it be
+    ))
+
+fp_rgn <- name_2_rgn(df_in = fp_clean, 
+                       fld_name='reference_area',
+                      flds_unique = c("year"))
+```
+
+
+```{r}
 # join with labor force data ------
 # fish processing labor force dataframe
 fp_labor <- left_join(labor_force, fp_clean, by = c("eez_iso3", "year")) %>% 
