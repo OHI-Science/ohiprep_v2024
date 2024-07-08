@@ -215,9 +215,7 @@ cf_job_iso <- oecd_fisher_jobs %>%
 # join labor force data with cf employment
 cf_job_labor_join <- left_join(cf_job_iso, labor_force, by = c("eez_iso3", "year"))
 
-# !!! need to fix join to preserve rgn_id, but not have double years!! Come back w fresh eyes :) 
-
-# make proportion of people employed in the commercial
+# make proportion of people employed in the commercial fishing sector
 cf_job_prop <- cf_job_labor_join %>% 
   dplyr::relocate(labor_force_total, .before = unit) %>%
   mutate(cf_prop_percent = (value/labor_force_total)*100) %>%
@@ -234,9 +232,59 @@ plotly::plot_ly(cf_job_prop, x = ~year, y = ~cf_prop_percent, color = ~admin_cou
 ggplot(data = cf_job_prop, aes(x = year, y = cf_prop_percent)) + geom_line(aes(color = admin_country_name))
 ```
 
+Prelim plot of Bangladesh to better visualize why there are issues
+```{r}
+bangladesh_cf <- cf_job_prop %>% 
+  filter(admin_country_name == "Bangladesh")
+```
+
+To fix this issue of multiple geo area observations per year: 
+```{r}
+labor_force %>% 
+  group_by(eez_iso3, year) %>% 
+  filter(n() > 1)
+
+cf_job_iso %>% 
+  group_by(eez_iso3, year) %>% 
+  filter(n() > 1)
+# bangladesh and others have duplicate entries.  Need to summarize by year and geo area
+
+cf_job_iso_agg <- cf_job_iso %>%
+  group_by(eez_iso3, year) %>%
+  summarize(value = sum(value))
+
+cf_job_labor_join_2 <- inner_join(labor_force, cf_job_iso_agg, by = c("eez_iso3", "year")) %>% 
+  dplyr::relocate(value, .before = labor_force_total)
+
+# make proportion of people employed in the commercial fishing sector
+cf_job_prop_agg <- cf_job_labor_join_2 %>% 
+  mutate(cf_prop_percent = (value/labor_force_total)*100) %>%
+  select(rgn_id, admin_country_name, year, value, labor_force_total, cf_prop_percent)
+```
+
+Prelim plot using aggregated data by year and geo area
+```{r}
+plotly::plot_ly(cf_job_prop_agg, x = ~year, y = ~cf_prop_percent, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Percent of Labor Force Employed by Marine Fishing Sector", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percent by region employed by the fishing sector"))
+```
+
+
 Saving intermediate data
 ```{r}
+# write_csv(cf_job_prop_agg, here(int_dir, "cf_jobs.csv"))
+```
 
+Visualizing without the outlier (Bangladesh)
+```{r}
+cf_job_prop_lim <- cf_job_prop_agg %>% 
+  filter(admin_country_name != "Bangladesh")
+
+plotly::plot_ly(cf_job_prop_lim, x = ~year, y = ~cf_prop_percent, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Percent of Labor Force Employed by Marine Fishing Sector", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percent by region employed by the fishing sector"))
 ```
 
 
