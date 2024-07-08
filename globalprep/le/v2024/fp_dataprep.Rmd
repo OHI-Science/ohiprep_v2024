@@ -117,7 +117,7 @@ labor_force <- read_csv(here(int_dir, "labor_force.csv"))
 
 # Aquarium Fishing FAO data 
 processing_jobs_raw <- read_csv(here(oecd_data_dir,
-                                     "OECD.TAD.ARP,DSD_FISH_EMP@DF_FISH_EMPL,1.0+.A...PROC._T._T.csv"))
+                                     "OECD_2009-2021_employment_fish_aqua_processing_raw.csv"))
 
 ```
 
@@ -131,6 +131,10 @@ processing_clean <- processing_jobs_raw %>%
 # preliminary exploration 
 #str(processing_jobs_raw)
 # > unique(processing_clean$working_domain)
+# [1] "Fishing sector"          "Marine deep-sea fishing" "Inland waters fishing"  
+# [4] "Aquaculture"             "Marine fishing, nei"     "Processing"             
+# [7] "Marine coastal fishing"  "Unspeficied"             "Subsistence" 
+# eventually, we want to just have it filtered to processing:
 # [1] "Processing" # <-- this is what we want to be extra sure of!
 # > unique(processing_clean$frequency_of_observation)
 # [1] "Annual"
@@ -144,7 +148,7 @@ processing_clean <- processing_jobs_raw %>%
 
 # Number of unique countries:
 length(unique(processing_clean$reference_area)) 
-# only 33...without having filtered to only OHI regions& countries
+# 50 ...without having filtered to only OHI regions& countries
 
 # create cleaned dataframe with iso3 column -------------------
 fp_clean <- processing_clean %>% 
@@ -156,6 +160,9 @@ fp_clean <- processing_clean %>%
   filter(working_domain %in% c("Processing")) %>% 
   # add iso3 column
   mutate(eez_iso3 = country_regex_to_iso3c(reference_area))
+
+length(unique(fp_clean$reference_area)) 
+# only 33 now...
 ```
 
 
@@ -175,13 +182,23 @@ fp_clean <- fp_clean %>%
 fp_rgn <- name_2_rgn(df_in = fp_clean, 
                        fld_name='reference_area',
                       flds_unique = c("year"))
+
+length(unique(fp_rgn$rgn_name))
+# 30 in 2024 (data up to 2021)
+
+
+fp_rgn_2019_filter <- fp_rgn %>% 
+  filter(year <= 2019)
+
+length(unique(fp_rgn_2019_filter$rgn_name))
+# 29 when filtered up to & including 2019
 ```
 
 
 ```{r}
 # join with labor force data ------
 # fish processing labor force dataframe
-fp_labor <- left_join(labor_force, fp_clean, by = c("eez_iso3", "year")) %>% 
+fp_labor <- left_join(labor_force, fp_rgn, by = c("rgn_name", "year")) %>% 
   filter(year %in% c(2009:2021))
 
 na_count <- sum(is.na(fp_labor$working_domain))
