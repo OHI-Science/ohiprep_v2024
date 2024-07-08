@@ -257,6 +257,10 @@ aqf_plot
 
 Aquarium fishing (AQF) revenue in Spain appears to far exceed any other country. From what little exposure to the aquarium hobbyist world I've had, I expected to see Thailand, Indonesia, Philippines, and the US & UK in the top 10. I'm interested in learning more about how and why the AQF revenue is so high in Spain and the Netherlands. I know that Spain is one of the world's biggest players in the fish and seafood export market, but I have no knowledge about why their aquarium fish exports are showing up as such high values in this dataset.
 
+
+
+
+
 ### Highest AQF Revenue 
 Let's look at a comparison of the countries that have the highest revenue from aquarium fishing: 
 
@@ -363,6 +367,8 @@ top_5_plot <- ggplot(data = top_5_revenue_yearly,
 top_10_plot
 top_5_plot
 ```
+
+
 
 
 ```{r fig.height=4, fig.width=8}

@@ -197,9 +197,20 @@ fp_jobs_prop <- fp_labor %>%
   mutate(fp_proportion = fp_jobs / labor_force_total)
   
 
+
+
 # prelim plot to visualize data
+m <- list(
+  l = 80,
+  r = 60,
+  b = 80,
+  t = 80,
+  pad = 4
+)
+
 fp_line_plot <- plotly::plot_ly(fp_jobs_prop, x = ~year, y = ~fp_proportion, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
   layout(title = "All Regions: Proportional Fish Processing Employment Within Total Labor Force", 
+         margin = m,
          xaxis = list(title = "Year"),
          yaxis = list(title = "Percent of people by region employed in fish processing"))
 fp_line_plot
