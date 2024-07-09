@@ -211,12 +211,8 @@ tour_jobs_labor <- full_join(tour_jobs_rgn_agg, labor_force #, by = c("rgn_id", 
 
 # calculate tourism jobs proportion of total labor force -----
 tour_jobs_prop_df <- tour_jobs_labor %>% 
-  mutate(tour_jobs_prop = (tourism_jobs_agg / labor_force_total))
-
-
-
-dplyr::mutate(year = as.numeric(year),
-                rgn_id = as.character(rgn_id)) 
+  mutate(tour_jobs_prop = (tourism_jobs_agg / labor_force_total)) %>% 
+  mutate(rgn_id = as.character(rgn_id)) 
 ```
 
 

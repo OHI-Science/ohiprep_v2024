@@ -91,7 +91,8 @@ int_dir <- here(data_path, "int")
 gdp_prop_raw <- readxl::read_xlsx(here(unwto_dir, "Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx"))
 
 # OHI regions data ----
-region_names_raw <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  select(-Notes)
 
 ```
 
@@ -118,7 +119,22 @@ gdp_prop_clean <- gdp_prop_raw %>%
 
 
 # run name_2_rgn -----
-gdp_rgn <- 
+gdp_rgn <- name_2_rgn(df_in = gdp_prop_clean, 
+                       fld_name = 'geo_area_name',
+                       flds_unique = c("year"))
+
+
+# sorting through mismatch and aggregation 
+
+# china: only have hong kong and macao, no mainland China data...
+
+# check duplicates (none)
+tour_eco_duplicates <- gdp_rgn[duplicated(gdp_rgn[, c("rgn_name", "year")]),]
+unique(tour_eco_duplicates$geo_area_name)
+unique(tour_eco_duplicates$rgn_name)
+
+length(unique(gdp_rgn$rgn_name))
+# v2024: 93
 ```
 
 
@@ -133,6 +149,13 @@ prelim_plot <- plot_ly(data = gdp_prop_clean, x = ~year, y = ~gdp_prop_percent, 
 prelim_plot
 
 # htmlwidgets::saveWidget(prelim_plot, file = "gdp_prelim_plot_all_years.html")
+
+
+plot_ly(data = gdp_rgn, x = ~year, y = ~gdp_prop_percent, color = ~rgn_name, 
+                       type = "scatter", mode = "lines") %>% 
+  layout(title = "Tourism direct GDP as a proportion of total GDP (%) for OHI Regions",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Tourism Contribution to GDP (%)"))
 ```
 
 Really interesting to see how the proportions drop in 202 -- intuition check: makes sense because of Covid.... especially interesting to note how extremely Macau was impacted!
@@ -145,24 +168,24 @@ More data cleaning & prep for gapfilling, then gapfilling
 ```{r}
 
 # filter tourism GDP data for year range (2009-2019) ----
-gdp_prop_filter <- gdp_prop_clean %>% 
+gdp_prop_filter <- gdp_rgn %>% 
   filter(year %in% c(2009:2019))
 
 
 # some geo areas are missing data for some years ----
-years_df <- tibble(iso3 = gdp_prop_filter$iso3) %>% # copy iso3 column
-  group_by(iso3) %>% # for each geo region, 
+years_df <- tibble(rgn_name = region_names$rgn_name) %>% # copy iso3 column
+  group_by(rgn_name) %>% # for each geo region, 
   summarize(year = seq(2009, 2019)) # have sequence of years from 2009-2019 
 # (fragile and R warns you about preferring `reframe()`)
 
 
 # join years df and tourism GDP df ----
-gdp_year_join <- left_join(years_df, gdp_prop_filter, by = c("iso3", "year"))
+gdp_year_join <- left_join(years_df, gdp_prop_filter, by = c("rgn_name", "year"))
 
 
 # fill in geo area names for NA years ----
 gdp_years <- gdp_year_join %>% 
-  group_by(iso3) %>% 
+  group_by(rgn_name) %>% 
   fill(geo_area_name, .direction = "downup") %>% 
   ungroup()
 
