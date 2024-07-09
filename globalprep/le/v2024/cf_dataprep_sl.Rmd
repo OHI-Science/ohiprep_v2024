@@ -494,22 +494,24 @@ cf_revenue <- read_csv(here("globalprep", "le", "v2023", "int", "cf_revenue.csv"
 #   ethiopia         0         16
 #   palestine       25          0
 
+length(unique(cf_revenue$country))
+
 cf_revenue_fix <- cf_revenue_rgn %>%
   mutate(country = case_when(
     country=="Bonaire/S.Eustatius/Saba" ~ "", # how to disaggregate instead of aggregate?
     country=="British Indian Ocean Ter" ~ "British Indian Ocean Territory",
     country=="Channel Islands" ~ "", # would be disaggregated into Guernsey and Jersey
-    country=="Korea" ~ "South Korea", 
-    country=="Korea" ~ "South Korea",
-    country=="Korea" ~ "South Korea",
-    country=="Korea" ~ "South Korea",
-    country=="Korea" ~ "South Korea",
-    country=="Korea" ~ "South Korea",
-    country=="Korea" ~ "South Korea",
-    country=="Korea" ~ "South Korea",
+    country=="" ~ " ", 
+    country=="" ~ " ",
+    country=="  " ~ " ",
+    country=="  " ~ " ",
+    country=="  " ~ " ",
+    country=="  " ~ " ",
+    country=="  " ~ " ",
+    country=="  " ~ " ",
     TRUE ~ country # Everything else, leave it be
   ))
-
+# look at rasterized fishing effort, to determine the relative proportion of it within each eez, and distribute catcbh relative to that proportion
 cf_revenue_rgn <- name_2_rgn(df_in = cf_revenue_fix, 
                              fld_name='country',
                              flds_unique = c("year"))
