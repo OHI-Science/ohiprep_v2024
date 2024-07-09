@@ -117,6 +117,12 @@ gdp_prop_clean <- gdp_prop_raw %>%
   mutate(iso3 = country_regex_to_iso3c(geo_area_name))
 
 
+# run name_2_rgn -----
+gdp_rgn <- 
+```
+
+
+```{r}
 # preliminary plotting ----
 prelim_plot <- plot_ly(data = gdp_prop_clean, x = ~year, y = ~gdp_prop_percent, color = ~geo_area_name, 
                        type = "scatter", mode = "lines") %>% 

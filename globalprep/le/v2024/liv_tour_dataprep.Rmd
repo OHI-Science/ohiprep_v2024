@@ -113,7 +113,12 @@ labor_force <- read_csv(here(int_dir, "liv_labor_force.csv"))
 # define file path
 unwto_fp <- file.path(here(unwto_dir, "unwto-all-data-download_0.xlsx"))
 # read in data
-
+# total number of people employed by the tourism sector, in thousands
+un_jobs_data_raw <- read_xlsx(un_job_data,
+                              skip = 2, # skip first 2 rows
+                              sheet = "Employment", # use Employment sheet
+                              col_names = TRUE, # use first row as column names
+                              na = c("","..")) # define NA markers
 
 # ILO wage data ----
 # define file path to ILO wage data 
@@ -128,9 +133,6 @@ ilo_wage_data <- read_csv(ilo_fp)
 region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
 
 
-# ==================== Tidy Data ===================================
-
-
 ```
 
 # Employment Data
@@ -138,40 +140,43 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
 (put this within previous chunk, read in data etc. for number of tourism jobs, join with labor_regions, make new proportion of tourism jobs column, group by year, do prelim plotting etc. and evaluate data quality etc.)
 
 ```{r}
-# total number of people employed by the tourism sector, in thousands (remember this!)
-un_jobs_data_raw <- read_xlsx(un_job_data, skip = 2, sheet = "Employment", col_names = TRUE, na = c("",".."))
+# ==================== Tidy Data ===================================
 
-# take in .xlsx and read it in, clean it
+# initial cleaning and tidying of jobs data
 un_jobs_data <- un_jobs_data_raw %>%
   janitor::clean_names() %>%
-  select(-c(1:3)) %>%
-  fill(1, .direction = "down") %>%
-  select(-c(x5, x7:units, notes, x38)) %>%
-  filter(x6 %in% "Total") %>%
-  select(-x6)
+  select(-c(1:3)) %>% # drop first 3 columns
+  fill(basic_data_and_indicators, # fill in country column with country names
+       .direction = "down" # from first row of country name down to the next populated row (next unique country name)
+       ) %>% 
+  select(-c(x5, x7, x8, units, notes, x38)) %>% # drop unwanted columns
+  filter(x6 %in% "Total") %>% # only using Total number of jobs
+  select(-x6) # drop column now that we've filtered
 
 # pivot longer so that we can see how many jobs per year, per country!
-un_jobs_data_piv <- un_jobs_data_raw %>%
-  pivot_longer(cols = 2:28, names_to = "year", values_to = "jobs") %>%
-  mutate(year = str_remove_all(year, 'x')) %>%
-  rename(country = basic_data_and_indicators) %>%
-  mutate()
+un_jobs_data_piv <- un_jobs_data %>%
+  pivot_longer(cols = x1995:x2021, names_to = "year", values_to = "jobs") %>% 
+    mutate(year = as.numeric(str_remove_all(year, 'x'))) # tidy up year column
 
-
-# converting number from thousands to 1s be consistent and prep for the left_join with labor_regions
+# tidy up pivoted data ----
 un_jobs_clean <- un_jobs_data_piv %>% 
-#  mutate(iso3c = country_regex_to_iso3c(country)) %>%
-  mutate(tourism_jobs = jobs*1000,
-         unit = "Persons (1)",
-         country = str_to_title(country),
-         year = as.numeric(year)) %>% 
-  select(-jobs)
+  rename(country = basic_data_and_indicators) %>% 
+  #  mutate(iso3c = country_regex_to_iso3c(country)) %>% # COME BACK -- after convo w mel, remove or add back in
+  mutate(
+    # converting number from thousands to 1s be consistent and prep for the left_join with labor_regions
+    tourism_jobs = jobs*1000,
+    unit = "Persons (1)", # add unit column
+    country = str_to_title(country) # convert to title case
+    ) %>% 
+  select(-jobs) # drop thousand jobs column
 
 
 # run ohicore name_2_rgn --------
-tour_jobs_rgn <- name_2_rgn(df_in = un_jobs_cc, 
+tour_jobs_rgn <- name_2_rgn(df_in = un_jobs_clean, 
                        fld_name = 'country',
                        flds_unique = c("year"))
+
+# no year mismatches, duplicates found
 
 # identify duplicates
 tour_duplicates <- tour_jobs_rgn[duplicated(tour_jobs_rgn[, c("rgn_name", "year")]),]
@@ -201,7 +206,8 @@ tour_jobs_rgn_agg <- tour_jobs_rgn %>%
 # join with labor force data ------------
 # COME BACK -- rejoin once labor force has been updated
 tour_jobs_labor <- full_join(tour_jobs_rgn_agg, labor_force #, by = c("rgn_id", "rgn_name", "year")) # don't need to specify this, R/dplyr is smart enough to figure it out
-)
+) %>% 
+  select(-c(sector, data_source)) # these currently only show Labor Force data-related values. Will add back on before exporting.
 
 # calculate tourism jobs proportion of total labor force -----
 tour_jobs_prop_df <- tour_jobs_labor %>% 
