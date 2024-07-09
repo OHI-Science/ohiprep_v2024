@@ -29,7 +29,10 @@ editor_options:
 -   **Data:**
 
     -   Tourism: UNWTO Dept. of Statistics (UN Tourism)
-        -   https://www.unwto.org/tourism-statistics/economic-contribution-SDG 
+        -   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG> 
+        
+    -  GDP: World Bank, in "Constant 2015 US$"
+      -   <https://data.worldbank.org/indicator/NY.GDP.MKTP.KD> Downloaded July 9, 2024. Has annual GDP value from 1960-2023. Additional metadata copied and saved as a `.rtf` in the WorldBank_global_annual_GDP_2015_constant_USD subfolder of the _raw_data WorldBank folder for d2024. Last updated (found in the first few rows of the `.csv`): 2024-06-28
 
 ### Setup
 
@@ -74,6 +77,9 @@ raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 # UNWTO raw data directory
 unwto_dir <- here(raw_data_dir, "UNWTO", data_dir_version_year)
 
+# World Bank raw data dir (for GDP data)
+wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+
 # Output data directory -- for intermediate data products
 int_dir <- here(data_path, "int")
 ```
@@ -94,28 +100,24 @@ gdp_prop_raw <- readxl::read_xlsx(here(unwto_dir, "Indicator-8_9_1-2022-UN_Touri
 region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
   select(-Notes)
 
+# World Bank GDP in 2015 Constant USD data ----
+wb_gdp_raw <- read_csv(here(wb_dir, "WorldBank_global_annual_GDP_2015_constant_USD", "WorldBank_global_annual_GDP_2015_constant_USD.csv"), skip = 4)
+# date range from 1960 to 2023
+
 ```
 
 
-## Data cleaning
+## Tourism GDP %: Data cleaning
 
-"Tourism direct GDP as a proportion of total GDP (%)"
-
+Current unit of "total" in dataframe:
+"Tourism direct GDP as a proportion of total GDP (%)" 
 
 ```{r}
-# make countrycode -- iso3 function ----
-# following this example on Rpubs: https://rpubs.com/Teal_Emery/cleaning_intl_data_tips_and_tricks 
-country_regex_to_iso3c <- function(country_string) {
-  country_string %>%
-    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
-}
-
-# GDP proportion dataset cleaning ----
+# ======= GDP proportion dataset cleaning ========
+# preliminary cleaning/tidying ----
 gdp_prop_clean <- gdp_prop_raw %>% 
   janitor::clean_names() %>% 
-  select(c(geo_area_name, year = time_period, gdp_prop_percent = total)) %>% 
-  # add iso3 column
-  mutate(iso3 = country_regex_to_iso3c(geo_area_name))
+  select(c(geo_area_name, year = time_period, gdp_prop_percent = total))
 
 
 # run name_2_rgn -----
@@ -123,10 +125,12 @@ gdp_rgn <- name_2_rgn(df_in = gdp_prop_clean,
                        fld_name = 'geo_area_name',
                        flds_unique = c("year"))
 
+# sorting through mismatch and aggregation ----
 
-# sorting through mismatch and aggregation 
+# note on Northern Mariana Islands and Guam OHI region: we only have data for Guam, not Northern Mariana Islands... this is problematic because in the World Bank GDP dataset, we only have GDP data for both the Northern Mariana Islands and Guam and need to aggregate them to fit into the OHI regions system. For now, we'll drop the Northern Mariana Islands GDP data in the WB GDP processing, but please note that if you get GDP % data for this region later on, you'll need to fix that in the GDP data processing chunk.
 
-# china: only have hong kong and macao, no mainland China data...
+# China: only have data hong kong and macao, no mainland China data...
+# Mel told us to just drop them... 
 
 # check duplicates (none)
 tour_eco_duplicates <- gdp_rgn[duplicated(gdp_rgn[, c("rgn_name", "year")]),]
@@ -135,6 +139,7 @@ unique(tour_eco_duplicates$rgn_name)
 
 length(unique(gdp_rgn$rgn_name))
 # v2024: 93
+
 ```
 
 
@@ -161,7 +166,7 @@ plot_ly(data = gdp_rgn, x = ~year, y = ~gdp_prop_percent, color = ~rgn_name,
 Really interesting to see how the proportions drop in 202 -- intuition check: makes sense because of Covid.... especially interesting to note how extremely Macau was impacted!
 
 
-## Gapfilling
+### Gapfilling
 
 More data cleaning & prep for gapfilling, then gapfilling
 
@@ -173,55 +178,59 @@ gdp_prop_filter <- gdp_rgn %>%
 
 
 # some geo areas are missing data for some years ----
-years_df <- tibble(rgn_name = region_names$rgn_name) %>% # copy iso3 column
-  group_by(rgn_name) %>% # for each geo region, 
+years_df <- tibble(rgn_name = region_names$rgn_name,
+                   rgn_id = region_names$rgn_id) %>% # copy region identifier columns
+  group_by(rgn_name, rgn_id) %>% # for each geo region, 
   summarize(year = seq(2009, 2019)) # have sequence of years from 2009-2019 
 # (fragile and R warns you about preferring `reframe()`)
 
 
 # join years df and tourism GDP df ----
-gdp_year_join <- left_join(years_df, gdp_prop_filter, by = c("rgn_name", "year"))
+gdp_year_join <- full_join(years_df, gdp_prop_filter, by = c("rgn_name", "rgn_id", "year"))
 
 
-# fill in geo area names for NA years ----
+# tidy or fill in geo area names for NA years ----
 gdp_years <- gdp_year_join %>% 
-  group_by(rgn_name) %>% 
-  fill(geo_area_name, .direction = "downup") %>% 
-  ungroup()
+  select(-geo_area_name) # %>%  # alternatively, set years_df to have geo_area_name column, then perform the following steps to fill in geo area names for NA years
+  # group_by(rgn_name) %>% 
+  # fill(geo_area_name, .direction = "downup") %>% 
+  # ungroup()
 
 
 # gapfilling ----
 # estimate tourism GDP proportion for geo areas with missing data
 gdp_filled <- gdp_years %>% 
-  group_by(geo_area_name) %>% 
+  group_by(rgn_name) %>% 
   # interpolate (fill missing values between 2 values)
-  mutate(appx_gdp = zoo::na.approx(gdp_prop_percent, # using values in this column
+  mutate(appx_gdp_pct = zoo::na.approx(gdp_prop_percent, # using values in this column
                                     na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
                                     #  extrapolate using rule = 2 from approx(),
-                                    # uses closest data extreme to extrapolate 
-                                    # for leading and trailing NAs
-                                    rule = 2)) %>% 
+                                    # which uses closest data extreme to
+                                    #  extrapolate for leading and trailing NAs
+                                    rule = 2
+         )) # %>% 
   
-  # fill NA values with the only other observed value (making sure to note the list of countries/regions we did this for)
-  mutate(appx_gdp_fill = zoo::na.aggregate(appx_gdp, by = 1, FUN = mean, na.rm = FALSE))
+  # fill NA values with the only other observed value (making sure to note the list of countries/regions we did this for) -- ended up not using this column
+  # mutate(appx_gdp_fill = zoo::na.aggregate(appx_gdp, by = 1, FUN = mean, na.rm = FALSE))
 ```
-
+Note: after further discussing with Melanie Frazier, we decided to not include countries with only 1 year of observations in our dataset.
 
 Assess how many countries we are gapfilling more extremely for
 
 ```{r}
-# find number of regions that only have 1 data point (wouldn't be filled by na.approx if only 1 datapoint, left as NAs)
-na_regions <- gdp_filled %>% 
-  filter(is.na(appx_gdp))
-
-# print which geo areas only had 1 datapoint
-unique(na_regions$geo_area_name)
-
-# calculate proportion of 1 point-filled geo areas to total geo areas
-num_na <- length(unique(na_regions$geo_area_name))
-num_tot <- length(unique(gdp_filled$geo_area_name))
-
-paste0("Proportion of geo areas with only 1 data point: ", round(((num_na / num_tot) * 100), 3), "%")
+# no longer useful, as we cut out this column to avoid over-gapfilling
+# # find number of regions that only have 1 data point (wouldn't be filled by na.approx if only 1 datapoint, left as NAs)
+# na_regions <- gdp_filled %>% 
+#   filter(is.na(appx_gdp_fill))
+# 
+# # print which geo areas only had 1 datapoint
+# #unique(na_regions$rgn_name)
+# 
+# # calculate proportion of 1 point-filled geo areas to total geo areas
+# num_na <- length(unique(na_regions$rgn_name))
+# num_tot <- length(unique(gdp_filled$rgn_name))
+# 
+# paste0("Proportion of geo areas with only 1 data point: ", round(((num_na / num_tot) * 100), 3), "%")
 ```
 
 #### Preliminary Plotting
@@ -292,8 +301,169 @@ top_diff_gdp_plot
 
 
 
+## GDP: WorldBank data cleaning
+
+
+
+```{r}
+# ======== GDP data cleaning ==================
+
+wb_gdp_clean <- wb_gdp_raw %>% 
+  clean_names() %>% 
+  select(-c(indicator_code, x69)) %>% 
+  pivot_longer(cols = x1960:x2023, names_to = "year", values_to = "gdp_value") %>% 
+    mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  # tidy up year column
+  filter(year %in% c(2009:2019))
+
+# run name_2_rgn -----
+wb_gdp_rgn <- name_2_rgn(df_in = wb_gdp_clean, 
+                       fld_name = "country_name",
+                       flds_unique = c("year"))
+
+# thankfully, in the list following this line: "These data were removed for not having any match in the lookup tables:", there are mostly just the WorldBank aggregate groups (i.e., "low & middle income, latin amaerica & caribbean, etc.), with the exception of Channel Islands and Isle of Man
+
+# identify duplicates ----
+wb_gdp_duplicates <- wb_gdp_rgn[duplicated(wb_gdp_rgn[, c("rgn_name", "year")]),]
+View(wb_gdp_duplicates)
+unique(wb_gdp_duplicates$country_name)
+unique(wb_gdp_duplicates$rgn_name)
+# then look up these & their pairs in the wb_gdp_clean df to see which countries we do or do not have data for to inform aggregation steps.
+
+# [1] "China": we have data on Macao and Hong Kong --> aggregate (can sum) -- but we don't have tourism GDP % data for mainland China... so just leave as basic aggregation (sum) for now
+
+
+# [2] "Northern Mariana Islands and Guam" --> have GDP data for Northern Mariana Islands, and Guam. Can aggregate this, but we only have tourism % GDP data for Guam (see earlier comment in GDP % data cleaning chunk). 
+# For now, we'll just keep Guam GDP and filter out northern mariana islands GDP... ? (COME BACK: double check w Mel)
+
+
+# [3] "Puerto Rico and Virgin Islands of the United States" --> have data for both separately --> aggregate
+
+
+
+# aggregate: sum by rgn_name etc. ----
+# name ~ WorldBank GDP region aggregated
+wb_gdp_rgn_agg <- wb_gdp_rgn %>%
+  filter(!country_name %in% c("Northern Mariana Islands")) %>% # filtering out NMI since we only have Guam GDP % data in our other dataset -- should revisit this and update once we have that data
+  group_by(rgn_id, rgn_name, year) %>%
+  dplyr::summarize(gdp_value_agg = sum(gdp_value, na.rm = TRUE) 
+            )%>%
+  ungroup() %>% 
+  # turn 0s into NAs (appropriate flag for lack of data, as earlier sum(na.rm = TRUE) step obscured NAs)
+  mutate(gdp_value_agg = case_when(
+    gdp_value_agg == 0 ~ NA,
+    .default = gdp_value_agg
+  ))
+
+# aggregation check ----
+# to double check and see if Northern Marian Islands was properly filtered out:
+agg_nmi_vals <- wb_gdp_rgn_agg %>% 
+  filter(rgn_name %in% c("Northern Mariana Islands and Guam")) %>%
+  select(year, gdp_value_agg)
+
+guam_reference <- wb_gdp_clean %>% 
+  filter(country_name %in% c("Guam")) %>% 
+  select(year, gdp_value)
+
+agg_nmi_check <- left_join(agg_nmi_vals, guam_reference)
+
+print(paste("Do the Guam GDP values before aggregation match the 'Northern Mariana Islands and Guam' values after aggregation?"))
+print(paste((agg_nmi_check$gdp_value_agg == agg_nmi_check$gdp_value)))
+
+
+# test region names again:
+# wb_gdp_rgn_2 <- name_2_rgn(df_in = wb_gdp_rgn_agg, 
+#                        fld_name = "rgn_name",
+#                        flds_unique = c("year"))
+```
+
+
+Extra: aggregation explanation/example
+```{r agg_example, eval = FALSE}
+# to see why we're using summarize instead of just mutating and adding a column see this example:
+# test <- wb_gdp_rgn %>%
+#   filter(!rgn_name %in% c("Northern Mariana Island")) %>% 
+#   group_by(rgn_id, rgn_name, year) %>% 
+#   mutate(test = sum(gdp_value, na.rm = TRUE)) 
+# 
+# View(test)
+
+# yields value column, but still keeps the old country_name column, so there are still duplicates! 
+
+```
+
+
+## Find Tourism Value 
+
+
+```{r}
+# join GDP Value (constant 2015 US$) with Tourism GDP % ----
+gdp_join <- full_join(gdp_filled, wb_gdp_rgn_agg, by = join_by(rgn_name, rgn_id, year))
+
+# gdp_join_rgn <- name_2_rgn(df_in = gdp_join, 
+#                        fld_name = "rgn_name",
+#                        flds_unique = c("year"))
+
+# calculate tourism value ---- 
+tourism_value <- gdp_join %>% 
+  # get proportion to use as multiplier
+  mutate(gdp_filled_prop = appx_gdp_pct / 100) %>% 
+  ungroup() %>% 
+  group_by(rgn_id, rgn_name, year) %>% 
+  mutate(tour_value = gdp_filled_prop * gdp_value_agg) %>% 
+  # fix data types
+  mutate(rgn_id = as.character(rgn_id))
+
+
+# preliminary plotting ----
+# make subset
+tour_val_subset <- tourism_value %>% 
+  filter(!is.na(tour_value))
+
+# preliminary plot to check this out!
+
+ggplot(data = tour_val_subset, 
+       aes(x = as.numeric(year), 
+           y = tour_value,
+           color = rgn_id)) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
+
+
+m <- list(
+  l = 80,
+  r = 80,
+  b = 80,
+  t = 80,
+  pad = 4
+)
+
+tour_val_plotly <- plot_ly(data = tour_val_subset, x = ~year, y = ~tour_value, color = ~rgn_name,
+                          type = "scatter", mode = "lines") %>% 
+  layout(title = "Tourism Value (2009-2019)",
+         margin = m,
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Tourism Value (2015 US$)")
+         ) 
+tour_val_plotly
+
+
+max_tour_val <- max(tourism_value$tour_value, na.rm = TRUE)
+
+tourism_value %>% 
+  filter(tour_value == max_tour_val)
+
+prettyNum(max_tour_val,big.mark=",",scientific=FALSE)
+
+# 582 billion in US in 2019... out of 20 Trillion GDP
+```
+
+
+
+
 ### Join with OHI regions
 
+COME BACK -- ask about joining w OHI rgns
 
 ```{r}
 
