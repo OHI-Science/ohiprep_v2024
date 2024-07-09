@@ -158,7 +158,11 @@ labor_rgn_agg <- labor_rgn %>%
   dplyr::summarize(labor_force_total = sum(labor_force_total, na.rm=TRUE)
             )%>%
   ungroup() %>% 
-  dplyr::mutate(year = as.numeric(year)) 
+  dplyr::mutate(year = as.numeric(year)) %>% 
+  mutate(labor_force_total = case_when(
+    labor_force_total == 0 ~ NA, # replace 0s with NAs, because there are no true 0s in our dataset -- NAs became 0s in the summarize step earlier
+    .default = labor_force_total
+  ))
  # mutate(eez_iso3 = country_regex_to_iso3c(rgn_name))
 
 # because we aggregated, getting EEZs is more complicated... OHI has assigned certain EEZ ISO3 codes to these aggregated regions, so if you want EEZ ISO3 codes, you'll need to join with regions_clean read in earlier by rgn_name
@@ -168,6 +172,7 @@ labor_rgn_agg <- labor_rgn %>%
 
 labor_export <- labor_rgn_agg %>% 
   mutate(rgn_id = as.character(rgn_id),
+         unit = "Persons (1)",
          sector = "liv",
          data_source = "World Bank")
 
