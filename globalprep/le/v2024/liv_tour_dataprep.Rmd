@@ -47,6 +47,7 @@ librarian::shelf(
   here,
   janitor,
   terra,
+  countrycode,
   readxl,
   RColorBrewer,
   foreach,
@@ -62,7 +63,7 @@ library(threadr)
 
 
 # source 
-source(here("workflow/R/common.R"))
+source(here("workflow", "R", "common.R"))
 
 # set year and file path info
 current_year <- 2024 # Update this!!
@@ -76,9 +77,21 @@ raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
 # world bank raw data directory
 wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+unwto_dir <- here(raw_data_dir, "UNWTO", data_dir_version_year)
 
 # output data dir for intermediate data products
 int_dir <- here(data_path, "int")
+```
+
+Create country code --> iso3 function
+
+```{r}
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
 ```
 
 ### Read in Data
@@ -88,9 +101,8 @@ int_dir <- here(data_path, "int")
 
 
 # Labor force data ----
-labor_raw <- readxl::read_xls(here(wb_dir, "worldbank_labor_force_raw.xls"),
-                               skip = 3,
-                               na = "")
+# created in liv_labor_force_dataprep.Rmd
+labor_force <- read_csv(here(int_dir, "liv_labor_force.csv"))
 
 # OHI regions data ----
 # read in OHI regions for joining
@@ -132,9 +144,12 @@ region_clean <- region_names %>%
   janitor::clean_names() %>% 
   # drop notes column
   select(-c(("notes")))
+```
 
 
+COME BACK -- delete if not joining with OHI regions, also would need to address EEZ ISO3 issue by joining regions df by rgn_name, don't make iso3 column beforehand
 
+```{r, eval=FALSE}
 # ============== Join labor force + OHI regions =============================
 
 labor_regions_join <- left_join(region_clean, labor_clean,
@@ -151,10 +166,14 @@ labor_export <- labor_regions %>%
   mutate(data_status = ifelse(is.na(year), "no_data", "yes_data"),
          admin_rgn_id = as.character(admin_rgn_id),
          rgn_id = as.character(rgn_id))
+```
 
+
+```{r}
 # save csv for use in other livelihood dataprep
 #write_csv(labor_export, here(int_dir, "labor_force.csv"))
 ```
+
 
 # Employment Data
 
@@ -162,7 +181,7 @@ labor_export <- labor_regions %>%
 
 ```{r}
 # total number of people employed by the tourism sector, in thousands (remember this!)
-un_job_data <- file.path(dir_M, "git-annex/globalprep/_raw_data/UNWTO/d2024/unwto-all-data-download_0.xlsx")
+un_job_data <- file.path(here(unwto_dir, "unwto-all-data-download_0.xlsx"))
 
 # take in .xlsx and read it in, clean it
 un_jobs_data_raw <- read_xlsx(un_job_data, skip = 2, sheet = "Employment", col_names = TRUE, na = c("","..")) %>%
@@ -180,23 +199,57 @@ un_jobs_data_piv <- un_jobs_data_raw %>%
   rename(country = basic_data_and_indicators) %>%
   mutate()
 
-# install.packages("countrycode")
-library(countrycode)
 
-country_regex_to_iso3c <- function(country_string) {
-  country_string %>%
-    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
-}
-
-# adding iso3 codes, converting number to thousands to be consistent and prep for the left_join with labor_regions
+# converting number from thousands to 1s be consistent and prep for the left_join with labor_regions
 un_jobs_cc <- un_jobs_data_piv %>% 
-  mutate(iso3c = country_regex_to_iso3c(country)) %>%
-  mutate(tourism_jobs = jobs*1000) %>%
-  mutate(country = str_to_title(country)) %>%
-  select(-jobs) %>%
-  mutate(year = as.numeric(year))
-# warning: ! Some values were not matched unambiguously: BONAIRE, SABA, SERBIA AND MONTENEGRO, SINT EUSTATIUS
+#  mutate(iso3c = country_regex_to_iso3c(country)) %>%
+  mutate(tourism_jobs = jobs*1000,
+         unit = "Persons (1)",
+         country = str_to_title(country),
+         year = as.numeric(year)) %>% 
+  select(-jobs)
 
+
+# run ohicore name_2_rgn --------
+tour_jobs_rgn <- name_2_rgn(df_in = un_jobs_cc, 
+                       fld_name = 'country',
+                       flds_unique = c("year"))
+
+# identify duplicates
+tour_duplicates <- tour_jobs_rgn[duplicated(tour_jobs_rgn[, c("rgn_name", "year")]),]
+unique(tour_duplicates$country)
+unique(tour_duplicates$rgn_name)
+
+# v2024 notes:
+# Serbia and Montenegro: all NA values in our dataset, means it's not an issue now (would need to disaggregate, reverse of weighted average based on population size, only keep Montenegro (Serbia is landlocked))
+# 	
+# Northern Mariana Islands and Guam
+# Guadeloupe and Martinique: only have sparse data for Martinique, none for Guam -- can just sum
+
+# aggregate: sum by rgn_name etc. ----
+tour_jobs_rgn_agg <- tour_jobs_rgn %>%
+  group_by(rgn_id, rgn_name, year) %>%
+  dplyr::summarize(tourism_jobs_agg = sum(tourism_jobs, na.rm=TRUE) # causing issues...
+            )%>%
+  ungroup() %>% 
+  filter(year >= 2009)
+# COME BACK: make 0s into NAs?? 
+
+
+# join with labor force data ------------
+# COME BACK -- rejoin once labor force has been updated
+# ISSUE -- tourism_jobs being populated with 0s instead of NAs.... super weird
+tour_jobs_labor <- full_join(tour_jobs_rgn_agg, labor_force #, by = c("rgn_id", "rgn_name", "year"))
+)
+
+# calculate tourism jobs proportion of total labor force
+
+dplyr::mutate(year = as.numeric(year),
+                rgn_id = as.character(rgn_id)) 
+```
+
+
+```{r}
 # join w OHI regions
 tourism_un_jobs_ohi <- left_join(region_clean, un_jobs_cc, by = c("eez_iso3" = "iso3c"))
 

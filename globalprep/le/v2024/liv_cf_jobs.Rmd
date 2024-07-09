@@ -1,0 +1,175 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - CF Livelihoods Job Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+---
+
+# CF Livelihoods: Proportion of Tourism Jobs per Country/Region per Year
+
+## Overview
+
+* **Data:** Labor Force & Employment Data
+
+  * Labor Force data from World Bank (downloaded June 28. 2024)
+
+      - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+      
+  * OECD (Employment in fisheries, aquaculture and processing, 2009 - 2021) (downloaded July 2, 2024) -- for cf job data
+  
+    - <https://data-explorer.oecd.org/vis?fs[0]=Topic%2C1%7CAgriculture%20and%20fisheries%23AGR%23%7CFisheries%20and%20aquaculture%23AGR_FSA%23&pg=0&fc=Topic&bp=true&snb=6&vw=ov&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_FISH_EMP%40DF_FISH_EMPL&df[ag]=OECD.TAD.ARP&df[vs]=1.0&dq=.A...._T._T&pd=2009%2C&to[TIME_PERIOD]=false&ly[cl]=TIME_PERIOD&ly[rs]=REF_AREA&ly[rw]=DOMAIN>
+    
+  * FAO Yearbook (downloaded July 2, 2024) -- for cf job gapfilling if needed
+  
+    - <https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content>
+      
+  * ILOSTAT (downloaded July 2, 2024) -- for cf wage data
+  
+      - https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A 
+      - select Rev 3.1.B: Fishing
+      
+  * Ex-Vessel Price Data (downloaded August 24, 2023) -- for cf wage data
+      - from emlab, see README.md
+
+
+### Setup
+
+```{r}
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  janitor,
+  terra,
+  readxl,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  tidyverse, 
+  httr,
+  plotly,
+  zoo, # for gapfilling
+  pdftools
+)
+#remotes::install_github("skgrange/threadr") # for na_extrapolate
+library(threadr)
+
+
+# source 
+source(here("workflow/R/common.R"))
+
+source(here('workflow/R/fao_fxn.R')) # function for cleaning old version of FAO data 
+
+source(here('workflow/R/fao_online_portal_clean.R'))
+
+# set year and file path info
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- here("globalprep", "le", version_year)
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# world bank raw data directory
+wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+
+# ILO raw data directory
+ilo_dir <- here(raw_data_dir, "ILOSTAT", data_dir_version_year)
+
+# FAO raw data directory
+fao_dir <- here(raw_data_dir, "FAO", data_dir_version_year)
+
+# OECD raw data directory
+oecd_dir <- here(raw_data_dir, "OECD", data_dir_version_year)
+
+# FAO capture raw data directory
+fao_capture_dir <- here(raw_data_dir, "FAO_capture", data_dir_version_year)
+
+# Ex-vessel raw data directory
+ex_vess_dir <- here(raw_data_dir, "ex-vessel-price-database-updated")
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
+```
+
+
+Create country code --> iso3 function
+```{r}
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+```
+
+## Read in Data
+
+```{r}
+#----------OHI regions data--------------------
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  janitor::clean_names() %>% 
+  select(-notes)
+
+#----------Labor Force Data (from earlier)-----
+labor_force <- read_csv(here(data_path, "int", "labor_force.csv"))
+
+############################################
+# Livelihoods: Number of fisher jobs
+############################################
+
+#---------- cf OECD data---------------------------
+oecd_cf_job_raw <- read_csv(here(oecd_dir, "OECD_2009-2021_employment_fish_aqua_processing_raw.csv"))
+
+#------cf FAO Yearbook Number of Fishers-------
+# turn the number of fishers table from the FAO yearbook into a data frame and clean.
+# note: world total includes countries and regions not within the table.  Unsure of where that data comes from; look for methodology.
+fao_pdf <- pdf_text(here(fao_dir, "fao_statistics_yearbook_07_03_24.pdf"))
+
+fishers_table <- fao_pdf[[169]] %>% #page number of the pdf
+  as.data.frame()
+
+#specify columns 
+columns <- c("country", "1995", "2000", "2005", "2010", "2015", "2016", "2017", "2018", "2019", "2020","2021")
+
+#turn the pdf page into a clean dataframe
+fao_fisher_jobs <- fishers_table %>%
+  separate_rows('.', sep = "\n") %>% #separate rows based on line breaks
+  rename(main_column = ".") %>%
+  mutate(main_column = str_remove_all(main_column, "\\*")) %>% #remove the * 
+  mutate(main_column = str_replace_all(main_column, "E(?!\\p{L})", " ")) %>% #replace all the Es not followed by letters (used to indicate estimate)
+  slice(7:69) %>% #remove all rows not in the table
+  separate(main_column, into = columns, sep = " {2,}", extra = "merge") %>% #separate into columns based on double spaces
+  pivot_longer(cols = -c("country"), names_to = "year") %>% 
+  mutate(value = str_squish(value)) %>% #remove extra spaces
+  mutate(value = str_remove_all(value, " ")) %>% 
+  mutate(value = if_else(value == "…" , NA, value)) %>% 
+  mutate(value = as.numeric(value)) %>% 
+  mutate(unit = "persons (1)",
+         sector = "cf",
+         data_source = "FAO number of fishers") %>% 
+  slice(-c(1:44))
+```
+
+

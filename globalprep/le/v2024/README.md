@@ -46,8 +46,14 @@ Value in each of these data sets is the total estimated revenue per country in u
   - [Global aquatic trade - By partner country Value (2019 - 2021)](https://www.fao.org/fishery/statistics-query/en/trade_partners/trade_partners_value)
   - under "Trade Flow" in the Dimensions filtering section, select "Exports"
   - scroll to the bottom of the page, click the "download" button/icon, then select "csv", "Flag enabled" (we clean this later), then "Yes" for "Include null values"
+  - select "Preferences", then:
+      - for "Show unavailable values" select "NA"
+      - for "Thousands separator" select "No space"
     - (all years -- 2019, 2020, and 2021 are selected by default, no countries or commodities etc. are selected for any filtering)
+    - © FAO 2024. Global Aquatic Trade Statistics. In: Fisheries and Aquaculture. Rome. [Cited Wednesday, July 3rd 2024]. 
+https://www.fao.org/fishery/en/collection/global_commodity_prod
 -   [Metadata](https://www.fao.org/fishery/en/collection/global_commodity_prod)
+- I also downloaded the full dataset, which showed up as a folder titled "FI_Trade_Partners" and contained other metadata-adjacent documents on what different symbols represented, as well as several other tables describing country codes, UN codes, and terms of usage and licensing. 
 
 ## Fishing
 
@@ -170,17 +176,29 @@ In order to calculate percent of a country's population within a 25 mile inland 
 
 -   A possible alternative to the WDI package is calculating total population based on a similar method to mar_prs_population.
 
-#### v2024: Fishing - Livelihood data
+#### v2024: Fishing - Livelihood data (downloaded July 3, 2024)
 
-"Number": jobs
+## "Number": jobs
 
-- (ILO? FAO? aggregate: look into whether their methodology is compatible, whether the values match/make sense)
+OECD Data Explorer:
 
-"Quality": wages
+- Employment in fisheries, aquaculture and processing (2009 - 2021) <https://data-explorer.oecd.org/vis?fs[0]=Topic%2C1%7CAgriculture%20and%20fisheries%23AGR%23%7CFisheries%20and%20aquaculture%23AGR_FSA%23&pg=0&fc=Topic&bp=true&snb=6&vw=tb&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_FISH_EMP%40DF_FISH_EMPL&df[ag]=OECD.TAD.ARP&df[vs]=1.0&dq=.A...._T._T&pd=2009%2C&to[TIME_PERIOD]=false>
+
+  - `Apply filter: "Time period" to the years desired.  In this case, it was after 2009. Download as filtered csv.`
+
+  - `/home/shares/ohi/git-annex/globalprep/_raw_data/OECD/d2024/OECD.TAD.ARP,DSD_FISH_EMP@DF_FISH_EMPL,1.0+.A...._T._T.csv`
+  
+FAO (gapfilling):
+  
+- FAO Yearbook Number of Fishers (2015 - 2021) <https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content>
+  
+  - `/home/shares/ohi/git-annex/globalprep/_raw_data/FAO/d2024/fao_statistics_yearbook_07_03_24.pdf`
+
+## "Quality": wages
+
+ILO via ILOSTAT explorer <https://rshiny.ilo.org/dataexplorer48/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A>
 
 -   "Average monthly earnings of employees by sex and economic activity - Annual"
-
--   ILO via ILOSTAT explorer <https://rshiny.ilo.org/dataexplorer48/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A>
 
     -   navigate to ILOSTAT explorer, select:
 
