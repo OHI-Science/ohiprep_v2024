@@ -113,7 +113,11 @@ Data for revenue from tourism was not finalized in 2023. One potential option is
 
 Jobs: Number of jobs (employed in the tourism sector) per country/region per year
 
--   UN Tourism (UNWTO)
+-   UN Tourism (UNWTO) Key Tourism Statistics <https://www.unwto.org/tourism-statistics/key-tourism-statistics>
+-   Downloaded June 26th, 2024. According to the website, the latest update of the dataset took place in 31 January 2024. 
+-   The data ranges from 1995 to 2021, with many data gaps for many countries along that range. We limited the range from 2009-2019 to address the notable cutoff in data for many countries beginning in 2020 (reflective of the COVID-19 Pandemic), which had a notable impact on global tourism that should be investigated in future years of OHI prep (once more data is available).
+-   The data is in the form of a `.xlsx` with many tabs. We use the "Employment" tab in our "number of jobs" dataprep script.
+
 
 Labor Force: used to find proportion of working-eligible population employed in tourism sector
 
