@@ -24,15 +24,13 @@ editor_options:
 
 ## Overview
 
-* **Data:** Labor Force & Employment Data
-
-  * Labor Force data from World Bank (downloaded June 28. 2024)
-
-      - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
-      
-  * ILOSTAT (downloaded July 2, 2024) -- for tour/cf wage data
-  
-      - https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A 
+* **Data:** 
+    * **Revenue** Data for Mariculture 
+    * Data came from FishStatJ, FAO's application to obtain different fishery-related metrics by country as well as by sector
+    * **Jobs** Data for mariculture 
+    * Partially obtained from [FAO Fisheries and Aquaculture Statistical Yearbook](https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content)
+    * Also brought in OECD data from their online [OECD Data Explorer](https://data-explorer.oecd.org/vis?df[ds]=DisseminateFinalDMZ&df[id]=DSD_SOE%40DF_SOE&df[ag]=OECD.ENV.EPI&dq=.A....&pd=1995%2C2024&to[TIME_PERIOD]=false&vw=tb)
+    
 
 
 ### Setup
@@ -294,6 +292,9 @@ mar_rev_rgn_final <- rbind.data.frame(mar_rev_rgn_temp, mar_rev_china_temp)
 #   ungroup() %>% 
 #   dplyr::mutate(year = as.numeric(year))
 
+## Checking how many unique countries are within the revenue data - 147 (2024 Assessment)
+# length(unique(mar_rev_rgn_final$Country))
+
 write_csv(mar_rev_rgn_final, here::here(data_path, "int/mar_revenue.csv"))
 ```
 
@@ -349,6 +350,14 @@ fao_mar_jobs_clean <- fao_mar_jobs %>%
   dplyr::slice(-c(1:6, 327:516)) %>% # %>% view() # Add view() to check df to make sure its tidy after 
   mutate(year = as.numeric(year))
 
+## OECD data on aquaculture employment 
+oecd.fp <- file.path(dir_M, "git-annex/globalprep/_raw_data/OECD", data_dir_version_year, "OECD.ENV.EPI,DSD_SOE@DF_SOE,+.A.FISH_EMP_AQUACULTURE_TOT....csv")
+
+#### BRING THIS JAWN IN #####
+
+oecd_mar_jobs <- read.csv(oecd.fp) %>% janitor::clean_names()
+length(unique(oecd_mar_jobs$reference_area))
+
 ```
 
 
@@ -356,7 +365,7 @@ fao_mar_jobs_clean <- fao_mar_jobs %>%
 
 ```{r}
 ## Hard coding a few of the country names that are either synonyms of countries or difficult to identify with name_2_rgn() function
-spi_calc <- fao_mar_jobs_clean %>%
+mar_jobs_rgn <- fao_mar_jobs_clean %>%
   filter(!country %in% "World total") %>% 
   dplyr::rename(Country = country) %>% 
   mutate(Country = case_when(
@@ -371,13 +380,13 @@ spi_calc <- fao_mar_jobs_clean %>%
 
 # Channel Islands are Jersey and Guernsey, but these are already in the data
 
-spi_rgn <- name_2_rgn(df_in = spi_calc, 
+mar_jobs_rgn_temp <- name_2_rgn(df_in = mar_jobs_rgn, 
                        fld_name='Country',
                       flds_unique = c("year"))
 
 ## Received a warning for a duplicated country. Using the following code to display the portion of the dataframe that's duplicated 
     ## Can see that in this case it was China, even though they actually didn't have any duplicated values. Interesting 
-spi_rgn[duplicated(spi_rgn[, c('Country','year')]),  ] 
+mar_jobs_rgn_temp[duplicated(mar_jobs_rgn_temp[, c('Country','year')]),  ] 
 
 # Weight the following duplicates by population
 # China, Guadeloupe, Guam, Hong Kong, Macao, Martinique, Northern Mariana Islands, Puerto Rico, Virgin Islands (U.S.)... Populations taken from google
@@ -391,16 +400,18 @@ spi_rgn[duplicated(spi_rgn[, c('Country','year')]),  ]
 #                          172069, 49551,
 #                          3252407, 103910))
 
-spi_rgn <- spi_rgn %>%
-  # left_join(pop_weights, by = "Country") %>%
-  mutate(pop = ifelse(is.na(pop), 1, pop)) %>%
-  group_by(rgn_id, rgn_name, year) %>%
-  dplyr::summarize(score = weighted.mean(score, pop, na.rm=TRUE),
-            method = paste(unique(method), collapse=" "),
-            gapfill = weighted.mean(gapfill, pop, na.rm=TRUE))%>%
-  ungroup() %>% 
-  dplyr::mutate(year = as.numeric(year))
+# mar_jobs_rgn_final <- mar_jobs_rgn_temp %>%
+#   # left_join(pop_weights, by = "Country") %>%
+#   mutate(pop = ifelse(is.na(pop), 1, pop)) %>%
+#   group_by(rgn_id, rgn_name, year) %>%
+#   dplyr::summarize(score = weighted.mean(score, pop, na.rm=TRUE),
+#             method = paste(unique(method), collapse=" "),
+#             gapfill = weighted.mean(gapfill, pop, na.rm=TRUE))%>%
+#   ungroup() %>% 
+#   dplyr::mutate(year = as.numeric(year))
 
+## Only twenty nine countries with data 
+# length(unique(mar_jobs_rgn_temp$Country))
 ```
 
 

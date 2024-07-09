@@ -15,7 +15,7 @@ output:
 pdf_document:
   toc: true
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
   markdown: 
     wrap: 72
 ---
@@ -132,7 +132,7 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
   select(-notes)
 
 #----------Labor Force Data (from earlier)-----
-labor_force <- read_csv(here(data_path, "int", "labor_force.csv"))
+labor_force <- read_csv(here(data_path, "int", "liv_labor_force.csv"))
 
 ############################################
 # Livelihoods: Number of fisher jobs
@@ -193,14 +193,14 @@ exvessel_prices_raw <- read_csv(here(ex_vess_dir, "price-db-results", "exvessel_
 
 (put this within previous chunk, read in data etc. for number of tourism jobs, join with labor_regions, make new proportion of tourism jobs column, group by year, do prelim plotting etc. and evaluate data quality etc.)
 
-Cleaning and wrangling data
+### Cleaning and wrangling data
 ```{r}
 # total number of people employed by the fishing (previously commercial fishing, cf -- see README.md) sector
 
 # no NAs, which means it may have been gapfilled already
 unique(is.na(oecd_cf_job_raw$OBS_VALUE))
 
-#----------cf OECD number of fishers data------
+# ============== cf OECD number of fishers data ============== 
 #note that this is data for the same category as the FAO fishers data, FAO data will be used to gapfill
 oecd_fisher_jobs <- oecd_cf_job_raw %>% 
   janitor::clean_names() %>% 
@@ -215,146 +215,195 @@ oecd_fisher_jobs <- oecd_cf_job_raw %>%
 
 unique(is.na(oecd_fisher_jobs$value))
 # FALSE -- no NAs
+
+# ============== Run ohicore name_2_rgn ==================================
+
+# check names
+#china, taiwan province of or china (provice of china) should pick it up as taiwan
+# "Chinese Taipei", "China (People’s Republic of)", "Korea"
+
+oecd_fisher_jobs_fix <- oecd_fisher_jobs %>%
+  mutate(reference_area = case_when(
+    reference_area=="Chinese Taipei" ~ "Taiwan",
+    reference_area=="China (People’s Republic of)" ~ "China",
+    reference_area=="Korea" ~ "South Korea",
+    TRUE ~ reference_area # Everything else, leave it be
+  ))
+
+oecd_fisher_jobs_rgn <- name_2_rgn(df_in = oecd_fisher_jobs_fix, 
+                       fld_name='reference_area',
+                      flds_unique = c("year"))
+
+oecd_duplicates <- oecd_fisher_jobs_rgn[duplicated(oecd_fisher_jobs_rgn[, c("reference_area", "year")]),]
+
+oecd_ref_duplicates <- unique(oecd_duplicates$reference_area)
+oecd_rgn_duplicates <- unique(oecd_duplicates$rgn_name)
+
+oecd_diff <- setdiff(oecd_rgn_duplicates, oecd_ref_duplicates)
+oecd_diff # Vietnam is the only difference, and name_2_rgn works, so we are good to move forward! The raw data had duplicates in observation by year and region, so now we have to aggregate.
 ```
 
-It should be noted that for the OECD number of fishers data, it has no NAs. For example, for the reference area of the Philippines, for 2009-2020 the observed value is consistently 120,000.  Therefore, the values have either been rounded or there has already been some sort of gapfilling. Within `oecd_cf_job_raw`, there is a column named "DECIMAL", which could allude to some sort of rounding.  Investigation was done to find OECD's metadata, however the link failed (below).  WILL RETURN!
+It should be noted that for the OECD number of fishers data, it has no NAs. Additionally, for the reference area of the Philippines, for 2009-2020 the observed value is consistently 120,000.  Therefore, the values have either been rounded or there has already been some sort of gapfilling. Within `oecd_cf_job_raw`, there is a column named "DECIMAL", which could allude to some sort of rounding.  Investigation was done to find OECD's metadata, however the link failed (below).  **WILL RETURN!**
 
 Page with metadata: <https://www.oecd-ilibrary.org/economics/data/oecd-stat/data-warehouse_data-00900-en?parentId=http%3A%2F%2Finstance.metastore.ingenta.com%2Fcontent%2Fcollection%2Fdata-00285-en>
 Failed link: <https://stats.oecd.org/wbos/default.aspx?checksum=40e0edc46aec7aee1cce210b898d5bd6&timestamp=1720045544&cid=id5845&oecdstat=data-00285-en&doi=data-00900-en&return_url=https%3A%2F%2Fwww.oecd-ilibrary.org%3A443%2Fcontent%2Fdata%2Fdata-00900-en&institution_name=UC+at+Santa+Barbara&lang=en>
 
-Preliminary plot
 ```{r}
-plotly::plot_ly(oecd_fisher_jobs, x = ~year, y = ~value, color = ~reference_area, type = "scatter", mode = "lines") %>% 
+# preliminary plot
+prelim_plot <- plotly::plot_ly(oecd_fisher_jobs_rgn, x = ~year, y = ~value, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
   layout(title = "All Regions: Marine Fishing Employment", 
          xaxis = list(title = "Year"),
          yaxis = list(title = "Number of people by region employed by the fishing sector"))
+prelim_plot
 ```
 
-
-Begin to create the proportion between tourism jobs and the total labor force
+### Aggregating data
 ```{r}
-# prep OECD to join with labor force
-cf_job_countrycode <- oecd_fisher_jobs %>% 
-  mutate(iso3c = country_regex_to_iso3c(reference_area))
+# ============== Aggregating data ==================================
+length(unique(oecd_fisher_jobs_rgn$reference_area)) #44
+length(unique(oecd_fisher_jobs_rgn$rgn_name)) #44
 
-all(cf_job_countrycode$ref_area == cf_job_countrycode$iso3c) # TRUE, so did not need to use countrycode func
+duplicate_exists <- oecd_fisher_jobs_rgn %>% 
+  group_by(rgn_name, year) %>% 
+  filter(n() > 1)
 
-# make ref_area the same column name as labor_force, to join cleanly
-cf_job_iso <- oecd_fisher_jobs %>% 
-  rename(eez_iso3 = ref_area)
+bang_filt <- oecd_fisher_jobs_rgn %>% 
+  filter(rgn_name %in% "Bangladesh")
+head(bang_filt) # still have multiple entries per region and year from raw oecd data, need to aggregate
 
-length(unique(cf_job_iso$eez_iso3)) # 44
+cf_jobs_rgn_agg <- oecd_fisher_jobs_rgn %>%
+  group_by(rgn_id, rgn_name, year) %>%
+  dplyr::summarize(value = sum(value, na.rm=TRUE)) %>%
+  ungroup() %>% 
+  dplyr::mutate(year = as.numeric(year)) 
+```
 
+```{r}
+# plot of aggregated data
+prelim_plot_agg <- plotly::plot_ly(cf_jobs_rgn_agg, x = ~year, y = ~value, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Marine Fishing Employment", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of people by region employed by the fishing sector"))
+prelim_plot_agg
+
+#plot without the large outliers Bangladesh and China
+remove_values <- c("Bangladesh", "China")
+cf_job_subset <- cf_jobs_rgn_agg %>% 
+  filter(!(rgn_name %in% remove_values))
+
+prelim_plot_lim <- plotly::plot_ly(cf_job_subset, x = ~year, y = ~value, color = ~rgn_name, type = "scatter", mode = "lines") %>%
+  layout(title = "All Regions: Marine Fishing Employment", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of people by region employed by the fishing sector"))
+prelim_plot_lim
+```
+
+### Create the proportion between tourism jobs and the total labor force
+```{r}
 # join labor force data with cf employment
-cf_job_labor_join <- left_join(cf_job_iso, labor_force, by = c("eez_iso3", "year"))
+cf_job_labor_join <- full_join(labor_force, cf_jobs_rgn_agg)
 
 # make proportion of people employed in the commercial fishing sector
 cf_job_prop <- cf_job_labor_join %>% 
-  dplyr::relocate(labor_force_total, .before = unit) %>%
+  dplyr::relocate(value, .before = labor_force_total) %>%
   mutate(cf_prop_percent = (value/labor_force_total)*100) %>%
-  select(rgn_id, admin_country_name, year, value, labor_force_total, cf_prop_percent)
+  select(-c(data_source, sector))
 ```
 
 Preliminary plot of the percent of labor force working in the fishing sector (cf)
 ```{r}
-plotly::plot_ly(cf_job_prop, x = ~year, y = ~cf_prop_percent, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+cf_prop_plot <- plotly::plot_ly(cf_job_prop, x = ~year, y = ~cf_prop_percent, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
   layout(title = "All Regions: Percent of Labor Force Employed by Marine Fishing Sector", 
          xaxis = list(title = "Year"),
          yaxis = list(title = "Percent by region employed by the fishing sector"))
-
-ggplot(data = cf_job_prop, aes(x = year, y = cf_prop_percent)) + geom_line(aes(color = admin_country_name))
+cf_prop_plot
 ```
-
-Prelim plot of Bangladesh to better visualize why there are issues
-```{r}
-bangladesh_cf <- cf_job_prop %>% 
-  filter(admin_country_name == "Bangladesh")
-```
-
-To fix this issue of multiple geo area observations per year: 
-```{r}
-labor_force %>% 
-  group_by(eez_iso3, year) %>% 
-  filter(n() > 1)
-
-cf_job_iso %>% 
-  group_by(eez_iso3, year) %>% 
-  filter(n() > 1)
-# bangladesh and others have duplicate entries.  Need to summarize by year and geo area
-
-cf_job_iso_agg <- cf_job_iso %>%
-  group_by(eez_iso3, year) %>%
-  summarize(value = sum(value, na.rm = TRUE))
-
-length(unique(cf_job_iso_agg$eez_iso3)) # 44
-
-cf_job_labor_join_2 <- left_join(labor_force, cf_job_iso_agg, by = c("eez_iso3", "year")) %>% 
-  dplyr::relocate(value, .before = labor_force_total)
-
-# make proportion of people employed in the commercial fishing sector
-cf_job_prop_agg <- cf_job_labor_join_2 %>% 
-  mutate(cf_prop_percent = (value/labor_force_total)*100) %>% 
-  select(-data_status)
-
-length(is.na(cf_job_labor_join_2$value))
-```
-
-Prelim plot using aggregated data by year and geo area
-```{r}
-plotly::plot_ly(cf_job_prop_agg, x = ~year, y = ~cf_prop_percent, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
-  layout(title = "All Regions: Percent of Labor Force Employed by Marine Fishing Sector", 
-         xaxis = list(title = "Year"),
-         yaxis = list(title = "Percent by region employed by the fishing sector"))
-```
-
 
 Saving intermediate data
 ```{r}
+# %>% 
+#   mutate(sector = "cf",
+#          data_source = "ILOSTAT")
+
 # write_csv(cf_job_prop_agg, here(int_dir, "cf_jobs.csv"))
 ```
 
-Visualizing without the outlier (Bangladesh)
+### Gapfilling using FAO Yearbook
 ```{r}
-cf_job_prop_lim <- cf_job_prop_agg %>% 
-  filter(admin_country_name != "Bangladesh")
+# ============== Run ohicore name_2_rgn ==================================
 
-plotly::plot_ly(cf_job_prop_lim, x = ~year, y = ~cf_prop_percent, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
-  layout(title = "All Regions: Percent of Labor Force Employed by Marine Fishing Sector", 
-         xaxis = list(title = "Year"),
-         yaxis = list(title = "Percent by region employed by the fishing sector"))
+# These data were removed for not being of the proper rgn_type (eez,ohi_region) or mismatching region names in the lookup tables:
+#         tmp_type
+# tmp_name landlocked
+#   uganda         11
+
+fao_fisher_jobs_fix <- fao_fisher_jobs %>%
+  filter(country != "World total") %>% 
+  mutate(country = case_when(
+    country=="China,Taiwan" ~ "Taiwan",
+    country=="Dem R Congo" ~ "Democratic Republic of the Congo",
+    country=="DPR Korea" ~ "North Korea",
+    country=="Rep.of Korea" ~ "South Korea",
+    country=="Faroe Is" ~ "Faeroe Islands",
+    country=="Russian Fed" ~ "Russia",
+    country=="USA" ~ "United States",
+    country=="Rep.of Korea" ~ "South Korea",
+    TRUE ~ country # Everything else, leave it be
+  ))
+
+fao_fisher_jobs_rgn <- name_2_rgn(df_in = fao_fisher_jobs_fix, 
+                       fld_name='country',
+                      flds_unique = c("year"))
+
+
+fao_duplicates <- fao_fisher_jobs_rgn[duplicated(fao_fisher_jobs_rgn[, c("country", "year")]),]
+
+fao_ref_duplicates <- unique(fao_duplicates$country)
+fao_rgn_duplicates <- unique(fao_duplicates$rgn_name)
+
+fao_diff <- setdiff(fao_rgn_duplicates, fao_ref_duplicates)
+fao_diff # none!
+
+length(unique(fao_fisher_jobs_rgn$rgn_name)) # 57
+
+# see where there is overlapping
+fao_rgns <- unique(fao_fisher_jobs_rgn$rgn_name)
+oecd_rgns <- unique(cf_jobs_rgn_agg$rgn_name) # use the data from before labor_force join
+
+fao_oecd_diff <- setdiff(fao_rgns, oecd_rgns)
+fao_oecd_diff # 27 regions could be filled! If the methodology makes sense.
 ```
 
-
-Gapfilling using FAO Yearbook
+Only years 2015-2021 could be gapfilled by the FAO Yearbook. This is still a good amount.
 ```{r}
-## make sure every place has a region id, cut it out if it doesnt
+# ============= Evaluating FAO Yearbook Methodology =========
 
-fao_fisher_jobs_iso <- fao_fisher_jobs %>% 
-  mutate(iso3c = country_regex_to_iso3c(country))
-
-unique(fao_fisher_jobs_iso$country) # 50 is alarming
-unique(fao_fisher_jobs_iso$iso3c)
-
+unique(fao_fisher_jobs_rgn$year)
 # years are weird: has 2010, then jumps to 2015 and increases sequentially to 2020 from there.
-unique(fao_fisher_jobs_iso$year)
-# "2010" "2015" "2016" "2017" "2018" "2019" "2020" "2021"
+ # [1] "1995" "2000" "2005" "2010" "2015" "2016" "2017" "2018" "2019" "2020" "2021"
 
-fao_unique <- unique(fao_fisher_jobs_iso$iso3c)
-cf_unique <- unique(cf_job_prop_agg$eez_iso3)
+#make a list of the countries in the fao data but not oecd, these are the ones we want to add
+missing_cf_oecd <- setdiff(fao_fisher_jobs_rgn$rgn_name, cf_jobs_rgn_agg$rgn_name)
+missing_cf_oecd
 
-in_fao_not_cf <- fao_unique[!fao_unique %in% cf_unique]
-in_cf_not_fao <- cf_unique[!cf_unique %in% fao_unique]
-in_both <- fao_unique[fao_unique %in% cf_unique]
+fao_missing_oecd <- fao_fisher_jobs_rgn %>% 
+  filter(rgn_name %in% c(missing_cf_oecd)) %>% 
+  select(rgn_id, rgn_name, year, value)
 
-print("In fao_fisher_jobs_iso but not in cf_job_prop_agg:")
-print(in_fao_not_cf)
-print("In cf_job_prop_agg but not in fao_fisher_jobs_iso:")
-print(in_cf_not_fao)
-print("In both:")
-print(in_both)
+fishing_jobs_final <- cf_jobs_rgn_agg %>% 
+  rbind(fao_missing_oecd)
 
-length(fao_unique)
-length(cf_unique)
+# evluate binded dataset containing oecd and fao data
+length(unique(fishing_jobs_final$rgn_name)) #72!
+
+# create proportion using the binded data
+cf_job_final_join <- full_join(labor_force, fishing_jobs_final)
+
+# make proportion of people employed in the commercial fishing sector
+cf_job_prop <- cf_job_labor_join %>% 
+  dplyr::relocate(value, .before = labor_force_total) %>%
+  mutate(cf_prop_percent = (value/labor_force_total)*100) %>%
+  select(-c(data_source, sector))
 ```
 
 
@@ -426,6 +475,57 @@ Plot
 ```{r}
 # read in cf revenue data from v2023, using FAO Capture data, Ex-vessel data, 
 cf_revenue <- read_csv(here("globalprep", "le", "v2023", "int", "cf_revenue.csv"))
+
+# ============== Run ohicore name_2_rgn ==================================
+
+# check names
+# These data were removed for not having any match in the lookup tables:
+# 
+# bonaire/s.eustatius/saba british indian ocean ter          channel islands     french southern terr 
+#                        1                        1                        1                        1 
+#              isle of man     netherlands antilles                other nei         saint barthélemy 
+#                        1                        1                        1                        1 
+# saint helena/asc./trist.    saint-martin (french)           yugoslavia sfr 
+#                        1                        1                        1 
+# 
+# These data were removed for not being of the proper rgn_type (eez,ohi_region) or mismatching region names in the lookup tables:
+#            tmp_type
+# tmp_name    disputed landlocked
+#   ethiopia         0         16
+#   palestine       25          0
+
+length(unique(cf_revenue$country))
+
+cf_revenue_fix <- cf_revenue_rgn %>%
+  mutate(country = case_when(
+    country=="Bonaire/S.Eustatius/Saba" ~ "", # how to disaggregate instead of aggregate?
+    country=="British Indian Ocean Ter" ~ "British Indian Ocean Territory",
+    country=="Channel Islands" ~ "", # would be disaggregated into Guernsey and Jersey
+    country=="" ~ " ", 
+    country=="" ~ " ",
+    country=="  " ~ " ",
+    country=="  " ~ " ",
+    country=="  " ~ " ",
+    country=="  " ~ " ",
+    country=="  " ~ " ",
+    country=="  " ~ " ",
+    TRUE ~ country # Everything else, leave it be
+  ))
+# look at rasterized fishing effort, to determine the relative proportion of it within each eez, and distribute catcbh relative to that proportion
+cf_revenue_rgn <- name_2_rgn(df_in = cf_revenue_fix, 
+                             fld_name='country',
+                             flds_unique = c("year"))
+
+oecd_duplicates <- oecd_fisher_jobs_rgn[duplicated(oecd_fisher_jobs_rgn[, c("country", "year")]),]
+
+oecd_ref_duplicates <- unique(oecd_duplicates$country)
+oecd_rgn_duplicates <- unique(oecd_duplicates$rgn_name)
+
+oecd_diff <- setdiff(oecd_rgn_duplicates, oecd_ref_duplicates)
+
+
+
+
 
 # Bring in imports and exports from FAO yearbook
 imp_table <- fao_pdf[[190]] %>% #page number of the pdf
