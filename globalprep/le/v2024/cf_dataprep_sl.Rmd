@@ -139,7 +139,7 @@ labor_force <- read_csv(here(data_path, "int", "labor_force.csv"))
 ############################################
 
 #---------- cf OECD data---------------------------
-oecd_cf_job_raw <- read_csv(here(oecd_dir, "OECD.TAD.ARP,DSD_FISH_EMP@DF_FISH_EMPL,1.0+.A...._T._T.csv"))
+oecd_cf_job_raw <- read_csv(here(oecd_dir, "OECD_2009-2021_employment_fish_aqua_processing_raw.csv"))
 
 #------cf FAO Yearbook Number of Fishers-------
 # turn the number of fishers table from the FAO yearbook into a data frame and clean.
@@ -284,7 +284,7 @@ cf_job_iso %>%
 
 cf_job_iso_agg <- cf_job_iso %>%
   group_by(eez_iso3, year) %>%
-  summarize(value = sum(value))
+  summarize(value = sum(value, na.rm = TRUE))
 
 length(unique(cf_job_iso_agg$eez_iso3)) # 44
 
@@ -322,6 +322,39 @@ plotly::plot_ly(cf_job_prop_lim, x = ~year, y = ~cf_prop_percent, color = ~admin
   layout(title = "All Regions: Percent of Labor Force Employed by Marine Fishing Sector", 
          xaxis = list(title = "Year"),
          yaxis = list(title = "Percent by region employed by the fishing sector"))
+```
+
+
+Gapfilling using FAO Yearbook
+```{r}
+## make sure every place has a region id, cut it out if it doesnt
+
+fao_fisher_jobs_iso <- fao_fisher_jobs %>% 
+  mutate(iso3c = country_regex_to_iso3c(country))
+
+unique(fao_fisher_jobs_iso$country) # 50 is alarming
+unique(fao_fisher_jobs_iso$iso3c)
+
+# years are weird: has 2010, then jumps to 2015 and increases sequentially to 2020 from there.
+unique(fao_fisher_jobs_iso$year)
+# "2010" "2015" "2016" "2017" "2018" "2019" "2020" "2021"
+
+fao_unique <- unique(fao_fisher_jobs_iso$iso3c)
+cf_unique <- unique(cf_job_prop_agg$eez_iso3)
+
+in_fao_not_cf <- fao_unique[!fao_unique %in% cf_unique]
+in_cf_not_fao <- cf_unique[!cf_unique %in% fao_unique]
+in_both <- fao_unique[fao_unique %in% cf_unique]
+
+print("In fao_fisher_jobs_iso but not in cf_job_prop_agg:")
+print(in_fao_not_cf)
+print("In cf_job_prop_agg but not in fao_fisher_jobs_iso:")
+print(in_cf_not_fao)
+print("In both:")
+print(in_both)
+
+length(fao_unique)
+length(cf_unique)
 ```
 
 

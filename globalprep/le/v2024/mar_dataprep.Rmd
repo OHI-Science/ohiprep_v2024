@@ -59,25 +59,25 @@ librarian::shelf(
 )
 #remotes::install_github("skgrange/threadr") # for na_extrapolate
 library(threadr)
-
+library(pdftools)
 
 # source 
-source(here("workflow/R/common.R"))
+source(here::here("workflow/R/common.R"))
 
 # set year and file path info
 current_year <- 2024 # Update this!!
 
 version_year <- paste0("v",current_year)
 data_dir_version_year <- paste0("d", current_year)
-data_path <- here("globalprep", "le", version_year)
+data_path <- here::here("globalprep", "le", version_year)
 
 # Raw data directory (on Mazu)
 raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
 # world bank raw data directory
-wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+wb_dir <- here::here(raw_data_dir, "WorldBank", data_dir_version_year)
 
-fao_dir <- here(raw_data_dir, "FAO_mariculture", data_dir_version_year)
+fao_dir <- here::here(raw_data_dir, "FAO_mariculture", data_dir_version_year)
 
 aquaculture_value <- read_csv(file.path(dir_M, "git-annex/globalprep/_raw_data/FAO_mariculture/d2023/online_query_portal/FAO_GlobalAquacultureProduction_Value_1984_2021.csv"))
 
@@ -85,7 +85,7 @@ aquaculture_value2 <- read_csv(file.path(fao_dir, "/FAO_GlobalAquacultureProduct
 
 
 # output data dir for intermediate data products
-int_dir <- here(data_path, "int")
+int_dir <- here::here(data_path, "int")
 ```
 
 
@@ -105,6 +105,28 @@ aquaculture_value <- read_csv(file.path(fao_dir, "/FAO_GlobalAquacultureProducti
 # str(aquaculture_value)
 ```
 
+## Test 
+
+```{r}
+fao_values <- fao %>% 
+  dplyr::select(-c(paste(initial_data_year:last_data_year, "Flag"))) %>% 
+  pivot_longer(cols = paste0(initial_data_year:last_data_year),
+               names_to = "year",
+               values_to = "value")
+
+#pivot all of the flag columns   
+fao_flags <- fao %>%
+  select(-paste0(initial_data_year:last_data_year)) %>% 
+  pivot_longer(cols = paste(initial_data_year:last_data_year, "Flag"),
+               names_to = "flag_year",
+               values_to = "flag") %>% 
+  mutate(year = str_remove(flag_year, " Flag")) %>% 
+  select(year, flag, row_id) 
+
+#combine flag and row id 
+fao_new <- fao_values %>%
+  left_join(fao_flags, by = c("row_id", "year"))
+```
 
 ```{r}
 #clean the aquaculture value data
@@ -114,8 +136,8 @@ aquaculture_value_clean <- aquaculture_value %>%
                 species =  asfis_species_name,
                 area = fao_major_fishing_area_name,
                 environment = environment_name) %>%
-  dplyr::select(-c(unit_name))  %>% #clean data, note that we are still using a sub_n value of .1 (100 dollars) 
-  mutate(row_id = row_number())
+  dplyr::select(-c(unit_name)) %>% #clean data, note that we are still using a sub_n value of .1 (100 dollars) 
+  mutate(row_id = 1:nrow(.))
 
 initial_data_year = 1984
 last_data_year = 2022
@@ -127,39 +149,259 @@ flag_end = 84
 test = paste0("symbol_", seq(flag_start, flag_end, by = 2))
 
 fao_values <- aquaculture_value_clean %>% 
-  # dplyr::select(-c(paste0("symbol_", seq(flag_start, flag_end, by = 2)))) %>% 
-  pivot_longer(cols = paste0("x", initial_data_year:last_data_year),
+  dplyr::select(-c(paste0("symbol_", seq(flag_start, flag_end, by = 2)))) %>%
+  pivot_longer(cols = paste0("x", initial_data_year:last_data_year), 
                names_to = "year",
                values_to = "value") %>% 
-  pivot_longer(cols = paste0("symbol_", seq(flag_start, flag_end, by = 2)),
+  mutate(year = str_remove(year, "x"))
+
+fao_flags1 <- aquaculture_value_clean %>% 
+  dplyr::select(-c(paste0("x", initial_data_year:last_data_year))) 
+
+colnames(fao_flags1) = c("country", "species", "area", "environment", "unit", paste0("flag", initial_data_year:last_data_year), "row_id")
+
+fao_flags <- fao_flags1 %>% 
+  pivot_longer(cols = paste0("flag", initial_data_year:last_data_year),
                names_to = "flag_year",
-               values_to = "flag")
+               values_to = "flag") %>% 
+  mutate(year = str_remove(flag_year, "flag")) %>% 
+  dplyr::select(year, row_id, flag)
+
+fao_new <- fao_values %>%
+  left_join(fao_flags, by = c("row_id", "year"))
+
 sub_N = 0.1
 
-fao_new <- fao_values %>% 
+#replace 
+fao_new <- fao_new%>% 
   mutate(value = case_when((str_detect(flag, "N") & value == 0) ~ sub_N,
                            TRUE ~value)) %>% #replace values that are 0 and have the flag N with sub_N
-  select(-c(row_id, flag, flag_year))
+  select(-c(row_id, flag))
 
 
 #filter to only marine habitats
- mariculture_revenue <- aquaculture_value_clean %>% 
+ mariculture_revenue <- fao_new %>% 
    filter(environment %in% c("Brackishwater", "Marine"))
 
 #sum by region and year (we need total revenue)
 total_mar_rev <- mariculture_revenue %>%
   group_by(country, year) %>% 
-  summarize(value = sum(value, na.rm = T)) %>% 
+  dplyr::summarize(value = sum(value, na.rm = TRUE)) %>% 
   mutate(sector = "mar", data_source = "FAO aquaculture value", unit = "USD (1)",
           value = value *1000) %>% #multiply value times 1000 to get dollars
   select(country, year, value, unit, sector, data_source)
 
-write_csv(total_mar_rev, here(data_path, "int/mar_revenue.csv"))
+## Maximum value in the dataset (2024) was china, with 2.2 trillion USD in aquaculture value. ??? Is that correct? according to the internet china's aquaculture and fisheries production value in 2022 was 1.5 trillion yuan, which according to conversion rates should not be 2.2 trillion usd 
+total_mar_rev %>% 
+  # filter(!country == "China") %>% 
+  ggplot(aes(x = as.numeric(year), y = value, color = country)) + 
+  geom_line() + 
+  theme(legend.position = "none") + 
+  scale_y_continuous(labels = scales::label_dollar(scale = 0.000000001, suffix = "B"))
+```
+
+## Assigning country names to their respective regions in OHI
+
+```{r}
+## Need to join with regions and assign each country its respective OHI Region ----------
+
+## Checking the unique country names for anything that needs to be hard-coded
+unique(total_mar_rev$country)
+
+mar_rev_rgn <- total_mar_rev %>% 
+  mutate(Country = case_when(
+    country=="Antigua and Barbuda" ~ "Antigua & Barbuda",
+    country=="Bonaire, Sint Eustatius and Saba" ~ "Sint Eustasius",
+    country=="Bosnia and Herzegovina" ~ "Bosnia Herzegovina",
+    country=="China, Hong Kong SAR" ~ "China",
+    country=="Democratic People's Republic of Korea" ~ "North Korea",
+    country=="Republic of Korea" ~ "South Korea",
+    country=="R<e9>union" ~ "Reunion",
+    country=="Saint Kitts and Nevis" ~ "Saint Kitts &amp Nevis",
+    country=="Saint Pierre and Miquelon" ~ "Saint Pierre and Miqelon",
+    country=="Saint Vincent and the Grenadines" ~ "Saint Vincent/Grenadines",
+    country=="Türkiye" ~ "Turkey",
+    country=="Yugoslavia SFR" ~ "The Former Yugoslav Republic of Macedonia",
+    country=="Netherlands Antilles" ~ "Curacao",
+    TRUE ~ country
+  ))
+  
+mar_rev_rgn_temp <- name_2_rgn(df_in = mar_rev_rgn, 
+                       fld_name='Country',
+                      flds_unique = c("year"))
+
+## Received a warning for a duplicated country. Using the following code to display the portion of the dataframe that's duplicated 
+    ## Can see that in this case the duplicated country is China, with both a "China" and "China, Hong Kong SAR" both being considered china 
+mar_rev_rgn_temp[duplicated(mar_rev_rgn_temp[, c('Country','year')]),  ] 
+
+## Double-checking to see how values add up
+mar_rev_rgn_check <- mar_rev_rgn_temp %>% 
+  filter(Country =="China") %>% 
+  ungroup()
+
+## Getting rid of duplicated China data from temp df
+mar_rev_rgn_temp <- mar_rev_rgn_temp %>% 
+  filter(!country %in% "China") %>% 
+  filter(!country %in% "China, Hong Kong SAR")
+
+## The following code was used to aggregate duplicates by population for the "Social Progress Index", This would likely be useful for another metric of progress, but since we're dealing with hard values for revenue from aquaculture, my thought process is that we can just add them together, and it will represent the combined value from Hong Kong as well as China itself
+
+mar_rev_china_temp <- mar_rev_rgn_check %>% 
+  mutate(year = as.character(year)) %>% 
+  # group_by(year) %>%
+  dplyr::summarize(value = sum(value), .by = year)
+
+## Okay, before I find a way to maintain columns this will have to be hard-coded to bring back the columns into the dataframe in the correct order so I can rbind it back to the primary mar_rev df 
+mar_rev_china_temp1 <- mar_rev_rgn_check %>% 
+  filter(country == "China")
+
+## Adding columns in (almost) required order after ensuring the df im pulling from is the correct length
+mar_rev_china_temp$country = mar_rev_china_temp1$country
+mar_rev_china_temp$unit = mar_rev_china_temp1$unit
+mar_rev_china_temp$sector = mar_rev_china_temp1$sector
+mar_rev_china_temp$data_source = mar_rev_china_temp1$data_source
+mar_rev_china_temp$Country = mar_rev_china_temp1$Country
+mar_rev_china_temp$rgn_id = mar_rev_china_temp1$rgn_id
+mar_rev_china_temp$rgn_name = mar_rev_china_temp1$rgn_name
+
+## Moving the "country" column to the correct position to rbind the china data back onto the entire data 
+mar_rev_china_temp <- mar_rev_china_temp %>% 
+  relocate(country, .before = year)
+
+## Binding the china data back onto the entire dataframe 
+mar_rev_rgn_final <- rbind.data.frame(mar_rev_rgn_temp, mar_rev_china_temp)
+
+  
+# Weight the following duplicates by population
+# China, Guadeloupe, Guam, Hong Kong, Macao, Martinique, Northern Mariana Islands, Puerto Rico, Virgin Islands (U.S.)... Populations taken from google
+
+# pop_weights <- data.frame(Country = c("China", "Hong Kong", "Macao",
+#                  "Guadeloupe", "Martinique",
+#                  "Guam", "Northern Mariana Islands",
+#                  "Puerto Rico", "Virgin Islands (U.S.)"),
+#                  pop = c(1452883897, 7632334, 669037,
+#                          400276, 367507,
+#                          172069, 49551,
+#                          3252407, 103910))
+# 
+# spi_rgn <- spi_rgn %>%
+#   # left_join(pop_weights, by = "Country") %>%
+#   mutate(pop = ifelse(is.na(pop), 1, pop)) %>%
+#   group_by(rgn_id, rgn_name, year) %>%
+#   dplyr::summarize(score = weighted.mean(score, pop, na.rm=TRUE),
+#             method = paste(unique(method), collapse=" "),
+#             gapfill = weighted.mean(gapfill, pop, na.rm=TRUE))%>%
+#   ungroup() %>% 
+#   dplyr::mutate(year = as.numeric(year))
+
+write_csv(mar_rev_rgn_final, here::here(data_path, "int/mar_revenue.csv"))
 ```
 
 
+# JOBS!!!!!!!
+
+## This was copied from Sophia's pdf processing she did for the fao yearbook 
+
+```{r}
+#------cf FAO Yearbook Number of Fishers-------
+# turn the number of fishers table from the FAO yearbook into a data frame and clean.
+# note: world total includes countries and regions not within the table.  Unsure of where that data comes from; look for methodology.
+
+# Need To update the fao_dir from above with the pdf of the FAO Fisheries and Aquaculture Statistics Yearbook
+fao_dir <- here::here(raw_data_dir, "FAO", data_dir_version_year)
+
+## Loading the pdf in as an object 
+fao_pdf <- pdf_text(here::here(fao_dir, "fao_statistics_yearbook_07_03_24.pdf"))
+
+## Selecting pdf table 
+fishers_table <- fao_pdf[[170]] %>% # page number of the pdf that the desired table is on 
+  as.data.frame()
+
+## Specify columns 
+columns <- c("country", "1995", "2000", "2005", "2010", "2015", "2017", "2018", "2019", "2020","2021")
+
+## Setting the columns name because mutate wasn't picking up on the "." as a column name.
+colnames(fishers_table) = c("main_column")
+## Checking 
+# colnames(fishers_table)
 
 
+## Turn the pdf page into a clean dataframe
+fao_mar_jobs <- fishers_table %>%
+  separate_rows(main_column, sep = "\n") %>%  #separate rows based on line breaks
+  # rename(main_column = '.') %>%  ## Removed because of above mention of column name 
+  mutate(main_column = str_remove_all(main_column, "\\*")) %>% # Remove the * 
+  mutate(main_column = str_replace_all(main_column, "E(?!\\p{L})", " ")) %>% # Replace all the Es not followed by letters (used to indicate estimate)
+  slice(7:69) %>% #remove all rows not in the table
+  separate(main_column, into = columns, sep = " {2,}", extra = "merge") %>% #separate into columns based on double spaces
+  pivot_longer(cols = -c("country"), names_to = "year") %>% 
+  mutate(value = str_squish(value)) %>% #remove extra spaces
+  mutate(value = str_remove_all(value, " ")) %>% 
+  mutate(value = if_else(value == "…" , NA, value)) %>% 
+  mutate(value = as.numeric(value)) %>% 
+  mutate(unit = "persons (1)",
+         sector = "mar/cf",
+         data_source = "FAO number of aquaculture jobs") %>% 
+  slice(-c(1:44))
+
+## Final cleaning. Removing extraneous rows not necessary 
+fao_mar_jobs_clean <- fao_mar_jobs %>% 
+  dplyr::slice(-c(1:6, 327:516)) %>% # %>% view() # Add view() to check df to make sure its tidy after 
+  mutate(year = as.numeric(year))
+
+```
+
+
+## This piece of code is for assigning countries to region id when there are dis-aggregated country names (i.e China, Hong Kong, Macao) that are considered one country for the OHI Regions 
+
+```{r}
+## Hard coding a few of the country names that are either synonyms of countries or difficult to identify with name_2_rgn() function
+spi_calc <- fao_mar_jobs_clean %>%
+  filter(!country %in% "World total") %>% 
+  dplyr::rename(Country = country) %>% 
+  mutate(Country = case_when(
+   Country=="China,Taiwan" ~ "China",
+    Country=="Russian Fed" ~ "Russia",
+    Country=="Rep.of Korea" ~ "South Korea",
+    Country=="DPR Korea" ~ "North Korea",
+    Country=="Türkiye" ~ "Turkey",
+   Country=="USA" ~ "United States of America",
+    TRUE ~ Country # Everything else, leave it be
+    ))
+
+# Channel Islands are Jersey and Guernsey, but these are already in the data
+
+spi_rgn <- name_2_rgn(df_in = spi_calc, 
+                       fld_name='Country',
+                      flds_unique = c("year"))
+
+## Received a warning for a duplicated country. Using the following code to display the portion of the dataframe that's duplicated 
+    ## Can see that in this case it was China, even though they actually didn't have any duplicated values. Interesting 
+spi_rgn[duplicated(spi_rgn[, c('Country','year')]),  ] 
+
+# Weight the following duplicates by population
+# China, Guadeloupe, Guam, Hong Kong, Macao, Martinique, Northern Mariana Islands, Puerto Rico, Virgin Islands (U.S.)... Populations taken from google
+
+# pop_weights <- data.frame(Country = c("China", "Hong Kong", "Macao",
+#                  "Guadeloupe", "Martinique",
+#                  "Guam", "Northern Mariana Islands",
+#                  "Puerto Rico", "Virgin Islands (U.S.)"),
+#                  pop = c(1452883897, 7632334, 669037,
+#                          400276, 367507,
+#                          172069, 49551,
+#                          3252407, 103910))
+
+spi_rgn <- spi_rgn %>%
+  # left_join(pop_weights, by = "Country") %>%
+  mutate(pop = ifelse(is.na(pop), 1, pop)) %>%
+  group_by(rgn_id, rgn_name, year) %>%
+  dplyr::summarize(score = weighted.mean(score, pop, na.rm=TRUE),
+            method = paste(unique(method), collapse=" "),
+            gapfill = weighted.mean(gapfill, pop, na.rm=TRUE))%>%
+  ungroup() %>% 
+  dplyr::mutate(year = as.numeric(year))
+
+```
 
 
 
