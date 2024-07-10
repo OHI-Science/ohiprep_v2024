@@ -27,6 +27,7 @@ editor_options:
 * **Data:** 
     * **Revenue** Data for Mariculture 
     * Data came from FishStatJ, FAO's application to obtain different fishery-related metrics by country as well as by sector
+    * Citation: © FAO 2024. Global Aquaculture Production. In: Fisheries and Aquaculture. Rome. [Cited Tuesday, July 9th 2024]. https://www.fao.org/fishery/en/collection/aquaculture
     * **Jobs** Data for mariculture 
     * Partially obtained from [FAO Fisheries and Aquaculture Statistical Yearbook](https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content)
     * Also brought in OECD data from their online [OECD Data Explorer](https://data-explorer.oecd.org/vis?df[ds]=DisseminateFinalDMZ&df[id]=DSD_SOE%40DF_SOE&df[ag]=OECD.ENV.EPI&dq=.A....&pd=1995%2C2024&to[TIME_PERIOD]=false&vw=tb)
@@ -58,6 +59,7 @@ librarian::shelf(
 #remotes::install_github("skgrange/threadr") # for na_extrapolate
 library(threadr)
 library(pdftools)
+library(priceR)
 
 # source 
 source(here::here("workflow/R/common.R"))
@@ -267,35 +269,34 @@ mar_rev_china_temp <- mar_rev_china_temp %>%
   relocate(country, .before = year)
 
 ## Binding the china data back onto the entire dataframe 
-mar_rev_rgn_final <- rbind.data.frame(mar_rev_rgn_temp, mar_rev_china_temp)
 
-  
-# Weight the following duplicates by population
-# China, Guadeloupe, Guam, Hong Kong, Macao, Martinique, Northern Mariana Islands, Puerto Rico, Virgin Islands (U.S.)... Populations taken from google
+eco_mar_usd_raw <- rbind.data.frame(mar_rev_rgn_temp, mar_rev_china_temp) %>% 
+  relocate(c(rgn_id, rgn_name), .before = country) %>% 
+  ungroup() %>% 
+  select(-c(country, sector, data_source, Country)) %>% 
+  dplyr::rename(usd = value)
 
-# pop_weights <- data.frame(Country = c("China", "Hong Kong", "Macao",
-#                  "Guadeloupe", "Martinique",
-#                  "Guam", "Northern Mariana Islands",
-#                  "Puerto Rico", "Virgin Islands (U.S.)"),
-#                  pop = c(1452883897, 7632334, 669037,
-#                          400276, 367507,
-#                          172069, 49551,
-#                          3252407, 103910))
-# 
-# spi_rgn <- spi_rgn %>%
-#   # left_join(pop_weights, by = "Country") %>%
-#   mutate(pop = ifelse(is.na(pop), 1, pop)) %>%
-#   group_by(rgn_id, rgn_name, year) %>%
-#   dplyr::summarize(score = weighted.mean(score, pop, na.rm=TRUE),
-#             method = paste(unique(method), collapse=" "),
-#             gapfill = weighted.mean(gapfill, pop, na.rm=TRUE))%>%
-#   ungroup() %>% 
-#   dplyr::mutate(year = as.numeric(year))
+## Using priceR for each unique combination of year, rgn_id, and sector --> aggregate function maybe 
+??priceR
+
+prices <- eco_mar_usd_raw$usd
+
+from_dates <- eco_mar_usd_raw$year
+
+to_dates <- 2017
+
+country = "US"
+
+converted_eco_mar_usd <- adjust_for_inflation(price = prices, from_date = from_dates, country = country, to_date = to_dates)
+
+eco_mar_usd_raw$converted_usd = converted_eco_mar_usd 
 
 ## Checking how many unique countries are within the revenue data - 147 (2024 Assessment)
-# length(unique(mar_rev_rgn_final$Country))
+# length(unique(eco_mar_usd_raw$rgn_id))
 
-write_csv(mar_rev_rgn_final, here::here(data_path, "int/mar_revenue.csv"))
+
+
+# write_csv(eco_mar_usd_raw, here::here(data_path, "int/eco_mar_usd_raw.csv"))
 ```
 
 
@@ -350,13 +351,52 @@ fao_mar_jobs_clean <- fao_mar_jobs %>%
   dplyr::slice(-c(1:6, 327:516)) %>% # %>% view() # Add view() to check df to make sure its tidy after 
   mutate(year = as.numeric(year))
 
-## OECD data on aquaculture employment 
+########### OECD data on aquaculture employment ###########
+
 oecd.fp <- file.path(dir_M, "git-annex/globalprep/_raw_data/OECD", data_dir_version_year, "OECD.ENV.EPI,DSD_SOE@DF_SOE,+.A.FISH_EMP_AQUACULTURE_TOT....csv")
 
 #### BRING THIS JAWN IN #####
 
 oecd_mar_jobs <- read.csv(oecd.fp) %>% janitor::clean_names()
+
 length(unique(oecd_mar_jobs$reference_area))
+
+oecd_mar_jobs_clean <- oecd_mar_jobs %>% 
+  ## Getting rid of all unnecessary columns 
+  select(-c(obs_status_2, observation_status_2, price_base, price_base_2, ref_year_price, price_reference_year, observation_value, time_period_2, iucn_management_categories, ret_period, freq, measure, structure, structure_id, action, measure_2, unit_measure, designation, return_periods, decimals, decimals_2, obs_status, observation_status, unit_mult, unit_multiplier)) %>% 
+  ## Moving columns to more intuitive order 
+  relocate(c(ref_area, reference_area, time_period, obs_value), .before = structure_name) %>% 
+  ## Multiplying obs_value by 1000 to obtain raw value of jobs per country 
+  mutate(value = obs_value*1000) %>% 
+  ## One more relocate
+  relocate(value, .after = obs_value) %>% 
+  ## Renaming structure_name to source
+  dplyr::rename(data_source = structure_name) %>% 
+  ## Removing redundant/unneeded columns 
+  select(-c(obs_value, frequency_of_observation)) %>% 
+  ## Renaming columns to join with other jobs data from FAO
+  dplyr::rename(year = time_period,
+                country = reference_area) %>% 
+  ## Relocating one last time 
+  relocate(unit_of_measure, .before=data_source)
+
+oecd_mar_jobs_join <- oecd_mar_jobs_clean %>% 
+  select(-c(unit_of_measure, ref_area)) %>% 
+  mutate(unit = "persons (1)",
+         sector = "mar") %>% 
+  relocate(c(unit, sector), .before=data_source)
+
+## With both datasets our total unique regions comes out to 82
+length(unique(fao_mar_jobs_clean$country)) + length(unique(oecd_mar_jobs_join$country))
+
+mar_jobs_tot <- rbind(fao_mar_jobs_final, oecd_mar_jobs_join)
+
+## Joined the unique country names comes out to 65
+length(unique(mar_jobs_tot$country))
+
+duplicates <- as.data.frame(mar_jobs_tot[duplicated(mar_jobs_tot[, c('country', 'year')]),  ])
+
+length(unique(duplicates$country))
 
 ```
 
