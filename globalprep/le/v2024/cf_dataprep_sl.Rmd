@@ -481,11 +481,11 @@ cf_revenue <- read_csv(here("globalprep", "le", "v2023", "int", "cf_revenue.csv"
 # check names
 # These data were removed for not having any match in the lookup tables:
 # 
-# bonaire/s.eustatius/saba british indian ocean ter          channel islands     french southern terr 
+# bonaire/s.eustatius/saba (need to be disaggregated) british indian ocean ter (DNE)    channel islands (split by eez area: Jersey, larger island)    french southern terr (DNE)
 #                        1                        1                        1                        1 
-#              isle of man     netherlands antilles                other nei         saint barthélemy 
+#.   isle of man (cannot be lumped w Britain, maybe Ireland)  netherlands antilles  (curacao)      other nei (DNE)        saint barthélemy (DNE)
 #                        1                        1                        1                        1 
-# saint helena/asc./trist.    saint-martin (french)           yugoslavia sfr 
+# saint helena/asc./trist. (Saint Helena)   saint-martin (french)  (DNE)         yugoslavia sfr (DNE)
 #                        1                        1                        1 
 # 
 # These data were removed for not being of the proper rgn_type (eez,ohi_region) or mismatching region names in the lookup tables:
@@ -494,62 +494,103 @@ cf_revenue <- read_csv(here("globalprep", "le", "v2023", "int", "cf_revenue.csv"
 #   ethiopia         0         16
 #   palestine       25          0
 
-length(unique(cf_revenue$country))
+length(unique(cf_revenue$country)) #203
 
-cf_revenue_fix <- cf_revenue_rgn %>%
+cf_revenue_fix <- cf_revenue %>%
   mutate(country = case_when(
-    country=="Bonaire/S.Eustatius/Saba" ~ "", # how to disaggregate instead of aggregate?
+    country=="Bonaire/S.Eustatius/Saba" ~ "Bonaire", # how to disaggregate instead of aggregate?
     country=="British Indian Ocean Ter" ~ "British Indian Ocean Territory",
-    country=="Channel Islands" ~ "", # would be disaggregated into Guernsey and Jersey
-    country=="" ~ " ", 
-    country=="" ~ " ",
-    country=="  " ~ " ",
-    country=="  " ~ " ",
-    country=="  " ~ " ",
-    country=="  " ~ " ",
-    country=="  " ~ " ",
-    country=="  " ~ " ",
+    country=="Channel Islands" ~ "Jersey", # would be disaggregated into Guernsey and Jersey
+    country=="Saint Helena/Asc./Trist." ~ "Saint Helena", 
+    country=="Saint-Martin (French)" ~ "Northern Saint-Martin",
+    country=="Netherlands Antilles" ~ "Curacao",
+    country=="Puerto Rico" ~ "Puerto Rico and Virgin Islands of the United States",
+    country=="China, Hong Kong SAR" ~ "China",
+    country=="China, Macao SAR" ~ "China",
+    country=="United Republic of Tanzania, Zanzibar" ~ "Tanzania",
+    country=="Tanzania, United Rep. of" ~ "Tanzania",
     TRUE ~ country # Everything else, leave it be
   ))
-# look at rasterized fishing effort, to determine the relative proportion of it within each eez, and distribute catcbh relative to that proportion
+
+# COME BACK!!!! look at rasterized fishing effort, to determine the relative proportion of it within each eez, and distribute catch relative to that proportion
+
 cf_revenue_rgn <- name_2_rgn(df_in = cf_revenue_fix, 
                              fld_name='country',
                              flds_unique = c("year"))
 
-oecd_duplicates <- oecd_fisher_jobs_rgn[duplicated(oecd_fisher_jobs_rgn[, c("country", "year")]),]
+cf_revenue_rgn_agg <- cf_revenue_rgn %>% 
+  select(rgn_id, rgn_name, year, value, unit, sector, data_source) %>%
+  filter(year %in% c(2009:2019)) %>% 
+  group_by(rgn_id, rgn_name, year) %>% # because china needs to be aggregated and has duplicate years
+  dplyr::summarize(value = sum(value, na.rm=TRUE)) %>%
+  ungroup() %>% 
+  dplyr::mutate(year = as.numeric(year)) 
 
-oecd_ref_duplicates <- unique(oecd_duplicates$country)
-oecd_rgn_duplicates <- unique(oecd_duplicates$rgn_name)
+rev_duplicates <- cf_revenue_rgn[duplicated(cf_revenue_rgn[, c("country", "year")]),]
+rev_ref_duplicates <- unique(rev_duplicates$country)
+rev_rgn_duplicates <- unique(rev_duplicates$rgn_name)
+rev_diff <- setdiff(rev_rgn_duplicates, rev_ref_duplicates)
+rev_diff # none! Move on
+```
 
-oecd_diff <- setdiff(oecd_rgn_duplicates, oecd_ref_duplicates)
+CF Revenue Plot
+```{r}
+cf_rev_plot <- plotly::plot_ly(cf_revenue_rgn_agg, x = ~year, y = ~value, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Yearly Revenue for the Marine Fishing Sector", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Revenue of all catch (USD)"))
+cf_rev_plot
 
+cf_revenue_china <- cf_revenue_rgn_agg %>% 
+  filter(rgn_name %in% "China") #before aggregation, 
 
+plotly::plot_ly(cf_revenue_china, x = ~year, y = ~value, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Yearly Revenue for the Marine Fishing Sector", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Revenue of all catch (USD)"))
+```
 
+Saving intermediate data
+```{r}
+# columns should be: rgn_id, rgn_name, year, usd (previously value), unit, sector, usd_yr (in this case = year)
 
-
-# Bring in imports and exports from FAO yearbook
-imp_table <- fao_pdf[[190]] %>% #page number of the pdf
-  as.data.frame()
-
-#specify columns 
-columns <- c("blank", "aggregate_geo_area", "2000", "2005", "2010", "2015", "2016", "2017", "2018", "2019", "2020","2021")
-
-#turn the pdf page into a clean dataframe
-cf_fao_imports <- imp_table %>%
-  separate_rows('.', sep = "\n") %>% #separate rows based on line breaks
-  rename(main_column = ".") %>%
-  mutate(main_column = str_remove_all(main_column, "\\*")) %>% #remove the *
-  slice(13:49) %>% #remove all rows not in the table
-  separate(main_column, into = columns, sep = " {3,}", extra = "merge") %>% #separate into columns based on double spaces
-  pivot_longer(cols = -c("country"), names_to = "year") %>% 
-  mutate(value = str_squish(value)) %>% #remove extra spaces
-  mutate(value = str_remove_all(value, " ")) %>% 
-  mutate(value = if_else(value == "…" , NA, value)) %>% 
-  mutate(value = as.numeric(value)) %>% 
-  mutate(unit = "persons (1)",
+cf_revenue_int <- cf_revenue_rgn_agg %>% 
+  mutate(usd = value,
+         unit = "USD (1)",
          sector = "cf",
-         data_source = "FAO number of fishers") %>% 
-  slice(-c(1:44))
+         usd_year = year) %>% 
+  select(-value)
+
+# write_csv(cf_revenue_int, here(int_dir, "eco_cf_usd_pre.csv"))
+```
+
+
+```{r}
+# ###################################################
+# 
+# # Bring in imports and exports from FAO yearbook
+# imp_table <- fao_pdf[[190]] %>% #page number of the pdf
+#   as.data.frame()
+# 
+# #specify columns 
+# columns <- c("blank", "aggregate_geo_area", "2000", "2005", "2010", "2015", "2016", "2017", "2018", "2019", "2020","2021")
+# 
+# #turn the pdf page into a clean dataframe
+# cf_fao_imports <- imp_table %>%
+#   separate_rows('.', sep = "\n") %>% #separate rows based on line breaks
+#   rename(main_column = ".") %>%
+#   mutate(main_column = str_remove_all(main_column, "\\*")) %>% #remove the *
+#   slice(13:49) %>% #remove all rows not in the table
+#   separate(main_column, into = columns, sep = " {3,}", extra = "merge") %>% #separate into columns based on double spaces
+#   pivot_longer(cols = -c("country"), names_to = "year") %>% 
+#   mutate(value = str_squish(value)) %>% #remove extra spaces
+#   mutate(value = str_remove_all(value, " ")) %>% 
+#   mutate(value = if_else(value == "…" , NA, value)) %>% 
+#   mutate(value = as.numeric(value)) %>% 
+#   mutate(unit = "persons (1)",
+#          sector = "cf",
+#          data_source = "FAO number of fishers") %>% 
+#   slice(-c(1:44))
 ```
 
 
