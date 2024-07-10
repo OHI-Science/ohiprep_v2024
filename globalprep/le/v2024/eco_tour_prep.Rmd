@@ -171,6 +171,7 @@ Really interesting to see how the proportions drop in 202 -- intuition check: ma
 More data cleaning & prep for gapfilling, then gapfilling
 
 ```{r}
+# define maximum year (determined after visually inspecting data)
 
 # filter tourism GDP data for year range (2009-2019) ----
 gdp_prop_filter <- gdp_rgn %>% 
@@ -486,11 +487,12 @@ tour_revenue_int <- tourism_value %>%
   mutate(
     unit = "USD (1)",
     sector = "tour",
-    usd_year = 2015 # because the tourism values are in "Constant 2015 US$"
+    usd_yr = 2015 # because the tourism values are in "Constant 2015 US$"
   ) %>% 
-  select(rgn_id, rgn_name, year, usd, unit, sector, usd_year)
+  select(rgn_id, rgn_name, year, usd, unit, sector, usd_yr) %>% 
+  ungroup()
 
-write_csv(tour_revenue_int, here(int_dir, "eco_tour_usd_pre.csv"))
+#write_csv(tour_revenue_int, here(int_dir, "eco_tour_usd_pre.csv"))
 ```
 
 
