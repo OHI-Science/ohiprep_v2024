@@ -155,6 +155,7 @@ exvessel_prices_raw <- read_csv(here(ex_vess_dir, "price-db-results", "exvessel_
 cf_revenue <- read_csv(here("globalprep", "le", "v2023", "int", "cf_revenue.csv"))
 ```
 
+## COME BACK!!!!
 ### Run ohicore name_2_rgn
 ```{r}
 # check names
@@ -239,7 +240,7 @@ cf_revenue_int <- cf_revenue_rgn_agg %>%
          usd_yr = year) %>% 
   select(-value)
 
-write_csv(cf_revenue_int, here(int_dir, "eco_cf_usd_pre.csv"))
+# write_csv(cf_revenue_int, here(int_dir, "eco_cf_usd_pre.csv"))
 ```
 
 
