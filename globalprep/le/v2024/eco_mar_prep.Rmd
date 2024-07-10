@@ -173,7 +173,7 @@ fao_new <- fao_values %>%
 sub_N = 0.1
 
 #replace 
-fao_new <- fao_new%>% 
+fao_new <- fao_new %>% 
   mutate(value = case_when((str_detect(flag, "N") & value == 0) ~ sub_N,
                            TRUE ~value)) %>% #replace values that are 0 and have the flag N with sub_N
   select(-c(row_id, flag))
@@ -274,7 +274,10 @@ eco_mar_usd_raw <- rbind.data.frame(mar_rev_rgn_temp, mar_rev_china_temp) %>%
   relocate(c(rgn_id, rgn_name), .before = country) %>% 
   ungroup() %>% 
   select(-c(country, sector, data_source, Country)) %>% 
-  dplyr::rename(usd = value)
+  dplyr::rename(usd = value) %>% 
+  mutate(sector = "mar",
+         usd_yr = year,
+         year = as.numeric(year))
 
 ## Using priceR for each unique combination of year, rgn_id, and sector --> aggregate function maybe 
 ??priceR
@@ -283,20 +286,18 @@ prices <- eco_mar_usd_raw$usd
 
 from_dates <- eco_mar_usd_raw$year
 
+
 to_dates <- 2017
 
 country = "US"
 
 converted_eco_mar_usd <- adjust_for_inflation(price = prices, from_date = from_dates, country = country, to_date = to_dates)
 
-eco_mar_usd_raw$converted_usd = converted_eco_mar_usd 
-
-## Checking how many unique countries are within the revenue data - 147 (2024 Assessment)
+eco_mar_usd_pre$adj = converted_eco_mar_usd 
+## Checking how many unique countries are within the revenue data - 142 (2024 Assessment)
 # length(unique(eco_mar_usd_raw$rgn_id))
 
-
-
-# write_csv(eco_mar_usd_raw, here::here(data_path, "int/eco_mar_usd_raw.csv"))
+# write_csv(eco_mar_usd_raw, here::here(data_path, "int/eco_mar_usd_pre.csv"))
 ```
 
 
