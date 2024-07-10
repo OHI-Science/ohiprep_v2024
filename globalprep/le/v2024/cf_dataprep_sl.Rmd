@@ -519,8 +519,7 @@ cf_revenue_rgn <- name_2_rgn(df_in = cf_revenue_fix,
                              flds_unique = c("year"))
 
 cf_revenue_rgn_agg <- cf_revenue_rgn %>% 
-  select(rgn_id, rgn_name, year, value, unit, sector, data_source) %>%
-  filter(year %in% c(2009:2019)) %>% 
+  select(rgn_id, rgn_name, year, value, unit, sector, data_source) %>% 
   group_by(rgn_id, rgn_name, year) %>% # because china needs to be aggregated and has duplicate years
   dplyr::summarize(value = sum(value, na.rm=TRUE)) %>%
   ungroup() %>% 
@@ -558,7 +557,7 @@ cf_revenue_int <- cf_revenue_rgn_agg %>%
   mutate(usd = value,
          unit = "USD (1)",
          sector = "cf",
-         usd_year = year) %>% 
+         usd_yr = year) %>% 
   select(-value)
 
 # write_csv(cf_revenue_int, here(int_dir, "eco_cf_usd_pre.csv"))
