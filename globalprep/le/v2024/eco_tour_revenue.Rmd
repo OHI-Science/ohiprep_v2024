@@ -310,23 +310,32 @@ top_diff_gdp_plot
 
 wb_gdp_clean <- wb_gdp_raw %>% 
   clean_names() %>% 
+  # remove unwanted columns
   select(-c(indicator_code, x69)) %>% 
+  # pivot to put years in 1 column, values in another
   pivot_longer(cols = x1960:x2023, names_to = "year", values_to = "gdp_value") %>% 
-    mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  # tidy up year column
+  # tidy up year column
+  mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  
+  # filter to date range
   filter(year %in% c(2009:2019))
+
 
 # run name_2_rgn -----
 wb_gdp_rgn <- name_2_rgn(df_in = wb_gdp_clean, 
                        fld_name = "country_name",
                        flds_unique = c("year"))
 
-# thankfully, in the list following this line: "These data were removed for not having any match in the lookup tables:", there are mostly just the WorldBank aggregate groups (i.e., "low & middle income, latin amaerica & caribbean, etc.), with the exception of Channel Islands and Isle of Man
+# thankfully, in the list following this line: "These data were removed for not having any match in the lookup tables:", there are mostly just the WorldBank aggregate groups (i.e., "low & middle income, Latin America & Caribbean, etc.), with the exception of Channel Islands and Isle of Man
+
+# COME BACK ---- split Channel Islands -- proportional to EEZ area, Jersey slightly larger than Guernsey
+# Isle of Man -- distinct governing body, should not be aggregated with Ireland or the UK
 
 # identify duplicates ----
 wb_gdp_duplicates <- wb_gdp_rgn[duplicated(wb_gdp_rgn[, c("rgn_name", "year")]),]
 View(wb_gdp_duplicates)
 unique(wb_gdp_duplicates$country_name)
 unique(wb_gdp_duplicates$rgn_name)
+
 # then look up these & their pairs in the wb_gdp_clean df to see which countries we do or do not have data for to inform aggregation steps.
 
 # [1] "China": we have data on Macao and Hong Kong --> aggregate (can sum) -- but we don't have tourism GDP % data for mainland China... so just leave as basic aggregation (sum) for now
@@ -343,7 +352,7 @@ unique(wb_gdp_duplicates$rgn_name)
 # aggregate: sum by rgn_name etc. ----
 # name ~ WorldBank GDP region aggregated
 wb_gdp_rgn_agg <- wb_gdp_rgn %>%
-  filter(!country_name %in% c("Northern Mariana Islands")) %>% # filtering out NMI since we only have Guam GDP % data in our other dataset -- should revisit this and update once we have that data
+  filter(!country_name %in% c("Northern Mariana Islands")) %>% # filtering out NMI since we only have Guam GDP % data in our other dataset -- should revisit this and update once we have that data -- double check to see which of these regions we have data for on both datasets in future years of updates!!!
   group_by(rgn_id, rgn_name, year) %>%
   dplyr::summarize(gdp_value_agg = sum(gdp_value, na.rm = TRUE) 
             )%>%
@@ -367,13 +376,17 @@ guam_reference <- wb_gdp_clean %>%
 agg_nmi_check <- left_join(agg_nmi_vals, guam_reference)
 
 print(paste("Do the Guam GDP values before aggregation match the 'Northern Mariana Islands and Guam' values after aggregation?"))
-print(paste((agg_nmi_check$gdp_value_agg == agg_nmi_check$gdp_value)))
 
+if (sum(agg_nmi_check$gdp_value_agg == agg_nmi_check$gdp_value) == length(unique(agg_nmi_check$gdp_value_agg))
+) {
+  print("Yes")
+} else {
+  print("No")
+}
 
-# test region names again:
-# wb_gdp_rgn_2 <- name_2_rgn(df_in = wb_gdp_rgn_agg, 
-#                        fld_name = "rgn_name",
-#                        flds_unique = c("year"))
+# If "No", check which don't match
+# print(paste((agg_nmi_check$gdp_value_agg == agg_nmi_check$gdp_value)))
+
 ```
 
 
@@ -381,11 +394,12 @@ Extra: aggregation explanation/example
 ```{r agg_example, eval = FALSE}
 # to see why we're using summarize instead of just mutating and adding a column see this example:
 # test <- wb_gdp_rgn %>%
-#   filter(!rgn_name %in% c("Northern Mariana Island")) %>% 
-#   group_by(rgn_id, rgn_name, year) %>% 
-#   mutate(test = sum(gdp_value, na.rm = TRUE)) 
+#   filter(!rgn_name %in% c("Northern Mariana Island")) %>%
+#   group_by(rgn_id, rgn_name, year) %>%
+#   mutate(test = sum(gdp_value, na.rm = TRUE))
 # 
-# View(test)
+# #View(test)
+# test %>% filter(rgn_name %in% c("China"))
 
 # yields value column, but still keeps the old country_name column, so there are still duplicates! 
 
@@ -446,8 +460,11 @@ tour_val_plotly <- plot_ly(data = tour_val_subset, x = ~year, y = ~tour_value, c
          yaxis = list(title = "Tourism Value (2015 US$)")
          ) 
 tour_val_plotly
+```
 
 
+```{r}
+# check max value
 max_tour_val <- max(tourism_value$tour_value, na.rm = TRUE)
 
 tourism_value %>% 
@@ -456,6 +473,24 @@ tourism_value %>%
 prettyNum(max_tour_val,big.mark=",",scientific=FALSE)
 
 # 582 billion in US in 2019... out of 20 Trillion GDP
+```
+
+
+# Saving intermediate data 
+
+```{r}
+#--------Prepping data for int saving -------
+
+tour_revenue_int <- tourism_value %>% 
+  rename(usd = tour_value) %>% 
+  mutate(
+    unit = "USD (1)",
+    sector = "tour",
+    usd_year = 2015 # because the tourism values are in "Constant 2015 US$"
+  ) %>% 
+  select(rgn_id, rgn_name, year, usd, unit, sector, usd_year)
+
+write_csv(tour_revenue_int, here(int_dir, "eco_tour_usd_pre.csv"))
 ```
 
 
@@ -485,15 +520,4 @@ Note: remember to add
   mutate(sector = "tour", data_source = "UNWTO Dept. of Statistics")
 
   at the end
-
-# Saving intermediate data 
-
-```{r}
-#--------Prepping data for int saving -------
-
-tour_revenue_int <- gdp_filled %>% 
-  mutate(sector = "tour", data_source = "UNWTO Dept. of Statistics")
-
-write_csv(tour_revenue_int, here(int_dir, "tour_revenue.csv"))
-```
 
