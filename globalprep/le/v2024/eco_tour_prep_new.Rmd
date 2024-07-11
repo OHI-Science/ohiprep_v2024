@@ -30,10 +30,20 @@ editor_options:
 
 -   Tourism: UNWTO Dept. of Statistics (UN Tourism)
 -   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG> 
-  -  A big issue with this data set is that it does not have data for mainland China. I found a resource from CEIC data that has [monthly tourism revenue for China](https://www.ceicdata.com/en/indicator/china/tourism-revenue) (accessed July 11, 2024), but only goes up until the end of 2018 (as of July 2024). If this dataset is updated in the future, it could be a potential resource used to gapfill tourism value for China, which may allow us to preserve the notable Macao tourism data (though you'd need to aggregate the data by taking a weighted sum based on population or some other metric, which would ultimately obscure Macao's trends in the end...). In the future, I hope that we can incorporate Macao as its own region.
+  -  A big issue with this data set is that it does not have data for mainland China. Thus, I was instructed to gapfill using another data source. I found tourism revenue data on the website for the National Bureau of Statistics for China
+-   National Data: National Bureau of Statistics of China (NBS) <https://data.stats.gov.cn/english/easyquery.htm?cn=C01>
+  -  Made an account to download data:
+  -  Email: aramji@bren.ucsb.edu
+  -  Password: OHI.f3ll0ws!
+  -  Security Question: who has influenced you the most?
+  -  Answer: Melanie Frazier
+  -  Returned to home page, clicked “Annual”, clicked “Tourism” from options on the left, clicked “Year” dropdown menu and selected “LATEST20”, then clicked the download button and selected “csv”. File appeared as “Annual.csv”, which I then renamed to “eco_tour_china_all_metrics_2004-2023.csv” 
+  -  Added to new file in _raw_data on Mazu → NBS_China
 
-- for the tourism revenue data used for China, I wanted to discern whether or not these numbers included Macao and Hong Kong, as that can sometimes be the case. Thankfully, the website where I downloaded the data had information on this: 
+- For this tourism revenue data used for China, I wanted to discern whether or not these numbers included Macao and Hong Kong, as that can sometimes be the case (and would significantly impact my data processing methods). Thankfully, the website where I downloaded the data had information on this: 
 > "National statistical indicators involved in the database don't contain data from Hong Kong Special Administrative Regions (SAR), Macao SAR and Taiwan Province except for administrative divisions, land area, forest resources and precipitation. Hong Kong SAR and Macao SAR are a part of the overall national statistics. According to the relevant principles of the PRC Hong Kong Basic Law and Macao SAR Basic Law, Hong Kong, Macao and the mainland are relatively independent statistical regions. Based on their different statistical systems and legal requirements, they conduct statistical work independently."
+
+  -  while this is a little ambiguous, I think it's safe to interpret this to mean that the tourism data we downloaded from the site does not include data from/about Macao and Hong Kong
 
 
 
@@ -378,6 +388,34 @@ unique(china_gdp$country_name)
 ### China Tourism Value
 
 ```{r}
+# ---- clean names ----
+nbsc_clean <- nbsc_raw %>% 
+  janitor::clean_names() 
+
+# get strings for subcategories of tourism data we're looking for (international and domestic tourism earnings)
+#unique(nbsc_clean$indicators)
+tourism_categories <- c("Foreign Exchange Earnings from International Tourism(USD million)", "Earnings from Domestic Tourism(100 million yuan)")
+# here we can see that these values are in different units. We'll want to standardize them to USD, then to Constant 2015 US$ (what the GDP data is in)
+
+# but first, let's tidy up the data! 
+
+# ---- tidy ----
+nbsc_tidy <- nbsc_clean %>% 
+  filter(indicators %in% c(tourism_categories)) %>% 
+  pivot_longer(cols = x2023:x2004, # update this depening on year range of newly downloaded data
+               names_to = "year", values_to = "tourism_value") %>% 
+  # tidy up year column
+  mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  
+  # filter to date range defined earlier
+  filter(year %in% c(min_year:cutoff_year))
+
+
+# ---- standardize value ----
+# convert Chinese Yuan to USD
+
+
+# Convert Current USD to 2015 Constant US$
+
 
 ```
 
