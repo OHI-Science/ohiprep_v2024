@@ -297,7 +297,7 @@ eco_mar_usd_pre$adj = converted_eco_mar_usd
 ## Checking how many unique countries are within the revenue data - 142 (2024 Assessment)
 # length(unique(eco_mar_usd_raw$rgn_id))
 
-# write_csv(eco_mar_usd_raw, here::here(data_path, "int/eco_mar_usd_pre.csv"))
+# write_csv(eco_mar_usd_raw, here::here(data_path, "int", "eco_mar_usd_pre.csv"))
 ```
 
 
