@@ -30,6 +30,7 @@ editor_options:
 
 -   Tourism: UNWTO Dept. of Statistics (UN Tourism)
 -   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG> 
+  -  A big issue with this data set is that it does not have data for mainland China. I found a resource from CEIC data that has [monthly tourism revenue for China](https://www.ceicdata.com/en/indicator/china/tourism-revenue) (accessed July 11, 2024), but only goes up until the end of 2018 (as of July 2024). If this dataset is updated in the future, it could be a potential resource used to gapfill tourism value for China, which may allow us to preserve the notable Macao tourism data (though you'd need to aggregate the data by taking a weighted sum based on population or some other metric, which would ultimately obscure Macao's trends in the end...). In the future, I hope that we can incorporate Macao as its own region. 
 
 -  GDP: World Bank, in "Constant 2015 US$"
 -   <https://data.worldbank.org/indicator/NY.GDP.MKTP.KD> Downloaded July 9, 2024. Has annual GDP value from 1960-2023. Additional metadata copied and saved as a `.rtf` in the WorldBank_global_annual_GDP_2015_constant_USD subfolder of the _raw_data WorldBank folder for d2024. Last updated (found in the first few rows of the `.csv`): 2024-06-28
@@ -198,7 +199,7 @@ ohi_rgns_prelim_plot
 # htmlwidgets::saveWidget(ohi_rgns_prelim_plot, file = "eco_tour_ohi_rgns_prelim_plot.html")
 ```
 
-
+It is notable how 
 
 
 ### Gapfilling
@@ -470,7 +471,7 @@ tourism_value <- gdp_join %>%
 
 #### Preliminary Plotting
 
-Static
+**Static plot**
 
 ```{r}
 # ---- preliminary plotting: static ----
@@ -503,8 +504,10 @@ ggplot(data = tour_val_subset,
   )
 ```
 
+This is obviously a very rudimentary (and not very helpful or informative) plot. It is  tedious to have to refer back to a table of the region IDs to understand which region is which, and is overall what I would call a "spaghetti plot". Let's use an interactive plot to more usefully visualize what's going on with the data!
 
-Interactive plot
+
+**Interactive plot**
 
 ```{r}
 # ---- preliminary plotting: interactive ----
@@ -533,6 +536,10 @@ tour_val_plotly <- plot_ly(data = tour_val_subset,
 
 tour_val_plotly
 ```
+
+COME BACK -- lines not showing up....
+
+
 
 
 ```{r}
