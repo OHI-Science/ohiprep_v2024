@@ -24,6 +24,7 @@ librarian::shelf(
   here,
   janitor,
   tidyverse,
+  ohicore,
   
   priceR, # for inflation function
   
@@ -42,6 +43,7 @@ source(here("workflow", "R", "inflation_adjustment.R"))
 
 # ---- set year and file path info ----
 current_year <- 2024 # Update this!!
+
 version_year <- paste0("v",current_year)
 
 data_path <- here("globalprep", "le", version_year)
@@ -82,13 +84,13 @@ tour_df_adj <- inflation_adjustment(tour_df_pre, conversion_date = 2017, country
 
 
 ```
-## Combine adjusted dataframes 
+## Combine adjusted data frames 
 
 ```{r}
-# bind rows of adjusted dataframes
+# bind rows of adjusted data frames
 eco_usd_bind <- rbind(cf_df_adj, mar_df_adj, tour_df_adj)
 
-# find maximum and minimum years for each adjusted dataframe
+# find maximum and minimum years for each adjusted data frame
 min_max_df <- tibble(
   min_year = c(min(cf_df_adj$year), min(mar_df_adj$year), min(tour_df_adj$year)),
   max_year = c(max(cf_df_adj$year), max(mar_df_adj$year), max(tour_df_adj$year))
@@ -98,7 +100,7 @@ min_max_df <- tibble(
 start_year <- max(min_max_df$min_year)
 stop_year <- min(min_max_df$max_year)
 
-# ----- create aggregated adjusted dataframe ------------
+# ----- create aggregated adjusted data frame ------------
 eco_usd_adj <- eco_usd_bind %>% 
   filter(year %in% c(start_year:stop_year)) %>% # filter to date range
   group_by(rgn_id, rgn_name, year) %>% # group by places & years
@@ -110,7 +112,7 @@ eco_usd_adj <- eco_usd_bind %>%
 
 
 
-# write dataframe to int
+# write data frame to int
 #write_csv(eco_usd_adj, here(int_dir, "eco_usd_adj.csv"))
 
 ```
@@ -127,6 +129,8 @@ eco_usd_adj <- eco_usd_bind %>%
 # want: current year / average of 5 previous years (sum of 5 previous yrs / 5, na.rm = T)
 
 # for each rgn_id, rgn_name
+
+
 current_value <- eco_usd_adj[eco_usd_adj$year == stop_year, "value"]
 
 reference_range <- c((stop_year - 4):stop_year - 1)
@@ -135,9 +139,39 @@ reference_point <- (sum(eco_usd_adj[eco_usd_adj$year %in% c(reference_range), "v
 
 
 
+
+
+
+# ============ stretch goals / want to implement ===========================
 # potential: add if statement that calculates average based on most recent year (next available year) if current year is NA
 
 
+# potential:
+# want to change length(reference_range) to length(!is.na(value)) in reference range for each sector -- would need to have pre-aggregated data 
+```
 
+
+
+Test
+
+```{r}
+library(dplyr)
+
+calculate_scores <- function(data, stop_year) {
+  data %>%
+    group_by(rgn_id, rgn_name) %>%
+    mutate(
+      current_value = value[year == max(year[year <= stop_year])],
+      reference_range = list(seq(max(year[year <= stop_year]) - 5, max(year[year <= stop_year]) - 1)),
+      reference_point = sapply(reference_range, function(x) mean(value[year %in% x], na.rm = TRUE)),
+      score = current_value / reference_point
+    ) %>%
+    filter(year == max(year[year <= stop_year])) %>%
+    select(rgn_id, rgn_name, year, current_value, reference_point, score) %>%
+    ungroup()
+}
+
+# Assuming your data frame is named 'eco_usd_adj'
+result <- calculate_scores(eco_usd_adj, stop_year = 2019)  # Replace 2019 with your desired stop year
 ```
 
