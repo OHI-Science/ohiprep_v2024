@@ -5,7 +5,7 @@
 #' @param df data frame with the following columns: rgn_id, rgn_name, year, usd, unit, sector, usd_yr
 #' @param conversion_date USD year you want the adjusted values to be in
 #' @param country country of unit value (e.g., "US")
-#' @param current_year USD year associated with value that you want to adjust for inflation
+#' @param current_year assessment year  
 #'
 #' @return updated data frame with adj_usd column populated with inflation-adjusted values in USD of specified year (conversion_date)
 #' @export  # writes csv with sector name incorporated to the 'int' folder 
