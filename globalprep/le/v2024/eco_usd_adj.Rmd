@@ -97,8 +97,8 @@ min_max_df <- tibble(
 )
 
 # set year range based on limiting dataset values
-start_year <- max(min_max_df$min_year)
-stop_year <- min(min_max_df$max_year)
+start_year <- max(min_max_df$min_year) # take maximum of minimum years
+stop_year <- min(min_max_df$max_year) # take minimum of maximum years
 
 # ----- create aggregated adjusted data frame ------------
 eco_usd_adj <- eco_usd_bind %>% 
