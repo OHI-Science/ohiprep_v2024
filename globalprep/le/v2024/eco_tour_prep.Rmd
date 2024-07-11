@@ -468,8 +468,12 @@ tourism_value <- gdp_join %>%
 ```
 
 
+#### Preliminary Plotting
+
+Static
+
 ```{r}
-# ---- preliminary plotting ----
+# ---- preliminary plotting: static ----
 # make subset
 tour_val_subset <- tourism_value %>% 
   filter(!is.na(tour_value))
@@ -481,11 +485,29 @@ ggplot(data = tour_val_subset,
            color = rgn_id)) +
   geom_point() +
   geom_line() +
+  scale_x_continuous(breaks = c(seq(min(tour_val_subset$year),
+                                    max(tour_val_subset$year), 1))) +
+  scale_y_continuous(labels = scales::label_currency(scale = 0.000000001, suffix = "B")) +
   theme_bw() +
-  labs(title = "Tourism Value over Time",
+  labs(title = paste0("Tourism Value ", "(",
+                      min(tour_val_subset$year),
+                      "-", max(tour_val_subset$year), ")"),
        subtitle = "Data Sources: UNWTO, World Bank",
        x = "Year",
-       y = "Tourism Value (Constant 2015 US$)")
+       y = "Tourism Value (Constant 2015 US$)") +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 0.8, hjust = 0.9),
+    axis.title.x = element_text(margin = margin(t = 1.2, b = 0.2, unit = "lines")),
+    axis.title.y = element_text(margin = margin(l = 0.5, r = 0.5, unit = "lines")),
+    panel.grid.minor.x = element_blank()
+  )
+```
+
+
+Interactive plot
+
+```{r}
+# ---- preliminary plotting: interactive ----
 
 # set margins
 m <- list(
