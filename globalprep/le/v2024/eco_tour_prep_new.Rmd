@@ -387,6 +387,8 @@ unique(china_gdp$country_name)
 
 ### China Tourism Value
 
+
+
 ```{r}
 # ---- clean names ----
 nbsc_clean <- nbsc_raw %>% 
@@ -408,18 +410,117 @@ nbsc_tidy <- nbsc_clean %>%
   mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  
   # filter to date range defined earlier
   filter(year %in% c(min_year:cutoff_year))
+```
 
 
-# ---- standardize value ----
+Tried to get the conversion rates in a reproducible way:
+
+- `quantmod::getFX()` documentation: <https://www.rdocumentation.org/packages/quantmod/versions/0.4.26/topics/getFX> -- unfortunately only has rates for the past 180 days (doesn't work for our situation)
+- `priceR::historical_exchange_rates()`: requires you to set up an API key -- the free one only gives you 100 requests per month and also requires you to enter credit card information even for the free account...
+  - documentation/repo for {priceR} : <https://github.com/stevecondylios/priceR?tab=readme-ov-file>
+  
+
+```{r}
+# ---- quantmod ----
+# library(quantmod)
+# cny_rates_test <- quantmod::getFX("CNY/USD" #, from = paste0(min_year, "-01-01"), to = paste0(cutoff_year, "-12-31")
+#                                   )
+# cny_rates_test
+
+# ---- priceR ----
+# #tried using the API key posted by the developer
+#Sys.setenv("EXCHANGERATEHOST_ACCESS_KEY"="7e5e3140140bd8e4f4650cc41fc772c0")
+## get Chinese Yuan to USD conversion rates for time range
+# cny_conversion_rate <- priceR::historical_exchange_rates(from = "CNY", to = "USD",
+#                           start_date = paste0(min_year, "-01-01"), end_date = paste0(cutoff_year, "-12-31"))
+
+## returned the following error:
+# Error in `pmap()`:
+# ℹ In index: 1.
+# Caused by error in `dat[[8]]`:
+# ! subscript out of bounds
+# Backtrace:
+#  1. priceR::historical_exchange_rates(...)
+#  2. purrr::pmap_dfr(...)
+#  3. purrr::pmap(.l, .f, ...)
+#  4. purrr:::pmap_("list", .l, .f, ..., .progress = .progress)
+#  8. priceR (local) .f(start_date = .l[[1L]][[i]], end_date = .l[[2L]][[i]], ...)
+#  9. dat[[8]] %>% length
+```
+
+After trying and failing to get a (truly) free, open-source, reproducible way to get conversion rates, we ultimately decided to use the conversion rate of 100 Million Chinese Yuan (CNY) to USD, which at a rate of 1 CNY to 1 USD of 0.137781 as of July 11, 2024 is: 13,778,100.00 (USD)
+- sources: [wise](https://wise.com/us/currency-converter/cny-to-usd-rate?amount=100000000), [Google Finance](https://www.google.com/finance/quote/CNY-USD?sa=X&ved=2ahUKEwiwt9CxgaCHAxWKle4BHdMZCxcQmY0JegQIBxAp)
+
+
+According to the US Bureau of Labor Statistics, \$1 USD in June 2024 has the same buying power as \$0.76 in June of 2015 [conversion link & source](https://data.bls.gov/cgi-bin/cpicalc.pl?cost1=1.00&year1=202406&year2=201506) (they didn't have data for July of this year, and thankfully the 1 month average of CNY to USD was relatively stable around 0.1378). This means that once we convert the historic CNY to 2024 USD, we can convert those 2024 USD values back to the Constant 2015 USD (which the rest of our GDP data is in) using this conversion rate. Alternatively, we could use the `priceR::adjust_for_inflation()` function. However, the cny_to_usd rate is hard-coded, so for now we'll continue to use the hard-coded approach for adjusting the CNY --> USD current --> USD 2015 values. We will use the `priceR::adjust_for_inflation()` to adjust the USD current --> USD 2015 constant values.
+
+
+```{r standardize_china_value}
+# 100 million yuan = 13,778,100.00 (USD)
+h_mil_cny_to_usd <- 13778100
+
 # convert Chinese Yuan to USD
+nbsc_usd <- nbsc_tidy %>% 
+  mutate(tourism_value = case_when(
+    indicators == tourism_categories[1] ~ tourism_value * 1000000, # USD million --> USD (1)
+    indicators == tourism_categories[2] ~ tourism_value * h_mil_cny_to_usd #(CNY hundred million --> USD (1))
+  ))
 
+# now we have domestic tourism value in 2024 USD and 
+# international tourism in current USD ($ year = year column value in data frame)
 
-# Convert Current USD to 2015 Constant US$
+# ---- adjust for inflation, standardize to 2015 USD ----
+nbsc_usd_adjusted <- nbsc_usd %>% 
+  # optional: tidy up indicator names
+  # mutate(indicators = case_when(
+  #   indicators == tourism_categories[1] ~ "Foreign Exchange Earnings from International Tourism",
+  #   indicators == tourism_categories[2] ~ "Earnings from Domestic Tourism"
+  mutate(usd = case_when(
+    # international: convert Current USD to 2015 Constant US$ 
+    indicators == tourism_categories[1] ~ priceR::adjust_for_inflation(price = tourism_value, from_date = year, country = "US", to_date = 2015),
+    
+    # domestic: (2024 USD --> 2015 USD)
+    indicators == tourism_categories[2] ~ priceR::adjust_for_inflation(price = tourism_value,
+                                                                       from_date = current_year, # or hard code this to whatever year's conversion rate you're using for CNY to USD
+                                                                       country = "US", to_date = 2015)
+    
+  ))
+  
 
+# Check: 2015 years should match up
+int_2015 <- nbsc_usd_adjusted %>% filter(year == 2015, indicators == tourism_categories[1])
+
+int_2015$tourism_value == int_2015$usd
+
+  
+# now that everything is in the same units (Constant 2015 US$), we can go ahead and aggregate the data to get a combined tourism value from international and domestic tourism earnings.
+
+# ---- aggregate ----
+china_usd_value <- nbsc_usd_adjusted %>% 
+  group_by(year) %>% 
+  summarize(usd = sum(tourism_value, usd, na.rm = T)) %>% 
+  mutate(geo_area_name = "China",
+         unit = "USD (1)")
 
 ```
 
 
+# Next steps:
+
+- join china_gdp (china subset of GDP data) with macao_hk_subset (gdp proportion subset of Macao and Hong Kong), calculate value (will be in Constant 2015 US$)
+  -  call this `macao_hk_value`
+- join `china_usd_value` with `macao_hk_value`, drop irrelevant columns etc. 
+  -  call this `china_value` or something similar
+  
+- create subset of GDP data without china, hong kong, or macao
+- run `name_2_rgn` function on this, make necessary adjustments
+  -  then join with `no_mc_hk_subset`, call it `no_china_gdp_join` or something similar
+  
+- calculate usd value for `no_china_gdp_join`. call this `no_china_value`
+
+- rbind `china_value` with `no_china_value`. call this `tourism_value`
+
+- prep `tourism_value` for export, then write script, rerun eco_usd_adj.Rmd
 
 
 
