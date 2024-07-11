@@ -178,7 +178,7 @@ fao_fisher_jobs <- fishers_table %>%
 # this data has limited entries, so local currency will need to be ppp adjusted to increase the number of observations per geo area
 cf_ilo_wage_raw <- read_csv(here(ilo_dir, "EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-03-cf-wage.csv"))
 
-cf_wage_ppp_raw <- read_csv(here(oecd_dir, "OECD.SDD.NAD,DSD_NAMAIN10@DF_TABLE4,1.0+A.AUS+AUT+BEL+CAN+CHL+COL+CRI+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ISR+ITA+JPN+KOR+LVA+LTU+LUX+MEX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+TUR+GBR+USA...PPP_B1GQ........csv"))
+cf_wage_ppp_raw <- read_csv(here(oecd_dir, "OECD_2009-2020_wage_quality_annual_ppp_raw.csv"))
 
 ############################################
 # Economies: Revenue of commercial fishing
