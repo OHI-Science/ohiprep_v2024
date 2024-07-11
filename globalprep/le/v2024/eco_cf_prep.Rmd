@@ -155,7 +155,6 @@ exvessel_prices_raw <- read_csv(here(ex_vess_dir, "price-db-results", "exvessel_
 cf_revenue <- read_csv(here("globalprep", "le", "v2023", "int", "cf_revenue.csv"))
 ```
 
-## COME BACK!!!!
 ### Run ohicore name_2_rgn
 ```{r}
 # check names
@@ -191,9 +190,75 @@ cf_revenue_fix <- cf_revenue %>%
     country=="Tanzania, United Rep. of" ~ "Tanzania",
     TRUE ~ country # Everything else, leave it be
   ))
+```
 
+## Disaggregation 
+```{r}
 # COME BACK!!!! look at rasterized fishing effort, to determine the relative proportion of it within each eez, and distribute catch relative to that proportion
 
+mean_catch_2017 <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohiprep_v2024/gh-pages/globalprep/fis/v2020/int/mean_catch.csv")
+
+# regions to disaggregate: 
+## Channel Islands --> Guernsey (228) and Jersey (227)
+## Bonaire/S.Eustatius/Saba --> Bonaire (245), Sint Eustatius (249), and Saba (248)
+
+mean_catch_ci_agg <- mean_catch_2017 %>% 
+  filter(rgn_id %in% c("228", "227")) %>% 
+  filter(year %in% c(2014:2017)) %>% 
+  group_by(rgn_id, year) %>% 
+  dplyr::summarize(catch = sum(mean_catch, na.rm=TRUE)) %>%
+  ungroup() %>%
+  group_by(rgn_id) %>% 
+  mutate(avg_catch = mean(catch)) %>% 
+  pivot_wider(names_from = "rgn_id",
+              values_from = "avg_catch") %>% 
+  rename(jersey = as.character(227),
+         guernsey = as.character(228))
+
+mean_catch_bes_agg <- mean_catch_2017 %>% 
+  filter(rgn_id %in% c("245","249","248")) %>% 
+  filter(year %in% c(2014:2017)) %>% 
+  group_by(rgn_id, year) %>% 
+  dplyr::summarize(catch = sum(mean_catch, na.rm=TRUE)) %>%
+  ungroup() %>%
+  group_by(rgn_id) %>% 
+  mutate(avg_catch = mean(catch)) %>% 
+  pivot_wider(names_from = "rgn_id",
+              values_from = "avg_catch") %>% 
+  rename(bonaire = as.character(245),
+         sint_eustatius = as.character(249),
+         saba = as.character(248))
+
+prop_g <- (mean_catch_ci_agg$guernsey[5])/(mean_catch_ci_agg$guernsey[5]+(mean_catch_ci_agg$jersey[1]))
+
+prop_j <- (mean_catch_ci_agg$jersey[1])/(mean_catch_ci_agg$jersey[1]+(mean_catch_ci_agg$guernsey[5]))
+
+prop_b <- (mean_catch_bes_agg$bonaire[1])/((mean_catch_bes_agg$bonaire[1])+(mean_catch_bes_agg$sint_eustatius[9])+(mean_catch_bes_agg$saba[5]))
+
+prop_e <- (mean_catch_bes_agg$sint_eustatius[9])/((mean_catch_bes_agg$bonaire[1])+(mean_catch_bes_agg$sint_eustatius[9])+(mean_catch_bes_agg$saba[5]))
+
+prop_s <- (mean_catch_bes_agg$saba[5])/((mean_catch_bes_agg$bonaire[1])+(mean_catch_bes_agg$sint_eustatius[9])+(mean_catch_bes_agg$saba[5]))
+```
+
+
+```{r}
+# use proportions to disaggregate Channel Islands and Bonaire/S.Eustatius/Saba
+split_ci <- cf_revenue %>%
+  filter(country == "Channel Islands") %>%
+  mutate(split_col = "Guernsey;Jersey") %>%
+  separate_rows(split_col, sep = ";") %>%
+  group_by(country, year, value, unit) %>%
+  case_when(
+    split_col == "Guernsey" ~ value*prop_g,
+    split_col == "Jersey" ~ value*prop_j
+  ) %>% 
+  ungroup()
+sum(split_saba_sint$tonnes) # 14362.37 ; perfect
+
+```
+
+
+```{r}
 cf_revenue_rgn <- name_2_rgn(df_in = cf_revenue_fix, 
                              fld_name='country',
                              flds_unique = c("year"))
