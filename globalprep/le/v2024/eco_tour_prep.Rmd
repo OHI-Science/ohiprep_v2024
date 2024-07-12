@@ -30,6 +30,10 @@ editor_options:
 
 -   Tourism: UNWTO Dept. of Statistics (UN Tourism)
 -   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG> 
+  -  A big issue with this data set is that it does not have data for mainland China. I found a resource from CEIC data that has [monthly tourism revenue for China](https://www.ceicdata.com/en/indicator/china/tourism-revenue) (accessed July 11, 2024), but only goes up until the end of 2018 (as of July 2024). If this dataset is updated in the future, it could be a potential resource used to gapfill tourism value for China, which may allow us to preserve the notable Macao tourism data (though you'd need to aggregate the data by taking a weighted sum based on population or some other metric, which would ultimately obscure Macao's trends in the end...). In the future, I hope that we can incorporate Macao as its own region.
+  
+
+
 
 -  GDP: World Bank, in "Constant 2015 US$"
 -   <https://data.worldbank.org/indicator/NY.GDP.MKTP.KD> Downloaded July 9, 2024. Has annual GDP value from 1960-2023. Additional metadata copied and saved as a `.rtf` in the WorldBank_global_annual_GDP_2015_constant_USD subfolder of the _raw_data WorldBank folder for d2024. Last updated (found in the first few rows of the `.csv`): 2024-06-28
@@ -77,10 +81,13 @@ data_path <- here("globalprep", "le", version_year)
 raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
 # UNWTO raw data directory
-unwto_dir <- here(raw_data_dir, "UNWTO", data_dir_version_year)
+unwto_dir <- here::here(raw_data_dir, "UNWTO", data_dir_version_year)
 
 # World Bank raw data dir (for GDP data)
-wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+wb_dir <- here::here(raw_data_dir, "WorldBank", data_dir_version_year)
+
+# China National Bureau of Statistics (NSB) directory
+nbsc_dir <- here(raw_data_dir, "NBS_China", data_dir_version_year)
 
 # Output data directory -- for intermediate data products
 int_dir <- here(data_path, "int")
@@ -93,16 +100,20 @@ int_dir <- here(data_path, "int")
 # ===================== Read in Data ==============================
 
 
-# Tourism revenue data ----
+# ---- Tourism revenue data ----
 gdp_prop_raw <- readxl::read_xlsx(here(unwto_dir, "Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx"))
 
-# OHI regions data ----
-region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+# ---- OHI regions data ----
+region_names <- readr::read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
   select(-Notes)
 
-# World Bank GDP in 2015 Constant USD data ----
-wb_gdp_raw <- read_csv(here(wb_dir, "WorldBank_global_annual_GDP_2015_constant_USD", "WorldBank_global_annual_GDP_2015_constant_USD.csv"), skip = 4)
+# ---- World Bank GDP in 2015 Constant USD data ----
+wb_gdp_raw <- readr::read_csv(here(wb_dir, "WorldBank_global_annual_GDP_2015_constant_USD", "WorldBank_global_annual_GDP_2015_constant_USD.csv"), skip = 4)
 # date range from 1960 to 2023
+
+
+# ---- NBSC Data (different units for international and domestic tourism) ----
+nbsc_raw <- readr::read_csv(here::here(nbsc_dir, "eco_tour_china_all_metrics_2004-2023.csv"), skip = 2)
 
 ```
 
@@ -122,9 +133,19 @@ gdp_prop_clean <- gdp_prop_raw %>%
   select(c(geo_area_name, year = time_period, gdp_prop_percent = total))
 
 length(unique(gdp_prop_clean$geo_area_name))
+
+# make all geographic areas have the same date range (and fill missing values with NAs)
+years_df <- tibble(geo_area_name = gdp_prop_clean$geo_area_name) %>% 
+  group_by(geo_area_name) %>% 
+  summarize(year = seq(min(gdp_prop_clean$year), max(gdp_prop_clean$year)))
+
+# join with gdp prop data
+gdp_prop_yrs <- left_join(years_df, gdp_prop_clean, by = c("geo_area_name", "year"))
+
+
 ```
 
-Create preliminary plot of cleaned full dataset (not joined or filtered to OHI regions yet)
+Create preliminary plot of cleaned full dataset (not joined/filtered to OHI regions yet)
 ```{r}
 # ---- preliminary plot ----
 # define margins
@@ -137,7 +158,7 @@ m <- list(
 )
 
 # ---- create plotly interactive plot ----
-prelim_plot <- plot_ly(data = gdp_prop_clean,
+prelim_plot <- plot_ly(data = gdp_prop_yrs,
                        x = ~year,
                        y = ~gdp_prop_percent,
                        color = ~geo_area_name, 
@@ -161,7 +182,7 @@ Macao has an extremely high percent of tourism contributing to their GDP (max of
 
 ```{r}
 # ---- run name_2_rgn -----
-gdp_rgn <- name_2_rgn(df_in = gdp_prop_clean, 
+gdp_rgn <- name_2_rgn(df_in = gdp_prop_yrs, 
                       fld_name = 'geo_area_name',
                       flds_unique = c("year"))
 
@@ -180,13 +201,44 @@ unique(tour_eco_duplicates$rgn_name)
 length(unique(gdp_rgn$rgn_name))
 # v2024: 93
 
+# ---- Rename Macao and Hong Kong ----
+gdp_prop_agg <- gdp_prop_yrs %>% 
+  mutate(geo_area_name = case_when(
+    geo_area_name == "China, Macao Special Administrative Region" ~ "China, Macao SAR",
+    geo_area_name == "China, Hong Kong Special Administrative Region" ~ "China, Hong Kong SAR",
+    .default = geo_area_name
+  ))
+
+
+# ---- Run name_2_rgn again -----
+gdp_rgn_agg <- name_2_rgn(df_in = gdp_prop_agg, 
+                      fld_name = 'geo_area_name',
+                      flds_unique = c("year"))
+
+# great! now nothing has been removed... now we need to check the duplicates 
+tour_agg_duplicates <- gdp_rgn_agg[duplicated(gdp_rgn_agg[, c("rgn_name", "year")]),]
+unique(tour_agg_duplicates$geo_area_name)
+unique(tour_agg_duplicates$rgn_name)
+
+
+# ----- China subset ----
+macao_hk_subset <- gdp_rgn_agg %>% filter(rgn_name == "China")
+
+
+# ---- excluding China subset ----
+# (we'll rbind later once we have the tourism values for HK, Macao, and China) 
+no_mc_hk_subset <- gdp_rgn_agg %>% filter(rgn_name != "China")
+
+
 ```
+
+
 
 Create preliminary plot with updated `rgn_name` field
 
 ```{r}
 # ---- updated prelim plot ----
-ohi_rgns_prelim_plot <- plot_ly(data = gdp_rgn, x = ~year, y = ~gdp_prop_percent, color = ~rgn_name, 
+ohi_rgns_prelim_plot <- plot_ly(data = no_mc_hk_subset, x = ~year, y = ~gdp_prop_percent, color = ~rgn_name, 
                                 type = "scatter", mode = "lines") %>% 
   layout(title = "Tourism direct GDP as a proportion of total GDP (%) for OHI Regions",
          xaxis = list(title = "Year"),
@@ -198,7 +250,13 @@ ohi_rgns_prelim_plot
 # htmlwidgets::saveWidget(ohi_rgns_prelim_plot, file = "eco_tour_ohi_rgns_prelim_plot.html")
 ```
 
+It is notable how much the y-axis scale changes once we drop Macao. I think that the -0.1 value we see for Fiji could be indicative of the country spending money on tourism infrastructure, development, and advertisement but then not getting enough tourism revenue due to Covid, but this is worth investigating further (I couldn't find anything helpful in the metadata, unfortunately).
 
+
+
+### China subset
+
+Remember that China subset we made out of the Macao and Hong Kong data? Now we're going to join that with a subset of the global country-level GDP data to find the tourism value. We will then join this data frame with the China tourism value data we read in earlier (we'll need to clean it first).
 
 
 ### Gapfilling
@@ -470,7 +528,7 @@ tourism_value <- gdp_join %>%
 
 #### Preliminary Plotting
 
-Static
+**Static plot**
 
 ```{r}
 # ---- preliminary plotting: static ----
@@ -503,8 +561,10 @@ ggplot(data = tour_val_subset,
   )
 ```
 
+This is obviously a very rudimentary (and not very helpful or informative) plot. It is  tedious to have to refer back to a table of the region IDs to understand which region is which, and is overall what I would call a "spaghetti plot". Let's use an interactive plot to more usefully visualize what's going on with the data!
 
-Interactive plot
+
+**Interactive plot**
 
 ```{r}
 # ---- preliminary plotting: interactive ----
@@ -533,6 +593,10 @@ tour_val_plotly <- plot_ly(data = tour_val_subset,
 
 tour_val_plotly
 ```
+
+COME BACK -- lines not showing up....
+
+
 
 
 ```{r}
