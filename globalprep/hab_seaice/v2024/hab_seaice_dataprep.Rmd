@@ -228,7 +228,7 @@ assessment year (v) in setup code chunk.
 
 ```{r setup, eval=FALSE}
 ## Install R packages where necessary
-pkg <- c("raster", "fasterize", "sf", "sp", "rgdal", "fields", "here", "tictoc", "dplyr", "ggplot2", "foreach") # "fields" for colors in Status_Trend.R
+pkg <- c("raster", "fasterize", "sf", "sp", "rgdal", "fields", "here", "tictoc", "dplyr", "ggplot2", "foreach", "parallel", "doParallel") # "fields" for colors in Status_Trend.R
 new.pkg <- pkg[!(pkg %in% installed.packages())]
 if (length(new.pkg)){install.packages(new.pkg)}
 if (!("ohicore" %in% installed.packages())){devtools::install_github("ohi-science/ohicore")}
@@ -238,15 +238,14 @@ lapply(c(pkg, "ohicore"), require, character.only = TRUE)
 
 ## UPDATE THESE!
 current_year <- 2024
-last_year <- 2022 # final year of data (all months)
+last_year <- 2023 # final year of data (all months)
 
 assess_year <- paste0("v", current_year) # assessment year for file paths
 previous_year <- paste0("v", last_year)  # previous assessment year
 ```
 
 ```{r source common and spatial_common}
-source("workflow/R/common.R")
-# source("../../../workflow/R/common.R") # directory locations - this directory was copied into ohiprep_v2024 so modified to this directory's workflow
+source(here::here("workflow/R/common.R"))
 ```
 
 ## Location of Maps
@@ -266,116 +265,6 @@ git-annex/globalprep/\_raw_data/NSIDC_SeaIce/v2023.
 ```{r define file path to ohi region maps (polygons), eval=FALSE}
 maps <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assess_year)
 ```
-
-
-## This chunk is the method for acquiring the data through R. As the full 2023 data is not currently (06/25/2024) available for access, this might need to be updated when the data becomes available so that the comparisons can be made. Currently leaving it in because I (Dustin) will be attempting to update this method once the data becomes available to facilitate the process for the next OHI fellows. 
-
-```{r}
-## Install R packages where necessary
-pkg <- c("raster", "fasterize", "sf", "sp", "rgdal", "fields", # "fields" for colors in Status_Trend.R
-         "ncdf4","openair","ggplot2","reshape2","scales","lubridate",
-         "cmocean","maps","mapdata", "RColorBrewer", "here")
-new.pkg <- pkg[!(pkg %in% installed.packages())]
-if (length(new.pkg)){install.packages(new.pkg)}
-if (!("ohicore" %in% installed.packages())){devtools::install_github("ohi-science/ohicore")}
-
-## Load libraries, set directories
-lapply(c(pkg, "ohicore"), require, character.only = TRUE)
-
-## UPDATE THESE!
-assessYear <- "v2024" # change to reflect assessment year
-previous_yr <- "v2023" # previous assessment year
-final.year <- 2023 # final year of data (all months)
-
-source("workflow/R/common.R") # directory locations
-fp.n <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assessYear, "north/")
-fp.s <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assessYear, "south/")
-
-# Download the lat-lon grid
-# Use the dataset id 'nsidcCDRice_nh_grid' and the default axis extent values
-
-url <- 'https://polarwatch.noaa.gov/erddap/griddap/'
-
-grid_id <- 'nsidcCDRice_nh_grid'
-
-grid_urlcall <- paste0(
-  url, grid_id,
-  '.nc?longitude[(5812500.0):1:(-5337500.0)][(-3837500.0):1:(3737500.0)]',
-  ',latitude[(5812500.0):1:(-5337500.0)][(-3837500.0):1:(3737500.0)]')
-
-## need to make new file in the mazu filezilla 
-  # command is 'mkdir + name of new folder' in terminal
-  # EX: if making new file called 'v2024', type: 
-  # "mkdir v2024"
-grid_file <- paste0(fp.n,"grid.nc")
-
-grid_nc <- download.file(
-  grid_urlcall,
-  destfile = grid_file,
-  mode='wb')
-
-# Read the grid file
-gridFid <- nc_open(grid_file)
-ygrid <- ncvar_get(gridFid, varid="ygrid")
-xgrid <- ncvar_get(gridFid, varid="xgrid")
-longitude <- ncvar_get(gridFid, varid="longitude")
-latitude <- ncvar_get(gridFid, varid="latitude")
-nc_close(gridFid)
-
-inds = which(latitude > 40, arr.ind=TRUE)
-rowrange <- range(inds[,1])
-colrange <- range(inds[,2])
-
-#Generate a data request URL using the indices from the grid
-dataid <- 'nsidcG02202v4nhmday'
-varnames <- c('cdr_seaice_conc_monthly')
-# Change the date here to end on the last date that the date is available (per the NSIDC data access tool)
-datestring <- '[(1978-11-01T00:00:00Z):1:(2023-09-30T00:00:00Z)]'
-coordstring <- paste0('[',colrange[1],':1:',colrange[2],'][',rowrange[1],':1:',rowrange[2]-1,']')
-
-urlcall <- paste0(url,dataid,'.nc?',varnames[1],datestring,coordstring)
-
-ice_file <- paste0(fp.n,"data.nc")
-#Download the netCDF file  (this will take a few minutes, 20 years of data)
-data_nc <- download.file(urlcall,destfile=ice_file,mode='wb')
-
-dataFid <- nc_open(ice_file)
-
-datatime <- ncvar_get(dataFid, varid="time")
-datatime <- as.Date(as.POSIXlt(datatime,origin='1970-01-01',tz= "GMT"))
-
-ygrid <- ncvar_get(dataFid, varid="ygrid")
-xgrid <- ncvar_get(dataFid, varid="xgrid")
-
-seaiceCDR <- ncvar_get(dataFid, varid=varnames)
-
-nc_close(dataFid)
-
-library(stringr)
-time_vec <- dataFid$dim$time$vals %>% 
-  as.vector() %>% 
-  lubridate::as_datetime() %>% 
-  lubridate::as_date() %>% 
-  as.character() %>%
-  str_replace_all(pattern = "-", replacement = "_")
-
-time_vec <- paste("cdr_seaice_conc", time_vec, sep = "_")
-
-df <- terra::rast(ice_file)#, crs = "EPSG:3411"
-dim(df)
-length(names(df)) == (2023 - 1978) * 12 + 2
-# names(df)
-# plot(df)
-
-names(df) <- time_vec
-
-terra::crs(df) <- prj.n
-
-plot(df)
-```
-
-
-
 
 ## Establish Parameters
 
@@ -423,10 +312,11 @@ tic()
 ## Previously (<2022) update to some file paths with the correct assessment year in ObtainingData.R was needed
 ## Currently (2023) this is automatic from this script with `assess_year` variable
 
-## WRap within evalWithTimeout
+## ATTN! Because this is now done in parallel rather than in sequence (saving ~2hrs of processing time), this script will not display the progress as it does when its sequentially run. Thats okay as long as you check mazu and ensure that the tmp folder is updated about 2 minutes into run-time, and the v2024 folder should have n_rasters_points.rdata and s_rasters_points.rdata populated in about 1.25-1.5 hours. 
+
 source("globalprep/hab_seaice/v2024/ObtainingData_Parallel.R") ## This has changed (2024) to account for the current working directory being ohiprep_v2024 rather than 'hab_seaice/v2024'
 toc()
-## should take ~30 minutes to completely run 
+## should take ~1.5 hrs to completely run with ObtainingData_Parallel.R 
 ```
 
 ## Function 2
@@ -536,11 +426,11 @@ ice_health_eez <- read.csv(sprintf("globalprep/hab_seaice/%s/output/hab_ice_heal
   dplyr::left_join(health, by = c("rgn_id", "habitat", "year")) %>% 
   na.omit("health") 
 
-comp_plot <- ggplot() + geom_point(data = ice_health_eez, aes(x = health_prev_assess, y = health)) + labs(x = "previous health (2012-2021)", y = "health (2012-2022)") + geom_abline(slope = 1, intercept = 0, col = "red")
+comp_plot <- ggplot() + geom_point(data = ice_health_eez, aes(x = health_prev_assess, y = health)) + labs(x = "previous health (2012-2022)", y = "health (2012-2023)") + geom_abline(slope = 1, intercept = 0, col = "red")
 plotly::ggplotly(comp_plot)
 
 
-### let's compare the data year 2022 to data year 2021 (current data year vs the year before)
+### let's compare the data year 2023 to data year 2022 (current data year vs the year before)
 
 ## Pair with region names
 regions <- rgn_master %>%
@@ -548,19 +438,19 @@ regions <- rgn_master %>%
   unique()
 
 ## Changing current year back to 2022 because that's the last full year of data.
-current_year = 2022
+current_year = 2023
 
-health_2022 <- health %>%
+health_2023 <- health %>%
   dplyr::filter(year == current_year)
 
 ## Changing last year to 2021 because that's the 'last year of data' provided that the current year is using 2022 as its data 
-last_year = 2021
+last_year = 2022
 
-health_2021 <- ice_health_eez %>%
+health_2022 <- ice_health_eez %>%
   dplyr::filter(year == last_year) %>%
   dplyr::select(-year, -health)
 
-health_old_new <-  dplyr::left_join(health_2022, health_2021) %>% mutate(difference = (health - health_prev_assess)) %>% left_join(regions)
+health_old_new <-  dplyr::left_join(health_2023, health_2022) %>% mutate(difference = (health - health_prev_assess)) %>% left_join(regions)
 
 
 year_change_plot <-ggplot() +
@@ -578,22 +468,22 @@ ice_trend_eez <- read.csv(sprintf("globalprep/hab_seaice/%s/output/hab_ice_trend
   na.omit("trend")
 
 #update label years 
-trend_comp <- ggplot() + geom_point(data = ice_trend_eez, aes(x = trend_prev_assess, y = trend)) + labs(x = "previous assessment trend (2016-2021)", y= "current assessment trend (2016-2021)") + geom_abline(slope = 1, intercept = 0, col = "red")
+trend_comp <- ggplot() + geom_point(data = ice_trend_eez, aes(x = trend_prev_assess, y = trend)) + labs(x = "previous assessment trend (2016-2022)", y= "current assessment trend (2017-2023)") + geom_abline(slope = 1, intercept = 0, col = "red")
 
 plotly::ggplotly(trend_comp)
 
-### let's compare the data year 2022 to data year 2021 (current data year vs the year before)
+### let's compare the data year 2023 to data year 2022 (current data year vs the year before)
 
-trend_2022 <- trend %>%
+trend_2023 <- trend %>%
   dplyr::filter(year == (current_year))
 
-trend_2021 <- ice_trend_eez %>%
+trend_2022 <- ice_trend_eez %>%
   dplyr::filter(year == last_year) %>%
   dplyr::select(-year, -trend)
 
-trend_old_new <- dplyr::left_join(trend_2022, trend_2021) %>% mutate(difference = (trend - trend_prev_assess)) %>% left_join(regions)
+trend_old_new <- dplyr::left_join(trend_2023, trend_2022) %>% mutate(difference = (trend - trend_prev_assess)) %>% left_join(regions)
 
-year_trend_change_plot <-ggplot() + geom_point(data = trend_old_new, aes(x = trend_prev_assess, y = trend, text = paste("Region ID:", rgn_id, "<br>Habitat:", habitat))) + labs(x = "previous data year trend (2021)", y = "current data year trend (2022)") + geom_abline(slope = 1, intercept = 0, col = "red")
+year_trend_change_plot <-ggplot() + geom_point(data = trend_old_new, aes(x = trend_prev_assess, y = trend, text = paste("Region ID:", rgn_id, "<br>Habitat:", habitat))) + labs(x = "previous data year trend (2022)", y = "current data year trend (2023)") + geom_abline(slope = 1, intercept = 0, col = "red")
 
 plotly::ggplotly(year_trend_change_plot, tooltip = "text")
 
@@ -607,11 +497,11 @@ ggplot(data = ice_extent_eez) +geom_point(aes(x =km2_prev_assess, y = km2)) + ge
 
 ### let's compare the data year 2022 to data year 2021
 
-extent_2022 <- extent 
+extent_2023 <- extent 
 
-extent_2021 <- ice_extent_eez
+extent_2022 <- ice_extent_eez
 
-extent_old_new <- dplyr::left_join(extent_2022, extent_2021)
+extent_old_new <- dplyr::left_join(extent_2023, extent_2022)
 
  # extent doesn't change at all, because we use the same year for extent every year
 ggplot(data = extent_old_new) + geom_point(aes(x = km2_prev_assess, y = km2)) + geom_abline(slope = 1, intercept = 0, col = "red")
@@ -627,26 +517,25 @@ data <- read.csv("globalprep/hab_seaice/v2024/output/hab_ice_health_eez.csv") %>
   dplyr::left_join(regions, by = "rgn_id") %>%
   dplyr::arrange(habitat, health)
 
+#### Check largest score changes for v2024 ####
 
 
-#### Check largest score changes for v2021 ####
-
-
-
-## Bouvet Island, rgn_id == 105, HAB score +15.15
+## Bouvet Island, rgn_id == 105, HAB score +
 
 
 # health 
 bouv_health <- health_old_new %>%
   dplyr::filter(rgn_id == 105) %>%
-  dplyr::mutate(diff = health - health_prev_assess) # +0.19 
+  dplyr::mutate(diff = health - health_prev_assess) # -0.33
 
 # trend 
 bouv_trend <- trend_old_new %>%
   dplyr::filter(rgn_id == 105) %>%
-  dplyr::mutate(diff = trend - trend_prev_assess) # trend got worse 
+  dplyr::mutate(diff = trend - trend_prev_assess) # trend got worse (-.01 previously to -0.14 in 2024)
+
 
 ## checked against previous conditions, and it looks like Bouvet Island and Jan Mayen (our two largest increases for 2021) have pretty volatile condition scores year after year, so I think this is ok. Nothing went wrong in the data processing on our part. 
+
 ```
 
 ## Gapfill
