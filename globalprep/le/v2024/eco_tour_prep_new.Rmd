@@ -343,8 +343,6 @@ ohi_rgns_prelim_plot
 It is notable how much the y-axis scale changes once we drop Macao. I think that the -0.1 value we see for Fiji could be indicative of the country spending money on tourism infrastructure, development, and advertisement but then not getting enough tourism revenue due to Covid, but this is worth investigating further (I couldn't find anything helpful in the metadata, unfortunately).
 
 
-
-
 ## GDP: WorldBank annual GDP (Constant 2015 US$)
 
 
@@ -354,6 +352,7 @@ It is notable how much the y-axis scale changes once we drop Macao. I think that
 ```{r}
 # find minimum year in tourism GDP % dataset for filtering:
 min_year <- min(gdp_rgn_agg$year)
+
 # ---- cleaning WorldBank GDP data ----
 wb_gdp_clean <- wb_gdp_raw %>% 
   clean_names() %>% 
@@ -365,15 +364,148 @@ wb_gdp_clean <- wb_gdp_raw %>%
   mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  
   # filter to date range
   filter(year %in% c(min_year:cutoff_year))
+
 ```
+
+### Next steps:
+  
+-  create subset of GDP data without china, hong kong, or macao
+-  run `name_2_rgn` function on this, make necessary adjustments
+  -  then join with `no_mc_hk_subset`, call it `no_china_join`
+  -  calculate usd tourism value for `no_china_join`. call this `nc_tourism_value`
+  
+-  join china_gdp (china subset of GDP data) with macao_hk_subset (gdp proportion subset of Macao and Hong Kong)
+-  calculate value (will be in Constant 2015 US$)
+  -  call this `macao_hk_value`
+- join `china_usd_value` with `macao_hk_value`, drop irrelevant columns etc. 
+  -  call this `china_value` or something similar
+  
+-  rbind `china_value` with `nc_tourism_value`. call this `tourism_value`
+
+-  prep `tourism_value` for export, then write script, rerun `eco_usd_adj.Rmds`
+
+
+## Tourism Value (no China)
+
+Now we'll prep to join our GDP and % GDP data frames by first making a subset without China, Macao, or Hong Kong. Then, we'll run `name_2_rgn` from {ohicore} and see what else we need to fix before joining.
+
+```{r nc_rgn_agg}
+# ---- make subset excluding China ----
+no_china_gdp <- china_gdp <- wb_gdp_clean %>% 
+  filter(!stringr::str_detect(country_name, "China"))
+
+# check
+nrow(no_china_gdp %>% filter(stringr::str_detect(country_name, "China")))
+# should be 0
+
+
+# ---- run name_2_rgn ----
+# nc = no china
+nc_gdp_rgn <- name_2_rgn(df_in = no_china_gdp, 
+                         fld_name = "country_name",
+                         flds_unique = c("year"))
+
+# thankfully, in the list following this line: "These data were removed for not having any match in the lookup tables:", there are mostly just the WorldBank aggregate groups (i.e., "low & middle income, Latin America & Caribbean, etc.), with the exception of Channel Islands and Isle of Man
+
+# don't make the mistake I did, and check your tourism dataset to see if it has Channel Islands, Jersey, or Guernsey first! 
+# it doesn't, so we can continue on since the name_2_rgn function helpfully removed this data from the GDP data frame already.
+
+# The Isle of Man is a distinct governing body, and should not be aggregated with Ireland or the UK. It is also not in our tourism dataset, so we can continue on with it being omitted from the df by name_2_rgn. 
+
+# ---- identify duplicates ----
+nc_gdp_duplicates <- nc_gdp_rgn[duplicated(nc_gdp_rgn[, c("rgn_name", "year")]),]
+#View(wb_gdp_duplicates)
+unique(nc_gdp_duplicates$country_name)
+unique(nc_gdp_duplicates$rgn_name)
+
+
+# ---- addressing duplicates ----
+# [1] "Northern Mariana Islands and Guam" --> we have GDP data for Northern Mariana Islands, and Guam. Can aggregate this, but we only have tourism % GDP data for Guam (see earlier comment in GDP % data cleaning chunk). 
+# For now, we'll just keep Guam GDP and filter out Northern Mariana Islands GDP.
+
+
+# [2] "Puerto Rico and Virgin Islands of the United States" --> we have data for both in the GDP data frame, but only for Puerto Rico in the GDP % data frame. Thus, we'll need to filter out the US Virgin Islands GDP data and only keep Puerto Rico data to get a more representative value (Puerto Rico tourism proportion of GDP * Puerto Rico GDP, rather than taking the Puerto Rico prop * Puerto Rico + US Virgin Islands GDP)
+
+
+
+# ---- aggregate ----
+# sum by rgn_name etc.
+# name ~ No China GDP region aggregated
+nc_gdp_rgn_agg <- nc_gdp_rgn %>%
+  dplyr::filter(!country_name %in% c("Northern Mariana Islands", # filtering out NMI since we only have Guam GDP % data in our other dataset -- should revisit this and update once we have that data -- double check to see which of these regions we have data for on both datasets in future years of updates!!!
+                              "Virgin Islands (U.S.)") # similarly, filtering out U.S. Virgin Islands. Only do this if the data continues to have the gaps addressed above.
+         ) %>% 
+  dplyr::group_by(rgn_id, rgn_name, year) %>%
+  dplyr::summarize(gdp_value_agg = sum(gdp_value, na.rm = TRUE) 
+  )%>%
+  dplyr::ungroup() %>% 
+  # turn 0s into NAs (appropriate flag for lack of data, as earlier sum(na.rm = TRUE) step obscured NAs)
+  dplyr::mutate(gdp_value_agg = case_when(
+    gdp_value_agg == 0 ~ NA,
+    .default = gdp_value_agg
+  ))
+
+# ---- aggregation check ----
+# to double check and see if Northern Marian Islands was properly filtered out:
+agg_nmi_vals <- nc_gdp_rgn_agg %>% 
+  filter(rgn_name %in% c("Northern Mariana Islands and Guam")) %>%
+  select(year, gdp_value_agg)
+
+guam_reference <- nc_gdp_rgn %>% 
+  filter(country_name %in% c("Guam")) %>% 
+  select(year, gdp_value)
+
+agg_nmi_check <- left_join(agg_nmi_vals, guam_reference)
+
+print(paste("Do the Guam GDP values before aggregation match the 'Northern Mariana Islands and Guam' values after aggregation?"))
+
+if (sum(agg_nmi_check$gdp_value_agg == agg_nmi_check$gdp_value) == length(unique(agg_nmi_check$gdp_value_agg))
+) {
+  print("Yes")
+} else {
+  print("No")
+}
+
+# If "No", check which don't match
+# print(paste((agg_nmi_check$gdp_value_agg == agg_nmi_check$gdp_value)))
+
+
+```
+
+
+Great! Now we're ready to join with the tourism as a proportion of total GDP subset that excludes China. We'll then multiply the percent of GDP by the GDP to yield a value (in constant 2015 USD)
+
+```{r nc_tourism_value}
+# ---- join GDP and GDP % data ----
+no_china_join <- dplyr::full_join(nc_gdp_rgn_agg, no_mc_hk_subset,
+                                  by = join_by("rgn_id", "rgn_name", "year"))
+# note that because we preserved the `geo_area_name` column, we can see which country is the true representative of the aggregate based on our steps above (e.g., Puerto Rico is the geo_area_name value for the Puerto Rico and US Virgin Islands rgn_name rows)
+
+# that is mostly only useful in the intermediate data processing though, so we will be dropping this column as we move on
+
+# ---- calculate tourism value ----
+nc_tourism_value <- no_china_join %>% 
+  ungroup() %>% 
+  group_by(rgn_id, rgn_name, year) %>% 
+  # get proportion to use as multiplier, multiply by GDP to get value
+  mutate(tour_value = (appx_gdp_pct / 100) * gdp_value_agg) %>% 
+  # fix data types
+  mutate(rgn_id = as.character(rgn_id)) %>% 
+  # select relevant columns for joining
+  select(c(rgn_id, rgn_name, year, tour_value))
+
+
+
+```
+
 
 
 ### China subset
 
-Remember that China subset we made out of the Macao and Hong Kong data? Now we're going to join that with a subset of the global country-level GDP data to find the tourism value for these areas. We will then join this data frame with the China tourism value data we read in earlier (we'll need to clean it first) and aggregate the values to yield one value per year for China as a region.
+Remember that China subset we made out of the Macao and Hong Kong data? Now we're going to join that with a subset of the global country-level GDP data to find the tourism value for these areas. We will then join this data frame with the China tourism value data we read in earlier (which we will clean & tidy first) and finally aggregate the values to yield one value per year for China as a region.
 
-```{r}
-# filter to China regions GDP ----
+```{r china_mo_hk_value}
+# ---- filter to China regions GDP ----
 china_gdp <- wb_gdp_clean %>% 
   filter(stringr::str_detect(country_name, "China")) # depending on the dataset, you'd need to change this to "Macao", "Hong Kong"
 
@@ -381,13 +513,42 @@ china_gdp <- wb_gdp_clean %>%
 unique(china_gdp$country_name)
 # yep! and they're named the same as Hong Kong and Macao are in macao_hk_subset
 
-# Since we already have the Tourism value for mainland China
+# Since we already have the Tourism Value for mainland China (which we'll clean and tidy in the chunks below), we'll filter out the GDP rows for China now and then rbind the tourism value for China back in at the end before aggregating.
+
+# ----- Prep for joining with Macao + Hong Kong subset ----
+# drop "China" rows
+macao_hk_gdp <- china_gdp %>% 
+  filter(country_name != "China")
+
+# check
+unique(macao_hk_gdp$country_name)
+
+
+# ---- Join Macao + HK subsets ----
+macao_hk_join <- left_join(macao_hk_subset, macao_hk_gdp, by = c("year", "geo_area_name" = "country_name"))
+
+
+# ---- Calculate tourism value ----
+macao_hk_value <- macao_hk_join %>% 
+  ungroup() %>% 
+  group_by(geo_area_name, year) %>% 
+  mutate(tourism_value = (appx_gdp_pct / 100) * gdp_value) %>% 
+  # select relevant columns
+  select(geo_area_name, year, tourism_value)
 ```
 
 
 ### China Tourism Value
 
+- clean & tidy China Tourism Value dataset 
+  - clean column names
+  - select relevant categories (earnings from international and domestic tourism) and columns (indicators, year columns)
+  - pivot data from wide to long so that `tourism_value` observations are in one column and `year` is in another columns (each row should be 1 observation -- with indicator, year, and earnings)
+  - clean up the new `year` column
+  - filter to date range specified earlier (`min_year` and `cutoff_year`)
 
+- convert tourism value (earnings) to a standardized format (we'll go over this in more detail later)
+- prep for joining with China subset (Macao + Hong Kong) of tourism value data 
 
 ```{r}
 # ---- clean names ----
@@ -404,7 +565,7 @@ tourism_categories <- c("Foreign Exchange Earnings from International Tourism(US
 # ---- tidy ----
 nbsc_tidy <- nbsc_clean %>% 
   filter(indicators %in% c(tourism_categories)) %>% 
-  pivot_longer(cols = x2023:x2004, # update this depening on year range of newly downloaded data
+  pivot_longer(cols = x2023:x2004, # update this depending on year range of newly downloaded data
                names_to = "year", values_to = "tourism_value") %>% 
   # tidy up year column
   mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  
@@ -497,106 +658,54 @@ int_2015$tourism_value == int_2015$usd
 
 # ---- aggregate ----
 china_usd_value <- nbsc_usd_adjusted %>% 
+  # for each year,
   group_by(year) %>% 
+  # sum values !
   summarize(usd = sum(tourism_value, usd, na.rm = T)) %>% 
-  mutate(geo_area_name = "China",
-         unit = "USD (1)")
+  # add descriptive columns for joining
+  mutate(geo_area_name = "China") %>% 
+  # order columns
+  select(geo_area_name, year, usd)
 
 ```
 
 
-# Next steps:
-
-- join china_gdp (china subset of GDP data) with macao_hk_subset (gdp proportion subset of Macao and Hong Kong), calculate value (will be in Constant 2015 US$)
-  -  call this `macao_hk_value`
-- join `china_usd_value` with `macao_hk_value`, drop irrelevant columns etc. 
-  -  call this `china_value` or something similar
-  
-- create subset of GDP data without china, hong kong, or macao
-- run `name_2_rgn` function on this, make necessary adjustments
-  -  then join with `no_mc_hk_subset`, call it `no_china_gdp_join` or something similar
-  
-- calculate usd value for `no_china_gdp_join`. call this `no_china_value`
-
-- rbind `china_value` with `no_china_value`. call this `tourism_value`
-
-- prep `tourism_value` for export, then write script, rerun eco_usd_adj.Rmd
-
-
-
-### Run OHI region name function
+Now we can join this newly created China tourism value data frame with the `macao_hk_value` data frame of tourism value (in Constant 2015 USD). Then, we'll run `name_2_rgn` and aggregate values to get combined tourism values for China as an OHI region.
 
 ```{r}
-# ---- run name_2_rgn -----
-wb_gdp_rgn <- name_2_rgn(df_in = wb_gdp_clean, 
-                         fld_name = "country_name",
-                         flds_unique = c("year"))
+# ---- join ----
+china_value_join <- dplyr::full_join(x = china_usd_value, y = macao_hk_value,
+                                     by = c("geo_area_name", "year",
+                                            "usd" = "tourism_value"))
+  
 
-# thankfully, in the list following this line: "These data were removed for not having any match in the lookup tables:", there are mostly just the WorldBank aggregate groups (i.e., "low & middle income, Latin America & Caribbean, etc.), with the exception of Channel Islands and Isle of Man
+# ---- run ohicore name_2_rgn function ----
 
-# COME BACK ---- split Channel Islands -- proportional to EEZ area, Jersey slightly larger than Guernsey
-# Isle of Man -- distinct governing body, should not be aggregated with Ireland or the UK
+china_rgn <- ohicore::name_2_rgn(
+  df_in = china_value_join, 
+  fld_name = "geo_area_name",
+  flds_unique = c("year")
+)
 
-# ---- identify duplicates ----
-wb_gdp_duplicates <- wb_gdp_rgn[duplicated(wb_gdp_rgn[, c("rgn_name", "year")]),]
-#View(wb_gdp_duplicates)
-unique(wb_gdp_duplicates$country_name)
-unique(wb_gdp_duplicates$rgn_name)
+# as expected, we get a "DUPLICATES found" warning. Now that the rgn_name and rgn_id have been added to our data frame, we can use those to aggregate by region
 
-# then look up these & their pairs in the wb_gdp_clean df to see which countries we do or do not have data for to inform aggregation steps.
-
-# [1] "China": we have data on Macao and Hong Kong --> aggregate (can sum) -- but we don't have tourism GDP % data for mainland China... so just leave as basic aggregation (sum) for now
-
-
-# [2] "Northern Mariana Islands and Guam" --> have GDP data for Northern Mariana Islands, and Guam. Can aggregate this, but we only have tourism % GDP data for Guam (see earlier comment in GDP % data cleaning chunk). 
-# For now, we'll just keep Guam GDP and filter out northern mariana islands GDP... ? (COME BACK: double check w Mel)
-
-
-# [3] "Puerto Rico and Virgin Islands of the United States" --> have data for both separately --> aggregate
-
-
-
-# ---- aggregate ----
-# sum by rgn_name etc.
-# name ~ WorldBank GDP region aggregated
-wb_gdp_rgn_agg <- wb_gdp_rgn %>%
-  filter(!country_name %in% c("Northern Mariana Islands")) %>% # filtering out NMI since we only have Guam GDP % data in our other dataset -- should revisit this and update once we have that data -- double check to see which of these regions we have data for on both datasets in future years of updates!!!
-  group_by(rgn_id, rgn_name, year) %>%
-  dplyr::summarize(gdp_value_agg = sum(gdp_value, na.rm = TRUE) 
-  )%>%
+# ---- aggregate for OHI region cohesion ----
+china_agg <- china_rgn %>% 
   ungroup() %>% 
-  # turn 0s into NAs (appropriate flag for lack of data, as earlier sum(na.rm = TRUE) step obscured NAs)
-  mutate(gdp_value_agg = case_when(
-    gdp_value_agg == 0 ~ NA,
-    .default = gdp_value_agg
-  ))
-
-# ---- aggregation check ----
-# to double check and see if Northern Marian Islands was properly filtered out:
-agg_nmi_vals <- wb_gdp_rgn_agg %>% 
-  filter(rgn_name %in% c("Northern Mariana Islands and Guam")) %>%
-  select(year, gdp_value_agg)
-
-guam_reference <- wb_gdp_clean %>% 
-  filter(country_name %in% c("Guam")) %>% 
-  select(year, gdp_value)
-
-agg_nmi_check <- left_join(agg_nmi_vals, guam_reference)
-
-print(paste("Do the Guam GDP values before aggregation match the 'Northern Mariana Islands and Guam' values after aggregation?"))
-
-if (sum(agg_nmi_check$gdp_value_agg == agg_nmi_check$gdp_value) == length(unique(agg_nmi_check$gdp_value_agg))
-) {
-  print("Yes")
-} else {
-  print("No")
-}
-
-# If "No", check which don't match
-# print(paste((agg_nmi_check$gdp_value_agg == agg_nmi_check$gdp_value)))
+  group_by(rgn_name, rgn_id, year) %>% 
+  summarize(tour_value = sum(usd, na.rm = T))
 
 ```
 
+Great! Now we're ready to reunite this china tourism value data with the rest of our tourism value data :) 
+
+
+
+```{r}
+
+
+
+```
 
 Extra: aggregation explanation/example
 ```{r agg_example, eval = FALSE}
