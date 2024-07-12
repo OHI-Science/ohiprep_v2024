@@ -124,6 +124,15 @@ eco_usd_adj <- eco_usd_bind %>%
 ```
 
 
+## Calculating scores following OHI methodology
+
+- [Methodology](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#economies-subgoal-of-livelihoods-and-economies)
+
+$$
+x_{eco} = \frac { \displaystyle\sum _{ k=1 }^{ N }{ { e }_{ c,k } }  }{ \displaystyle\sum _{ k=1 }^{ N }{ { e }_{ r,k } }  }
+$$
+
+where, $e$ is the total adjusted revenue generated directly and indirectly from sector $k$, at current $c$, and reference $r$, time points
 
 <https://stackoverflow.com/questions/743812/calculating-moving-average>
 
@@ -176,8 +185,50 @@ calculate_scores <- function(data, stop_year) {
     select(rgn_id, rgn_name, year, current_value, reference_point, score) %>%
     ungroup()
 }
+```
 
+
+Testing function: 
+
+```{r}
 # Assuming your data frame is named 'eco_usd_adj'
 result <- calculate_scores(eco_usd_adj, stop_year = 2019)  # Replace 2019 with your desired stop year
+```
+
+```{r}
+top_score <- result %>% 
+  filter(score == max(result$score, na.rm = TRUE))
+
+top_score
+```
+
+
+```{r}
+top_change <- result %>% 
+  slice_max(order_by = score, n = 10) %>% 
+  ungroup()
+```
+
+
+```{r}
+
+plotly::plot_ly(data = top_change, x = ~score, y = ~rgn_name, color = ~rgn_name, 
+                                type = "scatter", mode = "lines") %>% 
+  layout(title = "Economies Score",
+         xaxis = list(title = "Score") #,
+        # yaxis = list(title = "Score")
+        )
+
+
+
+plot_df <- result %>% ungroup()
+
+plotly::plot_ly(data = plot_df, x = ~score, y = ~rgn_name, color = ~rgn_name, 
+                                type = "scatter", mode = "lines") %>% 
+  layout(title = "Economies Score",
+         xaxis = list(title = "Score") #,
+        # yaxis = list(title = "Score")
+        )
+
 ```
 
