@@ -72,6 +72,7 @@ librarian::shelf(
   foreach,
   doParallel, # for using multiple cores
   tidyverse, 
+  scales,
   httr,
   plotly,
   zoo # for gapfilling
@@ -114,7 +115,6 @@ int_dir <- here(data_path, "int")
 ```{r}
 # ===================== Read in Data ==============================
 
-
 # ---- Tourism revenue data ----
 gdp_prop_raw <- readxl::read_xlsx(here(unwto_dir, "Indicator-8_9_1-2022-UN_Tourism_april2024_update.xlsx"))
 
@@ -154,10 +154,12 @@ length(unique(gdp_prop_clean$geo_area_name))
 # make all geographic areas have the same date range (and fill missing values with NAs)
 years_df <- tibble(geo_area_name = gdp_prop_clean$geo_area_name) %>% 
   group_by(geo_area_name) %>% 
-  summarize(year = seq(min(gdp_prop_clean$year), max(gdp_prop_clean$year)))
+  summarize(year = seq(min(gdp_prop_clean$year),
+                       max(gdp_prop_clean$year)))
 
-# join with gdp prop data
-gdp_prop_yrs <- left_join(years_df, gdp_prop_clean, by = c("geo_area_name", "year"))
+# ---- join with gdp prop data ----
+gdp_prop_yrs <- left_join(years_df, gdp_prop_clean,
+                          by = c("geo_area_name", "year"))
 
 
 ```
@@ -318,7 +320,7 @@ macao_hk_subset <- gdp_rgn_agg %>% filter(rgn_name == "China")
 
 
 # excluding China regions
-# (we'll rbind them back in later once we have the tourism values for HK, Macao, and China) 
+# (we'll join them back together later once we have the tourism values for HK, Macao, and China) 
 no_mc_hk_subset <- gdp_rgn_agg %>% filter(rgn_name != "China")
 
 
@@ -348,6 +350,7 @@ It is notable how much the y-axis scale changes once we drop Macao. I think that
 
 ## GDP: WorldBank annual GDP (Constant 2015 US$)
 
+-  Global dataset of country-level GDP in constant 2015 USD (they write this as US$ in World Bank documentation)
 
 ### Data cleaning
 
@@ -383,7 +386,7 @@ wb_gdp_clean <- wb_gdp_raw %>%
 - join `china_usd_value` with `macao_hk_value`, drop irrelevant columns etc. 
   -  call this `china_value` or something similar
   
--  rbind `china_value` with `nc_tourism_value`. call this `tourism_value`
+-  join `china_value` with `nc_tourism_value`. call this `tourism_value`
 
 -  prep `tourism_value` for export, then write script, rerun `eco_usd_adj.Rmds`
 
@@ -394,7 +397,7 @@ Now we'll prep to join our GDP and % GDP data frames by first making a subset wi
 
 ```{r nc_rgn_agg}
 # ---- make subset excluding China ----
-no_china_gdp <- china_gdp <- wb_gdp_clean %>% 
+no_china_gdp <- wb_gdp_clean %>% 
   filter(!stringr::str_detect(country_name, "China"))
 
 # check
@@ -440,7 +443,7 @@ nc_gdp_rgn_agg <- nc_gdp_rgn %>%
          ) %>% 
   dplyr::group_by(rgn_id, rgn_name, year) %>%
   dplyr::summarize(gdp_value_agg = sum(gdp_value, na.rm = TRUE) 
-  )%>%
+  ) %>%
   dplyr::ungroup() %>% 
   # turn 0s into NAs (appropriate flag for lack of data, as earlier sum(na.rm = TRUE) step obscured NAs)
   dplyr::mutate(gdp_value_agg = case_when(
@@ -499,8 +502,8 @@ nc_tourism_value <- no_china_join %>%
   # select relevant columns for joining
   select(c(rgn_id, rgn_name, year, tour_value))
 
-
-
+#View(nc_tourism_value)
+#summary(nc_tourism_value)
 ```
 
 
@@ -517,7 +520,7 @@ china_gdp <- wb_gdp_clean %>%
 unique(china_gdp$country_name)
 # yep! and they're named the same as Hong Kong and Macao are in macao_hk_subset
 
-# Since we already have the Tourism Value for mainland China (which we'll clean and tidy in the chunks below), we'll filter out the GDP rows for China now and then rbind the tourism value for China back in at the end before aggregating.
+# Since we already have the Tourism Value for mainland China (which we'll clean and tidy in the chunks below), we'll filter out the GDP rows for China now and then bring the tourism values for China back in at the end before aggregating.
 
 # ----- Prep for joining with Macao + Hong Kong subset ----
 # drop "China" rows

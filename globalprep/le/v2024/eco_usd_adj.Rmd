@@ -7,7 +7,7 @@ author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 ## Setup
 
 ```{r}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 
 options(scipen=99)
 ```
@@ -30,8 +30,8 @@ librarian::shelf(
   
   # for data viz
   RColorBrewer, 
-  paletteer,
-  plotly
+  plotly,
+  scales
 )
 
 
@@ -71,16 +71,22 @@ tour_df_pre <- read_csv(here(int_dir, "eco_tour_usd_pre.csv"))
 ## Implement `inflation_adjustment.R`
 
 ```{r}
-# Fishing (cf)
-cf_df_adj <- inflation_adjustment(cf_df_pre, conversion_date = 2017, country = "US", current_year = current_year)
+# ---- Fishing (cf) ----
+cf_df_adj <- inflation_adjustment(
+  cf_df_pre, # csv with the following columns: rgn_id, rgn_name, year, usd, unit, sector, usd_yr
+  conversion_date = 2017, # USD year you want the adjusted values to be in
+  country = "US", # country of unit value
+  current_year = current_year) # assessment year (to index into vYYYY subfolder in "le" folder)
 
 
-# Mariculture (mar)
-mar_df_adj <- inflation_adjustment(mar_df_pre, conversion_date = 2017, country = "US", current_year = current_year)
+# ---- Mariculture (mar) ----
+mar_df_adj <- inflation_adjustment(mar_df_pre, conversion_date = 2017,
+                                   country = "US", current_year = current_year)
 
 
-# Tourism (tour)
-tour_df_adj <- inflation_adjustment(tour_df_pre, conversion_date = 2017, country = "US", current_year = current_year)
+# ---- Tourism (tour) ----
+tour_df_adj <- inflation_adjustment(tour_df_pre, conversion_date = 2017,
+                                    country = "US", current_year = current_year)
 
 
 ```
