@@ -172,17 +172,24 @@ Test
 ```{r}
 library(dplyr)
 
-calculate_scores <- function(data, stop_year) {
+calculate_scores <- function(df, stop_year) {
   data %>%
     group_by(rgn_id, rgn_name) %>%
     mutate(
-      current_value = value[year == max(year[year <= stop_year])],
+     # current_value = value[year == max(year[year <= stop_year])],
+      current_value = df[df$year == stop_year, "value"],
+      
       reference_range = list(seq(max(year[year <= stop_year]) - 5, max(year[year <= stop_year]) - 1)),
+      
       reference_point = sapply(reference_range, function(x) mean(value[year %in% x], na.rm = TRUE)),
+      
       score = current_value / reference_point
     ) %>%
+    
     filter(year == max(year[year <= stop_year])) %>%
+    
     select(rgn_id, rgn_name, year, current_value, reference_point, score) %>%
+    
     ungroup()
 }
 ```
@@ -191,9 +198,29 @@ calculate_scores <- function(data, stop_year) {
 Testing function: 
 
 ```{r}
+test_range <- eco_usd_adj %>% 
+  group_by(rgn_id, rgn_name) %>%
+  mutate(
+    # set current value to value in max year of most recent years (starting at stop_year)
+    current_value = value[year == max(year[year <= stop_year])],
+    
+    # create 5 year time range of most recent years of data
+    reference_range = list(seq(max(year[year <= stop_year]) - 5, max(year[year <= stop_year]) - 1)),
+    
+    #
+    reference_point = sapply(reference_range, function(x) mean(value[year %in% x], na.rm = TRUE)),
+    
+    score = current_value / reference_point
+    )
+  
+test_range$reference_range
+test_range$reference_point
+
 # Assuming your data frame is named 'eco_usd_adj'
 result <- calculate_scores(eco_usd_adj, stop_year = 2019)  # Replace 2019 with your desired stop year
 ```
+
+Note -- data is kept for countries that have fewer than 5 years if that data is within the time range defined earlier
 
 ```{r}
 top_score <- result %>% 
@@ -204,10 +231,24 @@ top_score
 
 
 ```{r}
+summary <- summary(result)
+
+paste("Summary of `score` column:")
+paste0(summary[36:42])
+
 top_change <- result %>% 
   slice_max(order_by = score, n = 10) %>% 
   ungroup()
+
+top_change
+
+low_change <- result %>% 
+  slice_min(order_by = score, n = 10) %>% 
+  ungroup()
+
+low_change
 ```
+Aside from the top 10 countries and bottom 4 countries, the scores of the rest of the countries were roughly in the range of 0.5-1.6
 
 
 ```{r}
