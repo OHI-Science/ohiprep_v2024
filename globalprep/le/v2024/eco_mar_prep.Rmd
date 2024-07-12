@@ -24,20 +24,42 @@ editor_options:
 
 ## Overview
 
-* **Data:** 
-    * **Revenue** Data for Mariculture 
-    * Data came from FishStatJ, FAO's application to obtain different fishery-related metrics by country as well as by sector
-    * Citation: © FAO 2024. Global Aquaculture Production. In: Fisheries and Aquaculture. Rome. [Cited Tuesday, July 9th 2024]. https://www.fao.org/fishery/en/collection/aquaculture
-    * **Jobs** Data for mariculture 
-    * Partially obtained from [FAO Fisheries and Aquaculture Statistical Yearbook](https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content)
-    * Also brought in OECD data from their online [OECD Data Explorer](https://data-explorer.oecd.org/vis?df[ds]=DisseminateFinalDMZ&df[id]=DSD_SOE%40DF_SOE&df[ag]=OECD.ENV.EPI&dq=.A....&pd=1995%2C2024&to[TIME_PERIOD]=false&vw=tb)
-    
+### Mariculture Revenue Data
+
+-   Data came from FishStatJ, FAO's application to obtain different
+    fishery-related metrics by country as well as by sector
+-   Citation: © FAO 2024. Global Aquaculture Production. In:
+    Fisheries and Aquaculture. Rome. [Cited Tuesday, July 9th 2024].
+    <https://www.fao.org/fishery/en/collection/aquaculture>
+
+-   **Instructions for download from FishStatJ**
+    -   Go to FAO website for download
+        [FAO](https://www.fao.org/fishery/en/statistics/software/fishstatj)
+    -   Also open the user manual found on that page, linked
+        [here](https://www.fao.org/fishery/static/FishStatJ/FishStatJ_4.03.05-Manual.pdf)
+    -   Once downloaded, open FishStatJ on your computer and follow the
+        instructions to set it up.
+    -   Then click file -\> manage workspaces -\> click 'FAO Global
+        Fishery and Aquaculture Production Statistics' -\> click
+        'Import' -\> Next -\> Next; until it opens
+    -   This should import the workspace and allow you to access the
+        'FAO Global Fishery and Aquaculture Production Value' data
+    -   Once it opens, click 'File' -\> 'Export Selection (CSV File)'
+    -   Store it somewhere you can find on your local drive and from
+        there move it into the 'FAO_mariculture' folder under
+        /home/shares/ohi/git-annex/globalprep/\_raw_data/FAO_mariculture/*your
+        data year*
+
+### Mariculture Jobs Data
+
+-   Partially obtained from [FAO Fisheries and Aquaculture Statistical Yearbook](https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content)
+-   Also brought in OECD data from their online [OECD Data Explorer](https://data-explorer.oecd.org/vis?df%5Bds%5D=DisseminateFinalDMZ&df%5Bid%5D=DSD_SOE%40DF_SOE&df%5Bag%5D=OECD.ENV.EPI&dq=.A....&pd=1995%2C2024&to%5BTIME_PERIOD%5D=false&vw=tb)
 
 
 ### Setup
 
 ```{r}
-# load packages
+# load packages ---- 
 if (!require(librarian)){
   install.packages("librarian")
   library(librarian)
@@ -50,45 +72,38 @@ librarian::shelf(
   RColorBrewer,
   foreach,
   doParallel, # for using multiple cores
+  priceR,
+  pdftools,
+  threadr,
   tidyverse, 
   httr,
   plotly,
   zoo # for gapfilling
   
 )
-#remotes::install_github("skgrange/threadr") # for na_extrapolate
-library(threadr)
-library(pdftools)
-library(priceR)
 
-# source 
+# source common.R ----
 source(here::here("workflow/R/common.R"))
 
-# set year and file path info
+# set year and file path info ----
 current_year <- 2024 # Update this!!
 
-version_year <- paste0("v",current_year)
-data_dir_version_year <- paste0("d", current_year)
-data_path <- here::here("globalprep", "le", version_year)
+version_year <- paste0("v",current_year) # Assessment year
+data_dir_version_year <- paste0("d", current_year) # Data folder for assessment year
+data_path <- here::here("globalprep", "le", version_year) # Path to assessment folder (v202X) 
 
-# Raw data directory (on Mazu)
+# Raw data directory (on Mazu) ---- 
 raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
 # world bank raw data directory
 wb_dir <- here::here(raw_data_dir, "WorldBank", data_dir_version_year)
 
+# FAO Mariculture raw data directory 
 fao_dir <- here::here(raw_data_dir, "FAO_mariculture", data_dir_version_year)
 
-aquaculture_value <- read_csv(file.path(dir_M, "git-annex/globalprep/_raw_data/FAO_mariculture/d2023/online_query_portal/FAO_GlobalAquacultureProduction_Value_1984_2021.csv"))
-
-aquaculture_value2 <- read_csv(file.path(fao_dir, "/FAO_GlobalAquacultureProduction_Value_1984_2022.csv"))
-
-
-# output data dir for intermediate data products
+# output data directory for intermediate data products
 int_dir <- here::here(data_path, "int")
 ```
-
-
 
 ## Read in Data
 
@@ -102,98 +117,109 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
 # FAO Aquaculture data ----
 aquaculture_value <- read_csv(file.path(fao_dir, "/FAO_GlobalAquacultureProduction_Value_1984_2022.csv")) %>% 
   janitor::clean_names()
+
+## str to view file structure (it can be very messy)
 # str(aquaculture_value)
 ```
 
-## Test 
+## Clean Aquaculture value data
+
+### Note: This process was done manually because instead of reading in the data with "flag" as the header for each observation's symbol, 2024's year was read in with "symbol" as the header for each observation's symbool
+
+-   As a result, the data cleaning function fao_online_portal_clean.R
+    was not able to be run. So what I did was drag components of the
+    cleaning function and manually cleaned the data. See v2023
+    livelihoods_economies_dataprep.Rmd to see what they did.
+    -   With the data in the correct format (drawn from online FAO
+        portal), this function should apply
 
 ```{r}
-fao_values <- fao %>% 
-  dplyr::select(-c(paste(initial_data_year:last_data_year, "Flag"))) %>% 
-  pivot_longer(cols = paste0(initial_data_year:last_data_year),
-               names_to = "year",
-               values_to = "value")
-
-#pivot all of the flag columns   
-fao_flags <- fao %>%
-  select(-paste0(initial_data_year:last_data_year)) %>% 
-  pivot_longer(cols = paste(initial_data_year:last_data_year, "Flag"),
-               names_to = "flag_year",
-               values_to = "flag") %>% 
-  mutate(year = str_remove(flag_year, " Flag")) %>% 
-  select(year, flag, row_id) 
-
-#combine flag and row id 
-fao_new <- fao_values %>%
-  left_join(fao_flags, by = c("row_id", "year"))
-```
-
-```{r}
-#clean the aquaculture value data
+#clean the aquaculture value data ----
 #this will also be used in the mariculture jobs data section, so need to keep in all environments in the first step
+
+# Cleaning aquaculture value data
 aquaculture_value_clean <- aquaculture_value %>% 
-   dplyr::rename(country = country_name,
-                species =  asfis_species_name,
+   dplyr::rename(country = country_name, # Assigning relevant column names 
+                species =  asfis_species_name, 
                 area = fao_major_fishing_area_name,
                 environment = environment_name) %>%
   dplyr::select(-c(unit_name)) %>% #clean data, note that we are still using a sub_n value of .1 (100 dollars) 
   mutate(row_id = 1:nrow(.))
 
+# This section adjusts columns simultaneously so that you dont have to ---- 
+
+# Check these! These are for the "year" columns
 initial_data_year = 1984
 last_data_year = 2022
 
+# Testing to make sure the "year" specs follow the same naming format as the df
 test = paste0("x", initial_data_year:last_data_year)
 
+# Check these! These are for the "symbol" or "flag" columns (2024 they were in increments of 2)
 flag_start = 8
 flag_end = 84
+
+# Testing to make sure the symbol or flag specs are the same naming format as the df 
 test = paste0("symbol_", seq(flag_start, flag_end, by = 2))
 
+# Pivoting columns to tidy the data ---- 
+
+# This creates a dataframe of just the values in the FAO data 
 fao_values <- aquaculture_value_clean %>% 
-  dplyr::select(-c(paste0("symbol_", seq(flag_start, flag_end, by = 2)))) %>%
+  dplyr::select(-c(paste0("symbol_", seq(flag_start, flag_end, by = 2)))) %>% # remove "flag" columns
   pivot_longer(cols = paste0("x", initial_data_year:last_data_year), 
                names_to = "year",
-               values_to = "value") %>% 
-  mutate(year = str_remove(year, "x"))
+               values_to = "value") %>% # Pivot value colunns
+  mutate(year = str_remove(year, "x")) # clean_names() put an 'x' in front of years. Removing the x
 
+# This is a little bit more messy than the values because my column headers contained symbol instead of flag 
 fao_flags1 <- aquaculture_value_clean %>% 
-  dplyr::select(-c(paste0("x", initial_data_year:last_data_year))) 
+  dplyr::select(-c(paste0("x", initial_data_year:last_data_year))) # select out year
 
+### MAYBE MOVE THIS TO APPLY TO THE AQUACULTURE_VALUE_CLEAN DF RATHER THAN FAO_FLAGS1
+
+# Rename the columns in the Flag dataframe to actually have "flag" rather than symbol AND** getting the year for each flag so that we can rejoin the flags df with the values df 
 colnames(fao_flags1) = c("country", "species", "area", "environment", "unit", paste0("flag", initial_data_year:last_data_year), "row_id")
 
+# Because values were already selected out, this line of code is just pivoting the flags df and cleaning
 fao_flags <- fao_flags1 %>% 
   pivot_longer(cols = paste0("flag", initial_data_year:last_data_year),
                names_to = "flag_year",
-               values_to = "flag") %>% 
-  mutate(year = str_remove(flag_year, "flag")) %>% 
-  dplyr::select(year, row_id, flag)
+               values_to = "flag") %>% # Pivot longer 
+  mutate(year = str_remove(flag_year, "flag")) %>% # Remove the "flag" from flag year so that we can have year to join by in the final flag df
+  dplyr::select(year, row_id, flag) # selecting relevant columns to join by 
 
+# Creating final df ---- 
+
+# Joining fao values dataframe with the fao flags dataframe so that we can account for "N" flag and assign a value to it 
 fao_new <- fao_values %>%
-  left_join(fao_flags, by = c("row_id", "year"))
+  left_join(fao_flags, by = c("row_id", "year")) # This is why we need year from each flag. If we just pivoted the values and then the flags in the aquaculture_values_clean df then it would double the values for each observation. 
 
+# Assign value to substitute "N" flags for 
 sub_N = 0.1
 
-#replace 
+# Replace "N" flags 
 fao_new <- fao_new %>% 
   mutate(value = case_when((str_detect(flag, "N") & value == 0) ~ sub_N,
                            TRUE ~value)) %>% #replace values that are 0 and have the flag N with sub_N
-  select(-c(row_id, flag))
+  select(-c(row_id, flag)) # Getting rid of temporary indexing row and flag row 
 
 
-#filter to only marine habitats
+# Filter to only marine habitats
  mariculture_revenue <- fao_new %>% 
    filter(environment %in% c("Brackishwater", "Marine"))
 
-#sum by region and year (we need total revenue)
+# Sum by region and year (we need total revenue)
 total_mar_rev <- mariculture_revenue %>%
   group_by(country, year) %>% 
   dplyr::summarize(value = sum(value, na.rm = TRUE)) %>% 
   mutate(sector = "mar", data_source = "FAO aquaculture value", unit = "USD (1)",
-          value = value *1000) %>% #multiply value times 1000 to get dollars
-  select(country, year, value, unit, sector, data_source)
+          value = value *1000) %>% # Multiply value times 1000 to get dollars
+  select(country, year, value, unit, sector, data_source) # Select relevant columns
 
-## Maximum value in the dataset (2024) was china, with 2.2 trillion USD in aquaculture value. ??? Is that correct? according to the internet china's aquaculture and fisheries production value in 2022 was 1.5 trillion yuan, which according to conversion rates should not be 2.2 trillion usd 
+# Plotting to gut check ---- 
 total_mar_rev %>% 
-  # filter(!country == "China") %>% 
+  # filter(!country == "China") %>% # If needed, filter out China because it tends to squish the lower values 
   ggplot(aes(x = as.numeric(year), y = value, color = country)) + 
   geom_line() + 
   theme(legend.position = "none") + 
@@ -202,12 +228,24 @@ total_mar_rev %>%
 
 ## Assigning country names to their respective regions in OHI
 
-```{r}
-## Need to join with regions and assign each country its respective OHI Region ----------
+-   **NOTE**: This year used the names_2_rgn function to find out which
+    country names needed to be hardcoded to align with the reference
+    regions.
+    -   To do this: Hold cmd (or ctrl) and click name_2_rgn
+    -   This should open up the script for the function
+    -   From there, hold cmd (or ctrl) and click rgn_synonyms on
+        line 31. This will pull up the synonyms for region names so that
+        you can check if yours align. If they do not, you can use
+        case_when() as seen below to revalue specific countries to their
+        relevant synonyms
 
-## Checking the unique country names for anything that needs to be hard-coded
+```{r}
+# Need to join with regions and assign each country its respective OHI Region ----
+
+# Checking the unique country names for anything that needs to be hard-coded
 unique(total_mar_rev$country)
 
+# This is hard coding regions with to their synonyms so that the names_2_rgn function can assign them region IDs
 mar_rev_rgn <- total_mar_rev %>% 
   mutate(Country = case_when(
     country=="Antigua and Barbuda" ~ "Antigua & Barbuda",
@@ -226,36 +264,37 @@ mar_rev_rgn <- total_mar_rev %>%
     TRUE ~ country
   ))
   
+# Using name_2_rgn function to populate values for rgn_id and rgn_name for each of the countries listed in the dataframe
 mar_rev_rgn_temp <- name_2_rgn(df_in = mar_rev_rgn, 
-                       fld_name='Country',
+                       fld_name='Country', # Check to make sure that the case matches
                       flds_unique = c("year"))
 
 ## Received a warning for a duplicated country. Using the following code to display the portion of the dataframe that's duplicated 
     ## Can see that in this case the duplicated country is China, with both a "China" and "China, Hong Kong SAR" both being considered china 
 mar_rev_rgn_temp[duplicated(mar_rev_rgn_temp[, c('Country','year')]),  ] 
 
-## Double-checking to see how values add up
+# Reducing redundancy by creating a new df with the "China" regions so I can combine them (see line 254)
 mar_rev_rgn_check <- mar_rev_rgn_temp %>% 
   filter(Country =="China") %>% 
   ungroup()
 
-## Getting rid of duplicated China data from temp df
+# Because I combined hong kong and china, I need to remove them from the original df so that I can rbind() my combined values to the original df 
 mar_rev_rgn_temp <- mar_rev_rgn_temp %>% 
   filter(!country %in% "China") %>% 
   filter(!country %in% "China, Hong Kong SAR")
 
-## The following code was used to aggregate duplicates by population for the "Social Progress Index", This would likely be useful for another metric of progress, but since we're dealing with hard values for revenue from aquaculture, my thought process is that we can just add them together, and it will represent the combined value from Hong Kong as well as China itself
+# The source code was used to aggregate duplicates by population for the "Social Progress Index", This would likely be useful for another metric of progress, but since we're dealing with hard values for revenue from aquaculture, my thought process is that we can just add them together, and it will represent the combined value from both Hong Kong as well as China
 
 mar_rev_china_temp <- mar_rev_rgn_check %>% 
   mutate(year = as.character(year)) %>% 
   # group_by(year) %>%
   dplyr::summarize(value = sum(value), .by = year)
 
-## Okay, before I find a way to maintain columns this will have to be hard-coded to bring back the columns into the dataframe in the correct order so I can rbind it back to the primary mar_rev df 
+# Okay, before I find a way to maintain columns this will have to be hard-coded to bring back the columns into the dataframe in the correct order so I can rbind it back to the primary mar_rev df 
 mar_rev_china_temp1 <- mar_rev_rgn_check %>% 
-  filter(country == "China")
+  filter(country == "China") # Filtering country == "China" because I only need ONE set of years in my 'combined' df. If I maintain hong kong I wont be able to drag the columns over because the vectors will be different lengths
 
-## Adding columns in (almost) required order after ensuring the df im pulling from is the correct length
+# Adding columns in (almost) required order AFTER ensuring the df I'm pulling from is the correct length 
 mar_rev_china_temp$country = mar_rev_china_temp1$country
 mar_rev_china_temp$unit = mar_rev_china_temp1$unit
 mar_rev_china_temp$sector = mar_rev_china_temp1$sector
@@ -264,46 +303,29 @@ mar_rev_china_temp$Country = mar_rev_china_temp1$Country
 mar_rev_china_temp$rgn_id = mar_rev_china_temp1$rgn_id
 mar_rev_china_temp$rgn_name = mar_rev_china_temp1$rgn_name
 
-## Moving the "country" column to the correct position to rbind the china data back onto the entire data 
+# Moving the "country" column to the correct position to rbind the china data back onto the entire data 
 mar_rev_china_temp <- mar_rev_china_temp %>% 
   relocate(country, .before = year)
 
-## Binding the china data back onto the entire dataframe 
-
+# Binding duplicate data and ensuring dataframe is in the CORRECT format to write out to /int folder ----
 eco_mar_usd_raw <- rbind.data.frame(mar_rev_rgn_temp, mar_rev_china_temp) %>% 
-  relocate(c(rgn_id, rgn_name), .before = country) %>% 
-  ungroup() %>% 
-  select(-c(country, sector, data_source, Country)) %>% 
-  dplyr::rename(usd = value) %>% 
-  mutate(sector = "mar",
-         usd_yr = year,
-         year = as.numeric(year))
+  relocate(c(rgn_id, rgn_name), .before = country) %>% # Relocating columns in the order specified by README
+  ungroup() %>% # Getting rid of any leftover groups 
+  select(-c(country, sector, data_source, Country)) %>% # Getting rid of extra columns
+  dplyr::rename(usd = value) %>% # Renaming value to specified format name 
+  mutate(sector = "mar", # Adding sector
+         usd_yr = year, # UPDATE THIS BASED ON THE USD METRIC CONVERSION (should specify in metadata, but for the data for v2024 the data was just converted to that year's USD value, so the usd_yr is just year)
+         year = as.numeric(year)) # Making sure its numeric per file structure. Could check this with class()
 
-## Using priceR for each unique combination of year, rgn_id, and sector --> aggregate function maybe 
-??priceR
-
-prices <- eco_mar_usd_raw$usd
-
-from_dates <- eco_mar_usd_raw$year
-
-
-to_dates <- 2017
-
-country = "US"
-
-converted_eco_mar_usd <- adjust_for_inflation(price = prices, from_date = from_dates, country = country, to_date = to_dates)
-
-eco_mar_usd_pre$adj = converted_eco_mar_usd 
 ## Checking how many unique countries are within the revenue data - 142 (2024 Assessment)
 # length(unique(eco_mar_usd_raw$rgn_id))
 
 # write_csv(eco_mar_usd_raw, here::here(data_path, "int", "eco_mar_usd_pre.csv"))
 ```
 
-
 # JOBS!!!!!!!
 
-## This was copied from Sophia's pdf processing she did for the fao yearbook 
+## This was copied from Sophia's pdf processing she did for the fao yearbook
 
 ```{r}
 #------cf FAO Yearbook Number of Fishers-------
@@ -401,8 +423,7 @@ length(unique(duplicates$country))
 
 ```
 
-
-## This piece of code is for assigning countries to region id when there are dis-aggregated country names (i.e China, Hong Kong, Macao) that are considered one country for the OHI Regions 
+## This piece of code is for assigning countries to region id when there are dis-aggregated country names (i.e China, Hong Kong, Macao) that are considered one country for the OHI Regions
 
 ```{r}
 ## Hard coding a few of the country names that are either synonyms of countries or difficult to identify with name_2_rgn() function
@@ -454,13 +475,3 @@ mar_jobs_rgn_temp[duplicated(mar_jobs_rgn_temp[, c('Country','year')]),  ]
 ## Only twenty nine countries with data 
 # length(unique(mar_jobs_rgn_temp$Country))
 ```
-
-
-
-
-
-
-
-
-
-
