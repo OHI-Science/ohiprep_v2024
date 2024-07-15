@@ -337,3 +337,26 @@ plotly::plot_ly(data = plot_df, x = ~score, y = ~rgn_name, color = ~rgn_name,
 
 ```
 
+
+
+
+## Alternative Score method: value 5 years ago as reference point
+
+
+```{r}
+calculate_scores_2 <- function(data, stop_year) {
+  data %>%
+    group_by(rgn_id, rgn_name) %>%
+    mutate(
+      current_year = max(year[year <= stop_year]),
+      current_value = value[year == current_year],
+      reference_year = current_year - 5,
+      reference_value = value[year == reference_year],
+      score = current_value / reference_value
+    ) %>%
+    filter(year == current_year) %>%
+    select(rgn_id, rgn_name, year, current_value, reference_value, score) %>%
+    ungroup()
+}
+```
+
