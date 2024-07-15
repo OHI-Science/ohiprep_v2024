@@ -193,53 +193,61 @@ cf_revenue_fix <- cf_revenue %>%
 ```
 
 ## Disaggregation 
-```{r}
-# COME BACK!!!! look at rasterized fishing effort, to determine the relative proportion of it within each eez, and distribute catch relative to that proportion
 
+Look at rasterized fishing effort, to determine the relative proportion of it within each eez, and distribute catch relative to that proportion.
+
+**Regions to disaggregate:**
+
+Channel Islands --> Guernsey (228) and Jersey (227)
+
+Bonaire/S.Eustatius/Saba --> Bonaire (245), Sint Eustatius (249), and Saba (248)
+
+
+```{r}
+# Function to calculate average catch for certain regions and certain years
+calculate_avg_catch <- function(data, region_ids, years) {
+  data %>% 
+    filter(rgn_id %in% region_ids, year %in% years) %>% 
+    group_by(rgn_id, year) %>% 
+    summarize(catch = sum(mean_catch, na.rm = TRUE)) %>%
+    ungroup() %>%
+    group_by(rgn_id) %>% 
+    mutate(avg_catch = mean(catch)) %>% 
+    select(rgn_id, avg_catch) %>%
+    distinct() %>% # ensures that there's only one row per region, removing any potential duplicates
+    pivot_wider(names_from = "rgn_id", values_from = "avg_catch")
+}
+
+# Function to calculate the proportion of fishing done for each region out of the total (aggregated) area
+# it sums up whatever is in that column. data[, -1] selects all rows (because there's nothing before the comma) and all columns except the first one (because of the -1 after the comma).
+calculate_proportion <- function(data, column) {
+  data[[column]] / sum(data[, -1], na.rm = TRUE)
+} 
+
+# Load in data on the mean catch for each region, used as a proxy to determine which region has a greater commercial fishing economy
 mean_catch_2017 <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohiprep_v2024/gh-pages/globalprep/fis/v2020/int/mean_catch.csv")
 
-# regions to disaggregate: 
-## Channel Islands --> Guernsey (228) and Jersey (227)
-## Bonaire/S.Eustatius/Saba --> Bonaire (245), Sint Eustatius (249), and Saba (248)
+# Define parameters to input into the functions
+years_to_analyze <- 2014:2017
+channel_islands_ids <- c("228", "227")
+bes_islands_ids <- c("245", "249", "248")
 
-mean_catch_ci_agg <- mean_catch_2017 %>% 
-  filter(rgn_id %in% c("228", "227")) %>% 
-  filter(year %in% c(2014:2017)) %>% 
-  group_by(rgn_id, year) %>% 
-  dplyr::summarize(catch = sum(mean_catch, na.rm=TRUE)) %>%
-  ungroup() %>%
-  group_by(rgn_id) %>% 
-  mutate(avg_catch = mean(catch)) %>% 
-  pivot_wider(names_from = "rgn_id",
-              values_from = "avg_catch") %>% 
-  rename(jersey = as.character(227),
-         guernsey = as.character(228))
+# Calculate average catch for Channel Islands for the 3 most recent years
+mean_catch_ci_agg <- calculate_avg_catch(mean_catch_2017, channel_islands_ids, years_to_analyze) %>%
+  rename(jersey = `227`, guernsey = `228`)
 
-mean_catch_bes_agg <- mean_catch_2017 %>% 
-  filter(rgn_id %in% c("245","249","248")) %>% 
-  filter(year %in% c(2014:2017)) %>% 
-  group_by(rgn_id, year) %>% 
-  dplyr::summarize(catch = sum(mean_catch, na.rm=TRUE)) %>%
-  ungroup() %>%
-  group_by(rgn_id) %>% 
-  mutate(avg_catch = mean(catch)) %>% 
-  pivot_wider(names_from = "rgn_id",
-              values_from = "avg_catch") %>% 
-  rename(bonaire = as.character(245),
-         sint_eustatius = as.character(249),
-         saba = as.character(248))
+# Calculate average catch for Bonaire/S.Eustatius/Saba
+mean_catch_bes_agg <- calculate_avg_catch(mean_catch_2017, bes_islands_ids, years_to_analyze) %>%
+  rename(bonaire = `245`, sint_eustatius = `249`, saba = `248`)
 
-prop_g <- (mean_catch_ci_agg$guernsey[5])/(mean_catch_ci_agg$guernsey[5]+(mean_catch_ci_agg$jersey[1]))
+# Calculate proportions for each disaggregated region
+prop_g <- calculate_proportion(mean_catch_ci_agg, "guernsey")
+prop_j <- calculate_proportion(mean_catch_ci_agg, "jersey")
 
-prop_j <- (mean_catch_ci_agg$jersey[1])/(mean_catch_ci_agg$jersey[1]+(mean_catch_ci_agg$guernsey[5]))
-
-prop_b <- (mean_catch_bes_agg$bonaire[1])/((mean_catch_bes_agg$bonaire[1])+(mean_catch_bes_agg$sint_eustatius[9])+(mean_catch_bes_agg$saba[5]))
-
-prop_e <- (mean_catch_bes_agg$sint_eustatius[9])/((mean_catch_bes_agg$bonaire[1])+(mean_catch_bes_agg$sint_eustatius[9])+(mean_catch_bes_agg$saba[5]))
-
-prop_s <- (mean_catch_bes_agg$saba[5])/((mean_catch_bes_agg$bonaire[1])+(mean_catch_bes_agg$sint_eustatius[9])+(mean_catch_bes_agg$saba[5]))
+prop_b <- calculate_proportion(mean_catch_bes_agg, "bonaire")
+prop_e <- calculate_proportion(mean_catch_bes_agg, "sint_eustatius")
+prop_s <- calculate_proportion(mean_catch_bes_agg, "saba")
 ```
-
 
 ```{r}
 # use proportions to disaggregate Channel Islands and Bonaire/S.Eustatius/Saba
@@ -253,7 +261,8 @@ split_ci <- cf_revenue %>%
     split_col == "Jersey" ~ value*prop_j
   ) %>% 
   ungroup()
-sum(split_saba_sint$tonnes) # 14362.37 ; perfect
+
+sum(split_ci$value) 
 
 ```
 
@@ -277,7 +286,7 @@ rev_diff <- setdiff(rev_rgn_duplicates, rev_ref_duplicates)
 rev_diff # none! Move on
 ```
 
-### CF Revenue Plot
+## CF Revenue Plot
 ```{r}
 cf_rev_plot <- plotly::plot_ly(cf_revenue_rgn_agg, x = ~year, y = ~value, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
   layout(title = "All Regions: Yearly Revenue for the Marine Fishing Sector", 
@@ -294,7 +303,7 @@ plotly::plot_ly(cf_revenue_china, x = ~year, y = ~value, color = ~rgn_name, type
          yaxis = list(title = "Revenue of all catch (USD)"))
 ```
 
-### Saving intermediate data
+## Saving intermediate data
 ```{r}
 # columns should be: rgn_id, rgn_name, year, usd (previously value), unit, sector, usd_yr (in this case = year)
 
