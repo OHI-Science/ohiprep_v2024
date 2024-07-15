@@ -213,10 +213,24 @@ artisanal_scores <- scores %>%
   filter(year %in% c(2012,2023))
 artisanal_scores
 
-unique(artisanal_scores$year)
+artisanal_scores<-artisanal_scores %>% 
+  filter(dimension=="score")
+
+unique(artisanal_scores$dimension)
+
+artisanal_scores<-artisanal_scores %>% 
+  pivot_wider(names_from=year, values_from= score)
+
+artisanal_scores<-na.omit(artisanal_scores)
+artisanal_scores$'2023'<-as.numeric(artisanal_scores$'2023')
+artisanal_scores$'2012'<-as.numeric(artisanal_scores$'2012')
+
+
+artisanal_scores<-artisanal_scores %>% 
+  mutate(changes=`2023`-`2012`)
 
 artisanal_scores %>% 
-  ggplot(aes(x=region_id, y=score, color=year))+
+  ggplot(aes(x=region_id, y=changes))+
   geom_point(size=1, alpha=0.5)+
   labs(title="Artisanal Opportunities in 2012 vs 2023")+
   theme_minimal()
@@ -230,7 +244,19 @@ Create a plot that shows the distribution (e.g., histogram or barplot or ??) of 
 ```{r across year plot}
 
 ## Code to create a plot showing distribution of country Index scores
+unique(scores$goal)
+unique(scores$dimension)
 
+
+index_scores<-scores %>% 
+  filter(goal=="Index")
+index_scores<-index_scores %>% 
+  filter(dimension=="score")
+
+ggplot(data=index_scores, aes(x=region_id, y=score))+
+  geom_col()+
+  facet_wrap(~year)+
+  labs(title = "Index Scores for each Region by Year")
 
 
 ```
