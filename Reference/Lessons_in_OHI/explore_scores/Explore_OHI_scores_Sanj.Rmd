@@ -8,6 +8,10 @@ output: html_document
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+install.packages("janitor")
+library(janitor)
+install.packages("stringr")
+library(stringr)
 ```
 
 
@@ -38,8 +42,8 @@ https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv
 
 ```{r, include=FALSE}
 ## Working space
-
-
+scores<-read.csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv")
+scores
 ```
 
 ### Region explore
@@ -55,14 +59,40 @@ Can you make this data more human readable by including the full goal name (vs. 
 *Hint 3* Which region has all NA values for scores?
 
 *Answer* Write your answer here!
+The scores data set has a region 0 which isnt in the official region list and it has region 213 Antactica which isnt included in the global assessment
 
 ```{r, include=FALSE}
 ## Working space
 
+#reading ohi regions in and renaming it to match scores column names for region id
+unique(scores$region_id)
+ohi_regions<-read.csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv")
+ohi_reg_countries<-ohi_regions %>% 
+  select(rgn_id, admin_country_name) %>% 
+  rename("region_id"="rgn_id")
 
+#joining region names to scores with left join to keep scores as the main frame
+scores_regionnames<-left_join(scores, ohi_reg_countries, by= "region_id")
+
+#reading in goals names and renaming columns to match new scores dataset
+goals<-read.csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/metadata_documentation/ohi_model/tables/ten_goals.csv")
+goals<-goals %>% 
+  select(-Description) %>% 
+  clean_names()
+goals<-goals %>% 
+  rename("fullgoal"="goal", "goal"="abbreviation")
+
+#joining new scores and goals with a full join because there are more goal ids in new scores than in goals
+scores_reg_goals<-full_join(scores_regionnames, goals, by= "goal")
+
+#removing and renaming to keep it clean
+rm(goals, ohi_reg_countries, ohi_regions, scores_regionnames)
+scores_og<-scores
+scores<-scores_reg_goals
+rm(scores_reg_goals)
 ```
 
-*Question* Which region id corresponds to the United States?
+*Question* Which region id corresponds to the United States? 12, 13, 116, 149,150,151, 158,159,163
 
 
 ### Goal explore
@@ -71,11 +101,11 @@ Can you make this data more human readable by including the full goal name (vs. 
 
 *Hint 1* Review the methods doc here: https://raw.githack.com/OHI-Science/ohi-global/published/documents/methods/Supplement.html
 
-*Answer* Write your answer here!
+*Answer* Write your answer here! There are 10 big goals but smaller subgoals within them, those have 3 letters in their ID while the big goals have 2 letters. The subgoals are ECO-Economies(LE) FIS-Fisheries(FP) HAB-Habitat(BD) ICO-Iconic Species(SP) LIV-Livelihoods(LE) LSP-Lasting Special Places(SP) MAR-Mariculture(FP) and SPP-Species Condition(BD)
 
 ```{r, include=FALSE}
 ## Working space
-
+unique(scores$goal)
 
 ```
 
@@ -84,16 +114,17 @@ Can you make this data more human readable by including the full goal name (vs. 
 
 *Question* There are 6 dimensions reported in this dataset (future, pressures, resilience, score, status, and trend).  When I look at the number of records in each of these categories, I notice that there are more "score" values reported than "status" values (see working space below). Given that scores are calculated using status, it seems like these should have the same number of records. Can you figure out what is going on here. Is something going wrong?
 
-*Answer* Write your answer here!
+*Answer* Write your answer here! 
+Index doesnt use status
 
 ```{r, include=FALSE}
 ## Working space
 
-# unique(scores$dimension)
-# table(scores$dimension)
-# 
-# table(scores$goal)
-# table(scores$goal, scores$dimension)
+unique(scores$dimension)
+table(scores$dimension)
+
+table(scores$goal)
+table(scores$goal, scores$dimension)
 
 
 ```
@@ -101,7 +132,7 @@ Can you make this data more human readable by including the full goal name (vs. 
 
 ### Missing data
 
-*Question* Figure out which goals/subgoals have the most NA values for scores in 2021.  Which ones have the least? Can you discern any reason why some goals have lots of missing values and others do not?
+*Question* Figure out which goals/subgoals have the most NA values for scores in 2023.  Which ones have the least? Can you discern any reason why some goals have lots of missing values and others do not?
 
 *Hint* Include only dimension = score, and year = 2023, and cut region_id = 0.
 
@@ -109,6 +140,17 @@ Can you make this data more human readable by including the full goal name (vs. 
 
 ```{r, include=FALSE}
 ## Working space
+class(scores$year)
+scores2023<-scores %>% 
+  filter(year==2023) %>% 
+  filter(dimension=="score") %>% 
+  filter(region_id==!0)
+
+missing<-scores2023 %>% 
+  filter(is.na(score))
+
+
+###why is there only 1 :(
 
 
 ```
@@ -120,11 +162,17 @@ Can you make this data more human readable by including the full goal name (vs. 
 
 *Hint* Isolate the future, status, and score values for one region and one goal and see if you can identify a pattern.
 
-*Answer* Write your answer here!
+*Answer* Write your answer here! Its the average of both so it would be 85
 
 ```{r, include=FALSE}
 ## Working space
+scores_AUS<-scores %>% 
+  filter(region_id==1)
+scores_AUS
 
+(70.87+72.67)/2
+
+rm(scores_AUS)
 
 ```
 
@@ -137,16 +185,16 @@ Write it in the following table.  NOTE: Knit the document to see if the table is
 
 Variable   | Description                  | Values
 ---------- | ---------------------------- | ------------------------------
-goal       |                              |
-dimension  |                              | 
-region_id  |                              | 
-score      |                              |          
+goal       |  10 goals 8 subgoals         | AO, BD, CP, CS, CW, ECO, FIS, FP, HAB, ICO, LE, LIV, LSP, MAR, NP, SP, SPP, TR
+dimension  |  Factors to combine for final score and final score                               | future, pressures, resilience, score, status, trend 
+region_id  |  number associated w country | 0-250
+score      |  Calculated value            | 0-100      
 year       |  Scenario year               | 2012 to 2022
 
 
 ```{r, include=FALSE}
 ## Working space
-
+unique(scores$goal)
 ```
 
 
@@ -160,7 +208,18 @@ Why might this be? How could you begin to figure this out?
 
 ```{r, include=FALSE}
 ## Working space
+artisanal_scores <- scores %>% 
+  filter(goal == "AO") %>% 
+  filter(year %in% c(2012,2023))
+artisanal_scores
 
+unique(artisanal_scores$year)
+
+artisanal_scores %>% 
+  ggplot(aes(x=region_id, y=score, color=year))+
+  geom_point(size=1, alpha=0.5)+
+  labs(title="Artisanal Opportunities in 2012 vs 2023")+
+  theme_minimal()
 
 
 ```
