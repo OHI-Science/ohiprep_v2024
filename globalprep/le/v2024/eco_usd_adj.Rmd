@@ -1,0 +1,339 @@
+---
+title: "Adjusting Economies data by Sector for Inflation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+---
+
+
+## Setup
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+options(scipen=99)
+```
+
+
+```{r}
+# ---- load packages ----
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  # general
+  here,
+  janitor,
+  tidyverse,
+  ohicore,
+  
+  priceR, # for inflation function
+  
+  # for data viz
+  RColorBrewer, 
+  plotly,
+  scales
+)
+
+
+# ---- source functions ----
+# common
+source(here("workflow", "R", "common.R"))
+# inflation function
+source(here("workflow", "R", "inflation_adjustment.R"))
+
+# ---- set year and file path info ----
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+
+data_path <- here("globalprep", "le", version_year)
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
+
+```
+
+
+## Read in pre-adjustment data
+
+```{r}
+# sector 1: Fishing (cf)
+cf_df_pre <- read_csv(here(int_dir, "eco_cf_usd_pre.csv"))
+
+# sector 2: Mariculture (mar)
+mar_df_pre <- read_csv(here(int_dir, "eco_mar_usd_pre.csv"))
+
+# sector 3: Tourism (tour)
+tour_df_pre <- read_csv(here(int_dir, "eco_tour_usd_pre.csv"))
+
+```
+
+## Implement `inflation_adjustment.R`
+
+```{r}
+# ---- Fishing (cf) ----
+cf_df_adj <- inflation_adjustment(
+  cf_df_pre, # csv with the following columns: rgn_id, rgn_name, year, usd, unit, sector, usd_yr
+  conversion_date = 2017, # USD year you want the adjusted values to be in
+  country = "US", # country of unit value
+  current_year = current_year) # assessment year (to index into vYYYY subfolder in "le" folder)
+
+
+# ---- Mariculture (mar) ----
+mar_df_adj <- inflation_adjustment(mar_df_pre, conversion_date = 2017,
+                                   country = "US", current_year = current_year)
+
+
+# ---- Tourism (tour) ----
+tour_df_adj <- inflation_adjustment(tour_df_pre, conversion_date = 2017,
+                                    country = "US", current_year = current_year)
+
+
+```
+
+```{r}
+# cf_df_adj_filter <- cf_df_adj %>% 
+#   filter(year %in% c())
+```
+
+
+
+## Combine adjusted data frames 
+
+```{r}
+# bind rows of adjusted data frames
+eco_usd_bind <- rbind(cf_df_adj, mar_df_adj, tour_df_adj)
+
+# find maximum and minimum years for each adjusted data frame
+min_max_df <- tibble(
+  min_year = c(min(cf_df_adj$year), min(mar_df_adj$year), min(tour_df_adj$year)),
+  max_year = c(max(cf_df_adj$year), max(mar_df_adj$year), max(tour_df_adj$year))
+)
+
+# set year range based on limiting dataset values
+start_year <- max(min_max_df$min_year) # take maximum of minimum years
+stop_year <- min(min_max_df$max_year) # take minimum of maximum years
+
+# ----- create aggregated adjusted data frame ------------
+
+eco_usd_filter <- eco_usd_bind %>% 
+  filter(year %in% c(start_year:stop_year)) # filter to date range
+```
+
+
+- plot heatmap of sectors we have data for within date range 
+
+- find 
+
+```{r}
+
+
+
+eco_heatmap <- eco_usd_filter %>% 
+  mutate(status = !is.na(usd)) 
+# %>% 
+#   group_by(rgn_id, rgn_name, year) %>% 
+eco_heatmap
+agg_test <- eco_heatmap %>% aggregate(status~rgn_name+year+sector, FUN = sum)
+
+agg_test
+
+
+agg_test_sum <- agg_test %>% 
+  ungroup() %>% 
+  group_by(rgn_name, year) %>% 
+  summarize(data_status = sum(status, na.rm = TRUE))
+
+agg_test_sum
+
+
+agg_heatmap_plot <- ggplot(data = agg_test_sum) +
+  geom_tile(aes(x = year,
+                y = rgn_name,
+                fill = as.factor(data_status)), color = "black") +
+  scale_fill_manual(values = c("white", "#AACAF9", "#5594F2", "#005FEC", "darkblue"), na.value = "grey") +
+  labs(y = "", 
+       x = "Year",
+       title = "Number of Sectors with Data per Region per Year") +
+  theme_bw() 
+
+agg_heatmap_plot
+
+
+plotly::ggplotly(agg_heatmap_plot)
+```
+
+
+```{r}
+eco_usd_adj <- eco_usd_filter %>% 
+  group_by(rgn_id, rgn_name, year) %>% # group by places & years
+  summarize(value = sum(adj_usd, na.rm = TRUE)) %>%  # sum values
+  mutate(value = case_when( 
+    value == 0 ~ NA, # replace 0s with NAs (flag of no data that was lost in summing)
+    .default = value
+  ))
+
+
+
+# write data frame to int
+#write_csv(eco_usd_adj, here(int_dir, "eco_usd_adj.csv"))
+
+```
+
+
+## Calculating scores following OHI methodology
+
+- [Methodology](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#economies-subgoal-of-livelihoods-and-economies)
+
+$$
+x_{eco} = \frac { \displaystyle\sum _{ k=1 }^{ N }{ { e }_{ c,k } }  }{ \displaystyle\sum _{ k=1 }^{ N }{ { e }_{ r,k } }  }
+$$
+
+where, $e$ is the total adjusted revenue generated directly and indirectly from sector $k$, at current $c$, and reference $r$, time points
+
+Based on this methodology and equation, we created and defined the `value` column earlier as the sum of the adjusted USD value for the three sectors (fishing, mariculture, and tourism). To calculate the score, we will take that combined sum across sectors per region per year and divide the current year's value by the 
+
+<https://stackoverflow.com/questions/743812/calculating-moving-average>
+
+<https://www.rdocumentation.org/packages/zoo/versions/1.8-12/topics/rollmean>
+
+```{r}
+# pseudo code
+
+# want: current year / average of 5 previous years (sum of 5 previous yrs / 5, na.rm = T)
+
+# for each rgn_id, rgn_name
+
+
+current_value <- eco_usd_adj[eco_usd_adj$year == stop_year, "value"]
+
+reference_range <- c((stop_year - 5):(stop_year - 1))
+
+reference_point <- (sum(eco_usd_adj[eco_usd_adj$year %in% c(reference_range), "value"], na.rm = TRUE) / length(reference_range))
+
+
+
+
+
+
+# ============ stretch goals / want to implement ===========================
+# potential: add if statement that calculates average based on most recent year (next available year) if current year is NA
+
+
+# potential:
+# want to change length(reference_range) to length(!is.na(value)) in reference range for each sector -- would need to have pre-aggregated data 
+```
+
+
+
+Test
+
+```{r}
+library(dplyr)
+
+calculate_scores <- function(df, stop_year) {
+  data %>%
+    group_by(rgn_id, rgn_name) %>%
+    mutate(
+     # current_value = value[year == max(year[year <= stop_year])],
+      current_value = df[df$year == stop_year, "value"],
+      
+      reference_range = list(seq(max(year[year <= stop_year]) - 5, max(year[year <= stop_year]) - 1)),
+      
+      reference_point = sapply(reference_range, function(x) mean(value[year %in% x], na.rm = TRUE)),
+      
+      score = current_value / reference_point
+    ) %>%
+    
+    filter(year == max(year[year <= stop_year])) %>%
+    
+    select(rgn_id, rgn_name, year, current_value, reference_point, score) %>%
+    
+    ungroup()
+}
+```
+
+
+Testing function: 
+
+```{r}
+test_range <- eco_usd_adj %>% 
+  group_by(rgn_id, rgn_name) %>%
+  mutate(
+    # set current value to value in max year of most recent years (starting at stop_year)
+    current_value = value[year == max(year[year <= stop_year])],
+    
+    # create 5 year time range of most recent years of data
+    reference_range = list(seq(max(year[year <= stop_year]) - 5, max(year[year <= stop_year]) - 1)),
+    
+    # define reference point as the mean of values within the reference range, excluding NA values (which is important)
+    reference_point = sapply(reference_range, function(x) mean(value[year %in% x], na.rm = TRUE)),
+    
+    # create score column as current value divided by reference point
+    score = current_value / reference_point
+    )
+  
+test_range$reference_range
+test_range$reference_point
+
+# Assuming your data frame is named 'eco_usd_adj'
+result <- calculate_scores(eco_usd_adj, stop_year = 2019)  # Replace 2019 with your desired stop year
+```
+
+Note -- data is kept for countries that have fewer than 5 years if that data is within the time range defined earlier
+
+```{r}
+top_score <- result %>% 
+  filter(score == max(result$score, na.rm = TRUE))
+
+top_score
+```
+
+
+```{r}
+summary <- summary(result)
+
+paste("Summary of `score` column:")
+paste0(summary[36:42])
+
+top_change <- result %>% 
+  slice_max(order_by = score, n = 10) %>% 
+  ungroup()
+
+top_change
+
+low_change <- result %>% 
+  slice_min(order_by = score, n = 10) %>% 
+  ungroup()
+
+low_change
+```
+Aside from the top 10 countries and bottom 4 countries, the scores of the rest of the countries were roughly in the range of 0.5-1.6
+
+
+```{r}
+top_change$rgn_name <- factor(top_change$rgn_name, levels = unique(top_change$rgn_name)[order(top_change$score, decreasing = TRUE)])
+
+plotly::plot_ly(data = top_change, x = ~score, y = ~rgn_name, color = ~rgn_name, 
+                                type = "bar") %>% 
+  layout(title = "Economies Score: Top 10",
+         xaxis = list(title = "Score"),
+         showlegend = FALSE,
+         margin = m,
+         yaxis = list(title = '')
+        # yaxis = list(title = "Score")
+        )
+
+
+
+plot_df <- result %>% ungroup()
+
+plotly::plot_ly(data = plot_df, x = ~score, y = ~rgn_name, color = ~rgn_name, 
+                                type = "bar") %>% 
+  layout(title = "Economies Score",
+         xaxis = list(title = "Score") #,
+        # yaxis = list(title = "Score")
+        )
+
+```
+

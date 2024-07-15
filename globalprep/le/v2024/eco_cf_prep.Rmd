@@ -1,0 +1,320 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - CF ECO Revenue Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
+---
+
+# CF Economies: USD Value of Marine (Commercial) Fishing per Country/Region per Year
+
+## Overview
+
+-   FAO Capture Data 
+
+    Data Source FAO Global Capture Production (in metric tonnes)
+
+    This version of the value database was downloaded from the
+    Statistical Query Panel. Data from [FAO Global Capture
+    Production](https://www.fao.org/fishery/en/collection/capture?lang=en)
+
+    Citation: FAO 2023. Global Capture Production. Fisheries and
+    Aquaculture Division
+    <https://www.fao.org/fishery/en/collection/capture?lang=en>
+
+    Source information: Navigate to the [online query
+    portal](https://www.fao.org/fishery/statistics-query/en/capture/capture_quantity)
+    for FAO Global Capture Production Quantity. Deselect all
+    pre-selected years. Drag these fields into selected rows: ASFIS
+    species name, FAO major fishing area name, ASFIS species ISSCAP
+    group name En. ASFIS species Family scientific name, FAO major
+    fishing areas, Inland/Marine areas Name en. Click on show data and
+    confirm that data is present for 1950- two years prior to current
+    year. Click download and select yes to include Null Values.
+
+    Date: September 15th, 2023
+
+    Time range: 1950-2021
+
+    Native data resolution: Country level
+
+    Format: csv
+
+    Description: Global Capture Production Quantity
+
+-   Ex-Vessel Price Data (downloaded August 24, 2023)
+
+    -   Ex-vessel price data is in USD/metric tonne.
+
+        -   ex-vessel-prices: ex-vessel prices for fishery caught
+            species from 1976-2019
+
+            -   exvessel_price_database_1976_2019.csv: ex-vessel price
+                data gathered from [Melnychuk et al.
+                2016](https://doi.org/10.1093/icesjms/fsw169) and
+                updated to 2019 using methods described in the
+                public-facing [github
+                repo](https://github.com/SFG-UCSB/price-db-sfg)
+                associated with the Melnychuk et al. 2016 paper
+
+        -   \*\*Citation for paper\*\*  
+
+        -   Melnychuk, M. C., Clavelle, T., Owashi, B., and
+            Strauss, K. 2016. Reconstruction of global ex-vessel prices
+            of fished species. - ICES Journal of Marine Science.
+            doi:10.1093/icesjms/fsw169.
+            
+            
+### Setup
+
+```{r}
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  janitor,
+  terra,
+  readxl,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  tidyverse, 
+  httr,
+  plotly,
+  zoo, # for gapfilling
+  pdftools
+)
+#remotes::install_github("skgrange/threadr") # for na_extrapolate
+library(threadr)
+
+
+# source 
+source(here("workflow/R/common.R"))
+
+source(here('workflow/R/fao_fxn.R')) # function for cleaning old version of FAO data 
+
+source(here('workflow/R/fao_online_portal_clean.R'))
+
+# set year and file path info
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- here("globalprep", "le", version_year)
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# world bank raw data directory
+wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+
+# ILO raw data directory
+ilo_dir <- here(raw_data_dir, "ILOSTAT", data_dir_version_year)
+
+# FAO raw data directory
+fao_dir <- here(raw_data_dir, "FAO", data_dir_version_year)
+
+# OECD raw data directory
+oecd_dir <- here(raw_data_dir, "OECD", data_dir_version_year)
+
+# FAO capture raw data directory
+fao_capture_dir <- here(raw_data_dir, "FAO_capture", data_dir_version_year)
+
+# Ex-vessel raw data directory
+ex_vess_dir <- here(raw_data_dir, "ex-vessel-price-database-updated")
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
+```
+
+### Read in Data
+
+```{r}
+fao_capture_raw <- read_csv(here(fao_capture_dir, "Global_capture_production_Quantity_1950-2021.csv"))
+
+exvessel_prices_raw <- read_csv(here(ex_vess_dir, "price-db-results", "exvessel_price_database_1976_2019.csv"))
+
+# read in cf revenue data from v2023, using FAO Capture data and Ex-vessel data
+cf_revenue <- read_csv(here("globalprep", "le", "v2023", "int", "cf_revenue.csv"))
+```
+
+### Run ohicore name_2_rgn
+```{r}
+# check names
+# These data were removed for not having any match in the lookup tables:
+# 
+# bonaire/s.eustatius/saba (need to be disaggregated) british indian ocean ter (DNE)    channel islands (split by eez area: Jersey, larger island)    french southern terr (DNE)
+#                        1                        1                        1                        1 
+#.   isle of man (cannot be lumped w Britain, maybe Ireland)  netherlands antilles  (curacao)      other nei (DNE)        saint barthélemy (DNE)
+#                        1                        1                        1                        1 
+# saint helena/asc./trist. (Saint Helena)   saint-martin (french)  (DNE)         yugoslavia sfr (DNE)
+#                        1                        1                        1 
+# 
+# These data were removed for not being of the proper rgn_type (eez,ohi_region) or mismatching region names in the lookup tables:
+#            tmp_type
+# tmp_name    disputed landlocked
+#   ethiopia         0         16
+#   palestine       25          0
+
+length(unique(cf_revenue$country)) #203
+
+cf_revenue_fix <- cf_revenue %>%
+  mutate(country = case_when(
+    country=="Bonaire/S.Eustatius/Saba" ~ "Bonaire", # how to disaggregate instead of aggregate?
+    country=="British Indian Ocean Ter" ~ "British Indian Ocean Territory",
+    country=="Channel Islands" ~ "Jersey", # would be disaggregated into Guernsey and Jersey
+    country=="Saint Helena/Asc./Trist." ~ "Saint Helena", 
+    country=="Saint-Martin (French)" ~ "Northern Saint-Martin",
+    country=="Netherlands Antilles" ~ "Curacao",
+    country=="Puerto Rico" ~ "Puerto Rico and Virgin Islands of the United States",
+    country=="China, Hong Kong SAR" ~ "China",
+    country=="China, Macao SAR" ~ "China",
+    country=="United Republic of Tanzania, Zanzibar" ~ "Tanzania",
+    country=="Tanzania, United Rep. of" ~ "Tanzania",
+    TRUE ~ country # Everything else, leave it be
+  ))
+```
+
+## Disaggregation 
+
+Look at rasterized fishing effort, to determine the relative proportion of it within each eez, and distribute catch relative to that proportion.
+
+**Regions to disaggregate:**
+
+Channel Islands --> Guernsey (228) and Jersey (227)
+
+Bonaire/S.Eustatius/Saba --> Bonaire (245), Sint Eustatius (249), and Saba (248)
+
+
+```{r}
+# Function to calculate average catch for certain regions and certain years
+calculate_avg_catch <- function(data, region_ids, years) {
+  data %>% 
+    filter(rgn_id %in% region_ids, year %in% years) %>% 
+    group_by(rgn_id, year) %>% 
+    summarize(catch = sum(mean_catch, na.rm = TRUE)) %>%
+    ungroup() %>%
+    group_by(rgn_id) %>% 
+    mutate(avg_catch = mean(catch)) %>% 
+    select(rgn_id, avg_catch) %>%
+    distinct() %>% # ensures that there's only one row per region, removing any potential duplicates
+    pivot_wider(names_from = "rgn_id", values_from = "avg_catch")
+}
+
+# Function to calculate the proportion of fishing done for each region out of the total (aggregated) area
+# it sums up whatever is in that column. data[, -1] selects all rows (because there's nothing before the comma) and all columns except the first one (because of the -1 after the comma).
+calculate_proportion <- function(data, column) {
+  data[[column]] / sum(data[, -1], na.rm = TRUE)
+} 
+
+# Load in data on the mean catch for each region, used as a proxy to determine which region has a greater commercial fishing economy
+mean_catch_2017 <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohiprep_v2024/gh-pages/globalprep/fis/v2020/int/mean_catch.csv")
+
+# Define parameters to input into the functions
+years_to_analyze <- 2014:2017
+channel_islands_ids <- c("228", "227")
+bes_islands_ids <- c("245", "249", "248")
+
+# Calculate average catch for Channel Islands for the 3 most recent years
+mean_catch_ci_agg <- calculate_avg_catch(mean_catch_2017, channel_islands_ids, years_to_analyze) %>%
+  rename(jersey = `227`, guernsey = `228`)
+
+# Calculate average catch for Bonaire/S.Eustatius/Saba
+mean_catch_bes_agg <- calculate_avg_catch(mean_catch_2017, bes_islands_ids, years_to_analyze) %>%
+  rename(bonaire = `245`, sint_eustatius = `249`, saba = `248`)
+
+# Calculate proportions for each disaggregated region
+prop_g <- calculate_proportion(mean_catch_ci_agg, "guernsey")
+prop_j <- calculate_proportion(mean_catch_ci_agg, "jersey")
+
+prop_b <- calculate_proportion(mean_catch_bes_agg, "bonaire")
+prop_e <- calculate_proportion(mean_catch_bes_agg, "sint_eustatius")
+prop_s <- calculate_proportion(mean_catch_bes_agg, "saba")
+```
+
+```{r}
+# use proportions to disaggregate Channel Islands and Bonaire/S.Eustatius/Saba
+split_ci <- cf_revenue %>%
+  filter(country == "Channel Islands") %>%
+  mutate(split_col = "Guernsey;Jersey") %>%
+  separate_rows(split_col, sep = ";") %>%
+  group_by(country, year, value, unit) %>%
+  case_when(
+    split_col == "Guernsey" ~ value*prop_g,
+    split_col == "Jersey" ~ value*prop_j
+  ) %>% 
+  ungroup()
+
+sum(split_ci$value) 
+
+```
+
+
+```{r}
+cf_revenue_rgn <- name_2_rgn(df_in = cf_revenue_fix, 
+                             fld_name='country',
+                             flds_unique = c("year"))
+
+cf_revenue_rgn_agg <- cf_revenue_rgn %>% 
+  select(rgn_id, rgn_name, year, value, unit, sector, data_source) %>% 
+  group_by(rgn_id, rgn_name, year) %>% # because china needs to be aggregated and has duplicate years
+  dplyr::summarize(value = sum(value, na.rm=TRUE)) %>%
+  ungroup() %>% 
+  dplyr::mutate(year = as.numeric(year)) 
+
+rev_duplicates <- cf_revenue_rgn[duplicated(cf_revenue_rgn[, c("country", "year")]),]
+rev_ref_duplicates <- unique(rev_duplicates$country)
+rev_rgn_duplicates <- unique(rev_duplicates$rgn_name)
+rev_diff <- setdiff(rev_rgn_duplicates, rev_ref_duplicates)
+rev_diff # none! Move on
+```
+
+## CF Revenue Plot
+```{r}
+cf_rev_plot <- plotly::plot_ly(cf_revenue_rgn_agg, x = ~year, y = ~value, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Yearly Revenue for the Marine Fishing Sector", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Revenue of all catch (USD)"))
+cf_rev_plot
+
+cf_revenue_china <- cf_revenue_rgn_agg %>% 
+  filter(rgn_name %in% "China") #before aggregation, 
+
+plotly::plot_ly(cf_revenue_china, x = ~year, y = ~value, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Yearly Revenue for the Marine Fishing Sector", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Revenue of all catch (USD)"))
+```
+
+## Saving intermediate data
+```{r}
+# columns should be: rgn_id, rgn_name, year, usd (previously value), unit, sector, usd_yr (in this case = year)
+
+cf_revenue_int <- cf_revenue_rgn_agg %>% 
+  mutate(usd = value,
+         unit = "USD (1)",
+         sector = "cf",
+         usd_yr = year) %>% 
+  select(-value)
+
+# write_csv(cf_revenue_int, here(int_dir, "eco_cf_usd_pre.csv"))
+```
+
+

@@ -1,0 +1,181 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - Livelilihoods (liv): Labor Force Data Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+---
+
+# Livelihoods: Proportion of Tourism Jobs per Country/Region per Year
+
+## Overview
+
+* **Data:** Labor Force & Employment Data
+
+  * Labor Force data from World Bank (downloaded June 28. 2024)
+
+      - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+
+
+### Setup
+
+```{r}
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  janitor,
+  terra,
+  countrycode,
+  readxl,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  tidyverse, 
+  httr,
+  plotly,
+  zoo # for gapfilling
+  
+)
+#remotes::install_github("skgrange/threadr") # for na_extrapolate
+library(threadr)
+
+
+# source 
+source(here("workflow", "R", "common.R"))
+
+# set year and file path info
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- here("globalprep", "le", version_year)
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# world bank raw data directory
+wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
+```
+
+Create country code --> iso3 function
+
+```{r}
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+```
+
+### Read in Data
+
+```{r}
+# ===================== Read in Data ==============================
+
+
+# Labor force data ----
+labor_raw <- readxl::read_xls(here(wb_dir, "worldbank_labor_force_raw.xls"),
+                               skip = 3,
+                               na = "")
+
+# OHI regions data ----
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
+
+
+
+# ==================== Tidy Data ===================================
+
+# Labor force data -----------------------------------
+labor_clean <- labor_raw %>% 
+  # conver to lower_snake_case
+  janitor::clean_names() %>% 
+  # tidy data from wide to long (years are currently columns)
+  pivot_longer(cols = 5:length(names(labor_raw)),
+               names_to = "year", 
+               values_to = "labor_force_total") %>% 
+  # remove unnecessary columns
+  select(-c(indicator_name, indicator_code)) %>% 
+  # clean up year column (currently in the form of xYYYY)
+  mutate(year = str_remove_all(year, pattern = "x")) %>% 
+  # fix data types
+  mutate(year = as.numeric(year),
+         country_name = as.factor(country_name),
+         labor_force_total = as.numeric(labor_force_total)) %>% 
+  filter(year >= 2009) # starting 5 years back from first year of evaluation
+  
+
+# clean regions data --------------
+region_clean <- region_names %>% 
+  janitor::clean_names() %>% 
+  # drop notes column
+  select(-c(("notes")))
+
+
+# ============== Run ohicore name_2_rgn ==================================
+# check names
+labor_rgn <- name_2_rgn(df_in = labor_clean, 
+                       fld_name='country_name',
+                      flds_unique = c("year"))
+
+duplicates <- labor_rgn[duplicated(labor_rgn[, c("rgn_name", "year")]),]
+
+unique(duplicates$country_name)
+unique(duplicates$rgn_name)
+
+# aggregating to address duplicates ----
+
+# we don't need to do a weighted average since the values can just be added (end goal is total labor force)
+# China: Hong Kong, Macao
+# Northern Mariana Islands and Guam: Northern Mariana Islands, Guam 
+# Puerto Rico and Virgin Islands of the United States: Puerto Rico, Virgin Islands (U.S.)
+
+
+labor_rgn_agg <- labor_rgn %>%
+  group_by(rgn_id, rgn_name, year) %>%
+  dplyr::summarize(labor_force_total = sum(labor_force_total, na.rm=TRUE)
+            )%>%
+  ungroup() %>% 
+  dplyr::mutate(year = as.numeric(year)) %>% 
+  mutate(labor_force_total = case_when(
+    labor_force_total == 0 ~ NA, # replace 0s with NAs, because there are no true 0s in our dataset -- NAs became 0s in the summarize step earlier
+    .default = labor_force_total
+  ))
+ # mutate(eez_iso3 = country_regex_to_iso3c(rgn_name))
+
+# because we aggregated, getting EEZs is more complicated... OHI has assigned certain EEZ ISO3 codes to these aggregated regions, so if you want EEZ ISO3 codes, you'll need to join with regions_clean read in earlier by rgn_name
+# Caused by warning:
+#! Some values were not matched unambiguously: Micronesia, Northern Mariana Islands and Guam, Northern #Saint-Martin, Puerto Rico and Virgin Islands of the United States
+
+
+labor_export <- labor_rgn_agg %>% 
+  mutate(rgn_id = as.character(rgn_id),
+         unit = "Persons (1)",
+         sector = "liv",
+         data_source = "World Bank")
+
+# save csv for use in other livelihood dataprep
+#write_csv(labor_export, here(int_dir, "liv_labor_force.csv"))
+```

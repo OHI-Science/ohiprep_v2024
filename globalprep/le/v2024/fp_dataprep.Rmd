@@ -1,0 +1,273 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - Fish Processing Livelihoods & Economies Data Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+---
+
+# Economies: Fish Processing: Proportion of Jobs per Country per Year (2019-2021)
+
+## Overview
+
+* **Data:** [OECD Employment in Fisheries, Aquaculture, and Processing Dataset](https://data-explorer.oecd.org/vis?fs[0]=Topic%2C1%7CAgriculture%20and%20fisheries%23AGR%23%7CFisheries%20and%20aquaculture%23AGR_FSA%23&pg=0&fc=Topic&bp=true&snb=6&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_FISH_EMP%40DF_FISH_EMPL&df[ag]=OECD.TAD.ARP&df[vs]=1.0&dq=.A...PROC._T._T&pd=2009%2C2021&to[TIME_PERIOD]=false&ly[cl]=TIME_PERIOD&ly[rs]=REF_AREA&vw=tb)
+
+Filtered to select:
+ -  Time Period 2009-2021 (2009-most recent year of data as of July 5th, 2024).
+ -  "Working domain" --> "Processing" 
+ -  "Sex" --> "Total"
+ -  "Working status" --> "Total"
+
+* **Data:** Labor Force Data
+
+  * Labor Force data from World Bank (downloaded June 28. 2024)
+
+      - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+      
+
+
+## Setup
+
+```{r}
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here, # reproducible file paths
+  janitor, # data cleaning: lower_snake_case 
+  terra,
+  countrycode,
+  readxl,
+  paletteer, # custom color palettes for plotting
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  tidyverse, 
+  httr,
+  plotly, # interactive plots
+  kableExtra, # for more aesthetically pleasing tables
+  zoo # for gapfilling
+  
+)
+#remotes::install_github("skgrange/threadr") # for na_extrapolate
+library(threadr)
+
+
+# source 
+source(here("workflow", "R", "common.R"))
+
+
+# set year and file path info
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- here("globalprep", "le", version_year)
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# world bank raw data directory
+oecd_data_dir <- here(raw_data_dir, "OECD", data_dir_version_year)
+
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
+```
+
+
+Create country code --> iso3 function
+
+```{r}
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+```
+
+### Read in Data
+
+```{r}
+# OHI regions data ----
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  janitor::clean_names() %>% 
+  select(-notes)
+
+# labor force from World Bank (cleaned, joined with OHI regions)
+labor_force <- read_csv(here(int_dir, "labor_force.csv"))
+
+# Aquarium Fishing FAO data 
+processing_jobs_raw <- read_csv(here(oecd_data_dir,
+                                     "OECD_2009-2021_employment_fish_aqua_processing_raw.csv"))
+
+```
+
+
+## Data cleaning & preliminary exploration
+
+```{r}
+processing_clean <- processing_jobs_raw %>% 
+  # lower_snake_case
+  janitor::clean_names()
+# preliminary exploration 
+#str(processing_jobs_raw)
+# > unique(processing_clean$working_domain)
+# [1] "Fishing sector"          "Marine deep-sea fishing" "Inland waters fishing"  
+# [4] "Aquaculture"             "Marine fishing, nei"     "Processing"             
+# [7] "Marine coastal fishing"  "Unspeficied"             "Subsistence" 
+# eventually, we want to just have it filtered to processing:
+# [1] "Processing" # <-- this is what we want to be extra sure of!
+# > unique(processing_clean$frequency_of_observation)
+# [1] "Annual"
+# > unique(processing_clean$measure)
+# [1] "EMP"
+# > unique(processing_clean$measure_2)
+# [1] "Employment"
+# > unique(processing_clean$unit_of_measure)
+# [1] "Persons"
+# etc...
+
+# Number of unique countries:
+length(unique(processing_clean$reference_area)) 
+# 50 ...without having filtered to only OHI regions& countries
+
+# create cleaned dataframe with iso3 column -------------------
+fp_clean <- processing_clean %>% 
+  # select relevant columns
+  select(c(reference_area, time_period, obs_value, unit_of_measure, working_domain)) %>% 
+  rename(year = time_period,
+         fp_jobs = obs_value) %>% 
+  # double check to make sure we only have "Processing" data (don't include data entries for working domains like Aquaculture, Fishing sector: Inland waters fishing, for example, which are part of the full dataset on the OECD data portal.)
+  filter(working_domain %in% c("Processing")) %>% 
+  # add iso3 column
+  mutate(eez_iso3 = country_regex_to_iso3c(reference_area))
+
+length(unique(fp_clean$reference_area)) 
+# only 33 now...
+```
+
+
+```{r}
+# check names
+fp_rgn <- name_2_rgn(df_in = fp_clean, 
+                       fld_name='reference_area',
+                      flds_unique = c("year"))
+
+fp_clean <- fp_clean %>%
+  mutate(reference_area = case_when(
+    reference_area == "China (People’s Republic of)" ~ "China",
+    reference_area == "Korea" ~ "South Korea",
+    TRUE ~ reference_area # Everything else, leave it be
+    ))
+
+fp_rgn <- name_2_rgn(df_in = fp_clean, 
+                       fld_name='reference_area',
+                      flds_unique = c("year"))
+
+length(unique(fp_rgn$rgn_name))
+# 30 in 2024 (data up to 2021)
+
+
+fp_rgn_2019_filter <- fp_rgn %>% 
+  filter(year <= 2019)
+
+length(unique(fp_rgn_2019_filter$rgn_name))
+# 29 when filtered up to & including 2019
+```
+
+
+```{r}
+# join with labor force data ------
+# fish processing labor force dataframe
+fp_labor <- left_join(labor_force, fp_rgn, by = c("rgn_name", "year")) %>% 
+  filter(year %in% c(2009:2021))
+
+na_count <- sum(is.na(fp_labor$working_domain))
+not_na_count <- sum(!is.na(fp_labor$working_domain))
+
+paste0("Percentage of NA data points in Fish Processing & Labor Force join: ", round(na_count / nrow(fp_labor) * 100, 2),  "%")
+```
+
+Given that we only have data for 18% of the countries/regions for 2009-2021, we may want to consider how we can account for this in our processing and analysis later.
+
+
+This data does not distinguish between coastal and inland fish processing jobs. However, a key purpose of this index is to track how a country is doing over time -- assuming the proportion of coastal to inland fish processing jobs stays relatively stable within a 5-year window within a country over time, we can continue to use this data (spoke to Melanie Frazier about this issue and that was her reasoning).
+
+
+Also, it seems like the territories without unique eez iso3 codes were treated as copies of admin country (reference area) fish processing jobs data -- for example, Portugal:
+
+```{r}
+fp_labor %>% filter(admin_country_name == "Portugal")
+
+```
+We can see that for each of these regions, because they don't have unique EEZ ISO3 codes, the values repeat/match exactly between each territory in Portugal for each year from 2009-2021. This occurred when creating the cleaned labor force dataset as well.
+
+This is another issue or concern that we are navigating. My concern is specifically around island territories who are more immediately and severely sensitive to changes in ocean health -- and those sensitivities and fluctuations being obscured by using the same values for different metrics as their admin country. 
+
+
+For now, let's create a tidier dataframe and make a proportional jobs column to track the number of fish processing jobs in a way that accounts for population growth within a country 
+
+```{r}
+# creating proportional jobs column ------
+# new data frame
+fp_jobs_prop <- fp_labor %>% 
+  select(-c(reference_area)) %>% 
+  ungroup() %>% 
+  group_by() %>% 
+  mutate(fp_proportion = fp_jobs / labor_force_total)
+  
+
+
+
+# prelim plot to visualize data
+m <- list(
+  l = 80,
+  r = 60,
+  b = 80,
+  t = 80,
+  pad = 4
+)
+
+fp_line_plot <- plotly::plot_ly(fp_jobs_prop, x = ~year, y = ~fp_proportion, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Proportional Fish Processing Employment Within Total Labor Force", 
+         margin = m,
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percent of people by region employed in fish processing"))
+fp_line_plot
+```
+
+Considering that both the total labor force and number of fish processing jobs values were copied over for both the mainland and territories of Portugal, I find the split line (which only shows Portugal when I hover over the upper and lower parts of the yellow line) confusing.
+
+
+## Save intermediate data
+
+Save data to `int` folder (in this project/on GitHub)
+
+```{r}
+fish_process_int <- fp_jobs_prop %>% select(-c(data_status, working_domain)) %>% 
+  mutate(sector = "fp",
+         data_source = "OECD")
+
+
+#write_csv(fish_process_int, here(int_dir, "fp_jobs.csv"))
+```
+

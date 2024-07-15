@@ -29,17 +29,19 @@ fao_query_data_tidy <- function(fao, initial_data_year, last_data_year, sub_N = 
                  values_to = "value") %>% 
     # clean up year column (currently in the form of xYYYY)
     mutate(year = str_remove_all(year, pattern = "x"))
-    
-    
-    # pivot all of the flag columns  
-    fao_flags <- fao %>% 
+  
+  
+  # pivot all of the flag columns  
+  fao_flags <- fao %>% 
     select(-c(paste0("x", initial_data_year:last_data_year))) %>% 
     pivot_longer(cols = ends_with("_flag"),
                  names_to = "flag_year",
                  values_to = "flag") %>% 
     # make year column using the year label from the flags for joining
     mutate(year = str_remove(flag_year, "_flag")) %>% 
-    select(year, flag, row_id) 
+    # clean up year column (currently in the form of xYYYY)
+    mutate(year = str_remove_all(year, pattern = "x")) %>% 
+  select(year, flag, row_id) 
   
   # combine flag and row id 
   fao_new <- fao_values %>%
