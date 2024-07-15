@@ -90,6 +90,14 @@ tour_df_adj <- inflation_adjustment(tour_df_pre, conversion_date = 2017,
 
 
 ```
+
+```{r}
+# cf_df_adj_filter <- cf_df_adj %>% 
+#   filter(year %in% c())
+```
+
+
+
 ## Combine adjusted data frames 
 
 ```{r}
@@ -107,8 +115,57 @@ start_year <- max(min_max_df$min_year) # take maximum of minimum years
 stop_year <- min(min_max_df$max_year) # take minimum of maximum years
 
 # ----- create aggregated adjusted data frame ------------
-eco_usd_adj <- eco_usd_bind %>% 
-  filter(year %in% c(start_year:stop_year)) %>% # filter to date range
+
+eco_usd_filter <- eco_usd_bind %>% 
+  filter(year %in% c(start_year:stop_year)) # filter to date range
+```
+
+
+- plot heatmap of sectors we have data for within date range 
+
+- find 
+
+```{r}
+
+
+
+eco_heatmap <- eco_usd_filter %>% 
+  mutate(status = !is.na(usd)) 
+# %>% 
+#   group_by(rgn_id, rgn_name, year) %>% 
+eco_heatmap
+agg_test <- eco_heatmap %>% aggregate(status~rgn_name+year+sector, FUN = sum)
+
+agg_test
+
+
+agg_test_sum <- agg_test %>% 
+  ungroup() %>% 
+  group_by(rgn_name, year) %>% 
+  summarize(data_status = sum(status, na.rm = TRUE))
+
+agg_test_sum
+
+
+agg_heatmap_plot <- ggplot(data = agg_test_sum) +
+  geom_tile(aes(x = year,
+                y = rgn_name,
+                fill = as.factor(data_status)), color = "black") +
+  scale_fill_manual(values = c("white", "#AACAF9", "#5594F2", "#005FEC", "darkblue"), na.value = "grey") +
+  labs(y = "", 
+       x = "Year",
+       title = "Number of Sectors with Data per Region per Year") +
+  theme_bw() 
+
+agg_heatmap_plot
+
+
+plotly::ggplotly(agg_heatmap_plot)
+```
+
+
+```{r}
+eco_usd_adj <- eco_usd_filter %>% 
   group_by(rgn_id, rgn_name, year) %>% # group by places & years
   summarize(value = sum(adj_usd, na.rm = TRUE)) %>%  # sum values
   mutate(value = case_when( 
