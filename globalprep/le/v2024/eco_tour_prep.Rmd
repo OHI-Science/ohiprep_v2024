@@ -199,6 +199,45 @@ Macao has an extremely high percent of tourism contributing to their GDP (max of
 
 
 
+### Heatmap: investigating data gaps
+
+
+```{r}
+library(ggplot2)
+
+heatmap_df <- gdp_prop_yrs %>% 
+  mutate(status = !is.na(gdp_prop_percent)) %>% 
+  ungroup()
+
+heatmap_plot <- ggplot(data = heatmap_df) +
+  geom_tile(aes(x = year,
+                y = geo_area_name,
+                fill = as.factor(status)), color = "black") +
+  scale_fill_manual(values = c("darkgreen", "gainsboro")) +
+  labs(y = "") +
+  theme_bw() 
+
+plotly::ggplotly(heatmap_plot)
+
+```
+
+
+
+```{r}
+# make subset showing counts of data per country
+
+raw_gdp_pct_data_summary <- heatmap_df %>% 
+  # group by region name and year
+  group_by(geo_area_name) %>% 
+  # return counts of data points per country pe year (essentially number of years we do have data for)
+  summarize(n_data_points = sum(status)) %>% 
+  arrange((n_data_points)) # show number of data points that we have for that region across the full time range 
+
+raw_gdp_pct_data_summary
+
+sum(heatmap_df$status)
+```
+
 ### Gapfilling
 
 Here we'll use `na.approx()` from {zoo} to interpolate missing values and extrapolate missing extremes (NA values that do not fall between non-NA values) by copying the nearest extreme value. After speaking with Melanie Frazier about our methodology, she recommended to not fill in any values for countries with only 1 data point. If you choose to do this in future years, we've provided commented-out code following the chunk below for assessing how much of your data this impacts.
@@ -727,7 +766,7 @@ ggplot(data = china_usd_value,
                                                      # $30.00B --> $30B
                                                     # scale_cut = scales::cut_long_scale()
                                                     )) +
-  # set base theme
+  # set base themex
   theme_bw() +
   # adjust labels
   labs(title = paste0("Tourism Value in mainland China ", "(",
