@@ -352,7 +352,7 @@ cf_rev_plot
 
 Heatmap
 ```{r}
-# make all geographic areas have the same date range (and fill missing values with NAs) to avoid problems upstream
+# make all geographic areas have the same date range (and fill missing values with NAs) to avoid problems downstream
 years_df <- tibble(rgn_name = cf_revenue_rgn_agg$rgn_name) %>% 
   mutate(rgn_id = cf_revenue_rgn_agg$rgn_id) %>% 
   group_by(rgn_id, rgn_name) %>% 
@@ -363,7 +363,6 @@ years_df <- tibble(rgn_name = cf_revenue_rgn_agg$rgn_name) %>%
 cf_revenue_yrs <- left_join(years_df, cf_revenue_rgn_agg,
                           by = c("rgn_id", "rgn_name", "year"))
 
-# heatmap_df <- 
 ```
 
 
