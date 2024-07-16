@@ -439,7 +439,7 @@ split_ci <- cf_revenue %>%
     split_col == "Guernsey" ~ value * prop_g,
     split_col == "Jersey" ~ value * prop_j,
     TRUE ~ NA_real_
-  )) %>% 
+  )) %>% # multiply each value by its proportion of avg catch in the area to split the value appropriately
   ungroup() %>%
   mutate(country = split_col) %>%
   select(-split_col)
@@ -455,25 +455,26 @@ split_bes <- cf_revenue %>%
     split_col == "Sint Eustatius" ~ value * prop_e,
     split_col == "Saba" ~ value * prop_s,
     TRUE ~ NA_real_
-  )) %>% 
+  )) %>% # multiply each value by its proportion of avg catch in the area to split the value appropriately
   ungroup() %>%
   mutate(country = split_col) %>%
   select(-split_col)
 
 # merge with cf_revenue
 cf_revenue_disaggregated <- cf_revenue_fix %>%
-  bind_rows(split_ci, split_bes) %>%
+  bind_rows(split_ci, split_bes) %>% # bind with the disaggregated dataframes
   mutate(value = case_when(
     country %in% c("Guernsey", "Jersey") ~ new_value,
     country %in% c("Bonaire", "Sint Eustatius", "Saba") ~ new_value,
     TRUE ~ value
-  )) %>%
-  select(-new_value)
+  )) %>% # if disaggregated, use the new value
+  select(-new_value) # not needed anymore
 ```
 
 Final names_2_rgn after disaggregation
 ```{r final_names}
-#using disaggregated revenue data: looks good!! 
+# using disaggregated revenue data within the name_2_rgn fxn: looks good!!
+# seeing the aggregated versions of regions that we already disaggregated drop out. Great!
 cf_revenue_rgn_final <- name_2_rgn(df_in = cf_revenue_disaggregated, 
                              fld_name='country',
                              flds_unique = c("year"))
@@ -495,9 +496,9 @@ rev_diff # none! Move on
 cf_revenue_rgn_agg <- cf_revenue_rgn_final %>% 
   select(rgn_id, rgn_name, year, value, unit, sector, data_source) %>% 
   group_by(rgn_id, rgn_name, year) %>% # because china needs to be aggregated and has duplicate years
-  dplyr::summarize(value = sum(value, na.rm=TRUE)) %>%
+  dplyr::summarize(value = sum(value, na.rm=TRUE)) %>% # sum the value for each region and year
   ungroup() %>% 
-  dplyr::mutate(year = as.numeric(year)) 
+  dplyr::mutate(year = as.numeric(year)) # to ensure it is numeric
 ```
 
 ## CF Revenue Plot
@@ -511,7 +512,7 @@ cf_rev_plot
 # looks great! China has a very large revenue, which makes sense.  Indonesia and Peru are the have the next highest revenue in 2019.  Interesting to see a decrease in the early 2000s for most regions.
 ```
 
-## Join with a "year" df
+## Join with a "year" tibble df
 ```{r year_join}
 # make all geographic areas have the same date range (and fill missing values with NAs) to avoid problems downstream
 years_df <- tibble(rgn_name = cf_revenue_rgn_agg$rgn_name) %>% 
@@ -551,7 +552,7 @@ interactive_heatmap <- plotly::ggplotly(heatmap_plot)
 interactive_heatmap
 ```
 
-## Cleaning and Gapfilling
+## Cleaning for GF
 
 Rule in order to be preserved: 
 * must have at least one data point in the last five years & 
@@ -574,6 +575,28 @@ date_range <- (start_year:stop_year)
 
 
 ```
+
+
+## Gapfilling -- from Anna 
+### COME BACK
+
+Here we'll use `na.approx()` from {zoo} to interpolate missing values and extrapolate missing extremes (NA values that do not fall between non-NA values) by copying the nearest extreme value. After speaking with Melanie Frazier about our methodology, she recommended to not fill in any values for countries with only 1 data point. If you choose to do this in future years, we've provided commented-out code following the chunk below for assessing how much of your data this impacts.
+
+```{r}
+# gapfilling ----
+# estimate tourism GDP proportion for geo areas with missing data
+gdp_filled <- gdp_prop_yrs %>% 
+  group_by(geo_area_name) %>% 
+  # interpolate (fill missing values between 2 values)
+  mutate(appx_gdp_pct = zoo::na.approx(gdp_prop_percent, # using values in this column
+                                       na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
+                                       #  extrapolate using rule = 2 from approx(),
+                                       # which uses closest data extreme to
+                                       #  extrapolate for leading and trailing NAs
+                                       rule = 2
+  ))
+```
+
 
 ### Heatmap to check gapfilling
 ```{r heatmap_check}
