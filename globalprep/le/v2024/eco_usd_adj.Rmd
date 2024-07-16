@@ -90,6 +90,14 @@ tour_df_adj <- inflation_adjustment(tour_df_pre, conversion_date = 2017,
 
 
 ```
+
+```{r}
+# cf_df_adj_filter <- cf_df_adj %>% 
+#   filter(year %in% c())
+```
+
+
+
 ## Combine adjusted data frames 
 
 ```{r}
@@ -106,9 +114,74 @@ min_max_df <- tibble(
 start_year <- max(min_max_df$min_year) # take maximum of minimum years
 stop_year <- min(min_max_df$max_year) # take minimum of maximum years
 
+
 # ----- create aggregated adjusted data frame ------------
-eco_usd_adj <- eco_usd_bind %>% 
-  filter(year %in% c(start_year:stop_year)) %>% # filter to date range
+
+eco_usd_filter <- eco_usd_bind %>% 
+  filter(year %in% c(start_year:stop_year)) # filter to date range
+
+
+# make all geographic areas have the same date range (and fill missing values with NAs)
+eco_years_df <- tibble(rgn_name = eco_usd_filter$rgn_name,
+                       rgn_id = eco_usd_filter$rgn_id) %>% 
+  group_by(rgn_id, rgn_name) %>% 
+  summarize(year = seq(start_year,
+                       stop_year))
+# note: returns warning to use 'reframe' instead, but that function is experimental as of July 2024
+
+# ---- join with gdp prop data ----
+eco_usd_years <- left_join(eco_years_df, eco_usd_filter,
+                          by = c("rgn_id", "rgn_name", "year"))
+```
+
+
+- plot heatmap of sectors we have data for within date range 
+
+- find 
+
+```{r}
+# ---- make NA status column ----
+eco_status <- eco_usd_years %>% 
+  mutate(status = !is.na(usd)) # TRUE if we DO have value data
+# %>% 
+#   group_by(rgn_id, rgn_name, year) %>% 
+#eco_status
+
+# ---- using the aggregate function from {stats} ----
+agg_test <- eco_status %>% 
+  # sum of status column for each rgn_name + year + sector combination
+  aggregate(status~rgn_name+year+sector, FUN = sum)
+
+#agg_test
+
+# ---- count number of sectors we have data for for each country per year ----
+agg_test_sum <- agg_test %>% 
+  ungroup() %>% 
+  group_by(rgn_name, year) %>% 
+  summarize(data_status = sum(status, na.rm = TRUE))
+
+#View(agg_test_sum)
+
+# ---- make heatmap to visualize missing data ----
+agg_heatmap_plot <- ggplot(data = agg_test_sum) +
+  geom_tile(aes(x = year,
+                y = rgn_name,
+                fill = as.factor(data_status)), color = "black") +
+  scale_fill_manual(values = c("white", "#AACAF9", "#5594F2", "#005FEC", "darkblue"), na.value = "grey") +
+  labs(y = "", 
+       x = "Year",
+       title = "Number of Sectors with Data per Region per Year") +
+  theme_bw() 
+
+agg_heatmap_plot
+
+
+plotly::ggplotly(agg_heatmap_plot)
+```
+
+
+```{r}
+eco_usd_adj <- eco_usd_filter %>% 
   group_by(rgn_id, rgn_name, year) %>% # group by places & years
   summarize(value = sum(adj_usd, na.rm = TRUE)) %>%  # sum values
   mutate(value = case_when( 
@@ -134,6 +207,8 @@ $$
 
 where, $e$ is the total adjusted revenue generated directly and indirectly from sector $k$, at current $c$, and reference $r$, time points
 
+Based on this methodology and equation, we created and defined the `value` column earlier as the sum of the adjusted USD value for the three sectors (fishing, mariculture, and tourism). To calculate the score, we will take that combined sum across sectors per region per year and divide the current year's value by the 
+
 <https://stackoverflow.com/questions/743812/calculating-moving-average>
 
 <https://www.rdocumentation.org/packages/zoo/versions/1.8-12/topics/rollmean>
@@ -148,7 +223,7 @@ where, $e$ is the total adjusted revenue generated directly and indirectly from 
 
 current_value <- eco_usd_adj[eco_usd_adj$year == stop_year, "value"]
 
-reference_range <- c((stop_year - 4):stop_year - 1)
+reference_range <- c((stop_year - 5):(stop_year - 1))
 
 reference_point <- (sum(eco_usd_adj[eco_usd_adj$year %in% c(reference_range), "value"], na.rm = TRUE) / length(reference_range))
 
@@ -167,7 +242,10 @@ reference_point <- (sum(eco_usd_adj[eco_usd_adj$year %in% c(reference_range), "v
 
 
 
-Test
+
+Score function: using average of 5 years' previous values as denominator
+
+Note: after doing some pseudo coding and tests, we created the following function to calculate scores given a "current year" (2019 for v2024). We do want to note that we used perplexity.ai to write portions of this function after providing it with the context of the problem.
 
 ```{r}
 library(dplyr)
@@ -207,9 +285,10 @@ test_range <- eco_usd_adj %>%
     # create 5 year time range of most recent years of data
     reference_range = list(seq(max(year[year <= stop_year]) - 5, max(year[year <= stop_year]) - 1)),
     
-    #
+    # define reference point as the mean of values within the reference range, excluding NA values (which is important)
     reference_point = sapply(reference_range, function(x) mean(value[year %in% x], na.rm = TRUE)),
     
+    # create score column as current value divided by reference point
     score = current_value / reference_point
     )
   
@@ -252,11 +331,15 @@ Aside from the top 10 countries and bottom 4 countries, the scores of the rest o
 
 
 ```{r}
+top_change$rgn_name <- factor(top_change$rgn_name, levels = unique(top_change$rgn_name)[order(top_change$score, decreasing = TRUE)])
 
 plotly::plot_ly(data = top_change, x = ~score, y = ~rgn_name, color = ~rgn_name, 
-                                type = "scatter", mode = "lines") %>% 
-  layout(title = "Economies Score",
-         xaxis = list(title = "Score") #,
+                                type = "bar") %>% 
+  layout(title = "Economies Score: Top 10",
+         xaxis = list(title = "Score"),
+         showlegend = FALSE,
+         margin = m,
+         yaxis = list(title = '')
         # yaxis = list(title = "Score")
         )
 
@@ -265,11 +348,52 @@ plotly::plot_ly(data = top_change, x = ~score, y = ~rgn_name, color = ~rgn_name,
 plot_df <- result %>% ungroup()
 
 plotly::plot_ly(data = plot_df, x = ~score, y = ~rgn_name, color = ~rgn_name, 
-                                type = "scatter", mode = "lines") %>% 
+                                type = "bar") %>% 
   layout(title = "Economies Score",
-         xaxis = list(title = "Score") #,
-        # yaxis = list(title = "Score")
+         xaxis = list(title = "Score")
         )
 
+```
+
+
+
+
+## Alternative Score method: value 5 years ago as reference point
+
+
+```{r}
+calculate_scores_2 <- function(data, stop_year) {
+  data %>%
+    group_by(rgn_id, rgn_name) %>%
+    mutate(
+      # creating columns so we can perform column-wise operations 
+      
+      # set current year equal to stop year or else most recent year of data
+      current_year = max(year[year <= stop_year]),
+      # get value in current or most recent year of data
+      current_value = value[year == current_year],
+      # set year for reference point to 5 years before current or most recent year
+      reference_year = current_year - 5,
+      # get value in reference year
+      reference_value = value[year == reference_year],
+      # calculate score
+      score = current_value / reference_value
+    ) %>%
+    # get year for which score was calculated for each region 
+    filter(year == current_year) %>%
+    # select relevant columns
+    select(rgn_id, rgn_name, year, current_value, reference_value, score) %>%
+    ungroup()
+}
+
+
+
+```
+
+
+Test new function
+
+```{r}
+calculate_scores_2(eco_usd_adj, stop_year = 2019)
 ```
 
