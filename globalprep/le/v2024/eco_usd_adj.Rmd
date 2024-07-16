@@ -170,13 +170,24 @@ agg_heatmap_plot <- ggplot(data = agg_test_sum) +
   scale_fill_manual(values = c("white", "#AACAF9", "#5594F2", "#005FEC", "darkblue"), na.value = "grey") +
   labs(y = "", 
        x = "Year",
-       title = "Number of Sectors with Data per Region per Year") +
+       title = "Number of Sectors with Data per Region per Year",
+       fill = "Number of Sectors with Data") +
   theme_bw() 
 
 agg_heatmap_plot
 
 
-plotly::ggplotly(agg_heatmap_plot)
+plotly::ggplotly(agg_heatmap_plot) 
+# %>% 
+#   add_trace(
+#     x = ~year, 
+#     y = ~rgn_name, 
+#     fill = ~as.factor(data_status),
+#     showlegend = T,
+#     hovertemplate = paste('<i>Year</i>: $%{x}',
+#                         '<br><b>Region Name</b>: %{y}<br>',
+#                         '<b>%{fill}</b>')
+#   )
 ```
 
 
@@ -290,8 +301,8 @@ test_range <- eco_usd_adj %>%
     score = current_value / reference_point
     )
   
-test_range$reference_range
-test_range$reference_point
+# test_range$reference_range
+# test_range$reference_point
 
 # Assuming your data frame is named 'eco_usd_adj'
 result <- calculate_scores(eco_usd_adj, stop_year = 2019)  # Replace 2019 with your desired stop year
@@ -311,7 +322,7 @@ top_score
 summary <- summary(result)
 
 paste("Summary of `score` column:")
-paste0(summary[36:42])
+summary(result$score)
 
 top_change <- result %>% 
   slice_max(order_by = score, n = 10) %>% 
@@ -392,6 +403,18 @@ calculate_scores_2 <- function(data, stop_year) {
 Test new function
 
 ```{r}
-calculate_scores_2(eco_usd_adj, stop_year = 2019)
+single_point_scores_2019 <- calculate_scores_2(eco_usd_adj, stop_year = 2019)
+single_point_scores_2019
 ```
 
+
+```{r}
+paste("Single reference point summary:")
+summary(single_point_scores_2019$score)
+
+
+paste("5 year average reference point summary:")
+summary(result$score)
+```
+
+In 2019, Nauru (and members of the PNA) sold 

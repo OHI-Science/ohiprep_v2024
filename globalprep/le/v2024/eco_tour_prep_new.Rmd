@@ -198,14 +198,89 @@ v2024:
 Macao has an extremely high percent of tourism contributing to their GDP (max of 59.6% in 2023), and all geographic areas appear to have a sharp decrease in tourism contribution to GDP in 2020, which is to be expected due to the COVID-19 Pandemic. Macao saw a fall by more than half, from 52.57% in 2019 to 21.44% in 2020.
 
 
-### Run `name_2_rgn`
+
+### Filter & Run OHI region name function
 
 ```{r}
+cutoff_year <- 2019 # update this depending on data updates
+# ---- Filter ----
+# set date range selection (rationale described in the paragraph below the previous plot)
+gdp_filter <- gdp_prop_yrs %>% 
+  filter(year <= cutoff_year)
 
+# ---- Run name_2_rgn -----
+gdp_rgn <- name_2_rgn(df_in = gdp_filter, 
+                      fld_name = "geo_area_name",
+                      flds_unique = c("year"))
+
+# sorting through mismatch and aggregation ----
+
+# v2024: note on Northern Mariana Islands and Guam OHI region: we only have data for Guam, not Northern Mariana Islands... this is problematic because in the World Bank GDP dataset, we only have GDP data for both the Northern Mariana Islands and Guam and need to aggregate them to fit into the OHI regions system. For now, we'll drop the Northern Mariana Islands GDP data in the WB GDP processing, but please note that if you get GDP % data for this region later on, you'll need to fix that in the GDP data processing chunk.
+
+# v2024: China: we only have data on Hong Kong and Macao, no mainland China data...
+# Mel told us to just drop them... which makes sense in context, but is unfortunate, as Macao had the highest values. I will look for data on mainland China to supplement if possible.
+
+# check duplicates         # v2024: (none)
+tour_eco_duplicates <- gdp_rgn[duplicated(gdp_rgn[, c("rgn_name", "year")]),]
+unique(tour_eco_duplicates$geo_area_name)
+unique(tour_eco_duplicates$rgn_name)
+
+length(unique(gdp_rgn$rgn_name))
+# v2024: 93
+
+# ---- Rename Macao and Hong Kong ----
+gdp_prop_agg <- gdp_filter %>% 
+  mutate(geo_area_name = case_when(
+    geo_area_name == "China, Macao Special Administrative Region" ~ "Macao SAR, China",
+    geo_area_name == "China, Hong Kong Special Administrative Region" ~ "Hong Kong SAR, China",
+    .default = geo_area_name
+  ))
+
+
+# ---- Run name_2_rgn again -----
+gdp_rgn_agg <- name_2_rgn(df_in = gdp_prop_agg, 
+                      fld_name = 'geo_area_name',
+                      flds_unique = c("year"))
+
+# great! now nothing has been removed... now we need to check the duplicates 
+tour_agg_duplicates <- gdp_rgn_agg[duplicated(gdp_rgn_agg[, c("rgn_name", "year")]),]
+unique(tour_agg_duplicates$geo_area_name)
+unique(tour_agg_duplicates$rgn_name)
+# inspect duplicates
+# gdp_rgn_agg %>% filter(rgn_name == "China")
+
+# ----- China subsets ----
+# exclusively China regions
+macao_hk_subset <- gdp_rgn_agg %>% filter(rgn_name == "China")
+
+
+# excluding China regions
+# (we'll join them back together later once we have the tourism values for HK, Macao, and China) 
+no_mc_hk_subset <- gdp_rgn_agg %>% filter(rgn_name != "China")
 
 
 ```
 
+
+#### Exploratory plot: OHI regions, based on `rgn_name`, excluding China
+
+Create preliminary plot with the newly added `rgn_name` field
+
+```{r}
+# ---- updated prelim plot ----
+ohi_rgns_prelim_plot <- plot_ly(data = no_mc_hk_subset, x = ~year, y = ~gdp_prop_percent, color = ~geo_area_name, 
+                                type = "scatter", mode = "lines") %>% 
+  layout(title = "Tourism direct GDP as a proportion of total GDP (%) for OHI Regions",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Tourism Contribution to GDP (%)"))
+
+ohi_rgns_prelim_plot
+
+
+# htmlwidgets::saveWidget(ohi_rgns_prelim_plot, file = "eco_tour_ohi_rgns_prelim_plot.html")
+```
+
+It is notable how much the y-axis scale changes once we drop Macao. I think that the -0.1 value we see for Fiji could be indicative of the country spending money on tourism infrastructure, development, and advertisement but then not getting enough tourism revenue due to Covid, but this is worth investigating further (I couldn't find anything helpful in the metadata, unfortunately).
 
 
 ### Heatmap: investigating data gaps
@@ -214,7 +289,7 @@ Macao has an extremely high percent of tourism contributing to their GDP (max of
 ```{r}
 library(ggplot2)
 
-heatmap_df <- gdp_prop_yrs %>% 
+heatmap_df <- gdp_rgn_agg %>% 
   mutate(status = !is.na(gdp_prop_percent)) %>% 
   ungroup()
 
@@ -247,11 +322,147 @@ raw_gdp_pct_data_summary <- heatmap_df %>%
 
 raw_gdp_pct_data_summary
 
-sum(heatmap_df$status)
+# sum(heatmap_df$status)
 ```
-## Country filtering
-```{r}
 
+
+## Country filtering
+
+Rules:
+
+- Must have at least one data point in the last five years &&
+- must have > three data points over time
+
+
+- After inspecting all of the Economies sector datasets, we decided to set our date range from 2008-2019. There are several reasons for this range:
+  -  Tourism data starts in 2008
+  -  Fishing data ends in 2019
+  -  2020 is rife with statistical anomalies -- this would seriously impact gapfilling (for example, a low 2020 data point may cause extremely inaccurate gapfilling for data missing in 2018-2019)
+
+```{r}
+# define date range for filtering
+start_year <- 2008
+stop_year <- 2019 # previously "cutoff_year"
+date_range <- c(start_year:stop_year) # update this depending on your data!
+
+# create date range of the last 5 years (including most recent year)
+recent_years <- c(((max(date_range)) - 4):max(date_range))
+
+# check to see if we need to ungroup
+is_grouped_df(heatmap_df)
+
+# ---- at least 1 data point in the last 5 years ----
+# filter by number of "TRUE" status
+five_yr_subset <- heatmap_df %>% 
+  filter(year %in% c(recent_years)) %>% 
+  group_by(geo_area_name) %>% 
+ # group_by(rgn_id, rgn_name) %>% 
+  summarize(n_data_points = sum(status)) %>% 
+  filter(n_data_points >= 1)
+ # arrange(n_data_points) # for visual inspection
+
+# extract geo area names
+five_yr_geos <- c(five_yr_subset$geo_area_name)
+
+# look at loss from first filtering step:
+length(five_yr_geos) # v2024: 89 
+length(unique(heatmap_df$geo_area_name)) - length(five_yr_geos) # number of geo areas filtered out
+# v2024: 6 
+# --- more than 3 data points in time range ----
+total_data_points <- heatmap_df %>% 
+  # filter to date range
+  filter(year %in% c(date_range)) %>% 
+  # group by geo_area_name
+  group_by(geo_area_name) %>% 
+  # summarize n_data_points
+  summarize(n_data_points = sum(status)) %>% 
+  # filter to > 3
+  filter(n_data_points > 3)
+  # extract names
+  
+over_three_pts_geos <- c(total_data_points$geo_area_name)  
+
+# look at loss from first filtering step:
+length(over_three_pts_geos) # v2024: 77 
+length(unique(heatmap_df$geo_area_name)) - length(over_three_pts_geos) # number of geo areas filtered out
+# v2024: 18
+
+
+# ---- filter rgn_names subsets ----
+# filter to geo area names in five_yr_subset && total_data_points
+# filter(geo_area_name %in% c(five_yr_geos) && geo_area_name %in% c(over_three_pts_geos))
+
+# Subset without Macao and Hong Kong
+no_china_filter <- no_mc_hk_subset %>% 
+  # filter year for specified date range (double-checking)
+  filter(year %in% c(date_range)) %>% 
+  # filter to geo_area_name that fulfills both (AND) conditions/rules 
+  filter(geo_area_name %in% c(five_yr_geos) & geo_area_name %in% c(over_three_pts_geos)) %>% 
+  # add status column back in for plotting
+  mutate(status = !is.na(gdp_prop_percent)) %>% 
+  ungroup()
+
+# Macao & Hong Kong subset
+macao_hk_filter <- macao_hk_subset %>% 
+  # filter year for specified date range (double-checking)
+  filter(year %in% c(date_range)) %>% 
+  # filter to geo_area_name that fulfills both (AND) conditions/rules 
+  filter(geo_area_name %in% c(five_yr_geos) & geo_area_name %in% c(over_three_pts_geos)) %>% 
+  # add status column back in for plotting
+  mutate(status = !is.na(gdp_prop_percent)) %>% 
+  ungroup()
+```
+
+#### Heatmap: subset without Macao & Hong Kong
+
+```{r no-mc-hk-heatmap}
+# ---- heatmap to check if countries we expected to be removed were removed ----
+
+no_china_heatmap <- ggplot(data = no_china_filter) +
+  geom_tile(aes(x = year,
+                y = geo_area_name,
+                fill = as.factor(status)), color = "black") +
+  scale_fill_manual(values = c("gainsboro", "darkgreen")) +
+  labs(y = "",
+       x = "Year",
+       title = "Filtered Data Status per Region per Year (excluding Macao & Hong Kong)",
+       fill = "Does the dataset \n have data for \n this region?:") +
+  theme_bw() 
+
+plotly::ggplotly(no_china_heatmap)
+```
+
+After discussing the datagaps after filtering, Melanie advised that we manually remove Argentina (in v2024, we had 4 total data points for this country, but they were all from the past 4 years (2016-2019)).
+
+```{r}
+no_china_filter <- no_china_filter %>% 
+  filter(!geo_area_name %in% c("Argentina"))
+```
+
+#### Heatmap: subset of Macao & Hong Kong
+
+```{r macao-hk-heatmap}
+macao_hk_heatmap <- ggplot(data = macao_hk_filter) +
+  geom_tile(aes(x = year,
+                y = geo_area_name,
+                fill = as.factor(status)), color = "black") +
+  scale_fill_manual(values = c("gainsboro", "darkgreen")) +
+  labs(y = "",
+       x = "Year",
+       title = "Filtered Data Status per Region per Year (Macao & Hong Kong)",
+       fill = "Does the dataset \n have data for \n this region?:") +
+  theme_bw() 
+
+plotly::ggplotly(macao_hk_heatmap)
+```
+
+
+```{r}
+# select relevant columns
+
+# gapfill
+
+# heatmap again
 ```
 
 
@@ -320,88 +531,6 @@ prelim_plot_gf
 Now we can see that some lines are filled in where there used to be gaps. Others, like Aruba, seem to be filled in a way that doesn't seem appropriate for 2020. For this reason, and due to the greater complications of gapfilling data from 2020, we have decided to set the max year cap on this data to 2019. In future years, when we have more data for 2020 and beyond, or if novel gapfilling techniques are used, we recommend not cutting off the data after 2019. Studying the impacts of the pandemic on tourism value and the economies subgoal as a whole is important and seems like a very interesting opportunity for future years' fellows.
 
 
-### Filter & Run OHI region name function
-
-```{r}
-cutoff_year <- 2019 # update this depending on data updates
-# ---- Filter ----
-# set date range selection (rationale described in the paragraph below the previous plot)
-gdp_filter <- gdp_filled %>% 
-  filter(year <= cutoff_year)
-
-# ---- Run name_2_rgn -----
-gdp_rgn <- name_2_rgn(df_in = gdp_filter, 
-                      fld_name = "geo_area_name",
-                      flds_unique = c("year"))
-
-# sorting through mismatch and aggregation ----
-
-# v2024: note on Northern Mariana Islands and Guam OHI region: we only have data for Guam, not Northern Mariana Islands... this is problematic because in the World Bank GDP dataset, we only have GDP data for both the Northern Mariana Islands and Guam and need to aggregate them to fit into the OHI regions system. For now, we'll drop the Northern Mariana Islands GDP data in the WB GDP processing, but please note that if you get GDP % data for this region later on, you'll need to fix that in the GDP data processing chunk.
-
-# v2024: China: we only have data on Hong Kong and Macao, no mainland China data...
-# Mel told us to just drop them... which makes sense in context, but is unfortunate, as Macao had the highest values. I will look for data on mainland China to supplement if possible.
-
-# check duplicates         # v2024: (none)
-tour_eco_duplicates <- gdp_rgn[duplicated(gdp_rgn[, c("rgn_name", "year")]),]
-unique(tour_eco_duplicates$geo_area_name)
-unique(tour_eco_duplicates$rgn_name)
-
-length(unique(gdp_rgn$rgn_name))
-# v2024: 93
-
-# ---- Rename Macao and Hong Kong ----
-gdp_prop_agg <- gdp_filter %>% 
-  mutate(geo_area_name = case_when(
-    geo_area_name == "China, Macao Special Administrative Region" ~ "Macao SAR, China",
-    geo_area_name == "China, Hong Kong Special Administrative Region" ~ "Hong Kong SAR, China",
-    .default = geo_area_name
-  ))
-
-
-# ---- Run name_2_rgn again -----
-gdp_rgn_agg <- name_2_rgn(df_in = gdp_prop_agg, 
-                      fld_name = 'geo_area_name',
-                      flds_unique = c("year"))
-
-# great! now nothing has been removed... now we need to check the duplicates 
-tour_agg_duplicates <- gdp_rgn_agg[duplicated(gdp_rgn_agg[, c("rgn_name", "year")]),]
-unique(tour_agg_duplicates$geo_area_name)
-unique(tour_agg_duplicates$rgn_name)
-# inspect duplicates
-# gdp_rgn_agg %>% filter(rgn_name == "China")
-
-# ----- China subsets ----
-# exclusively China regions
-macao_hk_subset <- gdp_rgn_agg %>% filter(rgn_name == "China")
-
-
-# excluding China regions
-# (we'll join them back together later once we have the tourism values for HK, Macao, and China) 
-no_mc_hk_subset <- gdp_rgn_agg %>% filter(rgn_name != "China")
-
-
-```
-
-
-#### Exploratory plot: OHI regions, based on `rgn_name`, excluding China
-
-Create preliminary plot with the newly added `rgn_name` field
-
-```{r}
-# ---- updated prelim plot ----
-ohi_rgns_prelim_plot <- plot_ly(data = no_mc_hk_subset, x = ~year, y = ~appx_gdp_pct, color = ~rgn_name, 
-                                type = "scatter", mode = "lines") %>% 
-  layout(title = "Tourism direct GDP as a proportion of total GDP (%) for OHI Regions",
-         xaxis = list(title = "Year"),
-         yaxis = list(title = "Tourism Contribution to GDP (%)"))
-
-ohi_rgns_prelim_plot
-
-
-# htmlwidgets::saveWidget(ohi_rgns_prelim_plot, file = "eco_tour_ohi_rgns_prelim_plot.html")
-```
-
-It is notable how much the y-axis scale changes once we drop Macao. I think that the -0.1 value we see for Fiji could be indicative of the country spending money on tourism infrastructure, development, and advertisement but then not getting enough tourism revenue due to Covid, but this is worth investigating further (I couldn't find anything helpful in the metadata, unfortunately).
 
 
 ## GDP: WorldBank annual GDP (Constant 2015 US$)

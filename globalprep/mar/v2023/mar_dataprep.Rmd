@@ -160,7 +160,7 @@ The species_list.csv is a master list of all the mariculture species in the FAO 
 ```{r update-species, eval = FALSE}
 
 ## Commented out 'read.csv' lines are different versions of the dataset, representing the three different seaweed exclusion methods (exclude some seaweed, all seaweed, all seaweed nei). Use at the end for data checking. The first one is the one which is saved to the "output" folder, and the main analysis to run. 
-mar_sp <- read.csv('raw/species_list.csv', stringsAsFactors=FALSE) %>%
+mar_sp <- read.csv(here::here('globalprep/mar/v2023/raw/species_list.csv'), stringsAsFactors=FALSE) %>%
   select(FAO_name, exclude,Taxon_code, family, notes, notes_2)
 
 new.spp <- setdiff(mar$FAO_name, mar_sp$FAO_name)
