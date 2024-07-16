@@ -100,7 +100,8 @@ librarian::shelf(
   plotly,
   zoo, # for gapfilling
   pdftools,
-  ohicore
+  ohicore,
+  ggplot2
 )
 #remotes::install_github("skgrange/threadr") # for na_extrapolate
 library(threadr) # for gapfilling, if necessary
@@ -349,11 +350,28 @@ cf_rev_plot
 # looks great! China has a very large revenue, which makes sense.  Indonesia and Peru are the have the next highest revenue in 2019.  Interesting to see a decrease in the early 2000s for most regions.
 ```
 
+Heatmap
+```{r}
+# make all geographic areas have the same date range (and fill missing values with NAs) to avoid problems upstream
+years_df <- tibble(rgn_name = cf_revenue_rgn_agg$rgn_name) %>% 
+  mutate(rgn_id = cf_revenue_rgn_agg$rgn_id) %>% 
+  group_by(rgn_id, rgn_name) %>% 
+  summarize(year = seq(min(cf_revenue_rgn_agg$year),
+                       max(cf_revenue_rgn_agg$year)))
+
+# ======== join with cf revenue aggregated data ========
+cf_revenue_yrs <- left_join(years_df, cf_revenue_rgn_agg,
+                          by = c("rgn_id", "rgn_name", "year"))
+
+# heatmap_df <- 
+```
+
+
 ## Saving intermediate data
 ```{r}
 # columns should be: rgn_id, rgn_name, year, usd (previously value), unit, sector, usd_yr (in this case = year)
 
-cf_revenue_int <- cf_revenue_rgn_agg %>% 
+cf_revenue_int <- cf_revenue_yrs %>% 
   mutate(usd = value,
          unit = "USD (1)",
          sector = "cf",
