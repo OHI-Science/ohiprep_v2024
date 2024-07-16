@@ -99,21 +99,22 @@ librarian::shelf(
   httr,
   plotly,
   zoo, # for gapfilling
-  pdftools
+  pdftools,
+  ohicore
 )
 #remotes::install_github("skgrange/threadr") # for na_extrapolate
-library(threadr)
+library(threadr) # for gapfilling, if necessary
 
 
-# source 
-source(here("workflow/R/common.R"))
+# sources! 
+source(here("workflow/R/common.R")) # file creates objects to process data
 
-source(here('workflow/R/fao_fxn.R')) # function for cleaning old version of FAO data 
+source(here('workflow/R/fao_fxn.R')) # fxn for cleaning old version of FAO data 
 
-source(here('workflow/R/fao_online_portal_clean.R'))
+source(here('workflow/R/fao_online_portal_clean.R')) # fxn for obtaining FAO data
 
 # set year and file path info
-current_year <- 2024 # Update this!!
+current_year <- 2024 # Update this in the future!!
 
 version_year <- paste0("v",current_year)
 data_dir_version_year <- paste0("d", current_year)
@@ -147,8 +148,10 @@ int_dir <- here(data_path, "int")
 ### Read in Data
 
 ```{r}
+# FAO Capture raw data
 fao_capture_raw <- read_csv(here(fao_capture_dir, "Global_capture_production_Quantity_1950-2021.csv"))
 
+# Ex-Vessel raw data, from EmLab, who projected Melnycuk's data (see README)
 exvessel_prices_raw <- read_csv(here(ex_vess_dir, "price-db-results", "exvessel_price_database_1976_2019.csv"))
 
 # read in cf revenue data from v2023, using FAO Capture data and Ex-vessel data
@@ -157,44 +160,52 @@ cf_revenue <- read_csv(here("globalprep", "le", "v2023", "int", "cf_revenue.csv"
 
 ### Run ohicore name_2_rgn
 ```{r}
-# check names
-# These data were removed for not having any match in the lookup tables:
-# 
-# bonaire/s.eustatius/saba (need to be disaggregated) british indian ocean ter (DNE)    channel islands (split by eez area: Jersey, larger island)    french southern terr (DNE)
-#                        1                        1                        1                        1 
-#.   isle of man (cannot be lumped w Britain, maybe Ireland)  netherlands antilles  (curacao)      other nei (DNE)        saint barthélemy (DNE)
-#                        1                        1                        1                        1 
-# saint helena/asc./trist. (Saint Helena)   saint-martin (french)  (DNE)         yugoslavia sfr (DNE)
-#                        1                        1                        1 
-# 
-# These data were removed for not being of the proper rgn_type (eez,ohi_region) or mismatching region names in the lookup tables:
-#            tmp_type
-# tmp_name    disputed landlocked
-#   ethiopia         0         16
-#   palestine       25          0
-
+# check how many countries are available from the v2023 .csv before running names_2_rgn
 length(unique(cf_revenue$country)) #203
 
+# run names_2_rgn, which identifies country names from the cf_revenue and determines which OHI region it belongs to
+cf_revenue_rgn <- ohicore::name_2_rgn(df_in = cf_revenue, 
+                             fld_name='country',
+                             flds_unique = c("year"))
+
+# to determine the correct OHI regions and compare the function's actions:
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% select(-Notes)
+```
+
+When names_2_rgn has been run, there are some countries from cf_revenue that are removed due to not having any match in the lookup tables.  This includes: bonaire/s.eustatius/saba, british indian ocean ter, channel islands, french southern terr, isle of man, netherlands antilles, other nei, saint barthélemy, saint helena/asc./trist., saint-martin (french), yugoslavia sfr.
+
+Some could be considered OHI regions, but they are aggregated within another name.  This includes: Bonaire/S.Eustatius/Saba, which can be split into Bonaire, Sint Eustatius, and Saba; and the Channel Islands, which should be split into Jersey and Guernsey.
+
+Others can be dropped because they do not belong to an OHI region.  This includes yugoslavia sfr, saint barthélemy, other nei, isle of man (self-governed), and french southern terr.  
+
+```{r}
+# fix the country names so they can be recognized by names_2_rgn
 cf_revenue_fix <- cf_revenue %>%
   mutate(country = case_when(
-    country=="Bonaire/S.Eustatius/Saba" ~ "Bonaire", # how to disaggregate instead of aggregate?
     country=="British Indian Ocean Ter" ~ "British Indian Ocean Territory",
-    country=="Channel Islands" ~ "Jersey", # would be disaggregated into Guernsey and Jersey
     country=="Saint Helena/Asc./Trist." ~ "Saint Helena", 
     country=="Saint-Martin (French)" ~ "Northern Saint-Martin",
-    country=="Netherlands Antilles" ~ "Curacao",
-    country=="Puerto Rico" ~ "Puerto Rico and Virgin Islands of the United States",
-    country=="China, Hong Kong SAR" ~ "China",
-    country=="China, Macao SAR" ~ "China",
-    country=="United Republic of Tanzania, Zanzibar" ~ "Tanzania",
-    country=="Tanzania, United Rep. of" ~ "Tanzania",
+    country=="Netherlands Antilles" ~ "Curacao", #Sint Maarten has already been covered in a separate country name, so this must be referring to Curacao
+    country=="Puerto Rico" ~ "Puerto Rico and Virgin Islands of the United States", #to ensure the fxn aggregated correctly
+    country=="US Virgin Islands"~"Puerto Rico and Virgin Islands of the United States", #to ensure the fxn aggregated correctly
+    country=="China, Hong Kong SAR" ~ "China", #to ensure the fxn aggregated correctly
+    country=="China, Macao SAR" ~ "China", #to ensure the fxn aggregated correctly
+    country=="United Republic of Tanzania, Zanzibar" ~ "Tanzania", #to ensure the fxn aggregated correctly
+    country=="Tanzania, United Rep. of" ~ "Tanzania", #to ensure the fxn aggregated correctly
     TRUE ~ country # Everything else, leave it be
   ))
 ```
 
-## Disaggregation 
+Re-run names_2_rgn after fixing names
+```{r}
+# re-run names_2_rgn, check which countries are still dropped
+cf_revenue_rgn_fix <- ohicore::name_2_rgn(df_in = cf_revenue_fix, 
+                             fld_name='country',
+                             flds_unique = c("year"))
+```
 
-Look at rasterized fishing effort, to determine the relative proportion of it within each eez, and distribute catch relative to that proportion.
+
+## Disaggregation 
 
 **Regions to disaggregate:**
 
@@ -202,88 +213,129 @@ Channel Islands --> Guernsey (228) and Jersey (227)
 
 Bonaire/S.Eustatius/Saba --> Bonaire (245), Sint Eustatius (249), and Saba (248)
 
+To do this, look at the rasterized fishing effort calculated in 2017 within the FIS subgoal, to determine the relative proportion of mean_catch within each region's eez. Afterwards, distribute revenue relative to that proportion.
 
 ```{r}
-# Function to calculate average catch for certain regions and certain years
-calculate_avg_catch <- function(data, region_ids, years) {
-  data %>% 
-    filter(rgn_id %in% region_ids, year %in% years) %>% 
-    group_by(rgn_id, year) %>% 
-    summarize(catch = sum(mean_catch, na.rm = TRUE)) %>%
-    ungroup() %>%
-    group_by(rgn_id) %>% 
-    mutate(avg_catch = mean(catch)) %>% 
-    select(rgn_id, avg_catch) %>%
-    distinct() %>% # ensures that there's only one row per region, removing any potential duplicates
-    pivot_wider(names_from = "rgn_id", values_from = "avg_catch")
-}
-
-# Function to calculate the proportion of fishing done for each region out of the total (aggregated) area
-# it sums up whatever is in that column. data[, -1] selects all rows (because there's nothing before the comma) and all columns except the first one (because of the -1 after the comma).
-calculate_proportion <- function(data, column) {
-  data[[column]] / sum(data[, -1], na.rm = TRUE)
-} 
-
-# Load in data on the mean catch for each region, used as a proxy to determine which region has a greater commercial fishing economy
+# load in data on the mean catch for each region, used as a proxy to determine which region has a greater commercial fishing economy
 mean_catch_2017 <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohiprep_v2024/gh-pages/globalprep/fis/v2020/int/mean_catch.csv")
 
-# Define parameters to input into the functions
+# function to calculate average catch for certain regions and certain years
+calculate_avg_catch <- function(data, region_ids, years) {
+  data %>% 
+    select(-stock_id_taxonkey) %>% 
+    filter(rgn_id %in% region_ids, year %in% years) %>% # for the specified region id and year:
+    group_by(rgn_id, year) %>%
+    summarize(catch = sum(mean_catch, na.rm = TRUE)) %>% # summarize the mean catch for all species per rgn_id and year within the sequence of years
+    ungroup() %>%
+    group_by(rgn_id) %>% #for all of the years per region, find the average catch using the mean catch of each year
+    summarize(avg_catch = mean(catch)) %>%
+    select(rgn_id, avg_catch) %>% 
+    dplyr::distinct() %>%  # ensures that there's only one row per region, removing any potential duplicates
+    pivot_wider(names_from = "rgn_id", values_from = "avg_catch") # to call on specific observations more easily
+}
+
+# define parameters to input into the functions
 years_to_analyze <- 2014:2017
 channel_islands_ids <- c("228", "227")
 bes_islands_ids <- c("245", "249", "248")
 
-# Calculate average catch for Channel Islands for the 3 most recent years
+# calculate proportion of average catch for Channel Island regions for the 3 most recent years
 mean_catch_ci_agg <- calculate_avg_catch(mean_catch_2017, channel_islands_ids, years_to_analyze) %>%
-  rename(jersey = `227`, guernsey = `228`)
+  rename(jersey = `227`, guernsey = `228`) %>% 
+  pivot_longer(cols = c(jersey, guernsey),
+             names_to = "rgn_id",
+             values_to = "avg_catch") %>% 
+  mutate(prop = avg_catch/sum(avg_catch, na.rm = TRUE))
 
-# Calculate average catch for Bonaire/S.Eustatius/Saba
+# ccalculate proportion of average catch for Bonaire/S.Eustatius/Saba
 mean_catch_bes_agg <- calculate_avg_catch(mean_catch_2017, bes_islands_ids, years_to_analyze) %>%
-  rename(bonaire = `245`, sint_eustatius = `249`, saba = `248`)
+  rename(bonaire = `245`, sint_eustatius = `249`, saba = `248`) %>% 
+  pivot_longer(cols = c(bonaire, sint_eustatius, saba),
+             names_to = "rgn_id",
+             values_to = "avg_catch") %>% 
+  mutate(prop = avg_catch/sum(avg_catch, na.rm = TRUE))
 
-# Calculate proportions for each disaggregated region
-prop_g <- calculate_proportion(mean_catch_ci_agg, "guernsey")
-prop_j <- calculate_proportion(mean_catch_ci_agg, "jersey")
+# calculate proportions for each disaggregated region
+## Channel Islands
+prop_j <- mean_catch_ci_agg$prop[1]
+prop_g <- mean_catch_ci_agg$prop[2]
 
-prop_b <- calculate_proportion(mean_catch_bes_agg, "bonaire")
-prop_e <- calculate_proportion(mean_catch_bes_agg, "sint_eustatius")
-prop_s <- calculate_proportion(mean_catch_bes_agg, "saba")
+## Bonaire/S. Eustatius/Saba
+prop_b <- mean_catch_bes_agg$prop[1]
+prop_e <- mean_catch_bes_agg$prop[2]
+prop_s <- mean_catch_bes_agg$prop[3]
 ```
 
 ```{r}
-# use proportions to disaggregate Channel Islands and Bonaire/S.Eustatius/Saba
+# use proportions to disaggregate Channel Islands 
 split_ci <- cf_revenue %>%
   filter(country == "Channel Islands") %>%
   mutate(split_col = "Guernsey;Jersey") %>%
   separate_rows(split_col, sep = ";") %>%
   group_by(country, year, value, unit) %>%
-  case_when(
-    split_col == "Guernsey" ~ value*prop_g,
-    split_col == "Jersey" ~ value*prop_j
-  ) %>% 
-  ungroup()
+  mutate(new_value = case_when(
+    split_col == "Guernsey" ~ value * prop_g,
+    split_col == "Jersey" ~ value * prop_j,
+    TRUE ~ NA_real_
+  )) %>% 
+  ungroup() %>%
+  mutate(country = split_col) %>%
+  select(-split_col)
 
-sum(split_ci$value) 
+# split for Bonaire/S.Eustatius/Saba
+split_bes <- cf_revenue %>%
+  filter(country == "Bonaire/S.Eustatius/Saba") %>%
+  mutate(split_col = "Bonaire;Sint Eustatius;Saba") %>%
+  separate_rows(split_col, sep = ";") %>%
+  group_by(country, year, value, unit) %>%
+  mutate(new_value = case_when(
+    split_col == "Bonaire" ~ value * prop_b,
+    split_col == "Sint Eustatius" ~ value * prop_e,
+    split_col == "Saba" ~ value * prop_s,
+    TRUE ~ NA_real_
+  )) %>% 
+  ungroup() %>%
+  mutate(country = split_col) %>%
+  select(-split_col)
 
+# merge with cf_revenue
+cf_revenue_disaggregated <- cf_revenue_fix %>%
+  bind_rows(split_ci, split_bes) %>%
+  mutate(value = case_when(
+    country %in% c("Guernsey", "Jersey") ~ new_value,
+    country %in% c("Bonaire", "Sint Eustatius", "Saba") ~ new_value,
+    TRUE ~ value
+  )) %>%
+  select(-new_value)
 ```
 
-
+Final names_2_rgn after disaggregation
 ```{r}
-cf_revenue_rgn <- name_2_rgn(df_in = cf_revenue_fix, 
+#using disaggregated revenue data: looks good!! 
+cf_revenue_rgn_final <- name_2_rgn(df_in = cf_revenue_disaggregated, 
                              fld_name='country',
                              flds_unique = c("year"))
 
-cf_revenue_rgn_agg <- cf_revenue_rgn %>% 
+#========== Indexing to check fxn ===============
+
+# to see how many duplicates there are after names_2_rgn
+rev_duplicates <- cf_revenue_rgn_final[duplicated(cf_revenue_rgn_final[, c("country", "year")]),]
+
+# save the unique duplicates for country and rgn_name to see if the function worked well
+rev_ref_duplicates <- unique(rev_duplicates$country)
+rev_rgn_duplicates <- unique(rev_duplicates$rgn_name)
+
+# setdiff to determine which observations are not the same in the country and rgn_id duplicates
+rev_diff <- setdiff(rev_rgn_duplicates, rev_ref_duplicates)
+rev_diff # none! Move on
+
+#=========== Aggregate by rgn_id and year ==============
+cf_revenue_rgn_agg <- cf_revenue_rgn_final %>% 
   select(rgn_id, rgn_name, year, value, unit, sector, data_source) %>% 
   group_by(rgn_id, rgn_name, year) %>% # because china needs to be aggregated and has duplicate years
   dplyr::summarize(value = sum(value, na.rm=TRUE)) %>%
   ungroup() %>% 
   dplyr::mutate(year = as.numeric(year)) 
-
-rev_duplicates <- cf_revenue_rgn[duplicated(cf_revenue_rgn[, c("country", "year")]),]
-rev_ref_duplicates <- unique(rev_duplicates$country)
-rev_rgn_duplicates <- unique(rev_duplicates$rgn_name)
-rev_diff <- setdiff(rev_rgn_duplicates, rev_ref_duplicates)
-rev_diff # none! Move on
 ```
 
 ## CF Revenue Plot
@@ -294,13 +346,7 @@ cf_rev_plot <- plotly::plot_ly(cf_revenue_rgn_agg, x = ~year, y = ~value, color 
          yaxis = list(title = "Revenue of all catch (USD)"))
 cf_rev_plot
 
-cf_revenue_china <- cf_revenue_rgn_agg %>% 
-  filter(rgn_name %in% "China") #before aggregation, 
-
-plotly::plot_ly(cf_revenue_china, x = ~year, y = ~value, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
-  layout(title = "All Regions: Yearly Revenue for the Marine Fishing Sector", 
-         xaxis = list(title = "Year"),
-         yaxis = list(title = "Revenue of all catch (USD)"))
+# looks great! China has a very large revenue, which makes sense.  Indonesia and Peru are the have the next highest revenue in 2019.  Interesting to see a decrease in the early 2000s for most regions.
 ```
 
 ## Saving intermediate data
