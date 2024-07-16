@@ -181,7 +181,8 @@ plotly::ggplotly(agg_heatmap_plot)
 
 
 ```{r}
-eco_usd_adj <- eco_usd_filter %>% 
+# calculate aggregate value across all sectors 
+eco_usd_adj <- eco_usd_years %>% 
   group_by(rgn_id, rgn_name, year) %>% # group by places & years
   summarize(value = sum(adj_usd, na.rm = TRUE)) %>%  # sum values
   mutate(value = case_when( 
@@ -226,9 +227,6 @@ current_value <- eco_usd_adj[eco_usd_adj$year == stop_year, "value"]
 reference_range <- c((stop_year - 5):(stop_year - 1))
 
 reference_point <- (sum(eco_usd_adj[eco_usd_adj$year %in% c(reference_range), "value"], na.rm = TRUE) / length(reference_range))
-
-
-
 
 
 
