@@ -202,6 +202,46 @@ pass <- readline("Type earthdata password: ")
 
 NOTE: updated to OHIfellows.2024! in 2024 to troubleshoot authentication error.
 
+Also made another account: ohifellows2024, with the same password
+
+```{r download-test}
+# ==== for testing local download with older version of R (for Dustin) ========
+# usrname: ohifellows2024
+# pass: OHIfellows.2024!
+
+uv_local_dir <- file.path("/Users/dustinduncan/Desktop/uv_data_test")
+uv_local_raw <- file.path(uv_local_dir, "data")
+
+# download file list
+file_list_raw <- read_delim(
+  file.path(uv_local_dir, "file_list-07-16.txt"), 
+  delim = "\\", col_names = FALSE)
+
+file_list <- file_list_raw %>% 
+  mutate(url_str = as.character(X1)) %>% 
+  # check if file name is a NetCDF file
+  mutate(check_netcdf = str_match(url_str, pattern = "http.*OMI-Aura_L3-OMUVBd.*nc4")) %>% 
+  # only keep NetCDF files
+  filter(!is.na(check_netcdf)) %>% 
+  # keep character version of urls
+  select(url_str)
+
+# pull out 1st file url
+test_url <- as.character(file_list[1, ])
+
+# define file names
+name_raw_file_test <- substr(test_url, 88, 146) 
+
+test_get <- httr::GET(test_url, authenticate(usrname, pass, type = "basic"), verbose(info = TRUE, ssl = TRUE))
+test_bin <- httr::content(test_get, as = "raw")
+writeBin(test_bin, file.path(uv_local_raw, "data", name_raw_file_test))
+
+# try to open 1st file
+test <- nc_open(uv_local_raw,
+                "OMI-Aura_L3-OMUVBd_2004m1005_v003-2016m0525t192148.he5.nc4")
+```
+
+
 ```{r download the data, eval = F}
 
 # registerDoParallel(70)
