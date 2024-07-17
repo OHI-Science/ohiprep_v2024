@@ -692,14 +692,14 @@ nc_gdp_rgn_agg <- nc_gdp_rgn %>%
 # ---- aggregation check ----
 # to double check and see if Northern Marian Islands was properly filtered out:
 agg_nmi_vals <- nc_gdp_rgn_agg %>% 
-  filter(rgn_name %in% c("Northern Mariana Islands and Guam")) %>%
-  select(year, gdp_value_agg)
+  dplyr::filter(rgn_name %in% c("Northern Mariana Islands and Guam")) %>%
+  dplyr::select(year, gdp_value_agg)
 
 guam_reference <- nc_gdp_rgn %>% 
-  filter(country_name %in% c("Guam")) %>% 
-  select(year, gdp_value)
+  dplyr::filter(country_name %in% c("Guam")) %>% 
+  dplyr::select(year, gdp_value)
 
-agg_nmi_check <- left_join(agg_nmi_vals, guam_reference)
+agg_nmi_check <- dplyr::left_join(agg_nmi_vals, guam_reference)
 
 print(paste("Do the Guam GDP values before aggregation match the 'Northern Mariana Islands and Guam' values after aggregation?"))
 
@@ -731,14 +731,14 @@ no_china_join <- dplyr::full_join(nc_gdp_rgn_agg, no_china_gf,
 
 # ---- calculate tourism value ----
 nc_tourism_value <- no_china_join %>% 
-  ungroup() %>% 
-  group_by(rgn_id, rgn_name, year) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(rgn_id, rgn_name, year) %>% 
   # get proportion to use as multiplier, multiply by GDP to get value
-  mutate(tour_value = (appx_gdp_pct / 100) * gdp_value_agg) %>% 
+  dplyr::mutate(tour_value = (appx_gdp_pct / 100) * gdp_value_agg) %>% 
   # fix data types
-  mutate(rgn_id = as.character(rgn_id)) %>% 
+  dplyr::mutate(rgn_id = as.character(rgn_id)) %>% 
   # select relevant columns for joining
-  select(c(rgn_id, rgn_name, year, tour_value))
+  dplyr::select(c(rgn_id, rgn_name, year, tour_value))
 
 #View(nc_tourism_value)
 #summary(nc_tourism_value)
@@ -761,7 +761,7 @@ Remember that China subset we made out of the Macao and Hong Kong data? Now we'r
 ```{r china_mo_hk_value}
 # ---- filter to China regions GDP ----
 china_gdp <- wb_gdp_clean %>% 
-  filter(stringr::str_detect(country_name, "China")) # depending on the dataset, you'd need to change this to "Macao", "Hong Kong"
+  dplyr::filter(stringr::str_detect(country_name, "China")) # depending on the dataset, you'd need to change this to "Macao", "Hong Kong"
 
 # check to see if the names will work with OHI region synonyms
 unique(china_gdp$country_name)
@@ -772,24 +772,24 @@ unique(china_gdp$country_name)
 # ----- Prep for joining with Macao + Hong Kong subset ----
 # drop "China" rows
 macao_hk_gdp <- china_gdp %>% 
-  filter(country_name != "China") # don't need this, as our China data is already in tourism value format
+  dplyr::filter(country_name != "China") # don't need this, as our China data is already in tourism value format
 
 # check
 unique(macao_hk_gdp$country_name)
 
 
 # ---- Join Macao + HK subsets ----
-macao_hk_join <- left_join(macao_hk_gf, macao_hk_gdp,
+macao_hk_join <- dplyr::left_join(macao_hk_gf, macao_hk_gdp,
                            by = c("year", "geo_area_name" = "country_name"))
 
 
 # ---- Calculate tourism value ----
 macao_hk_value <- macao_hk_join %>% 
-  ungroup() %>% 
-  group_by(geo_area_name, year) %>% 
-  mutate(tour_value = (appx_gdp_pct / 100) * gdp_value) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(geo_area_name, year) %>% 
+  dplyr::mutate(tour_value = (appx_gdp_pct / 100) * gdp_value) %>% 
   # select relevant columns
-  select(geo_area_name, year, tour_value)
+  dplyr::select(geo_area_name, year, tour_value)
 # remember: the unit of this value is in constant 2015 US$ 
 ```
 
@@ -920,7 +920,7 @@ h_mil_cny_to_usd <- 13778100 # update this appropriately, or ideally find a repr
 
 # convert Chinese Yuan to USD
 nbsc_usd <- nbsc_tidy %>% 
-  mutate(tour_value = case_when(
+  dplyr::mutate(tour_value = case_when(
     indicators == tourism_categories[1] ~ tour_value * 1000000, # USD million --> USD (1)
     indicators == tourism_categories[2] ~ tour_value * h_mil_cny_to_usd #(CNY hundred million --> USD (1))
   ))
@@ -934,7 +934,7 @@ nbsc_usd_adjusted <- nbsc_usd %>%
   # mutate(indicators = case_when(
   #   indicators == tourism_categories[1] ~ "Foreign Exchange Earnings from International Tourism",
   #   indicators == tourism_categories[2] ~ "Earnings from Domestic Tourism"
-  mutate(usd = case_when(
+  dplyr::mutate(usd = case_when(
     # international: convert Current USD to 2015 Constant US$ 
     indicators == tourism_categories[1] ~ priceR::adjust_for_inflation(price = tour_value, from_date = year, country = "US", to_date = 2015),
     
@@ -947,7 +947,8 @@ nbsc_usd_adjusted <- nbsc_usd %>%
 
 
 # Check: 2015 years should match up
-int_2015 <- nbsc_usd_adjusted %>% filter(year == 2015, indicators == tourism_categories[1])
+int_2015 <- nbsc_usd_adjusted %>% 
+  dplyr::filter(year == 2015, indicators == tourism_categories[1])
 
 int_2015$tour_value == int_2015$usd
 
@@ -957,18 +958,20 @@ int_2015$tour_value == int_2015$usd
 # ---- aggregate ----
 china_usd_value <- nbsc_usd_adjusted %>% 
   # for each year,
-  group_by(year) %>% 
+  dplyr::group_by(year) %>% 
   # sum values !
-  summarize(usd = sum(tour_value, usd, na.rm = T)) %>% 
+  dplyr::summarize(usd = sum(tour_value, usd, na.rm = T)) %>% 
   # add descriptive columns for joining
-  mutate(geo_area_name = "China") %>% 
+  dplyr::mutate(geo_area_name = "China") %>% 
   # order columns
-  select(geo_area_name, year, usd)
+  dplyr::select(geo_area_name, year, usd)
 
 ```
 
+#### Plot China Tourism Value
 
 ```{r}
+library(ggplot2) # to avoid namespacing
 ggplot(data = china_usd_value, 
        aes(x = as.numeric(year), 
            y = usd)) +
@@ -1040,7 +1043,7 @@ Great! Now we're ready to reunite this china tourism value data with the rest of
 
 ```{r}
 # ---- joining china + no china dfs ----
-tourism_value <- full_join(nc_tourism_value, china_agg,
+tourism_value <- dplyr::full_join(nc_tourism_value, china_agg,
                            by = join_by(rgn_id, rgn_name, year, tour_value))
 
 #View(tourism_value)
@@ -1053,6 +1056,7 @@ tourism_value <- full_join(nc_tourism_value, china_agg,
 **Static plot**
 
 ```{r}
+library(ggplot2) # so we don't have to namespace
 # ---- preliminary plotting: static ----
 # make subset
 tour_val_subset <- tourism_value %>% 
@@ -1085,68 +1089,64 @@ ggplot(data = tour_val_subset,
 ```
 
 
-We can see that the scale of tourism value in China and the US dwarf all other countries' values. This is obviously a fairly rudimentary (and not very helpful or informative) plot.
-It is  tedious to have to refer back to a table of the region IDs to understand which region is which, and is overall what I would call a "spaghetti plot". 
-Let's use an interactive plot to more usefully visualize what's going on with the data in subsets with and without US & China.
+We can see that the scale of tourism value in China dwarfs all other countries' values. This is obviously a fairly rudimentary (and not very helpful or informative) plot.
+It is tedious to have to refer back to a table of the region IDs to understand which region is which, and is overall what I would call a "spaghetti plot". 
+Let's use an interactive plot to more usefully visualize what's going on with the data in a subset without the USA.
 
 
 **Interactive plot**
 
-```{r}
+```{r scrapped-china-usa-plot, eval=FALSE}
 # ---- exploratory plotting: interactive ----
 
-# ---- China + USA subset ----
-# with China + USA
-chn_usa <- tourism_value %>% 
-  filter(rgn_name %in% c("China", "United States")) %>% 
-  ungroup() # lines have a tendency to not show up in plotly if the data is grouped
+no_china_value <- tour_val_subset %>% 
+  dplyr::filter(!rgn_name %in% c("China")) %>% 
+  dplyr::ungroup()
 
-# without China or USA
-no_chn_usa <- tourism_value %>% 
-  filter(!rgn_name %in% c("China", "United States")) %>% 
-  ungroup()
-
-# set margins
-m <- list(
-  l = 80,
-  r = 80,
-  b = 80,
-  t = 80,
-  pad = 4
-)
-
-# ---- create updated interactive plot ----
-# COME BACK -- not sure why plot lines aren't showing
-chn_usa_plotly <- plotly::plot_ly(data = chn_usa,
-                                  x = ~year,
-                                  y = ~tour_value,
-                                  color = ~rgn_name,
-                                  type = "scatter", mode = "lines") %>% 
-  layout(title = "Tourism Value",
-         margin = m,
-         xaxis = list(title = "Year"),
-         yaxis = list(title = "Tourism Value (2015 US$)")
-  ) 
-
-chn_usa_plotly
+# ---- China subset ----
+# with China 
+# chn_usa <- tourism_value %>% 
+#   filter(rgn_name %in% c("China"
+#                          #, "United States" # filtered out earlier due to lack of data
+#                          )) %>% 
+#   ungroup() # lines have a tendency to not show up in plotly if the data is grouped
+# 
+# # without China or USA
+# no_chn_usa <- tourism_value %>% 
+#   filter(!rgn_name %in% c("China"
+#                           #, "United States"
+#                           )) %>% 
+#   ungroup()
+# 
+# # ---- create updated interactive plot ----
+# chn_plotly <- plotly::plot_ly(data = chn_usa,
+#                                   x = ~year,
+#                                   y = ~tour_value,
+#                                   color = ~rgn_name,
+#                                   type = "scatter", mode = "lines") %>% 
+#   layout(title = "Tourism Value",
+#          margin = m,
+#          xaxis = list(title = "Year"),
+#          yaxis = list(title = "Tourism Value (2015 US$)")
+#   ) 
+# 
+# chn_plotly
 
 
-
-no_chn_usa_plotly <- plotly::plot_ly(data = no_chn_usa,
+# ---- Plot wihtout China ----
+no_china_plotly <- plotly::plot_ly(data = no_china_value,
                                      x = ~year,
                                      y = ~tour_value,
                                      color = ~rgn_name,
                                      type = "scatter", mode = "lines") %>% 
-  layout(title = "Tourism Value",
+  plotly::layout(title = "Tourism Value",
          margin = m,
          xaxis = list(title = "Year"),
          yaxis = list(title = "Tourism Value (2015 US$)")
   ) 
 
-no_chn_usa_plotly
+no_china_plotly
 ```
-
-
 
 
 ```{r}
@@ -1154,15 +1154,17 @@ no_chn_usa_plotly
 max_tour_val <- max(tourism_value$tour_value, na.rm = TRUE)
 
 tourism_value %>% 
-  filter(tour_value == max_tour_val)
+  dplyr::filter(tour_value == max_tour_val)
 
 prettyNum(max_tour_val,big.mark = ",", scientific = FALSE)
 
-# 582 billion in US in 2019... out of 20 Trillion GDP
+# 1.69 trillion in China in 2019 out of 14.28 trillion total GDP
 ```
 
 
 # Saving intermediate data 
+
+Prep for saving & save to `int` folder
 
 ```{r}
 #--------Prepping data for int saving -------
@@ -1172,6 +1174,7 @@ tour_revenue_int <- tourism_value %>%
   mutate(
     unit = "USD (1)",
     sector = "tour",
+    # used in the inflation adjustment calculation downstream
     usd_yr = 2015 # because the tourism values are in "Constant 2015 US$"
   ) %>% 
   select(rgn_id, rgn_name, year, usd, unit, sector, usd_yr) %>% 
