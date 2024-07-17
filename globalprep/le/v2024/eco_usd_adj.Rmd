@@ -3,6 +3,27 @@ title: "Adjusting Economies data by Sector for Inflation"
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 ---
 
+## Overview
+
+The individual LE::ECO scripts from other sectors will all be adjusted for inflation within this script. After, they will be combined into one data frame. Finally, the values will be aggregated by region and year across all sectors, which can then be used to calculate the final score.
+
+Initially, there are three scripts, each with different starting units of value, shown below:
+
++----------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+|                | Metadata documentation                                                | Pre-Adjustment Unit                | Post-Adjustment Unit           |
++================+=======================================================================+====================================+================================+
+| cf             | [FAO Capture Data](https://www.fao.org/fishery/en/collection/capture) | Final: USD (current year)          | USD inflation adjusted to 2017 |
+|                |                                                                       |                                    |                                |
+|                | [Ex-Vessel Price Data](https://github.com/SFG-UCSB/price-db-sfg)      | FAO Capture: tonnes                |                                |
+|                |                                                                       |                                    |                                |
+|                |                                                                       | Ex-Vessel Prices: USD/metric tonne |                                |
++----------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+| tour           |                                                                       | USD PPP adjusted to 2015           | USD inflation adjusted to 2017 |
++----------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+| mar            |                                                                       | USD (current year)                 | USD inflation adjusted to 2017 |
++----------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+
+: Pre/Post-Inflation Adjustment Units
 
 ## Setup
 
@@ -11,7 +32,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 options(scipen=99)
 ```
-
 
 ```{r}
 # ---- load packages ----
@@ -53,7 +73,6 @@ int_dir <- here(data_path, "int")
 
 ```
 
-
 ## Read in pre-adjustment data
 
 ```{r}
@@ -94,11 +113,11 @@ tour_df_adj <- inflation_adjustment(tour_df_pre, conversion_date = 2017,
 ```{r}
 # cf_df_adj_filter <- cf_df_adj %>% 
 #   filter(year %in% c())
+
+#
 ```
 
-
-
-## Combine adjusted data frames 
+## Combine adjusted data frames
 
 ```{r}
 # bind rows of adjusted data frames
@@ -134,10 +153,9 @@ eco_usd_years <- left_join(eco_years_df, eco_usd_filter,
                           by = c("rgn_id", "rgn_name", "year"))
 ```
 
+-   plot heatmap of sectors we have data for within date range
 
-- plot heatmap of sectors we have data for within date range 
-
-- find 
+-   find
 
 ```{r}
 # ---- make NA status column ----
@@ -190,7 +208,6 @@ plotly::ggplotly(agg_heatmap_plot)
 #   )
 ```
 
-
 ```{r}
 # calculate aggregate value across all sectors 
 eco_usd_adj <- eco_usd_years %>% 
@@ -208,10 +225,9 @@ eco_usd_adj <- eco_usd_years %>%
 
 ```
 
-
 ## Calculating scores following OHI methodology
 
-- [Methodology](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#economies-subgoal-of-livelihoods-and-economies)
+-   [Methodology](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#economies-subgoal-of-livelihoods-and-economies)
 
 $$
 x_{eco} = \frac { \displaystyle\sum _{ k=1 }^{ N }{ { e }_{ c,k } }  }{ \displaystyle\sum _{ k=1 }^{ N }{ { e }_{ r,k } }  }
@@ -219,7 +235,7 @@ $$
 
 where, $e$ is the total adjusted revenue generated directly and indirectly from sector $k$, at current $c$, and reference $r$, time points
 
-Based on this methodology and equation, we created and defined the `value` column earlier as the sum of the adjusted USD value for the three sectors (fishing, mariculture, and tourism). To calculate the score, we will take that combined sum across sectors per region per year and divide the current year's value by the 
+Based on this methodology and equation, we created and defined the `value` column earlier as the sum of the adjusted USD value for the three sectors (fishing, mariculture, and tourism). To calculate the score, we will take that combined sum across sectors per region per year and divide the current year's value by the
 
 <https://stackoverflow.com/questions/743812/calculating-moving-average>
 
@@ -248,9 +264,6 @@ reference_point <- (sum(eco_usd_adj[eco_usd_adj$year %in% c(reference_range), "v
 # potential:
 # want to change length(reference_range) to length(!is.na(value)) in reference range for each sector -- would need to have pre-aggregated data 
 ```
-
-
-
 
 Score function: using average of 5 years' previous values as denominator
 
@@ -281,8 +294,7 @@ calculate_scores <- function(df, stop_year) {
 }
 ```
 
-
-Testing function: 
+Testing function:
 
 ```{r}
 test_range <- eco_usd_adj %>% 
@@ -317,7 +329,6 @@ top_score <- result %>%
 top_score
 ```
 
-
 ```{r}
 summary <- summary(result)
 
@@ -336,8 +347,8 @@ low_change <- result %>%
 
 low_change
 ```
-Aside from the top 10 countries and bottom 4 countries, the scores of the rest of the countries were roughly in the range of 0.5-1.6
 
+Aside from the top 10 countries and bottom 4 countries, the scores of the rest of the countries were roughly in the range of 0.5-1.6
 
 ```{r}
 top_change$rgn_name <- factor(top_change$rgn_name, levels = unique(top_change$rgn_name)[order(top_change$score, decreasing = TRUE)])
@@ -364,11 +375,7 @@ plotly::plot_ly(data = plot_df, x = ~score, y = ~rgn_name, color = ~rgn_name,
 
 ```
 
-
-
-
 ## Alternative Score method: value 5 years ago as reference point
-
 
 ```{r}
 calculate_scores_2 <- function(data, stop_year) {
@@ -399,14 +406,12 @@ calculate_scores_2 <- function(data, stop_year) {
 
 ```
 
-
 Test new function
 
 ```{r}
 single_point_scores_2019 <- calculate_scores_2(eco_usd_adj, stop_year = 2019)
 single_point_scores_2019
 ```
-
 
 ```{r}
 paste("Single reference point summary:")
@@ -417,4 +422,4 @@ paste("5 year average reference point summary:")
 summary(result$score)
 ```
 
-In 2019, Nauru (and members of the PNA) sold 
+In 2019, Nauru (and members of the PNA) sold
