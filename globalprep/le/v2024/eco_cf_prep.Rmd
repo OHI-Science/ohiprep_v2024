@@ -549,7 +549,7 @@ heatmap_plot <- ggplot(data = heatmap_df) +
        color = " ") +
   theme_bw()
 interactive_heatmap <- plotly::ggplotly(heatmap_plot)
-interactive_heatmap
+# interactive_heatmap
 ```
 
 ## Cleaning for GF
@@ -608,15 +608,14 @@ filtered_heatmap_df <- heatmap_df %>%
 ```
 
 
-## Gapfilling -- from Anna 
-### COME BACK
+## Gapfilling
 
 Here we'll use `na.approx()` from {zoo} to interpolate missing values and extrapolate missing extremes (NA values that do not fall between non-NA values) by copying the nearest extreme value. After speaking with Melanie Frazier about our methodology, she recommended to not fill in any values for countries with only 1 data point. If you choose to do this in future years, we've provided commented-out code following the chunk below for assessing how much of your data this impacts.
 
 Since we already filtered out any region that does not adhere to the rule above, any regions left that have NAs can be gapfilled. 
 
 ```{r}
-# estimate  for regions with missing data
+# estimate value for regions with missing data
 value_filled <- filtered_heatmap_df %>% 
   group_by(rgn_name) %>% 
   # interpolate (fill missing values between 2 values)
@@ -652,7 +651,7 @@ heatmap_gf <- ggplot(data = heatmap_gf_df) +
        color = " ") +
   theme_bw()
 interactive_heatmap_gf <- plotly::ggplotly(heatmap_gf)
-interactive_heatmap_gf
+# interactive_heatmap_gf
 
 # YAY! it worked the way we wanted it to.  The heatmap is a solid color; there are only TRUEs, which indicates that there is a value present for every observation.
 ```
@@ -662,12 +661,12 @@ interactive_heatmap_gf
 ```{r}
 # columns should be: rgn_id, rgn_name, year, usd (previously value), unit, sector, usd_yr (in this case = year)
 
-cf_revenue_int <- cf_revenue_yrs %>% 
-  mutate(usd = value,
+cf_revenue_int <- heatmap_gf_df %>% 
+  mutate(usd = appx_value,
          unit = "USD (1)",
          sector = "cf",
          usd_yr = year) %>% 
-  select(-value)
+  select(-appx_value)
 
 # write_csv(cf_revenue_int, here(int_dir, "eco_cf_usd_pre.csv"))
 ```
