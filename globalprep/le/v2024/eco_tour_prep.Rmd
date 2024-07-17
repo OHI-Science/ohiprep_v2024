@@ -356,7 +356,7 @@ raw_gdp_pct_data_summary <- heatmap_df %>%
   dplyr::summarize(n_data_points = sum(status)) %>% 
   dplyr::arrange((n_data_points)) # show number of data points that we have for that region across the full time range 
 
-raw_gdp_pct_data_summary
+head(raw_gdp_pct_data_summary, n = 20)
 
 # sum(heatmap_df$status)
 ```
@@ -620,15 +620,7 @@ wb_gdp_clean <- wb_gdp_raw %>%
 -  calculate usd tourism value for `no_china_join`. call this `nc_tourism_value`
 
 -  create China subset of GDP data `china_gdp`, join with `macao_hk_gf` (gdp proportion subset of Macao and Hong Kong, gapfilled)
--  calculate value (will be in Constant 2015 US$)
--  call this `macao_hk_value`
-- join `china_usd_value` with `macao_hk_value`, drop irrelevant columns etc. 
--  call this `china_value` or something similar
-
--  join `china_value` with `nc_tourism_value`. call this `tourism_value`
-
--  prep `tourism_value` for export, then write script, rerun `eco_usd_adj.Rmds`
-
+-  calculate value (will be in Constant 2015 US$): `macao_hk_value`
 
 ## Tourism Value (no China)
 
@@ -752,6 +744,9 @@ nc_tourism_value <- no_china_join %>%
     -   filter to only include Hong Kong and Macao: `macao_hk_gdp`
 -   join with `macao_hk_gf` (gapfilled, filtered gdp proportion subset with only Macao and Hong Kong): `macao_hk_join`
 -   calculate value (will be in Constant 2015 US$): `macao_hk_value`
+
+-   clean & tidy China gapfill dataset from National Bureau of Statistics of China
+  -   convert values to standard from GDP dataset -- constant 2015 USD
 -   join `china_usd_value` with `macao_hk_value`, drop irrelevant columns etc.: call this `china_value`
 
 
