@@ -1,0 +1,425 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - Livelilihoods Data Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+---
+
+# Livelihoods: Proportion of Tourism Jobs per Country/Region per Year
+
+## Overview
+
+* **Data:** Labor Force & Employment Data
+
+  * Labor Force data from World Bank (downloaded June 28, 2024)
+
+      - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+      
+  * Jobs data from UN Tourism / UNWTO (downloaded June 26th, 2024)
+  
+      - Key Tourism Statistics <https://www.unwto.org/tourism-statistics/key-tourism-statistics>
+      - According to the website, the latest update of the dataset took place in 31 January 2024. 
+      
+  * Quality/Wage data from ILOSTAT (downloaded July 2, 2024) -- for tour/cf wage data
+  
+      - https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A 
+
+
+### Setup
+
+```{r}
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  janitor,
+  terra,
+  countrycode,
+  readxl,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  tidyverse, 
+  httr,
+  plotly,
+  zoo # for gapfilling
+  
+)
+#remotes::install_github("skgrange/threadr") # for na_extrapolate
+library(threadr)
+
+
+# source 
+source(here("workflow", "R", "common.R"))
+
+# set year and file path info
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- here("globalprep", "le", version_year)
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# world bank raw data directory
+wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+unwto_dir <- here(raw_data_dir, "UNWTO", data_dir_version_year)
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
+```
+
+Create country code --> iso3 function
+
+```{r}
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+```
+
+### Read in Data
+
+```{r}
+# ===================== Read in Data ==============================
+
+
+# Labor force data ----
+# created in liv_labor_force_dataprep.Rmd
+labor_force <- read_csv(here(int_dir, "liv_labor_force.csv"))
+
+# Jobs data ----
+# define file path
+unwto_fp <- file.path(here(unwto_dir, "unwto-all-data-download_0.xlsx"))
+# read in data
+# total number of people employed by the tourism sector, in thousands
+un_jobs_data_raw <- read_xlsx(un_job_data,
+                              skip = 2, # skip first 2 rows
+                              sheet = "Employment", # use Employment sheet
+                              col_names = TRUE, # use first row as column names
+                              na = c("","..")) # define NA markers
+
+# ILO wage data ----
+# define file path to ILO wage data 
+ilo_fp <- file.path(dir_M,
+                        "git-annex/globalprep/_raw_data/ILOSTAT/d2024/EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-02-tour-wage.csv")
+
+# read in ILO wage data
+ilo_wage_data <- read_csv(ilo_fp)
+
+# OHI regions data ----
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") 
+
+
+```
+
+# Employment Data
+
+(put this within previous chunk, read in data etc. for number of tourism jobs, join with labor_regions, make new proportion of tourism jobs column, group by year, do prelim plotting etc. and evaluate data quality etc.)
+
+```{r}
+# ==================== Tidy Data ===================================
+
+# initial cleaning and tidying of jobs data
+un_jobs_data <- un_jobs_data_raw %>%
+  janitor::clean_names() %>%
+  select(-c(1:3)) %>% # drop first 3 columns
+  fill(basic_data_and_indicators, # fill in country column with country names
+       .direction = "down" # from first row of country name down to the next populated row (next unique country name)
+       ) %>% 
+  select(-c(x5, x7, x8, units, notes, x38)) %>% # drop unwanted columns
+  filter(x6 %in% "Total") %>% # only using Total number of jobs
+  select(-x6) # drop column now that we've filtered
+
+# pivot longer so that we can see how many jobs per year, per country!
+un_jobs_data_piv <- un_jobs_data %>%
+  pivot_longer(cols = x1995:x2021, names_to = "year", values_to = "jobs") %>% 
+    mutate(year = as.numeric(str_remove_all(year, 'x'))) # tidy up year column
+
+# tidy up pivoted data ----
+un_jobs_clean <- un_jobs_data_piv %>% 
+  rename(country = basic_data_and_indicators) %>% 
+  #  mutate(iso3c = country_regex_to_iso3c(country)) %>% # COME BACK -- after convo w mel, remove or add back in
+  mutate(
+    # converting number from thousands to 1s be consistent and prep for the left_join with labor_regions
+    tourism_jobs = jobs*1000,
+    unit = "Persons (1)", # add unit column
+    country = str_to_title(country) # convert to title case
+    ) %>% 
+  select(-jobs) # drop thousand jobs column
+
+
+# run ohicore name_2_rgn --------
+tour_jobs_rgn <- name_2_rgn(df_in = un_jobs_clean, 
+                       fld_name = 'country',
+                       flds_unique = c("year"))
+
+# no year mismatches, duplicates found
+
+# identify duplicates
+tour_duplicates <- tour_jobs_rgn[duplicated(tour_jobs_rgn[, c("rgn_name", "year")]),]
+unique(tour_duplicates$country)
+unique(tour_duplicates$rgn_name)
+
+# v2024 notes:
+# Serbia and Montenegro: all NA values in our dataset, means it's not an issue now (would need to disaggregate, reverse of weighted average based on population size, only keep Montenegro (Serbia is landlocked))
+# 	
+# Northern Mariana Islands and Guam
+# Guadeloupe and Martinique: only have sparse data for Martinique, none for Guadeloupe -- can just sum
+
+# aggregate: sum by rgn_name etc. ----
+tour_jobs_rgn_agg <- tour_jobs_rgn %>%
+  group_by(rgn_id, rgn_name, year) %>%
+  dplyr::summarize(tourism_jobs_agg = sum(tourism_jobs, na.rm = TRUE) 
+            )%>%
+  ungroup() %>% 
+  filter(year >= 2009) %>% 
+  # turn 0s into NAs (appropriate flag for lack of data)
+  mutate(tourism_jobs_agg = case_when(
+    tourism_jobs_agg == 0 ~ NA,
+    .default = tourism_jobs_agg
+  ))
+
+
+# join with labor force data ------------
+# COME BACK -- rejoin once labor force has been updated
+tour_jobs_labor <- full_join(tour_jobs_rgn_agg, labor_force #, by = c("rgn_id", "rgn_name", "year")) # don't need to specify this, R/dplyr is smart enough to figure it out
+) %>% 
+  select(-c(sector, data_source)) # these currently only show Labor Force data-related values. Will add back on before exporting.
+
+# calculate tourism jobs proportion of total labor force -----
+tour_jobs_prop_df <- tour_jobs_labor %>% 
+  mutate(tour_jobs_prop = (tourism_jobs_agg / labor_force_total)) %>% 
+  mutate(rgn_id = as.character(rgn_id)) 
+```
+
+
+```{r}
+# join w OHI regions
+tourism_un_jobs_ohi <- left_join(region_clean, un_jobs_cc, by = c("eez_iso3" = "iso3c"))
+
+
+# ----------Join with Labor Force Data--------------
+tourism_labor_join <- left_join(labor_regions, tourism_un_jobs_ohi, by = c("rgn_id", "year")) 
+```
+
+Create the proportion between tourism jobs and the total labor force
+```{r}
+tourism_job_proportion <- tourism_labor_join %>%
+  dplyr::relocate(tourism_jobs, .before = labor_force_total) %>%
+  mutate(tourism_proportion = tourism_jobs/labor_force_total) %>%
+  rename(labor_force_total = labor_force_total) %>%
+  select(rgn_id, rgn_name.x, country, year, labor_force_total, tourism_jobs, tourism_proportion)
+
+# plot it, interactively!
+line_plot <- plotly::plot_ly(tourism_job_proportion, x = ~year, y = ~tourism_proportion, color = ~country, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Proportional Tourism Employment Within Total Labor Force", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percent of people by region employed by the tourism sector"))
+
+line_plot
+
+# htmlwidgets::saveWidget(line_plot, file = "prop_tourism_laborforce.html")
+```
+
+### Saving intermediate data
+
+```{r}
+#write_csv(tourism_job_proportion, here(int_dir, "tour_jobs.csv"))
+```
+
+
+## ILO wage data
+  - note: this data came from many sources and was compiled by ILO
+
+```{r}
+# preliminary cleanings
+wage_data_clean <- ilo_wage_data %>% 
+  # lower_snake_case
+  janitor::clean_names() %>% 
+  # more intuitive value name
+  rename(monthly_wage = obs_value) %>% 
+  # filter to PPP adjusted data (this accounts for inflation, diff in currencies globally, cost of living etc.)
+  filter(classif2_label == "Currency: 2017 PPP $") %>% 
+  # group by country/region
+  group_by(ref_area_label) %>% 
+  # set column name to year
+  rename(year = time) %>% 
+  # filter to the cap date range from the jobs data -- 2019
+  filter(year %in% c(2009:2019)) %>%  
+  # add iso3 column, tourism sector label
+  mutate(iso3 = country_regex_to_iso3c(ref_area_label),
+         sector = "tour") %>% 
+  select(c(ref_area_label, iso3, year, monthly_wage, classif2_label))
+  
+
+
+# make sequence of years for gapfilling ----
+# note: data does not have wage data for some years in some countries -- we want to account for that by leaving them as NAs, then gapfilling with the average between the pre and post years
+
+years_df <- tibble(iso3 = wage_data_clean$iso3) %>% 
+  group_by(iso3) %>% 
+  summarize(year = seq(2009, 2019))
+
+
+wage_data_years <- left_join(years_df, wage_data_clean, by = c("iso3", "year"))
+
+# filling in country names when possible --- 
+wage_years_filled <- wage_data_years %>% 
+  group_by(iso3) %>% 
+  fill(ref_area_label, .direction = "downup") %>% 
+  ungroup()
+
+# =================
+
+# test gapfilling
+# gap_fill_test <- wage_years_filled %>% 
+#   mutate(ref_area_label = as.factor(ref_area_label)) %>% 
+#   mutate(lm_est = list(lm(monthly_wage ~ year + ref_area_label)))
+# 
+# 
+# lm_test <- lm(monthly_wage ~ year + ref_area_label, data = wage_years_filled)
+# summary(lm_test)
+# 
+# lm_test$coefficients 
+
+# wage_years_filled$lm_values <- lm_test$fitted.values
+
+# gap filling  ----
+wage_gf <- wage_years_filled %>% 
+  group_by(ref_area_label) %>% 
+  # interpolate (fill missing values between 2 values)
+  mutate(appx_wage = zoo::na.approx(monthly_wage, # using values in this column
+                                    na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
+                                    #  extrapolate using rule = 2 from approx(),
+                                    # uses closest data extreme to extrapolate 
+                                    # for leading and trailing NAs
+                                    rule = 2)) %>% 
+  
+  # fill NA values with the only other observed value (making sure to note the list of countries/regions we did this for)
+  mutate(appx_wage_fill = zoo::na.aggregate(appx_wage, by = 1, FUN = mean, na.rm = FALSE))
+# note: made this a new column so that we can still identify each country that we are using this fill (na.aggregate function) method for.
+  
+# other notes: 
+# need more than 1 data point to do any approximation. 
+# also, extremes (leading and trailing) are just copied data points from nearest extreme
+
+```
+
+
+
+```{r}
+# find regions with only 1 data point (still have NAs in appx_wage column)
+
+na_regions <- wage_gf %>% 
+  filter(is.na(appx_wage))
+
+
+unique(na_regions$ref_area_label)
+num_na <- length(unique(na_regions$ref_area_label))
+num_tot <- length(unique(wage_gf$ref_area_label))
+
+paste0("proportion of countries/regions with only 1 data point: ", round(((num_na / num_tot) * 100), 3), "%")
+```
+
+
+
+
+```{r}
+# preliminary plot 
+line_plot <- plotly::plot_ly(wage_gf, x = ~year, y = ~appx_wage_fill, color = ~ref_area_label, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: monthly Service Wages (USD (2017) PPP-Adjusted)", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "monthly Wages (USD)"))
+
+line_plot
+
+# htmlwidgets::saveWidget(line_plot, file = "prop_tourism_laborforce.html")
+
+```
+
+
+
+
+In this plot we can see that Sao Tome and Principe is a clear high outlier with no variation -- it is one of the countries for which we gapfilled with copied values from a single observation. We will continue to join the data with the OHI regions, then plot again and reinvestigate.
+
+
+Clean up ILO data, join with OHI regions
+
+```{r}
+# join with OHI regions
+wage_region_join <- left_join(region_clean, wage_gf, by = c("eez_iso3" = "iso3"))
+
+# come back ---- stopping point for Mel to take a look!
+
+# Currency: 2017 PPP $
+
+wage_regions <- wage_region_join %>% 
+  mutate(unit = "Currency: 2017 PPP $") %>% 
+  select(-classif2_label) %>% 
+  mutate(sector = "tour",
+         data_source = "ILO")
+
+```
+
+
+Plot
+
+```{r}
+# interactive plot after joining with OHI Regions
+plotly::plot_ly(wage_regions, x = ~year, y = ~appx_wage_fill, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Monthly Service Wages (USD)", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Monthly Wages (USD)"))
+
+```
+
+We can see that Sao Tome and Principe is still included and is still this high, unvarying outlier. 
+This lack of data combined with how high of an outlier is led us to reconsider our methods for this country and consider dropping it from this intermediate data product. 
+
+Let's drop & plot what that looks like. 
+
+```{r}
+wage_regions_no_sp <- wage_regions %>% 
+  filter(!ref_area_label %in% c("Sao Tome and Principe"))
+
+# plot to see what it looks like after dropping Sao Tome and Principe
+plotly::plot_ly(wage_regions_no_sp, x = ~year, y = ~monthly_wage, color = ~admin_country_name, type = "scatter", mode = "lines") %>% 
+  layout(title = "All Regions: Monthly Service Wages (USD)", 
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Monthly Wages (USD)"))
+
+```
+
+Dropping Sao Tome and Principe (STP) adjusted the y-axis scale significantly to better visualize the monthly service wage data (USD) for other geographic areas.  Investigating further, it looks as though the Sao Tome and Principe observation from 2017 (133814.9 USD) may have been inputted incorrectly, measured as annual income instead of monthly, or there was an error when it was adjusted by PPP.  Dustin noticed that the data source from this observation was "HIES - Household Budget Survey".  This was the only observation from this data source. Upon further investigation, we discovered the average annual income in STP is ~2,400 USD [WorldData]("https://www.worlddata.info/africa/sao-tome-and-principe/index.php#:~:text=With%20an%20average%20annual%20income,the%20lower%20middle%2Dincome%20countries") and a GDP per capita of ~2,817 USD [World Bank]("https://www.worldbank.org/en/country/saotome/overview"). Therefore, we have decided to drop it for the intermediate data set.
+
+
+## Saving intermediate data products
+
+```{r}
+# write_csv(wage_regions_no_sp, here(int_dir, "tour_quality.csv"))
+
+```
+

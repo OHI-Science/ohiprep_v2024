@@ -14,6 +14,8 @@ output:
       in_header: '../../../workflow/templates/ohi_hdr.html'
 pdf_document:
   toc: true
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Summary
@@ -30,10 +32,8 @@ This process is completed entirely within this script. The raw data is downloade
 
 # Updates from previous assessment
 
-- One additional year of data, 2021, was added 
-- Added in code to automatically create folders when applicable
-- Added in some more tic/tocs
-- Had to change `terra` code back to `raster` for one chunk (making the histograms) to get it to work; later, commented out this code and added a version of histograms that works with `terra`
+- One additional year of data, 2022, was added.
+- Added new comparative plots, along with a .csv of the 2024 major pressure score changes between v2024 (2022 data) and v2023 (2021 data).
 
 ***
 
@@ -42,10 +42,10 @@ This process is completed entirely within this script. The raw data is downloade
 The source data are monthly mean sea level anomalies, in meters. These anomalies are calculated by subtracting the current absolute sea level for each month from the average sea level for that month calculated from 1993 - 2015.
 
 **Reference**: The altimeter products were produced and distributed by Aviso (http://www.aviso.altimetry.fr/), as part of the Ssalto ground processing segment. [AVISO MSLA heights, monthly means](https://www.aviso.altimetry.fr/en/data/products/sea-surface-height-products/global/gridded-sea-level-anomalies-mean-and-climatology.html#c10358)  
-**Downloaded**: June 01, 2023  
+**Downloaded**: June 14, 2024  
 **Description**: Monthly mean sea level anomaly (meters above mean sea level) (msla_h)
 **Native data resolution**: 0.25 degree grid cells   
-**Time range**: January 1993 - December 2021
+**Time range**: January 1993 - December 2022
 **Format**: NetCDF   
 **Citation information**  The altimeter products were produced and distributed by Aviso (http://www.aviso.altimetry.fr/), as part of the Ssalto ground processing segment. [AVISO MSLA heights, monthly means](https://www.aviso.altimetry.fr/en/data/products/sea-surface-height-products/global/gridded-sea-level-anomalies-mean-and-climatology.html#c10358)
 
@@ -83,13 +83,17 @@ library(rasterVis)
 library(terra)
 library(tictoc)
 library(plotly)
+library(ggplot2)
 setGDALconfig("GDAL_PAM_ENABLED", "FALSE")
 
-source('../../../workflow/R/common.R')
-library(here)
+# 2024 update: switched to use here() for reproducibility (throughout the document when working from/with products saved in this repository)
+#source('../../../workflow/R/common.R')
+
+library(here) # sets working directory to project (ohiprep_v202X) base directory
+source(here("workflow", "R", "common.R"))
  
 ## define paths and variables to use throughout data prep
-scen_year <- 2023 # change to reflect assessment year!
+scen_year <- 2024 # change to reflect assessment year!
 dir_anx_aviso <- file.path(dir_M, "git-annex/globalprep/_raw_data/AVISO_slr") 
 dir_prs_slr <-  sprintf("%s/git-annex/globalprep/prs_slr/v%s", dir_M, scen_year)
 
@@ -123,12 +127,12 @@ If you don't want to go through the trouble of running the download process in R
 
 ## need AVISO username and password, define the following line of code in console (as is), then when prompted, enter the username and password string, don't save the login information here in the script
 ## if either password or username contain the @ symbol, replace with '%40' (percent-encoding for reserved characters)
-userpasswd <- readline("Type AVISO username and password, separated by colon no space:") 
+userpasswd <- readline("Type AVISO username and password, separated by colon no space:")
 ```
 
 Define file paths for data download:
 ```{r download_data, eval=FALSE}
-year <- 2021 # data year to download; lags by 2 years, since 2022 only goes to may as of now... v2023
+year <- 2022 # data year to download; lags by 2 years. 2023 goes to May as of now, and we need a full year's worth of data for v2024
 months <- str_pad(1:12, 2, pad = "0") #if they upload the rest just change the numbers here to reflect rest of months
 
 ## download data from FTP and collect each month/year in raster stack
@@ -150,8 +154,8 @@ for (mo in months){
   
   ## retrieve the data (compressed, gzipped files prior to 2021 data, and just .nc files starting with 2021 data)
   # sprintf() contains %s in two places, which represent the two spots that will get filled with the two strings specified in the following arguments `ub` and `mo`
-  u <- sprintf("%s/dt_global_allsat_msla_h_y2021_m%s.nc", ub, mo)
-  u_filename <- file.path(dir_anx_aviso, paste0("d", scen_year), substr(u, 121, 156)) # this directs the file into the correct data folder (d202?) and names the file with the value of substr(u, 121, 156)
+  u <- sprintf("%s/dt_global_allsat_msla_h_y2022_m%s.nc", ub, mo)
+  u_filename <- file.path(dir_anx_aviso, paste0("d", scen_year), substr(u, 121, 157)) # this directs the file into the correct data folder (d202?) and names the file with the value of substr(u, 121, 156)
   res <- httr::GET(u, write_disk(u_filename))
 }
 closeAllConnections()
@@ -177,7 +181,9 @@ All NetCDF files for each month are rasterized.
 ```{r clip, eval=FALSE}
 ## d2016/msla_monthly_mean has data for 1993-2015
 ## also include list.files for d2017 through the data folder for current scenario year
-nc_files <- c(list.files(file.path(dir_anx_aviso, "d2023"),
+nc_files <- c(list.files(file.path(dir_anx_aviso, "d2024"),
+                       full.names = TRUE, pattern = ".nc"),
+              list.files(file.path(dir_anx_aviso, "d2023"),
                        full.names = TRUE, pattern = ".nc"),
               list.files(file.path(dir_anx_aviso, "d2022"),
                        full.names = TRUE, pattern = ".nc"),
@@ -244,7 +250,7 @@ for (i in seq_along(nc_files)){
 }
 
 toc()
-# v2023 - 197.377 sec elapsed
+# v2024 - 410.867 sec elapsed
 ```
 
 ## Annual mean sea level anomalies
@@ -273,7 +279,7 @@ foreach(yr = c(1993:maxyr)) %dopar% {
                 overwrite = TRUE)
 }
 toc()
-# v2023 - 71.646 sec elapsed
+# v2024 - 10.983 sec elapsed
 ```
 
 ## Changing the projection and masking
@@ -296,12 +302,17 @@ if(file.exists(ocean_mask_prev)){
   s <- calc(s, fun = function(x) {ifelse(x > 0, 1, NA)})
   terra::writeRaster(s, sprintf("%s/int/ocean_mask.tif", dir_prs_slr, scen_year))
 }
-s <- terra::rast(sprintf("%s/int/ocean_mask.tif", dir_prs_slr, scen_year))
-plot(s, col = "red")
+s <- terra::rast(sprintf("%s/int/ocean_mask.tif", dir_prs_slr 
+                         #, scen_year # 2024 note: redundant information, as "v2024" is already part of the dir_prs_slr file path ("/home/shares/ohi/git-annex/globalprep/prs_slr/v2024")
+                         ))
+# plot to confirm that the ocean mask tif is being read in properly
+plot(s, col = "red") 
 
 annual_means <- list.files(file.path(dir_prs_slr, "int/msla_annual_mean"), full = TRUE)
 
-# v2022 - tried to use foreach with terra: Error in x@ptr$nrow() : external pointer is not valid
+# v2022 - tried to use for each with terra: Error in x@ptr$nrow() : external pointer is not valid
+
+# v2024: running annual_means in the console shows that we have msla annual mean tifs from 1993 through 2022 
 ```
 
 ```{r, eval=FALSE}
@@ -311,7 +322,7 @@ dir.create(folder_path_prs_slr_int_msla_annual_mol)
 
 tic()
 # unparallelize loop because working with `terra::project()` and `foreach()` threw the error "external pointer is not valid"
-# total time for loop: 96 minutes
+# total time for loop: 34.996 minutes, v2024
 for(i in seq_along(annual_means)) {  
 
   yr <- str_sub(annual_means[i], -8, -5)
@@ -325,7 +336,7 @@ for(i in seq_along(annual_means)) {
 
 }
 toc()
-# v2023 - 2098.572 sec elapsed
+# v2024 - 2099.743 sec elapsed
 ```
 
 ```{r, eval=FALSE}
@@ -344,7 +355,7 @@ foreach(file = annual_mol) %dopar% { # file = annual_mol[2]
                                 
 }
 toc()
-# v2023 - 1405.114 sec elapsed
+# v2024 - 1800.464 sec elapsed
 
 plot(terra::rast(file.path(dir_prs_slr, "int/msla_annual_mol_coastal/msla_annual_mol_coastal_2010.tif")))
 ```
@@ -362,24 +373,24 @@ coastal_rasts <- list.files(file.path(dir_prs_slr, "int/msla_annual_mol_coastal"
 ## script was updated in 2022 to convert from raster to terra, so terra functions were added to the following loop but not run because no reason to believe source updated past years data
 # tic()
 # registerDoParallel(8)
-
-# vals <- foreach(i = 1993:2015, .combine = c) %dopar% { # i = 1993
-#   coastal_rasts[which(str_sub(coastal_rasts, -8, -5) == i)] %>%
-#     #raster() %>%
-#     terra::rast() %>%
-#     #getValues() %>%
-#     terra::values() #%>%
-#     #na.omit()
-# }
-
-# possibly better code:
+# 
+# # vals <- foreach(i = 1993:2015, .combine = c) %dopar% { # i = 1993
+# #   coastal_rasts[which(str_sub(coastal_rasts, -8, -5) == i)] %>%
+# #     #raster() %>%
+# #     terra::rast() %>%
+# #     #getValues() %>%
+# #     terra::values() #%>%
+# #     #na.omit()
+# # }
+# 
+# # possibly better code, used by Gage in v2023:
 # vals <- foreach(i = 1993:2015, .combine = c) %dopar% { # i = 1993
 #   coastal_rasts[which(str_sub(coastal_rasts, -8, -5) == i)] %>%
 #     terra::rast() %>%
 #     terra::values() %>%
-#     as.data.frame() %>% 
+#     as.data.frame() %>%
 #     filter(!is.na(layer))
-#   
+# 
 #     # na.omit()
 # }
 # toc()
@@ -391,33 +402,46 @@ coastal_rasts <- list.files(file.path(dir_prs_slr, "int/msla_annual_mol_coastal"
 
 # v2023 - we recalculated ref_point_slr and were getting varying numbers, but a lot similar to the v2019 reference point below and the source does not seem to have been updated, so we will continue with the ref_point_slr below
 
+# v2024 - even with parallel computing and utilizing multiple cores, my R session would abnormally terminate every time it was run (three times, each taking about 20 minutes).  I will assume the reference point is correct as the source data has no indication of change.  I will continue to use the v2019 reference point (0.335938483476639). -SL
+
 ## If not rerunning the above, use this (taken from v2019 reference point csv)
 ref_point_slr <- 0.335938483476639
 
-dir_refpt <- "../../supplementary_information"
-if(file.exists(sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, scen_year))){
+dir_refpt <- "globalprep/supplementary_information"
+
+# 2024 update: using here() instead of sprintf() for reproducibility
+if(file.exists(here(dir_refpt, scen_year, "reference_points_pressures.csv"))){
   ## if already created and been partially updated for this assessment, don't want to overwrite with v2016 csv...
-  ref_tab <- read_csv(sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, scen_year))
+  ref_tab <- read_csv(here(dir_refpt, scen_year, "reference_points_pressures.csv")) # v2-24: reproducible file path update: using here() instead of sprintf()
 } else {
   ## grab ref file from v2016 if doesn't exist yet in current assessment 'supplementary information' folder
   ref_tab <- read_csv(file.path(dir_refpt, "v2016/reference_points_pressures.csv"))
 }
 
+
 ref_tab$ref_point[ref_tab$pressure == "Sea Level Rise"] <- ref_point_slr # set sea level rise reference to the 99.99 percentile
 
 # create v20?? folder in supplementary_information (only use if needed)
+# used to create v2024
 # folder_name_supplementary_information_v_scen_year <- paste0("v", scen_year)
 # folder_path_supplementary_information_v_scen_year <- file.path(dir_refpt, folder_name_supplementary_information_v_scen_year)
 # dir.create(folder_path_supplementary_information_v_scen_year)
 
 # write to reference_points_pressures.csv
-write.csv(ref_tab, sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, scen_year), row.names = FALSE)
+write.csv(ref_tab,
+          here(dir_refpt, scen_year, "reference_points_pressures.csv"),
+          row.names = FALSE)
 
 ## grab reference value from the supp_info csv
-ref <- read_csv(sprintf("%s/v%s/reference_points_pressures.csv", dir_refpt, "2023")) %>%
+ref <- read_csv(here(dir_refpt, "v2024", "reference_points_pressures.csv")) %>%
        filter(pressure == "Sea Level Rise") %>%
        .$ref_point %>%
         as.numeric()
+
+# ref <- read_csv("globalprep/supplementary_information/v2024/reference_points_pressures.csv") %>%
+#        filter(pressure == "Sea Level Rise") %>%
+#        .$ref_point %>%
+#         as.numeric()
 ```     
 
 ## Rescale 
@@ -451,14 +475,14 @@ for(i in seq_along(coastal_rasts)) { # i = coastal_rasts[26]
   }
 }
 toc()
-# v2023 - 3937.095 sec elapsed
+# v2024 - 4259.81 sec elapsed
 ```
 
 # Results
 
 ```{r plot_results, eval=FALSE}
 r <- terra::rast(sprintf("%s/output/slr_%s.tif", dir_prs_slr, scen_year - 2))
-plot(ocean, col = "cornsilk2", axes = FALSE, box = FALSE, main = "Sea Level Rise Pressure 2020", legend = FALSE)		
+plot(ocean, col = "cornsilk2", axes = FALSE, box = FALSE, main = "Sea Level Rise Pressure 2022", legend = FALSE)		
 plot(r, col = cols, axes = FALSE, box = FALSE, add = TRUE)
 
 # # get current scenario year most recent year of data
@@ -483,9 +507,9 @@ r_new_old_terra <- terra::rast(sprintf("%s/output/slr_%s.tif", dir_prs_slr, scen
 # get previous scenario year most recent year of data IN COMMON (ie. will likely be one more year back)
 r_old_terra <- terra::rast(sprintf("%s/git-annex/globalprep/prs_slr/v%s/output/slr_%s.tif", dir_M, scen_year - 1, scen_year - 3))
 
-terra::hist(r_new_terra, main = sprintf("Sea Level Pressure %s current version (v%s) data", scen_year - 2, scen_year), breaks = 70) # v2023 - plots v2023 2021 data
-terra::hist(r_new_old_terra, main = sprintf("Sea Level Pressure %s current version (v%s) data", scen_year - 3, scen_year), breaks = 70) # v2023 - plots v2023 2020 data
-terra::hist(r_old_terra, main = sprintf("Sea Level Pressure %s previous version (v%s) data", scen_year - 3, scen_year - 1), breaks = 70) # v2023 - plots v2022 2020 data
+terra::hist(r_new_terra, main = sprintf("Sea Level Pressure %s current version (v%s) data", scen_year - 2, scen_year), breaks = 70) # v2024 - plots v2024 2022 data
+terra::hist(r_new_old_terra, main = sprintf("Sea Level Pressure %s current version (v%s) data", scen_year - 3, scen_year), breaks = 70) # v2024 - plots v2024 2021 data
+terra::hist(r_old_terra, main = sprintf("Sea Level Pressure %s previous version (v%s) data", scen_year - 3, scen_year - 1), breaks = 70) # v2024 - plots v2023 2021 data
 ```
 
 ```{r extract regions, eval=FALSE}
@@ -508,7 +532,7 @@ rgn_data <- read_sf(file.path(dir_M, "git-annex/globalprep/spatial/v2017"), "reg
 tic()
 regions_stats <- zonal(stack_slr, zones, fun = "mean", na.rm = TRUE, progress = "text") %>% data.frame() 
 toc()
-# v2023 - 3786.449 sec elapsed
+# v2024 - 3188.695 sec elapsed
 
 setdiff(regions_stats$zone, rgn_data$rgn_id) # High Seas regions are in there, makes sense....no land
 #[1] 260 261 262 263 264 266 267 269 270 272 273 274 275 276 277
@@ -521,9 +545,10 @@ regions_stats_clean <- regions_stats %>%
   mutate(year = as.numeric(as.character(substring(year, 7, 8)))) %>%
   mutate(year = 1993 + year - 1) # convert from numbers to actual years
 
-write.csv(regions_stats_clean, "output/slr.csv", row.names = FALSE)
+# 2024 note: updated to use here() for reproducibility
+write.csv(regions_stats_clean, here("globalprep", "prs_slr", "v2024", "output", "slr.csv"), row.names = FALSE)
 
-regions_stats_clean <- read_csv("output/slr.csv")
+regions_stats_clean <- read_csv(here("globalprep", "prs_slr", "v2024", "output", "slr.csv"))
 
 ## visualize data
 plotData <- regions_stats_clean %>%
@@ -551,26 +576,120 @@ htmlwidgets::saveWidget(line_plot, file = "slr.html")
 ```
 
 ```{r compare, eval=FALSE}
-new_data <- read.csv("output/slr.csv") %>%
+new_data <- read_csv(here("globalprep", "prs_slr", "v2024", "output", "slr.csv")) %>%
   dplyr::select(rgn_id, year, new_pressure_score = pressure_score)
 
-old_data <- read.csv(sprintf("../v%s/output/slr.csv", scen_year - 1)) %>%
+# define higher level prs_slr file path 
+prs_fp <- file.path(here("globalprep", "prs_slr"))
+# 2024 note: keeping sprintf here so that the year arithmetic and "v" concatenation work
+
+old_data <- read.csv(sprintf("%s/v%s/output/slr.csv", prs_fp, scen_year - 1)) %>%
   left_join(new_data, by = c("year", "rgn_id"))
 
 plot(old_data$pressure_score, old_data$new_pressure_score, ylab = "new score", xlab = "old score")
 abline(0, 1, col = "red")
 ```
 
+```{r all_mjr_score_change, eval=FALSE}
+# create data frame with scores that changed by more than 0.05
+old_data_pscore <- old_data %>%
+  filter(year == "2021") %>%
+  select(rgn_id, year, pressure_score)
+
+new_data_pscore <- new_data %>%
+  filter(year == "2022")
+
+slr_new_old <- new_data_pscore %>%
+  left_join(old_data_pscore, by = 'rgn_id')
+
+all_score_changes <- slr_new_old %>%
+  mutate(diff = new_pressure_score - pressure_score)
+
+mjr_score_change <- slr_new_old %>%
+  mutate(diff = new_pressure_score - pressure_score) %>%
+  filter(abs(diff) > 0.05) %>%
+  mutate(abs_diff = abs(diff))
+
+# save major score changes to output folder as csv
+write.csv(mjr_score_change, here("globalprep", "prs_slr", "v2024", "output", "major_changes_2024.csv"))
+```
+
+```{r score_change_plots, eval=FALSE}
+slr_status_plot <- ggplot(slr_new_old, 
+                        aes(x = pressure_score, y = new_pressure_score, key = rgn_id)) +
+  geom_point(alpha = .6) +
+  theme(legend.position = 'none') +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(x = 'SLR status v2023 (data through Dec 2021)',
+       y = 'SLR status v2024 (data through Dec 2022)',
+       title = 'Comparing SLR status: 2024 vs 2023')
+
+slr_status_plot 
+
+library(plotly)
+interactive_plot <- ggplotly(slr_status_plot)
+interactive_plot 
+
+bar_plot_mjr_change <- ggplot(mjr_score_change, aes(x = factor(rgn_id), y = diff)) +
+  geom_bar(stat = 'identity', fill = 'cornflowerblue', alpha = 0.8) +
+  labs(x = 'Region ID',
+       y = 'Difference in Pressure Score',
+       title = 'Major Score changes between New (v2024) and Old (v2023) Pressure Scores') +
+  theme_minimal(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90, size = 5, margin = margin(t = 0, r = -3, b = 0, l = -3)),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+bar_plot_mjr_change # bar plot of all 118 major score changes
+
+bar_plot_all_change <- ggplot(all_score_changes, aes(x = factor(rgn_id), y = diff)) +
+  geom_bar(stat = 'identity', fill = 'cornflowerblue', alpha = 0.8) +
+  labs(x = 'Region ID',
+       y = 'Difference in Pressure Score',
+       title = 'Major Score changes between New (v2024) and Old (v2023) Pressure Scores') +
+  theme_minimal(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90, size = 5, margin = margin(t = 0, r = -3, b = 0, l = -3)),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+bar_plot_all_change
+
+boxplot_diff <- ggplot(mjr_score_change, aes(y = diff)) +
+  geom_boxplot(fill = 'cornflowerblue', alpha = 0.7) +
+  labs(y = 'Difference in Pressure Score (v2024 vs v2023)',
+       title = 'Distribution of Differences between New and Old Pressure Scores') +
+  theme_minimal(base_size = 11) +
+  theme(axis.title.y = element_text(size = 9))
+boxplot_diff
+```
+
+# Visual representation of the difference between this year and last year's rasters
+
+```{r}
+# refer back to line 503 for the rasterized output for current year and last year. v2024 update
+
+raster_diff <- r_new_terra - r_new_old_terra
+plot(raster_diff)
+
+# takes a while, not necessary but interesting:
+table(values(raster_diff))
+```
+
+
 # Gapfill csv
 
 There was no gapfilling for these data. Created gapfill files with values of 0.
 
 ```{r, eval=FALSE}
-slr_gf <- read.csv("output/slr.csv")%>%
+slr_gf <- read.csv(here("globalprep", "prs_slr", "v2024", "output", "slr.csv"))%>%
   mutate(pressure_score = 0) %>% 
   rename(gapfilled = pressure_score)
 
-write.csv(slr_gf, "output/slr_gf.csv", row.names=FALSE)
+write.csv(slr_gf, here("globalprep", "prs_slr", "v2024", "output", "slr_gf.csv"), row.names=FALSE)
 ```
 
 
