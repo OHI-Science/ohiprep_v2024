@@ -168,7 +168,7 @@ rgn_yr_df <- tibble(rgn_name = region_names$rgn_name,
 
 # ---- final data frame before aggregation, in which all regions and sectors are present ----
 eco_usd_rgn_full <- left_join(rgn_yr_df, eco_usd_filter,
-                          by = c("rgn_id", "rgn_name", "year")) # works!
+                          by = c("rgn_id", "rgn_name", "year")) # works! We now see NAs for all years within the start:stop seq for each region in OHI.
 
 ```
 
