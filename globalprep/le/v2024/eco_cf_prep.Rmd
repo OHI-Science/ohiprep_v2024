@@ -528,7 +528,7 @@ cf_revenue_yrs <- left_join(years_df, cf_revenue_rgn_agg,
 ```
 
 
-## Heatmap for Gapfilling
+## Heatmap before Gapfilling
 
 Typically, this would be used to visualize the data before and after gapfilling, to get a better picture of what areas needed to be filled and whether it was done correctly.  However, here we are taking from v2023's .csv that had already been gapfilled, so we are only going to visualize how well the gapfilling worked in this case.
 
@@ -566,14 +566,45 @@ All regions preserved can be gapfilled if needed.
 # ======= Determining regions that need to be cut based on the above rule ========
 start_year <- 2008
 stop_year <- 2019
-date_range <- (start_year:stop_year)
+date_range <- start_year:stop_year
+last_five_years <- (stop_year - 4):stop_year
 
 # ---- first sub-rule: must have at least one data pt in the last five years ----
-
+one_data_pt <- heatmap_df %>%
+  group_by(rgn_name) %>%
+  summarize(
+    has_recent_data = any(year %in% last_five_years & status == "TRUE"),
+    total_data_points = sum(status == "TRUE"),
+  ) %>%
+  ungroup() %>% 
+  filter(has_recent_data == "FALSE") %>%
+  pull(rgn_name)
 
 # ---- second sub-rule: must have more than three data points over time ----
+three_pts <- heatmap_df %>%
+  group_by(rgn_name) %>%
+  summarize(
+    has_recent_data = any(year %in% last_five_years & status == "TRUE"),
+    total_data_points = sum(status == "TRUE"),
+  ) %>%
+  ungroup() %>% 
+  filter(total_data_points < 3) %>%
+  pull(rgn_name)
 
+# see which and how many regions must be filtered out
+one_data_pt # v2024: Norfolk Island
+length(one_data_pt) # v2024: 1
 
+three_pts # v2024: NA
+length(three_pts) # v2024: 0
+
+# determine regions to keep
+all_regions <- unique(heatmap_df$rgn_name) # a vector of all regions
+regions_to_keep <- setdiff(all_regions, one_data_pt) # remove the regions that do not follow the rule
+
+# filter the original dataframe to keep only the valid regions
+filtered_heatmap_df <- heatmap_df %>%
+  filter(rgn_name %in% regions_to_keep)
 ```
 
 
@@ -582,25 +613,48 @@ date_range <- (start_year:stop_year)
 
 Here we'll use `na.approx()` from {zoo} to interpolate missing values and extrapolate missing extremes (NA values that do not fall between non-NA values) by copying the nearest extreme value. After speaking with Melanie Frazier about our methodology, she recommended to not fill in any values for countries with only 1 data point. If you choose to do this in future years, we've provided commented-out code following the chunk below for assessing how much of your data this impacts.
 
+Since we already filtered out any region that does not adhere to the rule above, any regions left that have NAs can be gapfilled. 
+
 ```{r}
-# gapfilling ----
-# estimate tourism GDP proportion for geo areas with missing data
-gdp_filled <- gdp_prop_yrs %>% 
-  group_by(geo_area_name) %>% 
+# estimate  for regions with missing data
+value_filled <- filtered_heatmap_df %>% 
+  group_by(rgn_name) %>% 
   # interpolate (fill missing values between 2 values)
-  mutate(appx_gdp_pct = zoo::na.approx(gdp_prop_percent, # using values in this column
-                                       na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
-                                       #  extrapolate using rule = 2 from approx(),
-                                       # which uses closest data extreme to
-                                       #  extrapolate for leading and trailing NAs
-                                       rule = 2
-  ))
+  mutate(appx_value = zoo::na.approx(value, # using values in this column
+                                     na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
+                                     #  extrapolate using rule = 2 from approx(),
+                                     # which uses closest data extreme to
+                                     #  extrapolate for leading and trailing NAs
+                                     rule = 2
+  )) %>% 
+  ungroup()
+
+# for the British Indian Ocean Territory in 2019, it copied the value from 2018.
+# for Saba, anything before 2011 was filled with the 2011 value.  The exact same thing happened for Bonaire and Sint Eustatius, which makes sense because those three were disaggregated and therefore it makes sense that they would have the same data availability, as they came from the same source.
 ```
 
 
 ### Heatmap to check gapfilling
 ```{r heatmap_check}
+heatmap_gf_df <- value_filled %>% 
+  select(-c(value, status)) %>% 
+  mutate(status = !is.na(appx_value))
 
+heatmap_gf <- ggplot(data = heatmap_gf_df) +
+  geom_tile(aes(x = year,
+                y = rgn_name,
+                fill = status, 
+                color = "black")) +
+  scale_fill_manual(values = c("cornflowerblue", "gainsboro")) +
+  labs(x = "Year",
+       y = "Region Names",
+       fill = "Data Status",
+       color = " ") +
+  theme_bw()
+interactive_heatmap_gf <- plotly::ggplotly(heatmap_gf)
+interactive_heatmap_gf
+
+# YAY! it worked the way we wanted it to.  The heatmap is a solid color; there are only TRUEs, which indicates that there is a value present for every observation.
 ```
 
 
