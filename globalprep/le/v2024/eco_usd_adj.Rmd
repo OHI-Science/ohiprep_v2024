@@ -9,19 +9,19 @@ The individual LE::ECO scripts from other sectors will all be adjusted for infla
 
 Initially, there are three scripts, each with different starting units of value, shown below:
 
-+----------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
-|                | Metadata documentation                                                | Pre-Adjustment Unit                | Post-Adjustment Unit           |
-+================+=======================================================================+====================================+================================+
-| cf             | [FAO Capture Data](https://www.fao.org/fishery/en/collection/capture) | Final: USD (current year)          | USD inflation adjusted to 2017 |
-|                |                                                                       |                                    |                                |
-|                | [Ex-Vessel Price Data](https://github.com/SFG-UCSB/price-db-sfg)      | FAO Capture: tonnes                |                                |
-|                |                                                                       |                                    |                                |
-|                |                                                                       | Ex-Vessel Prices: USD/metric tonne |                                |
-+----------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
-| tour           |                                                                       | USD PPP adjusted to 2015           | USD inflation adjusted to 2017 |
-+----------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
-| mar            |                                                                       | USD (current year)                 | USD inflation adjusted to 2017 |
-+----------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
++-------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+|             | Metadata documentation                                                | Pre-Adjustment Unit                | Post-Adjustment Unit           |
++=============+=======================================================================+====================================+================================+
+| cf          | [FAO Capture Data](https://www.fao.org/fishery/en/collection/capture) | Final: USD (current year)          | USD inflation adjusted to 2017 |
+|             |                                                                       |                                    |                                |
+|             | [Ex-Vessel Price Data](https://github.com/SFG-UCSB/price-db-sfg)      | FAO Capture: tonnes                |                                |
+|             |                                                                       |                                    |                                |
+|             |                                                                       | Ex-Vessel Prices: USD/metric tonne |                                |
++-------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+| tour        |                                                                       | USD (constant 2015 US\$)           | USD inflation adjusted to 2017 |
++-------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+| mar         |                                                                       | USD (current year)                 | USD inflation adjusted to 2017 |
++-------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
 
 : Pre/Post-Inflation Adjustment Units
 
@@ -154,6 +154,7 @@ eco_usd_years <- left_join(eco_years_df, eco_usd_filter,
 ```
 
 Join with OHI regions before aggregating by region for all sectors
+
 ```{r}
 # ------------ join with OHI Regions to make clear which regions do not have any data -----
 region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
