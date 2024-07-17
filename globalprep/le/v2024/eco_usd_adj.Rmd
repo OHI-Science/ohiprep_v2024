@@ -153,6 +153,25 @@ eco_usd_years <- left_join(eco_years_df, eco_usd_filter,
                           by = c("rgn_id", "rgn_name", "year"))
 ```
 
+Join with OHI regions before aggregating by region for all sectors
+```{r}
+# ------------ join with OHI Regions to make clear which regions do not have any data -----
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  select(-Notes)
+
+# ---- join with years df ----
+rgn_yr_df <- tibble(rgn_name = region_names$rgn_name,
+                       rgn_id = region_names$rgn_id) %>% # take the regions from region_names, which is all of the regions, even the ones we dont have data for
+  group_by(rgn_id, rgn_name) %>% 
+  summarize(year = seq(start_year,
+                       stop_year)) # each region should have a row for each year as well now, filled with NA
+
+# ---- final data frame before aggregation, in which all regions and sectors are present ----
+eco_usd_rgn_full <- left_join(rgn_yr_df, eco_usd_filter,
+                          by = c("rgn_id", "rgn_name", "year")) # works!
+
+```
+
 -   plot heatmap of sectors we have data for within date range
 
 -   find
@@ -210,7 +229,7 @@ plotly::ggplotly(agg_heatmap_plot)
 
 ```{r}
 # calculate aggregate value across all sectors 
-eco_usd_adj <- eco_usd_years %>% 
+eco_usd_adj <- eco_usd_rgn_full %>% 
   group_by(rgn_id, rgn_name, year) %>% # group by places & years
   summarize(value = sum(adj_usd, na.rm = TRUE)) %>%  # sum values
   mutate(value = case_when( 
@@ -218,11 +237,8 @@ eco_usd_adj <- eco_usd_years %>%
     .default = value
   ))
 
-
-
 # write data frame to int
-#write_csv(eco_usd_adj, here(int_dir, "eco_usd_adj.csv"))
-
+# write_csv(eco_usd_adj, here(int_dir, "eco_usd_adj.csv"))
 ```
 
 ## Calculating scores following OHI methodology

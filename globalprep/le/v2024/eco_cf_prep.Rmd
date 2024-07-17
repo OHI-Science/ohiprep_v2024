@@ -24,19 +24,19 @@ editor_options:
 
 ## Overview
 
--   FAO Capture Data 
+**FAO Capture Data (downloaded August 24, 2023)**
 
-    Data Source FAO Global Capture Production (in metric tonnes)
+-   Data Source FAO Global Capture Production (in metric tonnes)
 
-    This version of the value database was downloaded from the
+-   This version of the value database was downloaded from the
     Statistical Query Panel. Data from [FAO Global Capture
     Production](https://www.fao.org/fishery/en/collection/capture?lang=en)
 
-    Citation: FAO 2023. Global Capture Production. Fisheries and
+-   Citation: FAO 2023. Global Capture Production. Fisheries and
     Aquaculture Division
     <https://www.fao.org/fishery/en/collection/capture?lang=en>
 
-    Source information: Navigate to the [online query
+-   Source information: Navigate to the [online query
     portal](https://www.fao.org/fishery/statistics-query/en/capture/capture_quantity)
     for FAO Global Capture Production Quantity. Deselect all
     pre-selected years. Drag these fields into selected rows: ASFIS
@@ -46,39 +46,37 @@ editor_options:
     confirm that data is present for 1950- two years prior to current
     year. Click download and select yes to include Null Values.
 
-    Date: September 15th, 2023
+-   Date: September 15th, 2023
 
-    Time range: 1950-2021
+-   Time range: 1950-2021
 
-    Native data resolution: Country level
+-   Native data resolution: Country level
 
-    Format: csv
+-   Format: csv
 
-    Description: Global Capture Production Quantity
+-   Description: Global Capture Production Quantity
 
--   Ex-Vessel Price Data (downloaded August 24, 2023)
+**Ex-Vessel Price Data (downloaded August 24, 2023)**
 
-    -   Ex-vessel price data is in USD/metric tonne.
+-   Ex-vessel price data is in USD/metric tonne.
 
-        -   ex-vessel-prices: ex-vessel prices for fishery caught
-            species from 1976-2019
+    -   ex-vessel-prices: ex-vessel prices for fishery caught species
+        from 1976-2019
 
-            -   exvessel_price_database_1976_2019.csv: ex-vessel price
-                data gathered from [Melnychuk et al.
-                2016](https://doi.org/10.1093/icesjms/fsw169) and
-                updated to 2019 using methods described in the
-                public-facing [github
-                repo](https://github.com/SFG-UCSB/price-db-sfg)
-                associated with the Melnychuk et al. 2016 paper
+        -   exvessel_price_database_1976_2019.csv: ex-vessel price data
+            gathered from [Melnychuk et al.
+            2016](https://doi.org/10.1093/icesjms/fsw169) and updated to
+            2019 using methods described in the public-facing [github
+            repo](https://github.com/SFG-UCSB/price-db-sfg) associated
+            with the Melnychuk et al. 2016 paper
 
-        -   \*\*Citation for paper\*\*  
+    -   \*\*Citation for paper\*\*  
 
-        -   Melnychuk, M. C., Clavelle, T., Owashi, B., and
-            Strauss, K. 2016. Reconstruction of global ex-vessel prices
-            of fished species. - ICES Journal of Marine Science.
-            doi:10.1093/icesjms/fsw169.
-            
-            
+    -   Melnychuk, M. C., Clavelle, T., Owashi, B., and
+        Strauss, K. 2016. Reconstruction of global ex-vessel prices of
+        fished species. - ICES Journal of Marine Science.
+        <doi:10.1093/icesjms/fsw169>.
+
 ### Setup
 
 ```{r setup}
@@ -317,10 +315,11 @@ fishing_revenue <- fao_capture_price_final %>%
          sector = "cf",
          data_source = "FAO capture production and ex-vessel prices")
 
-write_csv(fishing_revenue, here(data_path, "int/cf_revenue.csv"))
+# write_csv(fishing_revenue, here(data_path, "int/cf_revenue.csv"))
 ```
 
-### Run ohicore name_2_rgn
+### Run `ohicore::name_2_rgn`
+
 ```{r name_2_rgn}
 # check how many countries are available from the v2023 .csv before running names_2_rgn
 length(unique(cf_revenue$country)) # v2024: 203
@@ -334,11 +333,21 @@ cf_revenue_rgn <- ohicore::name_2_rgn(df_in = cf_revenue,
 region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% select(-Notes)
 ```
 
-When names_2_rgn has been run, there are some countries from cf_revenue that are removed due to not having any match in the lookup tables.  This includes: bonaire/s.eustatius/saba, british indian ocean ter, channel islands, french southern terr, isle of man, netherlands antilles, other nei, saint barthélemy, saint helena/asc./trist., saint-martin (french), yugoslavia sfr.
+When names_2_rgn has been run, there are some countries from cf_revenue
+that are removed due to not having any match in the lookup tables. This
+includes: bonaire/s.eustatius/saba, british indian ocean ter, channel
+islands, french southern terr, isle of man, netherlands antilles, other
+nei, saint barthélemy, saint helena/asc./trist., saint-martin (french),
+yugoslavia sfr.
 
-Some could be considered OHI regions, but they are aggregated within another name.  This includes: Bonaire/S.Eustatius/Saba, which can be split into Bonaire, Sint Eustatius, and Saba; and the Channel Islands, which should be split into Jersey and Guernsey.
+Some could be considered OHI regions, but they are aggregated within
+another name. This includes: Bonaire/S.Eustatius/Saba, which can be
+split into Bonaire, Sint Eustatius, and Saba; and the Channel Islands,
+which should be split into Jersey and Guernsey.
 
-Others can be dropped because they do not belong to an OHI region.  This includes yugoslavia sfr, saint barthélemy, other nei, isle of man (self-governed), and french southern terr.  
+Others can be dropped because they do not belong to an OHI region. This
+includes yugoslavia sfr, saint barthélemy, other nei, isle of man
+(self-governed), and french southern terr.
 
 ```{r fix_rgns}
 # fix the country names so they can be recognized by names_2_rgn
@@ -359,6 +368,7 @@ cf_revenue_fix <- cf_revenue %>%
 ```
 
 Re-run names_2_rgn after fixing names
+
 ```{r fix_names}
 # re-run names_2_rgn, check which countries are still dropped
 cf_revenue_rgn_fix <- ohicore::name_2_rgn(df_in = cf_revenue_fix, 
@@ -366,16 +376,19 @@ cf_revenue_rgn_fix <- ohicore::name_2_rgn(df_in = cf_revenue_fix,
                              flds_unique = c("year"))
 ```
 
-
-## Disaggregation 
+## Disaggregation
 
 **Regions to disaggregate:**
 
-Channel Islands --> Guernsey (228) and Jersey (227)
+Channel Islands --\> Guernsey (228) and Jersey (227)
 
-Bonaire/S.Eustatius/Saba --> Bonaire (245), Sint Eustatius (249), and Saba (248)
+Bonaire/S.Eustatius/Saba --\> Bonaire (245), Sint Eustatius (249), and
+Saba (248)
 
-To do this, look at the rasterized fishing effort calculated in 2017 within the FIS subgoal, to determine the relative proportion of mean_catch within each region's eez. Afterwards, distribute revenue relative to that proportion.
+To do this, look at the rasterized fishing effort calculated in 2017
+within the FIS subgoal, to determine the relative proportion of
+mean_catch within each region's eez. Afterwards, distribute revenue
+relative to that proportion.
 
 ```{r proportions}
 # load in data on the mean catch for each region, used as a proxy to determine which region has a greater commercial fishing economy
@@ -472,6 +485,7 @@ cf_revenue_disaggregated <- cf_revenue_fix %>%
 ```
 
 Final names_2_rgn after disaggregation
+
 ```{r final_names}
 # using disaggregated revenue data within the name_2_rgn fxn: looks good!!
 # seeing the aggregated versions of regions that we already disaggregated drop out. Great!
@@ -502,6 +516,7 @@ cf_revenue_rgn_agg <- cf_revenue_rgn_final %>%
 ```
 
 ## CF Revenue Plot
+
 ```{r rev_plot}
 cf_rev_plot <- plotly::plot_ly(cf_revenue_rgn_agg, x = ~year, y = ~value, color = ~rgn_name, type = "scatter", mode = "lines") %>% 
   layout(title = "All Regions: Yearly Revenue for the Marine Fishing Sector", 
@@ -513,6 +528,7 @@ cf_rev_plot
 ```
 
 ## Join with a "year" tibble df
+
 ```{r year_join}
 # make all geographic areas have the same date range (and fill missing values with NAs) to avoid problems downstream
 years_df <- tibble(rgn_name = cf_revenue_rgn_agg$rgn_name) %>% 
@@ -527,10 +543,13 @@ cf_revenue_yrs <- left_join(years_df, cf_revenue_rgn_agg,
 
 ```
 
-
 ## Heatmap before Gapfilling
 
-Typically, this would be used to visualize the data before and after gapfilling, to get a better picture of what areas needed to be filled and whether it was done correctly.  However, here we are taking from v2023's .csv that had already been gapfilled, so we are only going to visualize how well the gapfilling worked in this case.
+Typically, this would be used to visualize the data before and after
+gapfilling, to get a better picture of what areas needed to be filled
+and whether it was done correctly. However, here we are taking from
+v2023's .csv that had already been gapfilled, so we are only going to
+visualize how well the gapfilling worked in this case.
 
 ```{r interactive_heatmap}
 # make a df where the "status" of the data (present or not) is defined.  Here, it would be 
@@ -552,11 +571,15 @@ interactive_heatmap <- plotly::ggplotly(heatmap_plot)
 # interactive_heatmap
 ```
 
+It looks as though Norfolk Island may need to be cut, and a couple of
+other regions need to be gap filled now that we joined with a data frame
+of all possible years. Let's use a rule that we defined as a team, so
+that cutting regions is consistent across sectors.
+
 ## Cleaning for GF
 
-Rule in order to be preserved: 
-* must have at least one data point in the last five years & 
-* must have more than three data points over time
+Rule in order to be preserved: \* must have at least one data point in
+the last five years & \* must have more than three data points over time
 
 Otherwise, the region needs to be removed.
 
@@ -607,12 +630,18 @@ filtered_heatmap_df <- heatmap_df %>%
   filter(rgn_name %in% regions_to_keep)
 ```
 
-
 ## Gapfilling
 
-Here we'll use `na.approx()` from {zoo} to interpolate missing values and extrapolate missing extremes (NA values that do not fall between non-NA values) by copying the nearest extreme value. After speaking with Melanie Frazier about our methodology, she recommended to not fill in any values for countries with only 1 data point. If you choose to do this in future years, we've provided commented-out code following the chunk below for assessing how much of your data this impacts.
+Here we'll use `na.approx()` from {zoo} to interpolate missing values
+and extrapolate missing extremes (NA values that do not fall between
+non-NA values) by copying the nearest extreme value. After speaking with
+Melanie Frazier about our methodology, she recommended to not fill in
+any values for countries with only 1 data point. If you choose to do
+this in future years, we've provided commented-out code following the
+chunk below for assessing how much of your data this impacts.
 
-Since we already filtered out any region that does not adhere to the rule above, any regions left that have NAs can be gapfilled. 
+Since we already filtered out any region that does not adhere to the
+rule above, any regions left that have NAs can be gapfilled.
 
 ```{r}
 # estimate value for regions with missing data
@@ -632,8 +661,8 @@ value_filled <- filtered_heatmap_df %>%
 # for Saba, anything before 2011 was filled with the 2011 value.  The exact same thing happened for Bonaire and Sint Eustatius, which makes sense because those three were disaggregated and therefore it makes sense that they would have the same data availability, as they came from the same source.
 ```
 
-
 ### Heatmap to check gapfilling
+
 ```{r heatmap_check}
 heatmap_gf_df <- value_filled %>% 
   select(-c(value, status)) %>% 
@@ -656,8 +685,8 @@ interactive_heatmap_gf <- plotly::ggplotly(heatmap_gf)
 # YAY! it worked the way we wanted it to.  The heatmap is a solid color; there are only TRUEs, which indicates that there is a value present for every observation.
 ```
 
-
 ## Saving intermediate data
+
 ```{r}
 # columns should be: rgn_id, rgn_name, year, usd (previously value), unit, sector, usd_yr (in this case = year)
 
@@ -666,9 +695,7 @@ cf_revenue_int <- heatmap_gf_df %>%
          unit = "USD (1)",
          sector = "cf",
          usd_yr = year) %>% 
-  select(-appx_value)
+  select(-c(appx_value, status))
 
 # write_csv(cf_revenue_int, here(int_dir, "eco_cf_usd_pre.csv"))
 ```
-
-
