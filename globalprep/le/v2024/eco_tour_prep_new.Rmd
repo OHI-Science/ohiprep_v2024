@@ -78,14 +78,17 @@ librarian::shelf(
   here,
   countrycode,
   janitor,
-  terra,
-  readxl,
   RColorBrewer,
   foreach,
   doParallel, # for using multiple cores
   tidyverse, 
-  scales,
+  ggplot2,
+  tidyr,
+  dplyr,
+  readr,
+  readxl,
   httr,
+  scales,
   plotly,
   zoo # for gapfilling
   
@@ -227,13 +230,19 @@ v2024 notes/observations:
 ### Filter & Run OHI region name function
 
 ```{r}
-cutoff_year <- 2019 # update this depending on data updates
+# check that this is the intended stop/cutoff year
+stop_year
+#stop_year <- 2019 # update this depending on data updates
+
 # ---- Filter ----
 # set date range selection (rationale described in the paragraph below the previous plot)
 gdp_filter <- gdp_prop_yrs %>% 
-  filter(year <= cutoff_year)
+  filter(year <= stop_year)
 
 # ---- Run name_2_rgn -----
+# note: if we don't namespace from ohicore:: here, it'll use 
+# the local name_2_rgn function stored/defined in this file:
+# ~/ohiprep_v2024/globalprep/cw_trend_trash/v2016/georgn_gapfill.R
 gdp_rgn <- ohicore::name_2_rgn(df_in = gdp_filter, 
                       fld_name = "geo_area_name",
                       flds_unique = c("year"))
@@ -263,7 +272,7 @@ gdp_prop_agg <- gdp_filter %>%
 
 
 # ---- Run name_2_rgn again -----
-gdp_rgn_agg <- name_2_rgn(df_in = gdp_prop_agg, 
+gdp_rgn_agg <- ohicore::name_2_rgn(df_in = gdp_prop_agg, 
                           fld_name = 'geo_area_name',
                           flds_unique = c("year"))
 
@@ -367,7 +376,7 @@ Rules:
 ```{r}
 # define date range for filtering
 start_year <- 2008
-stop_year <- 2019 # previously "cutoff_year"
+stop_year <- 2019 
 date_range <- c(start_year:stop_year) # update this depending on your data!
 
 # create date range of the last 5 years (including most recent year)
@@ -488,6 +497,7 @@ plotly::ggplotly(macao_hk_heatmap)
 Here we'll use `na.approx()` from {zoo} to interpolate missing values and extrapolate missing extremes (NA values that do not fall between non-NA values) by copying the nearest extreme value. After speaking with Melanie Frazier about our methodology, she recommended to not fill in any values for countries with only 1 data point (or any that don't satisfy the other rules), which is why we're doing this step after filtering. 
 
 ```{r}
+
 # ---- Gapfilling ----
 # subset excluding China regions ----
 # estimate tourism GDP proportion for geo areas with missing data
@@ -557,18 +567,17 @@ prelim_plot_gf <- plot_ly(data = no_china_gf,
                           color = ~geo_area_name, 
                           type = "scatter", mode = "lines") %>% 
   # update layout: text, margins
-  layout(title = "Tourism direct GDP as a proportion of total GDP (%) for All Geo Regions (Gapfilled)",
+  layout(title = "Tourism direct GDP as a proportion of total GDP (%), Gapfilled \n (Exluding China, Macao & Hong Kong)",
          margin = m, # set margins
          xaxis = list(title = "Year"),
-         yaxis = list(title = "Tourism Contribution to GDP (%)"))
+         yaxis = list(title = "Tourism proportion of total GDP (%)"))
 
 # display plot
 prelim_plot_gf
 ```
 
-Now we can see that some lines are filled in where there used to be gaps. Others, like Aruba, seem to be filled in a way that doesn't seem appropriate for 2020. For this reason, and due to the greater complications of gapfilling data from 2020, we have decided to set the max year cap on this data to 2019. 
 
-In future years, when we have more data for 2020 and beyond, or if novel gapfilling techniques are used, we recommend not cutting off the data after 2019. Studying the impacts of the pandemic on tourism value and the economies subgoal as a whole is important and seems like a very interesting opportunity for future years' fellows.
+In future years, when we have more data for 2020 and beyond, or if novel gapfilling techniques are used (e.g., not linear fitting, as the 2019-2020 trend is an irregular pattern poorly suited to linear models), we recommend not cutting off the data after 2019. Studying the impacts of the pandemic on tourism value and the economies subgoal as a whole is important and seems like a very interesting opportunity for future years' fellows.
 
 
 
@@ -581,31 +590,34 @@ In future years, when we have more data for 2020 and beyond, or if novel gapfill
 
 
 ```{r}
-# find minimum year in tourism GDP % dataset for filtering:
-min_year <- min(gdp_rgn_agg$year)
+# use minimum (start) year in tourism GDP % dataset for filtering:
+# start_year 2008
+# stop_year 2019 
+# date_range 2008:2019
 
 # ---- cleaning WorldBank GDP data ----
 wb_gdp_clean <- wb_gdp_raw %>% 
-  clean_names() %>% 
+  janitor::clean_names() %>% 
   # remove unwanted columns
-  select(-c(indicator_code, x69)) %>% 
+  dplyr::select(-c(indicator_code, x69)) %>% 
   # pivot to put years in 1 column, values in another
-  pivot_longer(cols = x1960:x2023, names_to = "year", values_to = "gdp_value") %>% 
+  tidyr::pivot_longer(cols = x1960:x2023, # update if new data downloaded
+                      names_to = "year", values_to = "gdp_value") %>% 
   # tidy up year column
-  mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  
+  dplyr::mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  
   # filter to date range
-  filter(year %in% c(min_year:cutoff_year))
+  dplyr::filter(year %in% c(date_range))
 
 ```
 
 ### Next steps:
 
--  create subset of GDP data without china, hong kong, or macao
--  run `name_2_rgn` function on this, make necessary adjustments
--  then join with `no_mc_hk_subset`, call it `no_china_join`
+-  create subset of GDP data without China, Hong Kong, or Macao: `no_china_gdp`
+-  run `name_2_rgn` function on this, make necessary adjustments: `nc_gdp_rgn`, final post-aggreagtion and adjustments: `nc_gdp_rgn_agg`
+-  then join with gapfilled, filtered, no-china dataframe `no_china_gf`; call this `no_china_join`
 -  calculate usd tourism value for `no_china_join`. call this `nc_tourism_value`
 
--  join china_gdp (china subset of GDP data) with macao_hk_subset (gdp proportion subset of Macao and Hong Kong)
+-  create China subset of GDP data `china_gdp`, join with `macao_hk_gf` (gdp proportion subset of Macao and Hong Kong, gapfilled)
 -  calculate value (will be in Constant 2015 US$)
 -  call this `macao_hk_value`
 - join `china_usd_value` with `macao_hk_value`, drop irrelevant columns etc. 
@@ -623,20 +635,22 @@ Now we'll prep to join our GDP and % GDP data frames by first making a subset wi
 ```{r nc_rgn_agg}
 # ---- make subset excluding China ----
 no_china_gdp <- wb_gdp_clean %>% 
-  filter(!stringr::str_detect(country_name, "China"))
+  # this works because Macao, Hong Kong, and mainland China all have "China" 
+  # in their country_name designations in this dataset
+  dplyr::filter(!stringr::str_detect(country_name, "China"))
 
 # check
-nrow(no_china_gdp %>% filter(stringr::str_detect(country_name, "China")))
+nrow(no_china_gdp %>% dplyr::filter(stringr::str_detect(country_name, "China")))
 # should be 0
 
 
 # ---- run name_2_rgn ----
 # nc = no china
-nc_gdp_rgn <- name_2_rgn(df_in = no_china_gdp, 
+nc_gdp_rgn <- ohicore::name_2_rgn(df_in = no_china_gdp, 
                          fld_name = "country_name",
                          flds_unique = c("year"))
 
-# thankfully, in the list following this line: "These data were removed for not having any match in the lookup tables:", there are mostly just the WorldBank aggregate groups (i.e., "low & middle income, Latin America & Caribbean, etc.), with the exception of Channel Islands and Isle of Man
+# thankfully, in the list following this line: "These data were removed for not having any match in the lookup tables:", there are mostly just the WorldBank aggregate groups (i.e., "low & middle income, Latin America & Caribbean, etc.), with the exception of Channel Islands (has all NA) and Isle of Man
 
 # don't make the mistake I did, and check your tourism dataset to see if it has Channel Islands, Jersey, or Guernsey first! 
 # it doesn't, so we can continue on since the name_2_rgn function helpfully removed this data from the GDP data frame already.
@@ -667,13 +681,12 @@ nc_gdp_rgn_agg <- nc_gdp_rgn %>%
                                      "Virgin Islands (U.S.)") # similarly, filtering out U.S. Virgin Islands. Only do this if the data continues to have the gaps addressed above.
   ) %>% 
   dplyr::group_by(rgn_id, rgn_name, year) %>%
-  dplyr::summarize(gdp_value_agg = sum(gdp_value, na.rm = TRUE) 
-  ) %>%
+  dplyr::summarize(gdp_value_agg = sum(gdp_value, na.rm = TRUE)) %>%
   dplyr::ungroup() %>% 
   # turn 0s into NAs (appropriate flag for lack of data, as earlier sum(na.rm = TRUE) step obscured NAs)
   dplyr::mutate(gdp_value_agg = case_when(
-    gdp_value_agg == 0 ~ NA,
-    .default = gdp_value_agg
+    gdp_value_agg == 0 ~ NA, # replace 0 with NA
+    .default = gdp_value_agg # maintain all other values
   ))
 
 # ---- aggregation check ----
@@ -699,18 +712,18 @@ if (sum(agg_nmi_check$gdp_value_agg == agg_nmi_check$gdp_value) == length(unique
 
 # If "No", check which don't match
 # print(paste((agg_nmi_check$gdp_value_agg == agg_nmi_check$gdp_value)))
-
+# use FALSEs for indexing
 
 ```
 
 
 
-
-Great! Now we're ready to join with the tourism as a proportion of total GDP subset that excludes China. We'll then multiply the percent of GDP by the GDP to yield a value (in constant 2015 USD)
+Great! Now we're ready to join with the tourism as a proportion of total GDP subset that excludes China. 
+We'll then multiply the percent of GDP by the GDP to yield a value (in constant 2015 USD)
 
 ```{r nc_tourism_value}
 # ---- join GDP Value (constant 2015 US$) with Tourism GDP % ----
-no_china_join <- dplyr::full_join(nc_gdp_rgn_agg, no_mc_hk_subset,
+no_china_join <- dplyr::full_join(nc_gdp_rgn_agg, no_china_gf,
                                   by = join_by("rgn_id", "rgn_name", "year"))
 # note that because we preserved the `geo_area_name` column, we can see which country is the true representative of the aggregate based on our steps above (e.g., Puerto Rico is the geo_area_name value for the Puerto Rico and US Virgin Islands rgn_name rows)
 
@@ -731,8 +744,17 @@ nc_tourism_value <- no_china_join %>%
 #summary(nc_tourism_value)
 ```
 
+## Tourism Value: China (including Macao and Hong Kong)
 
-### China subset
+-   create China subset of GDP data: `china_gdp`
+    -   filter to only include Hong Kong and Macao: `macao_hk_gdp`
+-   join with `macao_hk_gf` (gapfilled, filtered gdp proportion subset with only Macao and Hong Kong): `macao_hk_join`
+-   calculate value (will be in Constant 2015 US$): `macao_hk_value`
+-   join `china_usd_value` with `macao_hk_value`, drop irrelevant columns etc.: call this `china_value`
+
+
+### China subset of WB GDP
+
 
 Remember that China subset we made out of the Macao and Hong Kong data? Now we're going to join that with a subset of the global country-level GDP data to find the tourism value for these areas. We will then join this data frame with the China tourism value data we read in earlier (which we will clean & tidy first) and finally aggregate the values to yield one value per year for China as a region.
 
@@ -750,14 +772,14 @@ unique(china_gdp$country_name)
 # ----- Prep for joining with Macao + Hong Kong subset ----
 # drop "China" rows
 macao_hk_gdp <- china_gdp %>% 
-  filter(country_name != "China")
+  filter(country_name != "China") # don't need this, as our China data is already in tourism value format
 
 # check
 unique(macao_hk_gdp$country_name)
 
 
 # ---- Join Macao + HK subsets ----
-macao_hk_join <- left_join(macao_hk_subset, macao_hk_gdp,
+macao_hk_join <- left_join(macao_hk_gf, macao_hk_gdp,
                            by = c("year", "geo_area_name" = "country_name"))
 
 
@@ -768,11 +790,13 @@ macao_hk_value <- macao_hk_join %>%
   mutate(tour_value = (appx_gdp_pct / 100) * gdp_value) %>% 
   # select relevant columns
   select(geo_area_name, year, tour_value)
+# remember: the unit of this value is in constant 2015 US$ 
 ```
 
+Plot to visualize Macao & Hong Kong Tourism Value
 
 ```{r}
-# Exploratory plot of Macao & Hong Kong tourism value
+# ---- Exploratory plot of Macao & Hong Kong tourism value ----
 library(scales)
 ggplot(data = macao_hk_value, 
        aes(x = as.numeric(year), 
@@ -780,21 +804,23 @@ ggplot(data = macao_hk_value,
            color = geo_area_name)) +
   geom_point() +
   geom_line() +
-  scale_x_continuous(breaks = c(seq(min(tour_val_subset$year),
-                                    max(tour_val_subset$year), 1))) +
+  scale_color_viridis_d(begin = 0.0, end = 0.7) +
+  scale_x_continuous(breaks = c(date_range)) +
   # make y-axis more legible
   scale_y_continuous(labels = scales::label_currency(scale = 0.000000001,
                                                      suffix = "B",
                                                      # $30.00B --> $30B
                                                      scale_cut = cut_long_scale())) +
   theme_bw() +
+  # update labels
   labs(title = paste0("Tourism Value in Hong Kong & Macao ", "(",
-                      min(tour_val_subset$year),
-                      "-", max(tour_val_subset$year), ")"),
+                      start_year,
+                      "-", stop_year, ")"),
        subtitle = "Data Sources: UNWTO, World Bank",
        x = "Year",
        y = "Tourism Value (Constant 2015 US$)",
        color = "Region") +
+  # customize theme elements
   theme(
     axis.text.x = element_text(angle = 45, vjust = 0.8, hjust = 0.9),
     axis.title.x = element_text(margin = margin(t = 1.2, b = 0.2, unit = "lines")),
@@ -807,16 +833,18 @@ ggplot(data = macao_hk_value,
 
 
 ### China Tourism Value
+Overview: 
 
-- clean & tidy China Tourism Value dataset 
-- clean column names
-- select relevant categories (earnings from international and domestic tourism) and columns (indicators, year columns)
-- pivot data from wide to long so that `tour(ism)_value` observations are in one column and `year` is in another columns (each row should be 1 observation -- with indicator, year, and earnings)
-- clean up the new `year` column
-- filter to date range specified earlier (`min_year` and `cutoff_year`)
+-   clean & tidy China Tourism Value dataset 
 
-- convert tourism value (earnings) to a standardized format (we'll go over this in more detail later)
-- prep for joining with China subset (Macao + Hong Kong) of tourism value data 
+    -   clean column names
+    -   select relevant categories (earnings from international and domestic tourism) and columns (indicators, year columns)
+    -   pivot data from wide to long so that `tour(ism)_value` observations are in one column and `year` is in another columns (each row should be 1 observation -- with indicator, year, and earnings)
+    -   clean up the new `year` column
+    -   filter to date range specified earlier (`start_year` and `stop_year`)
+
+-   convert tourism value (earnings) to a standardized format (we'll go over this in more detail later)
+-   prep for joining with China subset (Macao + Hong Kong) of tourism value data 
 
 ```{r}
 # ---- clean names ----
@@ -825,20 +853,22 @@ nbsc_clean <- nbsc_raw %>%
 
 # get strings for subcategories of tourism data we're looking for (international and domestic tourism earnings)
 #unique(nbsc_clean$indicators)
-tourism_categories <- c("Foreign Exchange Earnings from International Tourism(USD million)", "Earnings from Domestic Tourism(100 million yuan)")
-# here we can see that these values are in different units. We'll want to standardize them to USD, then to Constant 2015 US$ (what the GDP data is in)
+tourism_categories <- c("Foreign Exchange Earnings from International Tourism(USD million)",
+                        "Earnings from Domestic Tourism(100 million yuan)")
+# here we can see that these values are in different units. 
+# We'll want to standardize them to USD, then to Constant 2015 US$ (what the GDP data is in)
 
 # but first, let's tidy up the data! 
 
 # ---- tidy ----
 nbsc_tidy <- nbsc_clean %>% 
-  filter(indicators %in% c(tourism_categories)) %>% 
-  pivot_longer(cols = x2023:x2004, # update this depending on year range of newly downloaded data
+  dplyr::filter(indicators %in% c(tourism_categories)) %>% 
+  tidyr::pivot_longer(cols = x2023:x2004, # update this depending on year range of newly downloaded data
                names_to = "year", values_to = "tour_value") %>% 
   # tidy up year column
-  mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  
+  dplyr::mutate(year = as.numeric(str_remove_all(year, 'x'))) %>%  
   # filter to date range defined earlier
-  filter(year %in% c(min_year:cutoff_year))
+  dplyr::filter(year %in% c(date_range))
 ```
 
 
@@ -849,10 +879,10 @@ Tried to get the conversion rates in a reproducible way:
 - documentation/repo for {priceR} : <https://github.com/stevecondylios/priceR?tab=readme-ov-file>
 
 
-```{r}
+```{r test-conversion-packages, eval=FALSE}
 # ---- quantmod ----
 # library(quantmod)
-# cny_rates_test <- quantmod::getFX("CNY/USD" #, from = paste0(min_year, "-01-01"), to = paste0(cutoff_year, "-12-31")
+# cny_rates_test <- quantmod::getFX("CNY/USD" #, from = paste0(start_year, "-01-01"), to = paste0(stop_year, "-12-31")
 #                                   )
 # cny_rates_test
 
@@ -861,7 +891,7 @@ Tried to get the conversion rates in a reproducible way:
 #Sys.setenv("EXCHANGERATEHOST_ACCESS_KEY"="7e5e3140140bd8e4f4650cc41fc772c0")
 ## get Chinese Yuan to USD conversion rates for time range
 # cny_conversion_rate <- priceR::historical_exchange_rates(from = "CNY", to = "USD",
-#                           start_date = paste0(min_year, "-01-01"), end_date = paste0(cutoff_year, "-12-31"))
+#                           start_date = paste0(start_year, "-01-01"), end_date = paste0(stop_year, "-12-31"))
 
 ## returned the following error:
 # Error in `pmap()`:
@@ -886,7 +916,7 @@ According to the US Bureau of Labor Statistics, \$1 USD in June 2024 has the sam
 
 ```{r standardize_china_value}
 # 100 million yuan = 13,778,100.00 (USD)
-h_mil_cny_to_usd <- 13778100
+h_mil_cny_to_usd <- 13778100 # update this appropriately, or ideally find a reproducible conversion rate method and implement
 
 # convert Chinese Yuan to USD
 nbsc_usd <- nbsc_tidy %>% 
@@ -942,10 +972,10 @@ china_usd_value <- nbsc_usd_adjusted %>%
 ggplot(data = china_usd_value, 
        aes(x = as.numeric(year), 
            y = usd)) +
+  # pulled hexcode from Chinese flag
   geom_point(color = "#EE1C25") +
   geom_line(color = "#EE1C25") +
-  scale_x_continuous(breaks = c(seq(min(tour_val_subset$year),
-                                    max(tour_val_subset$year), 1))) +
+  scale_x_continuous(breaks = c(date_range)) +
   # make y-axis more legible
   scale_y_continuous(labels = scales::label_currency(scale = 0.000000001,
                                                      suffix = "B"
@@ -956,8 +986,8 @@ ggplot(data = china_usd_value,
   theme_bw() +
   # adjust labels
   labs(title = paste0("Tourism Value in mainland China ", "(",
-                      min(tour_val_subset$year),
-                      "-", max(tour_val_subset$year), ")"),
+                      start_year,
+                      "-", stop_year, ")"),
        subtitle = "Data Sources: UNWTO, World Bank",
        x = "Year",
        y = "Tourism Value (Constant 2015 US$)") +
@@ -972,10 +1002,11 @@ ggplot(data = china_usd_value,
   )
 ```
 
-Here we can see that China's earnings from tourism far exceed any of the values we've seen before, surpassing 1.6 Trillion by 2019. These numbers will be slightly higher once we add on the values for Macao and Hong Kong (likely no more than 50 Billion or so).
+Here we can see that China's earnings from tourism far exceed any of the values we've seen before, surpassing 1.6 Trillion by 2019. These numbers will be slightly higher once we add on the values for Macao and Hong Kong (likely no more than an added 50 Billion or so).
 
+#### China Join
 
-Now we can join this newly created China tourism value data frame with the `macao_hk_value` data frame of tourism value (in Constant 2015 USD). Then, we'll run `name_2_rgn` and aggregate values to get combined tourism values for China as an OHI region.
+Now we can join this newly created China tourism value data frame with the `macao_hk_value` data frame of tourism value (in Constant 2015 USD). Then, we'll run `name_2_rgn` and aggregate values to get combined tourism values for China as an OHI region. We'll call this `china_agg`.
 
 ```{r}
 # ---- join ----
@@ -996,16 +1027,16 @@ china_rgn <- ohicore::name_2_rgn(
 
 # ---- aggregate for OHI region cohesion ----
 china_agg <- china_rgn %>% 
-  ungroup() %>% 
-  group_by(rgn_name, rgn_id, year) %>% 
-  summarize(tour_value = sum(usd, na.rm = T)) %>% 
-  mutate(rgn_id = as.character(rgn_id)) # fix data type
+  dplyr::ungroup() %>% 
+  dplyr::group_by(rgn_name, rgn_id, year) %>% 
+  dplyr::summarize(tour_value = sum(usd, na.rm = T)) %>% 
+  dplyr::mutate(rgn_id = as.character(rgn_id)) # fix data type
 
 ```
 
 Great! Now we're ready to reunite this china tourism value data with the rest of our tourism value data :) 
 
-
+### Full Tourism Value
 
 ```{r}
 # ---- joining china + no china dfs ----
@@ -1017,7 +1048,7 @@ tourism_value <- full_join(nc_tourism_value, china_agg,
 ```
 
 
-#### Preliminary Plotting
+#### Exploratory plots
 
 **Static plot**
 
