@@ -1085,54 +1085,52 @@ ggplot(data = tour_val_subset,
 ```
 
 
-We can see that the scale of tourism value in China and the US dwarf all other countries' values. This is obviously a fairly rudimentary (and not very helpful or informative) plot.
-It is  tedious to have to refer back to a table of the region IDs to understand which region is which, and is overall what I would call a "spaghetti plot". 
-Let's use an interactive plot to more usefully visualize what's going on with the data in subsets with and without US & China.
+We can see that the scale of tourism value in China dwarfs all other countries' values. This is obviously a fairly rudimentary (and not very helpful or informative) plot.
+It is tedious to have to refer back to a table of the region IDs to understand which region is which, and is overall what I would call a "spaghetti plot". 
+Let's use an interactive plot to more usefully visualize what's going on with the data in a subset without the USA.
 
 
 **Interactive plot**
 
-```{r}
+```{r scrapped-china-usa-plot, eval=FALSE}
 # ---- exploratory plotting: interactive ----
 
-# ---- China + USA subset ----
-# with China + USA
-chn_usa <- tourism_value %>% 
-  filter(rgn_name %in% c("China", "United States")) %>% 
-  ungroup() # lines have a tendency to not show up in plotly if the data is grouped
-
-# without China or USA
-no_chn_usa <- tourism_value %>% 
-  filter(!rgn_name %in% c("China", "United States")) %>% 
+no_china_value <- tour_val_subset %>% 
+  filter(!rgn_name %in% c("China")) %>% 
   ungroup()
 
-# set margins
-m <- list(
-  l = 80,
-  r = 80,
-  b = 80,
-  t = 80,
-  pad = 4
-)
+# ---- China subset ----
+# with China 
+# chn_usa <- tourism_value %>% 
+#   filter(rgn_name %in% c("China"
+#                          #, "United States" # filtered out earlier due to lack of data
+#                          )) %>% 
+#   ungroup() # lines have a tendency to not show up in plotly if the data is grouped
+# 
+# # without China or USA
+# no_chn_usa <- tourism_value %>% 
+#   filter(!rgn_name %in% c("China"
+#                           #, "United States"
+#                           )) %>% 
+#   ungroup()
+# 
+# # ---- create updated interactive plot ----
+# chn_plotly <- plotly::plot_ly(data = chn_usa,
+#                                   x = ~year,
+#                                   y = ~tour_value,
+#                                   color = ~rgn_name,
+#                                   type = "scatter", mode = "lines") %>% 
+#   layout(title = "Tourism Value",
+#          margin = m,
+#          xaxis = list(title = "Year"),
+#          yaxis = list(title = "Tourism Value (2015 US$)")
+#   ) 
+# 
+# chn_plotly
 
-# ---- create updated interactive plot ----
-# COME BACK -- not sure why plot lines aren't showing
-chn_usa_plotly <- plotly::plot_ly(data = chn_usa,
-                                  x = ~year,
-                                  y = ~tour_value,
-                                  color = ~rgn_name,
-                                  type = "scatter", mode = "lines") %>% 
-  layout(title = "Tourism Value",
-         margin = m,
-         xaxis = list(title = "Year"),
-         yaxis = list(title = "Tourism Value (2015 US$)")
-  ) 
 
-chn_usa_plotly
-
-
-
-no_chn_usa_plotly <- plotly::plot_ly(data = no_chn_usa,
+# ---- Plot wihtout China ----
+no_china_plotly <- plotly::plot_ly(data = no_china_value,
                                      x = ~year,
                                      y = ~tour_value,
                                      color = ~rgn_name,
@@ -1143,10 +1141,8 @@ no_chn_usa_plotly <- plotly::plot_ly(data = no_chn_usa,
          yaxis = list(title = "Tourism Value (2015 US$)")
   ) 
 
-no_chn_usa_plotly
+no_china_plotly
 ```
-
-
 
 
 ```{r}
@@ -1158,11 +1154,13 @@ tourism_value %>%
 
 prettyNum(max_tour_val,big.mark = ",", scientific = FALSE)
 
-# 582 billion in US in 2019... out of 20 Trillion GDP
+# 1.69 trillion in China in 2019 out of 14.28 trillion total GDP
 ```
 
 
 # Saving intermediate data 
+
+Prep for saving & save to `int` folder
 
 ```{r}
 #--------Prepping data for int saving -------
@@ -1172,6 +1170,7 @@ tour_revenue_int <- tourism_value %>%
   mutate(
     unit = "USD (1)",
     sector = "tour",
+    # used in the inflation adjustment calculation downstream
     usd_yr = 2015 # because the tourism values are in "Constant 2015 US$"
   ) %>% 
   select(rgn_id, rgn_name, year, usd, unit, sector, usd_yr) %>% 
