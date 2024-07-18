@@ -530,12 +530,7 @@ heatmap <- ggplot(mar_heatmap, aes(x = year, y = rgn_name, fill = as.factor(stat
 
 heatmap
 
-```
-
-## Finish up and write out .csv  
-
-```{r}
-# Doing some final data prep so that we have both the raw gapfilled data as well as the oen that we're writing out 
+# Doing some data prep so that we have both the raw gapfilled data as well as the one that we're writing out ----
 eco_mar_usd_write <- eco_mar_usd_gf %>% 
   select(-usd) %>% 
   rename(usd = appx_usd) %>% 
@@ -544,8 +539,66 @@ eco_mar_usd_write <- eco_mar_usd_gf %>%
 # Gut check ---- 
 check <- is.na(eco_mar_usd_write$usd)
 summary(check) # Cool no NAs
+```
+
+## Weighting by Developed vs Developing Country 
+
+Refer to the OHI Methods or [Ben Halpern's Supplementary Information](https://static-content.springer.com/esm/art%3A10.1038%2Fnature11397/MediaObjects/41586_2012_BFnature11397_MOESM79_ESM.pdf) **(page 29)** for the multipliers to apply towards revenue values by sector for developing versus developed countries. For mariculture revenue, the multipliers are 1.59 for developing countries and 2.377 for developed countries.
+
+```{r}
+# Finally: Applying the multiplier to mariculture for developed versus developing countries ----
+# Setting filepath to unsd data on developing versus developed countries 
+fp_unsd <- file.path(dir_M,"git-annex/globalprep/_raw_data/UNSD/d2024/historical-classification-of-developed-and-developing-regions.xlsx")
+
+# Reading in unsd data 
+unsd_class <- read_excel(fp_unsd,col_names=TRUE, sheet = "Distinction as of May 2022") %>% 
+  janitor::clean_names()
+
+# Reading in OHI Regions data for gut checks/individual country checks 
+ohi_regions <- readr::read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  janitor::clean_names() %>% 
+  dplyr::select(-notes)
+
+# Fixing a couple of the countries that are present under different synonyms in the unsd dataset OR Duplicated. Do this AFTER running name_2_rgn!!! 
+unsd_class_fix <- unsd_class %>% 
+  mutate(country_or_area = case_when(
+  country_or_area == "Bonaire, Sint Eustatius and Saba" ~ "Sint Eustasius",
+  country_or_area == "China, Hong Kong Special Administrative Region" ~ "China",
+  country_or_area == "China, Macao Special Administrative Region" ~ "China",
+  country_or_area == "Åland Islands" ~ "Finland",
+  TRUE ~ country_or_area
+  ))
+
+# Using name to rgn function to assign rgn_id to country names 
+class_temp <- ohicore::name_2_rgn(df_in = unsd_class_fix, 
+                       fld_name='country_or_area')
+
+# Identifying duplicates  
+duplicates <- class_temp[duplicated(class_temp$country_or_area), ]
+
+# Removing countries with duplicated rgn_id by using their iso2 code 
+class_temp <- class_temp %>% 
+  dplyr::filter(!iso_alpha2_code %in% c("HK", "MO", "AX")) %>% 
+  dplyr::select(rgn_id, rgn_name, developed_developing_regions)
+
+# Left joining the new developed/developing country classes to their respective rgn_id
+eco_mar_usd_class <- eco_mar_usd_write %>% 
+  left_join(y = class_temp, by = c("rgn_id"))
+
+# Removing unecessary columns from the joined df
+eco_mar_usd_class <- eco_mar_usd_class %>% 
+  dplyr::select(-c(rgn_name.y))
+
+# Applying weights to mariculture revenue data -----
+eco_mar_usd_final <- eco_mar_usd_class %>% 
+  mutate(usd_weighted = ifelse(developed_developing_regions == "Developing", usd*1.59, usd*2.377))
+
+# Tidying up data for export to the 'int' folder 
+eco_mar_usd_final <- eco_mar_usd_final %>% 
+  mutate(usd = usd_weighted) %>% 
+  select(-c(usd_weighted, developed_developing_regions))
 
 # Writing out csv FINALLY -----
-# write_csv(eco_mar_usd_write, here::here(data_path, "int", "eco_mar_usd_pre.csv"))
+# write_csv(eco_mar_usd_final, here::here(data_path, "int", "eco_mar_usd_pre.csv"))
 ```
 
