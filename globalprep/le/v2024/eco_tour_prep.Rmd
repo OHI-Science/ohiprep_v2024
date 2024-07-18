@@ -740,14 +740,17 @@ nc_tourism_value <- no_china_join %>%
 
 ## Tourism Value: China (including Macao and Hong Kong)
 
+**Overview**
+
 -   create China subset of GDP data: `china_gdp`
     -   filter to only include Hong Kong and Macao: `macao_hk_gdp`
 -   join with `macao_hk_gf` (gapfilled, filtered gdp proportion subset with only Macao and Hong Kong): `macao_hk_join`
 -   calculate value (will be in Constant 2015 US$): `macao_hk_value`
 
 -   clean & tidy China gapfill dataset from National Bureau of Statistics of China
+  -   pivot from wide to long (years columns --> year column), clean again
   -   convert values to standard from GDP dataset -- constant 2015 USD
--   join `china_usd_value` with `macao_hk_value`, drop irrelevant columns etc.: call this `china_value`
+-   join `china_usd_value` with `macao_hk_value`, drop irrelevant columns etc. and aggregate across `rgn_name` (China): call this `china_value`
 
 
 ### China subset of WB GDP

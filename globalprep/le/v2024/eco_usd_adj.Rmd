@@ -141,6 +141,7 @@ eco_usd_filter <- eco_usd_bind %>%
 
 
 # make all geographic areas have the same date range (and fill missing values with NAs)
+# note: this should also be done upstream, as the sector region should not be NA (important for later aggregation, function implementation)
 eco_years_df <- tibble(rgn_name = eco_usd_filter$rgn_name,
                        rgn_id = eco_usd_filter$rgn_id) %>% 
   group_by(rgn_id, rgn_name) %>% 
@@ -157,10 +158,10 @@ Join with OHI regions before aggregating by region for all sectors
 
 ```{r}
 # ------------ join with OHI Regions to make clear which regions do not have any data -----
-region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
-  select(-Notes)
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>%
+  select(-Notes) # drop notes column
 
-# ---- join with years df ----
+# ---- join OHI regions with years df ----
 rgn_yr_df <- tibble(rgn_name = region_names$rgn_name,
                        rgn_id = region_names$rgn_id) %>% # take the regions from region_names, which is all of the regions, even the ones we dont have data for
   group_by(rgn_id, rgn_name) %>% 
@@ -205,7 +206,12 @@ agg_heatmap_plot <- ggplot(data = agg_test_sum) +
   geom_tile(aes(x = year,
                 y = rgn_name,
                 fill = as.factor(data_status)), color = "black") +
-  scale_fill_manual(values = c("white", "#AACAF9", "#5594F2", "#005FEC", "darkblue"), na.value = "grey") +
+  scale_fill_manual(values = c("white", # 0
+                               "#AACAF9", # 1
+                               #"#5594F2",
+                               "#005FEC", # 2
+                               "darkblue"), # 3
+                    na.value = "grey") +
   labs(y = "", 
        x = "Year",
        title = "Number of Sectors with Data per Region per Year",
