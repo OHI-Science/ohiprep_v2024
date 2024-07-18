@@ -208,141 +208,36 @@ fao_new <- fao_new %>%
 
 # Filter to only marine habitats
  mariculture_revenue <- fao_new %>% 
-   filter(environment %in% c("Brackishwater", "Marine"))
-
-new.spp <- setdiff(mariculture_revenue$species, mar_sp$FAO_name)
-
-new.spp # I suppose there are 17 new species in the 2024 data 
-
-## Adding new species to species_list.csv ----
-mar_sp <- read.csv(here::here('globalprep/mar/v2023/raw/species_list.csv'), stringsAsFactors=FALSE) %>%
-  select(FAO_name, exclude,Taxon_code, family, notes, notes_2)
-
-# Species to add: 
-FAO_names = c("Tarpon Snook", 
-              "Clown crab", 
-              "Coarse shrimp", 
-              "Freshwater crustaceans nei", 
-              "Whiskered velvet shrimp",
-              "Hard clams nei", 
-              "Bonefish", 
-              "Mexican spiny lobster", 
-              "Mojarras, etc. nei", 
-              "Northern brown shrimp", 
-              "Sea catfishes nei", 
-              "Smalleyed squillid mantis shri", 
-              "Fine flounder", 
-              "Ascidiaceans", 
-              "Red king crab", 
-              "Truncate donax", 
-              "White grouper")
-
-exclude = c(0, 
-            1,
-            1,
-            1,
-            1,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-            )
-
-Taxon_codes = c("F",
-                "CRUST",
-                "CRUST",
-                "CRUST",
-                "CRUST",
-                "BI",
-                "F",
-                "CRUST",
-                "F",
-                "CRUST",
-                "F",
-                "CRUST",
-                "F",
-                "TUN",
-                "CRUST",
-                "BI",
-                "F"
-                )
+   filter(environment %in% c("Brackishwater", "Marine")) %>% 
+   mutate(species = case_when(
+     species == "Mexican spiny loster" ~ "Mexican spiny lobster",
+     TRUE ~ species
+   ))
  
-families = c("Centropomidae",
-             "Xanthidae",
-             "Penaeidae",
-             "Crustaceans",
-             "Penaeidae",
-             "Veneridae",
-             "Albulidae",
-             "Palinuridae",
-             "Gerreidae",
-             "Penaeidae",
-             "Ariidae",
-             "Odontodactylidae",
-             "Paralichthyidae",
-             "Pyuridae",
-             "Lithodidae",
-             "Donacidae.",
-             "Serranidae"
-             )
-
-notes = c(NA,
-          NA,
-          "Not fully certain, but species distribution adds up.",
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA
-          )
-
-notes2 = c(NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA
-          )
-
-new_spp_add <- tibble(FAO_name = FAO_names, exclude = exclude, Taxon_code = Taxon_codes, family = families, notes = notes, notes_2 = notes2)
-
-new_spp_add <- new_spp_add %>% 
-  mutate(notes_2 = as.character(notes_2))
-
-mar_sp_2 <- mar_sp %>% rbind(new_spp_add)
-
-write.csv(mar_sp_2, here::here('globalprep/mar/v2023/raw/species_list.csv'))
-
-mar_sp <- read.csv(here::here('globalprep/mar/v2023/raw/species_list.csv'), stringsAsFactors=FALSE) %>%
-  select(FAO_name, exclude,Taxon_code, family, notes, notes_2)
+# 
+# mar_sp <- read.csv(here::here('globalprep/mar/v2023/raw/species_list.csv'), stringsAsFactors=FALSE) %>%
+#   select(FAO_name, exclude,Taxon_code, family, notes, notes_2)
+# 
+# mar_sp_fix <- read.csv(here::here('globalprep/mar/v2022/raw/species_list.csv'), stringsAsFactors=FALSE)
+# 
+# new.spp <- setdiff(mariculture_revenue$species, mar_sp$FAO_name)
+# 
+# new.spp # I suppose there are 17 new species in the 2024 data
+# 
+# 
+# 
+# mariculture_revenue <- mariculture_revenue %>%
+#   dplyr::rename(FAO_name = species)
+# 
+# mar_test <- mariculture_revenue %>% left_join(mar_sp, by="FAO_name")
+# 
+# mar_test <- mariculture_test %>% dplyr::filter(exclude < 1)
+# 
+# mar_test <- mar_test %>%
+#   dplyr::mutate(include = 1 - exclude)
+# 
+# mar_test <- mar_test %>%
+#   mutate(value_include = value*include)
 
 # Sum by region and year (we need total revenue)
 total_mar_rev <- mariculture_revenue %>%
@@ -579,7 +474,23 @@ duplicates <- eco_mar_usd_raw[duplicated(eco_mar_usd_raw[, c('rgn_id','year')]),
 ## Find out which countries can be gapfilled versus the countries that cant be
 
 ```{r}
-# For 2024: The countries that can be gapfilled are: 
+# For 2024: The countries that can be gapfilled are: Yemen, Uruguay, Togo, Sint Eustatius, Seychelles (needs > three data points over time), Qatar, Puerto Rico, Poland, Libya, Jordan, Falkland Islands, Estonia, Dominica, Curacao, Cape Verde
+
+eco_mar_usd_raw_cut <- eco_mar_usd_raw %>% 
+  filter(!rgn_name %in% c("Yemen", "Uruguay", "Togo", "Sint Eustacius", "Seychelles", "Qatar", "Puerto Rico and Virgin Islands of the United States", "Poland", "Libya", "Jordan", "Falkland Islands", "Estonia", "Dominica", "Curacao", "Cape Verde"))
+
+mar_heatmap <- eco_mar_usd_raw_cut %>% 
+  mutate(status = case_when(
+    usd == 0 ~ FALSE,
+    usd > 0 ~ TRUE
+  )) %>% 
+  filter(year %in% 2009:2019)
+heatmap <- ggplot(mar_heatmap, aes(x = year, y = rgn_name, fill = as.factor(status))) + 
+  geom_tile(color = "black") + 
+  scale_fill_manual(values = c("darkgrey", "lightgreen")) + 
+  theme_bw()
+
+heatmap
 ```
 
 
@@ -590,16 +501,31 @@ Here we'll use `na.approx()` from {zoo} to interpolate missing values and extrap
 ```{r}
 # gapfilling ----
 # estimate tourism GDP proportion for geo areas with missing data
-gdp_filled <- gdp_prop_yrs %>% 
-  group_by(geo_area_name) %>% 
+eco_mar_usd_gf <- eco_mar_usd_raw_cut %>% 
+  group_by(rgn_name) %>% 
   # interpolate (fill missing values between 2 values)
-  mutate(appx_gdp_pct = zoo::na.approx(gdp_prop_percent, # using values in this column
+  mutate(appx_usd = zoo::na.approx(usd, # using values in this column
                                        na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
                                        #  extrapolate using rule = 2 from approx(),
                                        # which uses closest data extreme to
                                        #  extrapolate for leading and trailing NAs
                                        rule = 2
   ))
+
+mar_heatmap <- eco_mar_usd_gf %>% 
+  mutate(status = case_when(
+    appx_usd == 0 ~ FALSE,
+    appx_usd > 0 ~ TRUE
+  )) %>% 
+  filter(year %in% 2009:2019)
+
+heatmap <- ggplot(mar_heatmap, aes(x = year, y = rgn_name, fill = as.factor(status))) + 
+  geom_tile(color = "black") + 
+  scale_fill_manual(values = c("darkgrey", "lightgreen")) + 
+  theme_bw()
+
+heatmap
+
 ```
 
 ## Finish up and write out .csv  
