@@ -1282,12 +1282,74 @@ usa_check_subset <- usa_coastal_adj %>%
   select(year, coastal_tour_gdp, coastal_tour_value)
 
 if (usa_check_subset$coastal_tour_gdp == usa_check_subset$coastal_tour_value) {
-  print(paste("Values have been successfully adjusted to", usa_check_subset$year, "USD."))
+  print(paste("USA Coastal tourism values have been successfully adjusted to", usa_check_subset$year, "USD."))
 } else {
   print("Adjustment for inflation did not match for the selected year. Please check that the data has been subsetted to the year of adjustment and try again.")
 }
 
+
+# ---- Prep for joining with full coastal tourism dataset ----
+usa_coastal_prep <- usa_coastal_adj %>% 
+  mutate(country_name = "United States of America") %>% 
+  select(country_name, year, coastal_tour_value)
+
+# run ohicore name_2_rgn
+usa_coastal_rgn <- ohicore::name_2_rgn(usa_coastal_prep,
+                                       fld_name = "country_name",
+                                       flds_unique = "year")
+
+# select columns for joining
+# full because we haven't filtered to the standardized date range
+usa_coastal_tourism_full <- usa_coastal_rgn %>% 
+  select(rgn_id, rgn_name, year, coastal_tour_value)
 ```
+
+
+Preliminary plot to inspect data
+
+```{r}
+
+ggplot(data = usa_coastal_tourism_full, 
+       aes(x = year, y = coastal_tour_value)) +
+  # old glory blue hex code from flag
+  geom_point(color = "#0A3161") + 
+  # old glory red hex code from flag
+  geom_line(color = "#B31942") +
+  # show_col(viridis::viridis(6))
+  #scale_x_continuous(breaks = c(date_range)) +
+  # make y-axis more legible
+  scale_y_continuous(labels = scales::label_currency(scale = 0.000000001,
+                                                     suffix = "B",
+                                                     # $30.00B --> $30B
+                                                     scale_cut = cut_long_scale())) +
+  theme_bw() +
+  # update labels
+  labs(title = paste0("Coastal Tourism Value in the United States of America ", "(2005-2021)"),
+       subtitle = "Data Source: ENOW",
+       x = "Year",
+       y = "Tourism Value (Constant 2015 US$)",
+       color = "Region") +
+  # customize theme elements
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 0.8, hjust = 0.9),
+    axis.title.x = element_text(margin = margin(t = 1.2, b = 0.2, unit = "lines")),
+    axis.title.y = element_text(margin = margin(l = 0.5, r = 0.5, unit = "lines")),
+    panel.grid.minor.x = element_blank(),
+    plot.title = element_text(margin = margin(t = 0.5, b = 0.5, unit = "lines")),
+    plot.subtitle = element_text(margin = margin(b = 1, unit = "lines")))
+```
+
+This seems to be fairly reflective of the $143 Billion value associated with US coastal tourism according to [NOAA](https://coast.noaa.gov/states/fast-facts/tourism-and-recreation.html), and the sharp fall in 2020 reflects the trend we expect to see due to COVID-19 Pandemic impacts on tourism globally.
+
+
+Now, let's filter to the date range of the rest of the data and join to get a full coastal tourism value dataset!
+```{r}
+usa_coastal_tourism <- usa_coastal_tourism_full %>% 
+  filter(year %in% c(date_range))
+
+max(usa_coastal_tourism$year) == stop_year
+```
+
 
 
 ## Implementing sector multipliers
