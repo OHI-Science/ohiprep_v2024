@@ -29,7 +29,9 @@ editor_options:
 
 -   **Data:**
 
--   Tourism direct GDP as a proportion of total GDP (indicator 8.9.1): UNWTO Dept. of Statistics (UN Tourism)
+### Tourism direct GDP as a proportion of total GDP 
+
+Tourism direct GDP as a proportion of total GDP (indicator 8.9.1): UNWTO Dept. of Statistics (UN Tourism)
 
 -   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG> 
 -   A big issue with this data set is that it does not have data for
@@ -57,13 +59,39 @@ National Bureau of Statistics for China
 
 
 
--   GDP: World Bank, in "Constant 2015 US$"
+### GDP: World Bank, in "constant 2015 US$"
+
 -   <https://data.worldbank.org/indicator/NY.GDP.MKTP.KD> 
 
     -   Downloaded July 9, 2024. 
     -   Contains country-level annual GDP value (in constant 2015 USD) from 1960-2023.
     -   Additional metadata copied and saved as a `.rtf` in the `WorldBank_global_annual_GDP_2015_constant_USD` subfolder of the `_raw_data`'s `WorldBank` folder for `d2024`. 
     -   Date last updated (found in the first few rows of the `.csv` when opened locally using Numbers): 2024-06-28
+
+
+### USA Coastal Tourism
+
+Economics: National Ocean Watch (ENOW) Data
+
+ -   Marine Economies: Industries for States and Coastal US
+ -   https://coast.noaa.gov/digitalcoast/data/ 
+ 
+Office for Coastal Management, 2024: Time-Series Data on the Ocean and Great Lakes Economy for Counties, States, and the Nation between 2005 and 2021 (Sector Level) from 2008-01-01 to 2019-12-31. NOAA National Centers for Environmental Information, https://www.fisheries.noaa.gov/inport/item/48033. Downloaded 2024-07-18.
+
+> Abstract: Economics: National Ocean Watch (ENOW) contains annual time-series data for over 400 coastal counties, 30 coastal states, 8 regions, and the nation, derived from the Bureau of Labor Statistics and the Bureau of Economic Analysis. It describes six economic sectors that depend on the oceans and Great Lakes and measures four economic indicators: Establishments, Employment, Wages, and Gross Domestic Product (GDP).
+
+    -   Metadata: https://www.fisheries.noaa.gov/inport/item/48033 
+
+-   Range: 2005-2021
+
+Has sector-level data:
+-   Includes Ship and Boat Building, Tourism and Recreation, Living Resources, Fish hatcheries and aquaculture, Seafood processing, Seafood markets, Fishing, Marine Construction, Marine Transportation, All Ocean Sectors
+-   Has employment, wages, GDP, RealGDP columns (RealGDP = adjusted for inflation -- theoretically to year of most recent update based on the metadata, which would be 2021. However, upon futher investigation, the gdp and real gdp values match in the year 2012, so it seems that RealGDP is GDP adjusted to 2012 USD)
+-   Contains -9999 values for data privacy – these values are captured in the totals but not in state-level
+
+- On Mazu in `home/shares/ohi/git-annex/globalprep/_raw_data/ENOW/d2024/ENOW_Industries/ENOW_Industries_2005_2021.csv`
+
+-   Downloaded from NOAA Office for Coastal Management; Digital Coast website: <https://coast.noaa.gov/digitalcoast/data/>.
 
 ### Setup
 
@@ -78,6 +106,7 @@ librarian::shelf(
   here,
   countrycode,
   janitor,
+  priceR, # for inflation adjustment
   RColorBrewer,
   foreach,
   doParallel, # for using multiple cores
@@ -120,6 +149,9 @@ wb_dir <- here::here(raw_data_dir, "WorldBank", data_dir_version_year)
 # China National Bureau of Statistics (NSB) directory
 nbsc_dir <- here::here(raw_data_dir, "NBS_China", data_dir_version_year)
 
+# Economics: National Ocean Watch (ENOW) Data for USA Coastal Tourism
+enow_dir <- here::here(raw_data_dir, "ENOW", data_dir_version_year, "ENOW_Industries")
+
 # Output data directory -- for intermediate data products
 int_dir <- here::here(data_path, "int")
 ```
@@ -151,6 +183,9 @@ wb_gdp_raw <- readr::read_csv(here::here(wb_dir,
 nbsc_raw <- readr::read_csv(here::here(nbsc_dir,
                                        "eco_tour_china_all_metrics_2004-2023.csv"), # update this if/when new data is downloaded
                             skip = 2) # skip first 2 rows
+
+# ---- ENOW Data for USA Coastal Tourism Gapfilling ----
+enow_usa_raw <- readr::read_csv(here::here(enow_dir, "ENOW_Industries_2005_2021.csv"), na = c("-9999"))
 
 ```
 
@@ -468,7 +503,7 @@ no_china_heatmap <- ggplot(data = no_china_filter) +
 plotly::ggplotly(no_china_heatmap)
 ```
 
-After discussing the datagaps after filtering, Melanie advised that we manually remove Argentina (in v2024, we had 4 total data points for this country, but they were all from the past 4 years (2016-2019)).
+After discussing the datagaps after filtering, Melanie advised that we manually remove Argentina (in v2024, we had 4 total data points for this country, but they were all from the past 4 years (2016-2019)). Note: we also removed the United States in this step, so we're using the ENOW data read in earlier to address this data gap.
 
 ```{r}
 no_china_filter <- no_china_filter %>% 
@@ -871,6 +906,7 @@ nbsc_tidy <- nbsc_clean %>%
   dplyr::filter(year %in% c(date_range))
 ```
 
+#### Standardize values 
 
 Tried to get the conversion rates in a reproducible way:
 
@@ -1159,6 +1195,98 @@ tourism_value %>%
 prettyNum(max_tour_val,big.mark = ",", scientific = FALSE)
 
 # 1.69 trillion in China in 2019 out of 14.28 trillion total GDP
+```
+
+# Coastal Tourism
+
+## Finding coastal tourism values from total tourism values
+
+-   dataframe of % coastal population per region
+-   multiply percentage decimal by total tourism value to get approximation for coastal tourism 
+
+
+## Coastal Tourism: The United States of America
+
+The data currently includes states that border/contain the Great Lakes, so we'll need to filter those out. To do that, first we'll clean the data and select tourism sector GDP data. Then we'll make two subsets: one that contains only the great lakes states and one that only contains the total coastal aggregate values. We can then subtract the great lakes subset values from the total to obtain the true coastal tourism GDP values.
+
+```{r}
+# ---- Preliminary cleaning & tidying ----
+enow_usa_clean <- enow_usa_raw %>% 
+  janitor::clean_names() %>% 
+  dplyr::select(geo_name, geo_scale, year, ocean_sector, ocean_industry, gdp, real_gdp) %>% 
+  dplyr::filter(ocean_sector %in% c("Tourism and Recreation")) %>% 
+  dplyr::filter(ocean_industry %in% c("Total"))
+
+# check for year of inflation adjustment real_gdp 
+enow_usa_clean %>% dplyr::filter(gdp == real_gdp) %>% head()
+
+# now we know that it has been adjusted to 2012!
+adjusted_year <- 2012 # update this if the adjusted date changes
+
+# ---- Subsetting: Coastal USA and Great Lakes states ----
+
+# Coastal total subset 
+coastal_total <- enow_usa_clean %>% 
+  dplyr::filter(geo_name %in% c("Coastal USA")) %>% # alternatively, you could filter to geo_scale == "National"
+  # remove redundant columns after double checking that we filtered properly earlier
+  dplyr::select(-c(geo_scale, ocean_sector, ocean_industry))
+
+# Great Lakes subset
+great_lakes <- enow_usa_clean %>% 
+  dplyr::filter(geo_name %in% c("Illinois", "Indiana",
+                         "Michigan", "Minnesota",
+                         "Ohio", "Wisconsin",
+                         "Pennsylvania")) %>% # excluding  "New York" because it is also coastal
+  dplyr::select(-c(geo_scale, ocean_sector, ocean_industry))
+
+
+# ---- Aggregate: get great lakes total tourism value ----
+great_lakes_total <- great_lakes %>% 
+  dplyr::group_by(year) %>% 
+  dplyr::summarize(gl_gdp = sum(gdp),
+            gl_real_gdp = sum(real_gdp))
+
+# ---- Calculate true coastal tourism value ----
+coastal_lakes_join <- dplyr::full_join(coastal_total, great_lakes_total,
+                                       by = "year")
+
+# subtract great lakes values from coastal total values
+true_coastal_value <- coastal_lakes_join %>% 
+  mutate(coastal_tour_gdp = (gdp - gl_gdp),
+         coastal_tour_real_gdp = (real_gdp - gl_real_gdp))
+
+# check:
+if (sum((true_coastal_value$coastal_tour_gdp == (true_coastal_value$gdp - true_coastal_value$gl_gdp)) / nrow(true_coastal_value))) {
+  print("Subtraction successful!")
+} else {
+  print("Subtraction failed. New column is not the difference between expected columns. Please double-check your methods.")
+}
+
+
+# ---- Adjust for inflation & Standardize ----
+# if we're not fully confident that the dataset's inflation adjustment matches the inflation adjustment methods that we use throughout this subgoal (priceR::adjust_for_inflation()), we can use the GDP column and convert to 2015 constant USD. We could also convert from 2012 adjusted to 2015 adjusted. The following code can be altered for either method.
+
+
+
+# standardize inflation adjustment to 2015 constant USD for joining with global tourism value dataframe
+usa_coastal_adj <- true_coastal_value %>% 
+  dplyr::mutate(coastal_tour_value = priceR::adjust_for_inflation(
+    price = coastal_tour_gdp, # or: coastal_tour_real_gdp
+    from_date = year, # or: adjusted_year (set to 2012 earlier)
+    country = "US",
+    to_date = 2015))
+
+# for gdp (not real_gdp) method: check
+usa_check_subset <- usa_coastal_adj %>% 
+  filter(year == 2015) %>% # or change to whichever year you've adjusted the data to for inflation
+  select(year, coastal_tour_gdp, coastal_tour_value)
+
+if (usa_check_subset$coastal_tour_gdp == usa_check_subset$coastal_tour_value) {
+  print(paste("Values have been successfully adjusted to", usa_check_subset$year, "USD."))
+} else {
+  print("Adjustment for inflation did not match for the selected year. Please check that the data has been subsetted to the year of adjustment and try again.")
+}
+
 ```
 
 
