@@ -477,7 +477,7 @@ duplicates <- eco_mar_usd_raw[duplicated(eco_mar_usd_raw[, c('rgn_id','year')]),
 # For 2024: The countries that can be gapfilled are: Yemen, Uruguay, Togo, Sint Eustatius, Seychelles (needs > three data points over time), Qatar, Puerto Rico, Poland, Libya, Jordan, Falkland Islands, Estonia, Dominica, Curacao, Cape Verde
 
 eco_mar_usd_raw_cut <- eco_mar_usd_raw %>% 
-  filter(!rgn_name %in% c("Yemen", "Uruguay", "Togo", "Sint Eustacius", "Seychelles", "Qatar", "Puerto Rico and Virgin Islands of the United States", "Poland", "Libya", "Jordan", "Falkland Islands", "Estonia", "Dominica", "Curacao", "Cape Verde"))
+  filter(!rgn_name %in% c("Yemen", "Uruguay", "Togo", "Sint Eustatius", "Seychelles", "Qatar", "Puerto Rico and Virgin Islands of the United States", "Poland", "Libya", "Jordan", "Falkland Islands", "Estonia", "Dominica", "Curacao", "Cape Verde"))
 
 mar_heatmap <- eco_mar_usd_raw_cut %>% 
   mutate(status = case_when(
@@ -502,6 +502,10 @@ Here we'll use `na.approx()` from {zoo} to interpolate missing values and extrap
 # gapfilling ----
 # estimate tourism GDP proportion for geo areas with missing data
 eco_mar_usd_gf <- eco_mar_usd_raw_cut %>% 
+  mutate(usd = case_when(
+    usd == 0 ~ NA,
+    TRUE ~ usd
+  )) %>% 
   group_by(rgn_name) %>% 
   # interpolate (fill missing values between 2 values)
   mutate(appx_usd = zoo::na.approx(usd, # using values in this column
@@ -521,7 +525,7 @@ mar_heatmap <- eco_mar_usd_gf %>%
 
 heatmap <- ggplot(mar_heatmap, aes(x = year, y = rgn_name, fill = as.factor(status))) + 
   geom_tile(color = "black") + 
-  scale_fill_manual(values = c("darkgrey", "lightgreen")) + 
+  scale_fill_manual(values = c("lightgreen")) + 
   theme_bw()
 
 heatmap
@@ -531,6 +535,17 @@ heatmap
 ## Finish up and write out .csv  
 
 ```{r}
-# write_csv(eco_mar_usd_raw, here::here(data_path, "int", "eco_mar_usd_pre.csv"))
+# Doing some final data prep so that we have both the raw gapfilled data as well as the oen that we're writing out 
+eco_mar_usd_write <- eco_mar_usd_gf %>% 
+  select(-usd) %>% 
+  rename(usd = appx_usd) %>% 
+  relocate(usd, .before = unit)
+
+# Gut check ---- 
+check <- is.na(eco_mar_usd_write$usd)
+summary(check) # Cool no NAs
+
+# Writing out csv FINALLY -----
+# write_csv(eco_mar_usd_write, here::here(data_path, "int", "eco_mar_usd_pre.csv"))
 ```
 
