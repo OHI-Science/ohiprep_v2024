@@ -587,7 +587,8 @@ eco_mar_usd_class <- eco_mar_usd_write %>%
 
 # Removing unecessary columns from the joined df
 eco_mar_usd_class <- eco_mar_usd_class %>% 
-  dplyr::select(-c(rgn_name.y))
+  dplyr::select(-c(rgn_name.y)) %>% 
+  dplyr::rename(rgn_name = rgn_name.x)
 
 # Applying weights to mariculture revenue data -----
 eco_mar_usd_final <- eco_mar_usd_class %>% 
@@ -597,6 +598,13 @@ eco_mar_usd_final <- eco_mar_usd_class %>%
 eco_mar_usd_final <- eco_mar_usd_final %>% 
   mutate(usd = usd_weighted) %>% 
   select(-c(usd_weighted, developed_developing_regions))
+
+#One last ggplot to gut check that the weighting did what we wanted it to do 
+
+# ggplot(eco_mar_usd_final, aes(x = as.numeric(year), y = usd, color = rgn_name)) +
+#   geom_line() +
+#   theme(legend.position = "none")
+
 
 # Writing out csv FINALLY -----
 # write_csv(eco_mar_usd_final, here::here(data_path, "int", "eco_mar_usd_pre.csv"))
