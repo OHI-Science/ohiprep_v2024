@@ -1271,6 +1271,26 @@ coastal_multipliers <- coastal_pop_adj %>%
 
 ```
 
+
+Basic plot to visually inspect data
+```{r}
+coastal_pct_plot <- plotly::plot_ly(data = coastal_multipliers,
+                                     x = ~year,
+                                     y = ~coastal_pct,
+                                     color = ~rgn_id, 
+                                     type = "scatter", mode = "lines") %>% 
+  # update layout: text, margins
+  plotly::layout(title = "Coastal Population (% per region)",
+                 margin = m, # set margins
+                 xaxis = list(title = "Year"),
+                 yaxis = list(title = "Coastal Population %"))
+
+coastal_pct_plot
+```
+
+This seems pretty solid -- we'd expect coastal population % to be relatively stable over this time frame.
+
+
 Now we can join the coastal population proportion dataframe with the tourism value dataframe to calculate the coastal tourism value.
 
 ```{r}
@@ -1287,6 +1307,21 @@ coastal_value_clean <- coastal_tourism_value %>%
   select(rgn_id, rgn_name, year, coastal_tour_value)
 ```
 
+Basic plot to visually inspect data
+```{r}
+coastal_val_plot <- plotly::plot_ly(data = (coastal_value_clean %>% ungroup()),
+                                     x = ~year,
+                                     y = ~coastal_tour_value,
+                                     color = ~rgn_name, 
+                                     type = "scatter", mode = "lines") %>% 
+  # update layout: text, margins
+  plotly::layout(title = "Coastal Tourism Value",
+                 margin = m, # set margins
+                 xaxis = list(title = "Year"),
+                 yaxis = list(title = "Tourism Value (constant 2015 USD)"))
+
+coastal_val_plot
+```
 
 
 
