@@ -1200,9 +1200,9 @@ prettyNum(max_tour_val,big.mark = ",", scientific = FALSE)
 
 ## Finding coastal tourism values from total tourism values
 
--   dataframe of % coastal population per region
+-   read in data on coastal population counts and total population per region 
+-   create dataframe of proportion of coastal population per region
 -   multiply percentage decimal by total tourism value to get approximation for coastal tourism 
-
 
 
 ```{r}
@@ -1234,10 +1234,59 @@ print(paste("Number of unique regions in UN Total Pop dataset:", length(unique(t
 # ---- join dataframes ----
 coastal_pop_join <- dplyr::full_join(coastal_pop_filter, total_pop_filter, by = c("rgn_id", "year"))
 
-# calculate proportion of coastal pop
-coastal_pop_prop <- coastal_pop_join %>% 
-  mutate(coastal_prop = (coastal_pop / total_pop))
+# ---- calculate proportion of coastal pop ----
+coastal_prop_pct <- coastal_pop_join %>% 
+  mutate(coastal_pct = (coastal_pop / total_pop),
+         coastal_prop = (coastal_pct / 100)) # proportion multiplier
+
+zero_coastal <- coastal_prop_pct[coastal_prop_pct$coastal_pop == 0, ]
+unique(zero_coastal$rgn_id)
+
+# adjust coastal population proportion and percentage multiplier 
+# if coastal_pop != 0 and total_pop is NA, set coastal_prop to 1 (assumes that population of small island regions is all coastal)
+coastal_pop_adj <- coastal_prop_pct %>% 
+  mutate(coastal_prop = case_when(
+    coastal_pop != 0 & is.na(total_pop) ~ 1,
+    .default = coastal_prop
+  ))
+
+
+# uninhabited OHI regions
+uninhabited_rgns <- read_csv(here::here("globalprep", "spatial", "v2017", "output", "rgn_uninhabited_islands.csv"))
+
+# to join with tourism_value
+uninhabited_rgns_ch <- uninhabited_rgns %>% 
+  mutate(rgn_id = as.character(rgn_id))
+
+# check if uninhabited regions have any pop data
+test_pop <- dplyr::inner_join(coastal_pop_adj, uninhabited_rgns, by = "rgn_id")
+
+tour_uninhabited_check <- dplyr::inner_join(tourism_value, uninhabited_rgns_ch, by = "rgn_id")
+#View(tour_uninhabited_check) # df is empty! makes sense because uninhabited regions wouldn't have governments to report tourism values... this means we can also antijoin our coastal population data with the uninhabited regions dataset
+
+# ---- remove uninhabited regions ----
+coastal_multipliers <- coastal_pop_adj %>% 
+  dplyr::anti_join(uninhabited_rgns, by = "rgn_id") %>% 
+  mutate(rgn_id = as.character(rgn_id)) # prep rgn_id column for joining with tourism_value df
+
 ```
+
+Now we can join the coastal population proportion dataframe with the tourism value dataframe to calculate the coastal tourism value.
+
+```{r}
+# ---- join coastal prop + tourism value ----
+coastal_tourism <- dplyr::full_join(tourism_value, coastal_multipliers,
+                                    by = join_by("rgn_id", "year"))
+
+# ---- calculate coastal tourism value ----
+coastal_tourism_value <- coastal_tourism %>% 
+  mutate(coastal_tour_value = (tour_value * coastal_prop))
+
+# making a clean subset so we can keep a full version of the dataframe for reference if needed
+coastal_value_clean <- coastal_tourism_value %>% 
+  select(rgn_id, rgn_name, year, coastal_tour_value)
+```
+
 
 
 
@@ -1377,13 +1426,63 @@ ggplot(data = usa_coastal_tourism_full,
 
 This seems to be fairly reflective of the $143 Billion value associated with US coastal tourism according to [NOAA](https://coast.noaa.gov/states/fast-facts/tourism-and-recreation.html), and the sharp fall in 2020 reflects the trend we expect to see due to COVID-19 Pandemic impacts on tourism globally.
 
+## Final Coastal Tourism
 
 Now, let's filter to the date range of the rest of the data and join to get a full coastal tourism value dataset!
 ```{r}
+# filter USA data
 usa_coastal_tourism <- usa_coastal_tourism_full %>% 
-  filter(year %in% c(date_range))
+  filter(year %in% c(date_range)) %>% 
+  mutate(rgn_id = as.character(rgn_id))
 
-max(usa_coastal_tourism$year) == stop_year
+# optional: check that year filtering worked
+#max(usa_coastal_tourism$year) == stop_year
+
+
+# ---- join coastal tourism datasets ----
+coastal_tourism_full <- dplyr::full_join(coastal_value_clean, usa_coastal_tourism,
+                                         by = join_by("rgn_id", "rgn_name", "year", "coastal_tour_value")) %>% 
+  ungroup()
+
+
+```
+
+
+```{r}
+# preliminary plotting to investigate
+
+coastal_tour_plot <- plotly::plot_ly(data = coastal_tourism_full,
+                                     x = ~year,
+                                     y = ~coastal_tour_value,
+                                     color = ~rgn_name, 
+                                     type = "scatter", mode = "lines") %>% 
+  # update layout: text, margins
+  plotly::layout(title = "Coastal Tourism Value",
+                 margin = m, # set margins
+                 xaxis = list(title = "Year"),
+                 yaxis = list(title = "Tourism Value (constant 2015 USD)"))
+
+coastal_tour_plot
+
+
+
+# make non-USA subset
+coastal_no_usa <- coastal_tourism_full %>% 
+  filter(!rgn_name %in% c("United States"))
+
+
+no_usa_coastal_plot <- plotly::plot_ly(data = coastal_no_usa,
+                                     x = ~year,
+                                     y = ~coastal_tour_value,
+                                     color = ~rgn_name, 
+                                     type = "scatter", mode = "lines") %>% 
+  # update layout: text, margins
+  plotly::layout(title = "Coastal Tourism Value",
+                 margin = m, # set margins
+                 xaxis = list(title = "Year"),
+                 yaxis = list(title = "Tourism Value (constant 2015 USD)"))
+
+no_usa_coastal_plot
 ```
 
 
@@ -1400,8 +1499,8 @@ Prep for saving & save to `int` folder
 ```{r}
 #--------Prepping data for int saving -------
 
-tour_revenue_int <- tourism_value %>% 
-  rename(usd = tour_value) %>% 
+tour_revenue_int <- coastal_tourism_full %>% 
+  rename(usd = coastal_tour_value) %>% 
   mutate(
     unit = "USD (1)",
     sector = "tour",
