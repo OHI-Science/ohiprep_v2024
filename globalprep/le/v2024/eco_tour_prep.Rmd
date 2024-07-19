@@ -266,8 +266,7 @@ v2024 notes/observations:
 
 ```{r}
 # check that this is the intended stop/cutoff year
-stop_year
-#stop_year <- 2019 # update this depending on data updates
+stop_year <- 2019 # update this depending on data updates
 
 # ---- Filter ----
 # set date range selection (rationale described in the paragraph below the previous plot)
@@ -1205,6 +1204,43 @@ prettyNum(max_tour_val,big.mark = ",", scientific = FALSE)
 -   multiply percentage decimal by total tourism value to get approximation for coastal tourism 
 
 
+
+```{r}
+# read in coastal population time series data from mar_prs_population v2021 dataprep script
+coastal_pop_count <- read_csv(here::here("globalprep", "mar_prs_population", "v2021", "output", "mar_pop_25mi.csv"))
+
+# read in total population time series data from the UN, created in mar_prs_population v2021 
+UN_total_pop <- read_csv(here::here("globalprep", "mar_prs_population", "v2021", "output", "UN_population.csv"))
+
+# ---- filter data to date_range (2008-2019 in v2024) ----
+coastal_pop_filter <- coastal_pop_count %>% 
+  filter(year %in% c(date_range)) %>% 
+  rename(coastal_pop = popsum)
+
+total_pop_filter <- UN_total_pop %>% 
+  filter(year %in% c(date_range)) %>% 
+  rename(total_pop = population)
+
+# note: the UN total pop and coastal pop dfs seem to have some missing regions
+
+pop_rgn_diff <- dplyr::setdiff(coastal_pop_filter$rgn_id, total_pop_filter$rgn_id)
+
+print(paste("Number of regions that don't occur in both datasets (only 1 set):", length(pop_rgn_diff)))
+
+print(paste("Number of unique regions in Coastal Pop dataset:", length(unique(coastal_pop_filter$rgn_id))))
+
+print(paste("Number of unique regions in UN Total Pop dataset:", length(unique(total_pop_filter$rgn_id))))
+
+# ---- join dataframes ----
+coastal_pop_join <- dplyr::full_join(coastal_pop_filter, total_pop_filter, by = c("rgn_id", "year"))
+
+# calculate proportion of coastal pop
+coastal_pop_prop <- coastal_pop_join %>% 
+  mutate(coastal_prop = (coastal_pop / total_pop))
+```
+
+
+
 ## Coastal Tourism: The United States of America
 
 The data currently includes states that border/contain the Great Lakes, so we'll need to filter those out. To do that, first we'll clean the data and select tourism sector GDP data. Then we'll make two subsets: one that contains only the great lakes states and one that only contains the total coastal aggregate values. We can then subtract the great lakes subset values from the total to obtain the true coastal tourism GDP values.
@@ -1311,10 +1347,10 @@ Preliminary plot to inspect data
 
 ggplot(data = usa_coastal_tourism_full, 
        aes(x = year, y = coastal_tour_value)) +
-  # old glory blue hex code from flag
-  geom_point(color = "#0A3161") + 
   # old glory red hex code from flag
   geom_line(color = "#B31942") +
+  # old glory blue hex code from flag
+  geom_point(color = "#0A3161") + 
   # show_col(viridis::viridis(6))
   #scale_x_continuous(breaks = c(date_range)) +
   # make y-axis more legible
@@ -1331,7 +1367,7 @@ ggplot(data = usa_coastal_tourism_full,
        color = "Region") +
   # customize theme elements
   theme(
-    axis.text.x = element_text(angle = 45, vjust = 0.8, hjust = 0.9),
+    axis.text.x = element_text(margin = margin(t = 0.8, unit = "lines")),
     axis.title.x = element_text(margin = margin(t = 1.2, b = 0.2, unit = "lines")),
     axis.title.y = element_text(margin = margin(l = 0.5, r = 0.5, unit = "lines")),
     panel.grid.minor.x = element_blank(),
