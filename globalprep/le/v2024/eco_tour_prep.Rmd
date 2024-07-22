@@ -1477,10 +1477,23 @@ usa_coastal_tourism <- usa_coastal_tourism_full %>%
 
 
 # ---- join coastal tourism datasets ----
-coastal_tourism_full <- dplyr::full_join(coastal_value_clean, usa_coastal_tourism,
+coastal_tourism_join <- dplyr::full_join(coastal_value_clean, usa_coastal_tourism,
                                          by = join_by("rgn_id", "rgn_name", "year", "coastal_tour_value")) %>% 
+  ungroup() %>% 
+  mutate(rgn_id = as.numeric(rgn_id)) # prep for joining with OHI regions
+
+# ---- join OHI regions with years df ----
+rgn_yr_df <- tibble(rgn_name = region_names$rgn_name,
+                       rgn_id = region_names$rgn_id) %>% # take the regions from region_names, even the ones we don't have data for
+  group_by(rgn_id, rgn_name) %>% 
+  summarize(year = seq(start_year,
+                       stop_year)) %>% # each region should have a row for each year as well now, filled with NA
   ungroup()
 
+# join with OHI regions
+coastal_tourism_full <- dplyr::full_join(rgn_yr_df, coastal_tourism_join,
+                                         by = join_by("rgn_id", "rgn_name", "year")) %>% 
+  select(rgn_id, rgn_name, year, coastal_tour_value)
 
 ```
 
