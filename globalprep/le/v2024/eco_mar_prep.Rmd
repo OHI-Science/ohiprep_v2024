@@ -287,7 +287,26 @@ mar_rev_rgn <- total_mar_rev %>%
     country=="Netherlands Antilles" ~ "Curacao",
     TRUE ~ country
   ))
-  
+
+## Need to split the Channel Islands into Jersey and Guernsey 
+m_CI <- mar_rev_rgn %>%
+  filter(country == 'Channel Islands') %>%
+  mutate(
+    value            = value/2,
+    'Guernsey'        = value,
+    'Jersey'           = value) %>%
+  ungroup() %>% 
+  dplyr::select(-c(value, Country)) %>% 
+  pivot_longer(cols = c(Guernsey, Jersey), values_to = "value", names_to = "Country") %>% 
+  mutate(Country = as.character(Country),
+         country = Country) %>% 
+    dplyr::relocate(value, .before = unit)
+
+mar_rev_rgn <- mar_rev_rgn %>%
+  filter(country != 'Channel Islands') %>%
+      bind_rows(m_CI)
+  arrange(country, fao, environment, species, year, value) 
+
 # Using name_2_rgn function to populate values for rgn_id and rgn_name for each of the countries listed in the dataframe
 mar_rev_rgn_temp <- ohicore::name_2_rgn(df_in = mar_rev_rgn, 
                        fld_name='Country', # Check to make sure that the case matches
@@ -429,6 +448,9 @@ mar_rev_fixed <- mar_rev_rgn_no_dupes %>%
   rbind(., joined_186) %>% 
   rbind(., joined_73)
 
+# Checking for duplicates one more times --> No observations = no duplicates 
+duplicates <- mar_rev_fixed[duplicated(mar_rev_fixed[, c('rgn_id','year')]),  ]
+
 # Binding duplicate data and ensuring dataframe is in the CORRECT format to write out to /int folder ----
 eco_mar_usd_raw <- mar_rev_fixed %>% 
   relocate(c(rgn_id, rgn_name), .before = country) %>% # Relocating columns in the order specified by README
@@ -450,8 +472,9 @@ heatmap <- ggplot(mar_heatmap, aes(x = year, y = rgn_name, fill = as.factor(stat
   geom_tile(color = "black") + 
   scale_fill_manual(values = c("darkgrey", "lightgreen")) + 
   theme_bw()
+heatmap
 
-plotly::ggplotly(heatmap) # rgn_id 249, 244, 98, and 116 have missing data for almost all years, aside from that what's in there is pretty good and those countries likely are present from freshwater aquaculture data im assuming 
+# plotly::ggplotly(heatmap) # rgn_id 249, 244, 98, and 116 have missing data for almost all years, aside from that what's in there is pretty good and those countries likely are present from freshwater aquaculture data im assuming 
 
 total_na <- mar_heatmap %>% 
   group_by(rgn_name) %>% 
@@ -562,7 +585,7 @@ unsd_class_fix <- unsd_class %>%
   country_or_area == "Åland Islands" ~ "Finland",
   TRUE ~ country_or_area
   ))
-  dplyr::filter(!m49_code %in% c(630, 316, 474))
+  # dplyr::filter(!m49_code %in% c(630, 316, 474))
 
 # Using name to rgn function to assign rgn_id to country names 
 class_temp <- ohicore::name_2_rgn(df_in = unsd_class_fix, 
