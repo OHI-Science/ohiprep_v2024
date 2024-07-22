@@ -255,10 +255,17 @@ where, $e$ is the total adjusted revenue generated directly and indirectly from 
 
 Based on this methodology and equation, we created and defined the `value` column earlier as the sum of the adjusted USD value for the three sectors (fishing, mariculture, and tourism). To calculate the score, we will take that combined sum across sectors per region per year and divide the value in the current (or most recent) year by the reference point value
 
+From the website's methodology:
+
+Because there is no absolute global reference point for revenue (i.e., a target number would be completely arbitrary), the economies subgoal uses a moving baseline as the reference point. Reference revenue is calculated as the value in the current year (or most recent year), relative to the value in a recent moving reference period, defined as 5 years prior to the current year. This reflects an implicit goal of maintaining coastal revenue on short time scales, allowing for decadal or generational shifts in what people want and expect. We allowed for a longer or shorter gap between the current and recent years if a 5 year span was not available from the data, but the gap could not be greater than 10 years. Our preferred gap between years was as follows (in order of preference): 5, 6, 4, 7, 3, 8, 2, 9, 1, and 10 years.
+
+Absolute values for $e$ in the current and reference periods were lumped across all sectors before calculating reference values (even though the current and reference years will not be exactly the same for all sectors), allowing a decrease in one sector to be balanced by an increase in another sector. As such, we do not track the status of individual sectors and instead always focus on the status of all sectors together.
 
 
 ## Calculating Scores: value 5 years ago as reference point
 
+
+### Test: calculate score for 1 year (2019)
 ```{r}
 calculate_scores <- function(data, stop_year) {
   data %>%
@@ -301,4 +308,62 @@ summary(single_point_scores_2019$score)
 
 ```
 
-In 2019, Nauru (and members of the PNA) sold
+In 2019, Nauru (and members of the PNA) sold rights to fish in their waters for higher amounts than in previous years, which may explain the extremely high score for this region. 
+
+
+
+### Test: calculate scores for a range of years
+
+```{r}
+calculate_scores <- function(data) {
+  data <- data %>% mutate(rgn_id = as.character(rgn_id))
+  
+  find_reference_year <- function(years, current_year) {
+    gap_preferences <- c(5, 6, 4, 7, 3, 8, 2, 9, 1, 10)
+    for (gap in gap_preferences) {
+      reference_year <- current_year - gap
+      if (reference_year %in% years) {
+        return(reference_year)
+      }
+    }
+    return(NA)
+  }
+  
+  min_year <- min(data$year, na.rm = TRUE)
+  max_year <- max(data$year, na.rm = TRUE)
+  
+  map(seq(min_year + 5, max_year), function(calc_year) {
+    data %>%
+      group_by(rgn_id, rgn_name) %>%
+      reframe(
+        calculation_year = calc_year,
+        current_value = value[year == calc_year],
+        reference_year = find_reference_year(year[year < calc_year], calc_year),
+        reference_value = value[year == reference_year[1]],
+        score = current_value / reference_value
+      )
+  }) %>%
+  list_rbind() %>%
+  select(rgn_id, rgn_name, calculation_year, current_value, reference_value, score)
+}
+```
+
+
+
+
+
+```{r}
+# test
+test_score_fun_1 <- calculate_scores(eco_usd_adj)
+
+
+length(unique(test_score_fun_1$rgn_id))
+
+
+score_test_summary <- summary(test_score_fun_1)
+
+score_test_summary
+```
+
+
+
