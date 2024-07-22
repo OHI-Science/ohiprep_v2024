@@ -300,6 +300,8 @@ Test new function
 ```{r}
 single_point_scores_2019 <- calculate_scores(eco_usd_adj, stop_year = 2019)
 single_point_scores_2019
+
+summary(single_point_scores_2019)
 ```
 
 ```{r}
@@ -366,4 +368,12 @@ score_test_summary
 ```
 
 
+
+```{r}
+plotly::plot_ly(data = test_score_fun_1)
+```
+
+check less than 0.8 scores, check big ones like Nauru
+
+seems typical for values over 1 bc we expect a lot to do better than they were 5 years ago
 
