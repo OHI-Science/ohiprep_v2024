@@ -1,6 +1,6 @@
 # Status of Livelihoods and Economies Update
 
-Acronyms for sectors used in the original output layers:
+## Acronyms for sectors used in the original output layers:
 
 | Sector                                                   | Acronym |
 |----------------------------------------------------------|---------|
@@ -18,7 +18,7 @@ Acronyms for sectors used in the original output layers:
 
 In 2024 we cleaned and prepped the best available data for most sectors and components included in this goal. The ECO subgoal was pursued, but LIV was tabled due to a lack of data in the fishing (cf) sector. When newly updated data wasn't available, we re-downloaded and cleaned the previous data source. ohiprep_v2023 contains all scripts and data produced during the 2023 fellows' deep dive. All of the cleaned files are now saved in the folder `~/ohiprep_v2024/globalprep/le/v2024/int` .
 
-We produced three steps to calculate the overall ECO subgoal score:
+## We produced three steps to calculate the overall ECO subgoal score:
 
 *FIRST*:
 
@@ -32,7 +32,7 @@ We produced three steps to calculate the overall ECO subgoal score:
 
         -   Don’t filter dates here. This will be done procedurally downstream
 
-        -   This will ideally end with columns:  **country**, **year**, **usd** (value), **unit** (currency), **sector**, **data_source**
+        -   This will ideally end with columns: **country**, **year**, **usd** (value), **unit** (currency), **sector**, **data_source**
 
     -   Assigning countries to OHI regions where possible
 
@@ -46,7 +46,7 @@ We produced three steps to calculate the overall ECO subgoal score:
 
         -   Example: If all of my data were already adjusted to 2015 USD, my **usd_yr** column would contain only 2015
 
-    -   This step should end with multiple scripts, one for each sector with the following naming conventions: 
+    -   This step should end with multiple scripts, one for each sector with the following naming conventions:
 
         -   eco\_”sector abbreviation”\_prep.Rmd → creating the eco\_”sector abbreviation”\_usd_pre.csv file
 
@@ -58,17 +58,18 @@ We produced three steps to calculate the overall ECO subgoal score:
 
     -   With the previously made dataframes in the correct file structure, this script’s job will be to read them in and adjust “usd” columns for inflation. This will be done using the “priceR” package.
 
-    -   First the user will follow the steps at the top to read in the data for each sector and rbind them on top of each other because each df should have the same number/order of columns
+    -   First the user will follow the steps at the top to read in the data for each sector and rbind them 
+        -   This is possible because each df should have the same columns in the same order 
 
-        -   Then they will use a small chunk of code to identify the **most recent minimum year (highest minimum)** in each of the datasets. Due to the nature of calculating the score, we found that it was important that the bound “score calculation” df have the range of years that corresponds to the most recent minimum year and to the most recent shared maximum year **(lowest maximum)** 
+        -   Then they will use a small chunk of code to identify the **most recent minimum year (highest minimum)** in each of the datasets. Due to the nature of calculating the score, we found that it was important that the bound “score calculation” df have the range of years that corresponds to the most recent shared minimum year and to the most recent shared maximum year **(lowest maximum)**
 
-    -   We made a small function that takes each of the eco_sector_usd_pre.csv dataframes, the year that you want each value to be inflation-adjusted for, the country of the currency that the value is in, and the year of assessment. 
+    -   We made a small function that takes each of the eco_sector_usd_pre.csv dataframes, the year that you want each value to be inflation-adjusted for, the country of the currency that the value is in, and the year of assessment.
 
-        -   This function then draws out relevant values from the df for both usd and usd_yr, adjusts the values for inflation to your desired year, and 
+        -   This function then draws out relevant values from the df for both usd and usd_yr, adjusts the values for inflation to your desired year, and
 
             -   1\. Adds a column onto the sector df that contains the adjusted values for usd
 
-            -   2\. Writes a csv out to the ‘int’ folder with the naming structure eco\_”sector abbreviation”\_usd_adj.csv 
+            -   2\. Writes a csv out to the ‘int’ folder with the naming structure eco\_”sector abbreviation”\_usd_adj.csv
 
                 -   This is so as to be able to track changes in real time as well as look back/forward when working on a different script
 
@@ -85,3 +86,14 @@ For all datasets, except tourism revenue, the current format has one value for e
 Acronyms for sectors used in the original output layers are used for simplicity of incorporating into the finalized OHI model. A new sector fish processing FP was added in this analysis, and will need to be incorporated into the model.
 
 ### v2024 updates:
+
+##### Mariculture: 
+
+**General Overview of Steps** 
+
+- Data:
+  - Data were downloaded from FishStatJ, 
+
+
+
+

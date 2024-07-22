@@ -1,5 +1,5 @@
 ---
-title: "OHI `r format(Sys.Date(), '%Y')` - Mariculture Livelihoods & Economies Data Preparation"
+title: "OHI `r format(Sys.Date(), '%Y')` - Mariculture Economies Data Preparation"
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
@@ -19,8 +19,6 @@ editor_options:
   markdown: 
     wrap: 72
 ---
-
-# Livelihoods: Proportion of Tourism Jobs per Country/Region per Year
 
 ## Overview
 
@@ -261,13 +259,9 @@ total_mar_rev %>%
 -   **NOTE**: This year used the names_2_rgn function to find out which
     country names needed to be hardcoded to align with the reference
     regions.
-    -   To do this: Hold cmd (or ctrl) and click name_2_rgn
-    -   This should open up the script for the function
-    -   From there, hold cmd (or ctrl) and click rgn_synonyms on
-        line 31. This will pull up the synonyms for region names so that
-        you can check if yours align. If they do not, you can use
-        case_when() as seen below to revalue specific countries to their
-        relevant synonyms
+    - Run the names_2_rgn function on your data, and the output should tell you any countries that    were removed for not having a match in the look-up table 
+    - Depending on which regions show up as not having a match, you may be required to hard-code the names to those of synonyms using case_when() (see chunk below for an example)
+    - call 'rgn_synonyms <- ohicore::rgn_synonyms' in a code chunk to load the OHI Region synonyms for review 
 
 ```{r}
 # Need to join with regions and assign each country its respective OHI Region ----
@@ -568,22 +562,25 @@ unsd_class_fix <- unsd_class %>%
   country_or_area == "Åland Islands" ~ "Finland",
   TRUE ~ country_or_area
   ))
+  dplyr::filter(!m49_code %in% c(630, 316, 474))
 
 # Using name to rgn function to assign rgn_id to country names 
 class_temp <- ohicore::name_2_rgn(df_in = unsd_class_fix, 
                        fld_name='country_or_area')
 
 # Identifying duplicates  
-duplicates <- class_temp[duplicated(class_temp$country_or_area), ]
+duplicates <- class_temp[duplicated(class_temp$rgn_id), ]
 
 # Removing countries with duplicated rgn_id by using their iso2 code 
 class_temp <- class_temp %>% 
-  dplyr::filter(!iso_alpha2_code %in% c("HK", "MO", "AX")) %>% 
+  dplyr::filter(!iso_alpha2_code %in% c("HK", "MO", "AX", "MP", "VI", "MQ")) %>% 
   dplyr::select(rgn_id, rgn_name, developed_developing_regions)
 
 # Left joining the new developed/developing country classes to their respective rgn_id
 eco_mar_usd_class <- eco_mar_usd_write %>% 
   left_join(y = class_temp, by = c("rgn_id"))
+
+# 140, 116, 13 Were duplicated so hard removing those above with their m49_code (Puerto Rico and the US virgin Islands, Guam and Nothern Mariana Islands, Guadaloupe and Martinique)
 
 # Removing unecessary columns from the joined df
 eco_mar_usd_class <- eco_mar_usd_class %>% 
@@ -603,7 +600,8 @@ eco_mar_usd_final <- eco_mar_usd_final %>%
 
 # ggplot(eco_mar_usd_final, aes(x = as.numeric(year), y = usd, color = rgn_name)) +
 #   geom_line() +
-#   theme(legend.position = "none")
+#   theme(legend.position = "none") +
+#   scale_y_continuous(labels = scales::label_dollar(scale = 0.000000001, suffix = "B"))
 
 
 # Writing out csv FINALLY -----
