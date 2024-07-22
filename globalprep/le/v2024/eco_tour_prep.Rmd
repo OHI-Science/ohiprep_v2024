@@ -1206,9 +1206,26 @@ prettyNum(max_tour_val,big.mark = ",", scientific = FALSE)
 
 
 ```{r}
-# read in coastal population time series data from mar_prs_population v2021 dataprep script
-coastal_pop_count <- read_csv(here::here("globalprep", "mar_prs_population", "v2021", "output", "mar_pop_25mi.csv"))
+# read in coastal population proportion from PLACE
+coastal_pop_prop_raw <- read_csv(here::here(raw_data_dir, "SEDAC_CIESIN", data_dir_version_year, "nagdc-population-landscape-and-climate-estimates-v3-csv", "nagdc-population-landscape-and-climate-estimates-version-3.csv"))
 
+# preliminary cleaning & filtering
+coastal_prop <- coastal_pop_prop_raw %>% 
+  janitor::clean_names() %>% 
+  # filter to 100km coastal proximity
+  dplyr::filter(theme_variable %in% c("COASTAL PROXIMITY: 100KM ZONE: 100km zone"))
+
+# note: there are two designations: rural and urban
+# so we're going to have to aggregate these to get a total proportion
+```
+
+tomorrow:
+- figure out if population pct is of rural/urban or of total population
+- check: add population counts for both designations for one country in 1 year, then divide rural count by total count, see if this equals rural pct or something else
+- if it is %rural and %urban OF coastal pop, combine counts, divide by total pop (from another df? -- check in with Mel about commonly used ones since UN data seems to always have lots of gaps and not all of the regions)
+
+
+```{r}
 # read in total population time series data from the UN, created in mar_prs_population v2021 
 UN_total_pop <- read_csv(here::here("globalprep", "mar_prs_population", "v2021", "output", "UN_population.csv"))
 
