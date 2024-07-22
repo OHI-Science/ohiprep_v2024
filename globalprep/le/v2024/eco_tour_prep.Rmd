@@ -1304,7 +1304,9 @@ coastal_tourism_value <- coastal_tourism %>%
 
 # making a clean subset so we can keep a full version of the dataframe for reference if needed
 coastal_value_clean <- coastal_tourism_value %>% 
-  select(rgn_id, rgn_name, year, coastal_tour_value)
+  select(rgn_id, rgn_name, year, coastal_tour_value) %>% 
+  # drop United States because we already have their values and don't want duplicates
+  filter(!rgn_name %in% c("United States"))
 ```
 
 Basic plot to visually inspect data
