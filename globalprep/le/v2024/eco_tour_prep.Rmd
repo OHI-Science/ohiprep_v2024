@@ -1248,11 +1248,12 @@ coastal_prop_tidy <- coastal_prop %>%
     names_prefix = "population_"
   )
 
-# there should now be three rows for each area (note: not countryname, as there is data on multiple areas (urban and rural) for most countries),
+# there should now be three rows for each designated area (urban and rural) for each country,
 # as there are three years (1990, 2000, 2010)
 
 # note: there are two designations: rural and urban
 # so we're going to have to aggregate these to get a total proportion
+
 ```
 
 
@@ -1294,7 +1295,7 @@ So, to make a coastal tourism multiplier, we need to aggregate the coastal popul
 Overview of next steps
 
 -   aggregate by countryname to get total coastal population count in 2010
--   run `ohicore::name_2_rgn`
+-   run `ohicore::name_2_rgn`(subset out Macao & Hong Kong first)
 -   bring in world population data 
 
     -   clean & tidy, select 2010 values
@@ -1305,7 +1306,31 @@ Overview of next steps
 -   join with appropriate tourism dataset & calculate appx. coastal tourism value 
 
 
+#### Coastal population
 
+Aggregate by `countryname` to get total coastal population count in 2010. We'll use this to calculate a fixed coastal population proportion multiplier to estimate coastal tourism value.
+
+```{r}
+# ---- create 2010 subset for fixed multiplier calculation ----
+coastal_2010_pop_subset <- coastal_prop_tidy %>% 
+  dplyr::filter(year == 2010) %>% 
+  dplyr::select(c(country_name = countryname, designation = designationname, year, population_count, population_pct))
+
+coastal_2010_pop_subset %>% filter(country_name %in% c("United States of America"))
+
+
+# ---- find estimated total coastal population ----
+coastal_2010_pop <- coastal_2010_pop_subset %>% 
+  dplyr::group_by(country_name, year) %>% 
+  dplyr::summarise(coastal_pop = sum(population_count, na.rm = TRUE),
+                   coastal_pct = sum(population_pct, na.rm = TRUE))
+  
+coastal_2010_pop %>% filter(country_name %in% c("United States of America"))
+```
+
+#### WorldBank: Total population
+
+Global, country-level total population data (ranges from 1960-2023)
 
 ```{r WDI-test, eval=FALSE}
 # tried using WDI package but got 502 Bad Gateway warning & timed out
@@ -1323,7 +1348,29 @@ WDI::WDI(country = "all", indicator = "SP.POP.TOTL", start = 2010, end = 2010)
 
 ```{r}
 # read in total pop data from world bank
-# world bank dir, "WorldBank_global_country_population_1960-2023", "API_SP.POP.TOTL_DS2_en_csv_v2_1584446.csv"
+wb_total_pop_raw <- readr::read_csv(here(wb_dir, "WorldBank_global_country_population_1960-2023",
+                                         "API_SP.POP.TOTL_DS2_en_csv_v2_1584446.csv"),
+                                    skip = 4)
+# note: values are total, not in thousands
+
+# ---- cleaning & tidying ----
+wb_total_pop <- wb_total_pop_raw %>% 
+  # pivot years from wide to long
+  tidyr::pivot_longer(
+    cols = "1960":"2023", # update to whatver time frame makes sense
+    names_to = "year",
+    values_to = "total_pop"
+  ) %>% 
+  # clean column names
+  janitor::clean_names() %>%  # running this after pivoting to reduce how much cleaning the year column needs
+  # fix data types
+  dplyr::mutate(year = as.numeric(year)) %>% 
+  # select relevant columns
+  dplyr::select(c(country_name, year, total_pop))
+
+# make 2010 subset for calculating coastal pop proportion
+wb_2010_pop <- wb_total_pop %>% 
+  filter(year == 2010)
 
 ```
 
