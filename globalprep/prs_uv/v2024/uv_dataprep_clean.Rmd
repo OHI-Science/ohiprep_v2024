@@ -49,14 +49,14 @@ The Ultraviolet Radiation pressure layer is generated from daily data on Local N
 
 **Values**: Level-3 OMI Surface UV Irradiance and Erythemal Dose- OMUVBd  
 
-**Time Range**: Daily data from 2005 - 2022 (10/1/2004 through 06/26/2023, but only full years of data are used)  
+**Time Range**: Daily data from 2005 - 2023 (10/1/2004 through 07/14/2024, but only full years of data are used)  
 **Format**: NetCDF HDF5 (.he5.nc)  
 
-**Downloaded**: June 26, 2023 (three files manually replaced on June 28, 2023)
+**Downloaded**: file list: July 16, 2024; data files: July 17, 2024 
 
 # Data citation information  
 
-Jari Hovila, Antii Arola, and Johanna Tamminen (2013), OMI/Aura Surface UVB Irradiance and Erythemal Dose Daily L3 Global Gridded 1.0 degree x 1.0 degree V3, NASA Goddard Space Flight Center, Goddard Earth Sciences Data and Information Services Center (GES DISC), Accessed: June 26, 2023, 10.5067/Aura/OMI/DATA3009
+Jari Hovila, Antii Arola, and Johanna Tamminen (2013), OMI/Aura Surface UVB Irradiance and Erythemal Dose Daily L3 Global Gridded 1.0 degree x 1.0 degree V3, NASA Goddard Space Flight Center, Goddard Earth Sciences Data and Information Services Center (GES DISC), Accessed: July 17, 2024, 10.5067/Aura/OMI/DATA3009
 
 ***
   
@@ -287,7 +287,7 @@ Calculate weekly means and standard deviations across all years:
 ```{r calc weekly means and st devs, eval = F}
 tic()
 ## for every week in each year of the time series, calculate weekly mean and standard deviation
-registerDoParallel(10)
+registerDoParallel(30)
 
 ## note: 2016 wk 22 has only 4 layers (4th layer all NAs) and length(days)=52; missing all week 23
 ## note: so far some 2005 files appear to have been downloaded incorrectly... replace them manually or just retry download??
