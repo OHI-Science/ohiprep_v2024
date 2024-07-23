@@ -1398,7 +1398,31 @@ kableExtra::kable_classic_2(guam_gf_check)
 
 Great! Now we can make subsets to apply to our tourism value data.
 
-We have a subset of Hong Kong and Macao tourism value separated out as `macao_hk_value`. We should apply appropriate multipliers to this subset and to the China subset created with the Bureau of Statistics of China data. After the multipliers have been applied, we can then aggregate their values within the greater OHI region classication of China. 
+We have a subset of Hong Kong and Macao tourism value separated out as `macao_hk_value`. We should apply appropriate multipliers to this subset and to the China subset created with the Bureau of Statistics of China data. After the multipliers have been applied, we can then aggregate their values within the greater OHI region classification of China. 
+
+**Next steps:**
+
+-   create coastal subsets for (1) Hong Kong + Macao, (2) China, (3) no China, HK, or Macao
+-   drop "year" column, see if this works for joining subsets. If not, create new years df, apply to coastal subset so that multiplier is copied along range of years for each country.
+-   join (1) Macao + HK coastal proportion subset and tourism value subset, implement multipliers
+-   join (2) China coastal subset and China tourism value subset, implement multiplier
+-   join Macao + HK coastal tourism value + China coastal tourism value, aggregate to get total China coastal tourism value
+
+--
+
+*Non-China subset:*
+
+-   join (3) no China, HK, or Macao coastal proportion subset with non-China (which is also non-USA) tourism value subset
+-   prep + implement multiplier to get coastal tourism value
+
+--
+
+*Final:*
+
+-   join USA coastal tour value + China coastal tour value + everything else coastal tour value
+-   plot along the way ^^^
+-   prep for export
+-   save to `int` as `.csv`
 
 ```{r}
 # ---- make subsets ----
@@ -1422,6 +1446,10 @@ no_china_coastal <- coastal_gf %>%
   dplyr::filter(!country_name %in% c("China", "Hong Kong", "Macao")) %>% 
   dplyr::select(country_name, year, coastal_prop_gf)
 ```
+
+
+
+
 
 Run `name_2_rgn`
 
@@ -1492,41 +1520,13 @@ coastal_rgn_agg <- coastal_rgn %>%
 
 ```
 
+Next steps:
+
+-   join 
 
 ```{r}
 
-# ---- join dataframes ----
-coastal_pop_join <- dplyr::full_join(coastal_pop_filter, total_pop_filter, by = c("rgn_id", "year"))
 
-zero_coastal <- coastal_prop_pct[coastal_prop_pct$coastal_pop == 0, ]
-unique(zero_coastal$rgn_id)
-
-# adjust coastal population proportion and percentage multiplier 
-# if coastal_pop != 0 and total_pop is NA, set coastal_prop to 1 (assumes that population of small island regions is all coastal)
-coastal_pop_adj <- coastal_prop_pct %>% 
-  mutate(coastal_prop = case_when(
-    coastal_pop != 0 & is.na(total_pop) ~ 1,
-    .default = coastal_prop
-  ))
-
-
-# uninhabited OHI regions
-uninhabited_rgns <- read_csv(here::here("globalprep", "spatial", "v2017", "output", "rgn_uninhabited_islands.csv"))
-
-# to join with tourism_value
-uninhabited_rgns_ch <- uninhabited_rgns %>% 
-  mutate(rgn_id = as.character(rgn_id))
-
-# check if uninhabited regions have any pop data
-test_pop <- dplyr::inner_join(coastal_pop_adj, uninhabited_rgns, by = "rgn_id") 
-
-tour_uninhabited_check <- dplyr::inner_join(tourism_value, uninhabited_rgns_ch, by = "rgn_id")
-#View(tour_uninhabited_check) # df is empty! makes sense because uninhabited regions wouldn't have governments to report tourism values... this means we can also antijoin our coastal population data with the uninhabited regions dataset
-
-# ---- remove uninhabited regions ----
-coastal_multipliers <- coastal_pop_adj %>% 
-  dplyr::anti_join(uninhabited_rgns, by = "rgn_id") %>% 
-  mutate(rgn_id = as.character(rgn_id)) # prep rgn_id column for joining with tourism_value df
 
 ```
 
