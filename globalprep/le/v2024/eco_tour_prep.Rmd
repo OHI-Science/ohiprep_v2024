@@ -1311,101 +1311,191 @@ Overview of next steps
 Aggregate by `countryname` to get total coastal population count in 2010. We'll use this to calculate a fixed coastal population proportion multiplier to estimate coastal tourism value.
 
 ```{r}
-# ---- create 2010 subset for fixed multiplier calculation ----
+# investigating values for 1 country
 coastal_2010_pop_subset <- coastal_prop_tidy %>% 
   dplyr::filter(year == 2010) %>% 
   dplyr::select(c(country_name = countryname, designation = designationname, year, population_count, population_pct))
 
 coastal_2010_pop_subset %>% filter(country_name %in% c("United States of America"))
 
+# ---- create subset for fixed multiplier calculation ----
+coastal_pop_subset <- coastal_prop_tidy %>% 
+  dplyr::select(c(country_name = countryname, designation = designationname, year, population_count, population_pct))
+
 
 # ---- find estimated total coastal population ----
-coastal_2010_pop <- coastal_2010_pop_subset %>% 
+coastal_pop <- coastal_pop_subset %>% 
   dplyr::group_by(country_name, year) %>% 
   dplyr::summarise(coastal_pop = sum(population_count, na.rm = TRUE),
-                   coastal_pct = sum(population_pct, na.rm = TRUE))
+                   coastal_pct = sum(population_pct, na.rm = TRUE)) 
+  # note: the raw data has zeros instead of NAs in many cases
   
-coastal_2010_pop %>% filter(country_name %in% c("United States of America"))
+# check to see if this step worked
+coastal_pop %>% filter(country_name %in% c("United States of America"))
+
+# create proportion multiplier (to estimate coastal proportion of tourism value)
+coastal_multipliers <- coastal_pop %>% 
+  dplyr::mutate(coastal_proportion = coastal_pct / 100)
 ```
 
-#### WorldBank: Total population
+pseudo code:
 
-Global, country-level total population data (ranges from 1960-2023)
+-   for each `country_name` (group by?)
+(do the rest in a mutate(case_when)?)
+    -   if coastal_proportion != 0 in 1990 and/or 2000 
+    -   AND coastal_proportion == 0 in 2010
+    -   replace coastal_prportion value of 0 with NA for 2010 
+    
+  then gapfill for those NAs (goal is to copy over 2000 value for missing/zero 2010 value)
 
-```{r WDI-test, eval=FALSE}
-# tried using WDI package but got 502 Bad Gateway warning & timed out
-# find code for World Bank total population dataset
-wdi_datasets <- WDI::WDI_data$series
-
-wb_pop_df_info <- wdi_datasets %>% 
-  filter(name %in% c("Population, total"))
-
-wb_pop_code <- wb_pop_df_info$indicator
-# SP.POP.TOTL
-
-WDI::WDI(country = "all", indicator = "SP.POP.TOTL", start = 2010, end = 2010)
-```
 
 ```{r}
-# read in total pop data from world bank
-wb_total_pop_raw <- readr::read_csv(here(wb_dir, "WorldBank_global_country_population_1960-2023",
-                                         "API_SP.POP.TOTL_DS2_en_csv_v2_1584446.csv"),
-                                    skip = 4)
-# note: values are total, not in thousands
-
-# ---- cleaning & tidying ----
-wb_total_pop <- wb_total_pop_raw %>% 
-  # pivot years from wide to long
-  tidyr::pivot_longer(
-    cols = "1960":"2023", # update to whatver time frame makes sense
-    names_to = "year",
-    values_to = "total_pop"
+# ---- gapfilling prep ----
+coastal_fixed <- coastal_multipliers %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(country_name) %>% 
+  dplyr::mutate(coastal_prop_fix = case_when(
+    # for each country, if the year is 2010 and 
+    year == 2010 & 
+      # coastal_proportion value is 0 and
+      coastal_proportion == 0 &
+      # if the coastal_proportion values in 1990 and 2000 are not zero, fill 2010 value with NA
+      any(coastal_proportion[year %in% c(1990, 2000)] != 0) ~ NA_real_,
+    # otherwise, keep original coastal_proportion value
+    .default = coastal_proportion
+  )
   ) %>% 
-  # clean column names
-  janitor::clean_names() %>%  # running this after pivoting to reduce how much cleaning the year column needs
-  # fix data types
-  dplyr::mutate(year = as.numeric(year)) %>% 
-  # select relevant columns
-  dplyr::select(c(country_name, year, total_pop))
+  dplyr::ungroup()
 
-# make 2010 subset for calculating coastal pop proportion
-wb_2010_pop <- wb_total_pop %>% 
-  filter(year == 2010)
+# check to see if this worked ----
+# proper NA filling:
+coastal_fixed %>% filter(country_name == "Guam") 
+# nice! we can see "NA" in 2010's coastal_prop_fixed column
+
+# maintaining appropriate zeroes for landlocked countries
+coastal_fixed %>% filter(country_name == "Afghanistan") 
+# great! zeroes are maintained when appropriate
+
+# ---- gapfilling ----
+# for countries that have 1990 and 2000 data but not 2010 data, gapfill 2010 values with 2000 values
+coastal_gf <- coastal_fixed %>% 
+  dplyr::group_by(country_name) %>% 
+  # interpolate (fill missing values between 2 values)
+  dplyr::mutate(coastal_prop_gf = zoo::na.approx(coastal_prop_fix, # using values in this column
+                                       na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
+                                       rule = 2 # uses closest data extreme to extrapolate for leading and trailing NAs
+  )) %>% 
+  dplyr::ungroup()
+
+# check:
+guam_gf_check <- coastal_gf %>% 
+  dplyr::filter(country_name == "Guam") %>% 
+  knitr::kable()
+
+kableExtra::kable_classic_2(guam_gf_check)
+# great! coastal_prop_gf is now 1 for 2010 
+```
+
+Great! Now we can make subsets to apply to our tourism value data.
+
+We have a subset of Hong Kong and Macao tourism value separated out as `macao_hk_value`. We should apply appropriate multipliers to this subset and to the China subset created with the Bureau of Statistics of China data. After the multipliers have been applied, we can then aggregate their values within the greater OHI region classication of China. 
+
+```{r}
+# ---- make subsets ----
+
+# Macao + Hong Kong
+macao_hk_coastal <- coastal_gf %>% 
+  dplyr::filter(country_name %in% c("Macao", "Hong Kong"))
+# note: both have proportions of 1 (100% of population lives within 100km of coast)
+# this means that we can actually just add their full tourism values to the coast-adjusted tourism values for China
+
+# China
+china_coastal <- coastal_gf %>% 
+  dplyr::filter(country_name %in% c("China"))
+
+# without China, Hong Kong, or Macao (to prep for running name_2_rgn)
+no_china_coastal <- coastal_gf %>% 
+  dplyr::filter(!country_name %in% c("China", "Hong Kong", "Macao"))
+```
+
+Run `name_2_rgn`
+
+```{r}
+# ---- run name_2_rgn on coastal subset without China ----
+coastal_rgn <- ohicore::name_2_rgn(
+  df_in = no_china_coastal, 
+  fld_name = "country_name",
+  flds_unique = c("year")
+)
+
+# ---- issues to address ----
+# "These data were removed for not having any match in the lookup tables:"
+# isle of man 
+# korea 
+# netherland antilles       
+# saint vincent            
+# svalbard       
+# western samoa 
+
+# ---- find duplicates ----
+coastal_duplicates <- coastal_rgn[duplicated(coastal_rgn[, c("rgn_name", "year")]),]
+#unique(coastal_duplicates$country_name)
+coastal_dup_rgns <- c(unique(coastal_duplicates$rgn_name))
+
+#length(unique(gdp_rgn$rgn_name))
+
+# Guadeloupe and Martinique
+# Northern Mariana Islands and Guam
+# Puerto Rico and Virgin Islands of the United States
+
+coastal_rgn %>% dplyr::filter(rgn_name %in% c("Guadeloupe and Martinique"))
+# both are 1, so we can aggregate by renaming both Guadeloupe and Martinique to the combined region name
+
+coastal_rgn %>% dplyr::filter(rgn_name %in% c("Northern Mariana Islands and Guam"))
+# both are equal to 0 (the coastal pop dataset did not have data on these regions in 2010, but the coastal population percent was 100% for both regions in 1990 and 2000, so we will set these proportions equal to 1 in our next aggregation step by just assigning them the same name)
+
+coastal_rgn %>% dplyr::filter(rgn_name %in% c("Puerto Rico and Virgin Islands of the United States"))
+# great! for all of these, the proportion is 1 in both regions, so we can just assign them the same name
+
+# ---- fix names ----
+no_china_coastal_fix <- no_china_coastal %>% 
+  dplyr::select(country_name, year, coastal_prop_gf) %>% 
+dplyr::mutate(country_name = case_when(
+    country_name == "Korea" ~ "South Korea",
+    country_name == "Netherland Antilles" ~ "Curacao",
+    country_name == "Saint Vincent" ~ "Saint Vincent and the Grenadines",
+    country_name == "Western Samoa" ~ "Samoa", #OHI has Samoa (WSM) and American Samoa (ASM)
+    .default = country_name
+  ))
+
+# ---- run name_2_rgn again ----
+coastal_rgn <- ohicore::name_2_rgn(
+  df_in = no_china_coastal_fix, 
+  fld_name = "country_name",
+  flds_unique = c("year")
+)
+
+# Isle of Man and Svalbard are still being removed. Check w Mel (COME BACK) about Svalbard being agged with Norway
+
+
+# ---- aggregate ----
+coastal_rgn_agg <- coastal_rgn %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(rgn_id, rgn_name, year) %>% 
+  dplyr::summarize(coastal_prop_gf = case_when(
+    # if it's one of the duplicate regions identified earlier, 
+    rgn_name %in% c(coastal_dup_rgns) ~ 1, # fill coastal_prop_gf with a 1 (100% of pop within 100km of coast)
+    # else, keep old value
+    .default = coastal_prop_gf
+  ))
 
 ```
 
 
-
 ```{r}
-# read in total population time series data from the UN, created in mar_prs_population v2021 
-UN_total_pop <- read_csv(here::here("globalprep", "mar_prs_population", "v2021", "output", "UN_population.csv"))
-
-# ---- filter data to date_range (2008-2019 in v2024) ----
-coastal_pop_filter <- coastal_pop_count %>% 
-  filter(year %in% c(date_range)) %>% 
-  rename(coastal_pop = popsum)
-
-total_pop_filter <- UN_total_pop %>% 
-  filter(year %in% c(date_range)) %>% 
-  rename(total_pop = population)
-
-# note: the UN total pop and coastal pop dfs seem to have some missing regions
-
-pop_rgn_diff <- dplyr::setdiff(coastal_pop_filter$rgn_id, total_pop_filter$rgn_id)
-
-print(paste("Number of regions that don't occur in both datasets (only 1 set):", length(pop_rgn_diff)))
-
-print(paste("Number of unique regions in Coastal Pop dataset:", length(unique(coastal_pop_filter$rgn_id))))
-
-print(paste("Number of unique regions in UN Total Pop dataset:", length(unique(total_pop_filter$rgn_id))))
 
 # ---- join dataframes ----
 coastal_pop_join <- dplyr::full_join(coastal_pop_filter, total_pop_filter, by = c("rgn_id", "year"))
-
-# ---- calculate proportion of coastal pop ----
-coastal_prop_pct <- coastal_pop_join %>% 
-  mutate(coastal_prop = (coastal_pop / total_pop),
-         coastal_pct = (coastal_prop * 100)) # proportion multiplier
 
 zero_coastal <- coastal_prop_pct[coastal_prop_pct$coastal_pop == 0, ]
 unique(zero_coastal$rgn_id)
