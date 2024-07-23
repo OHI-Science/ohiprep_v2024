@@ -1405,17 +1405,22 @@ We have a subset of Hong Kong and Macao tourism value separated out as `macao_hk
 
 # Macao + Hong Kong
 macao_hk_coastal <- coastal_gf %>% 
-  dplyr::filter(country_name %in% c("Macao", "Hong Kong"))
+  dplyr::filter(country_name %in% c("Macao", "Hong Kong")) %>% 
+  dplyr::select(country_name, year, coastal_prop_gf) %>% 
+  dplyr::filter(year == 2010)
 # note: both have proportions of 1 (100% of population lives within 100km of coast)
 # this means that we can actually just add their full tourism values to the coast-adjusted tourism values for China
 
 # China
 china_coastal <- coastal_gf %>% 
-  dplyr::filter(country_name %in% c("China"))
+  dplyr::filter(country_name %in% c("China")) %>% 
+  dplyr::select(country_name, year, coastal_prop_gf) %>% 
+  dplyr::filter(year == 2010)
 
 # without China, Hong Kong, or Macao (to prep for running name_2_rgn)
 no_china_coastal <- coastal_gf %>% 
-  dplyr::filter(!country_name %in% c("China", "Hong Kong", "Macao"))
+  dplyr::filter(!country_name %in% c("China", "Hong Kong", "Macao")) %>% 
+  dplyr::select(country_name, year, coastal_prop_gf)
 ```
 
 Run `name_2_rgn`
@@ -1449,18 +1454,18 @@ coastal_dup_rgns <- c(unique(coastal_duplicates$rgn_name))
 # Puerto Rico and Virgin Islands of the United States
 
 coastal_rgn %>% dplyr::filter(rgn_name %in% c("Guadeloupe and Martinique"))
-# both are 1, so we can aggregate by renaming both Guadeloupe and Martinique to the combined region name
+# both are 1, so we can aggregate by taking the mean proportion value per year, grouping by rgn_name, rgn_id, and year
 
 coastal_rgn %>% dplyr::filter(rgn_name %in% c("Northern Mariana Islands and Guam"))
-# both are equal to 0 (the coastal pop dataset did not have data on these regions in 2010, but the coastal population percent was 100% for both regions in 1990 and 2000, so we will set these proportions equal to 1 in our next aggregation step by just assigning them the same name)
+# both are equal to 0 (the coastal pop dataset did not have data on these regions in 2010, but the coastal population percent was 100% for both regions in 1990 and 2000, so we will set these proportions equal to 1 in our next aggregation step by taking the mean of both 1s
 
 coastal_rgn %>% dplyr::filter(rgn_name %in% c("Puerto Rico and Virgin Islands of the United States"))
-# great! for all of these, the proportion is 1 in both regions, so we can just assign them the same name
+# great! for all of these, the proportion is 1 in both regions, so we can just use a mean to aggregate
 
 # ---- fix names ----
 no_china_coastal_fix <- no_china_coastal %>% 
   dplyr::select(country_name, year, coastal_prop_gf) %>% 
-dplyr::mutate(country_name = case_when(
+  dplyr::mutate(country_name = case_when(
     country_name == "Korea" ~ "South Korea",
     country_name == "Netherland Antilles" ~ "Curacao",
     country_name == "Saint Vincent" ~ "Saint Vincent and the Grenadines",
@@ -1482,12 +1487,8 @@ coastal_rgn <- ohicore::name_2_rgn(
 coastal_rgn_agg <- coastal_rgn %>% 
   dplyr::ungroup() %>% 
   dplyr::group_by(rgn_id, rgn_name, year) %>% 
-  dplyr::summarize(coastal_prop_gf = case_when(
-    # if it's one of the duplicate regions identified earlier, 
-    rgn_name %in% c(coastal_dup_rgns) ~ 1, # fill coastal_prop_gf with a 1 (100% of pop within 100km of coast)
-    # else, keep old value
-    .default = coastal_prop_gf
-  ))
+  # taking the mean 
+  dplyr::summarize(coastal_prop_gf = mean(coastal_prop_gf, na.rm = TRUE))
 
 ```
 
