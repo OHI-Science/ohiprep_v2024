@@ -1206,23 +1206,127 @@ prettyNum(max_tour_val,big.mark = ",", scientific = FALSE)
 
 
 ```{r}
+library(tidyverse)
 # read in coastal population proportion from PLACE
 coastal_pop_prop_raw <- read_csv(here::here(raw_data_dir, "SEDAC_CIESIN", data_dir_version_year, "nagdc-population-landscape-and-climate-estimates-v3-csv", "nagdc-population-landscape-and-climate-estimates-version-3.csv"))
 
-# preliminary cleaning & filtering
+# ---- preliminary cleaning & filtering ----
 coastal_prop <- coastal_pop_prop_raw %>% 
   janitor::clean_names() %>% 
   # filter to 100km coastal proximity
-  dplyr::filter(theme_variable %in% c("COASTAL PROXIMITY: 100KM ZONE: 100km zone"))
+  dplyr::filter(theme_variable %in% c("COASTAL PROXIMITY: 100KM ZONE: 100km zone")) %>% 
+  # select relevant columns
+  dplyr::select(c(iso3v10, countryname, designationid:incomegroup)) %>% 
+  # rename population (not pct) columns to prepare for pivoting
+  dplyr::rename_with(
+    # use a regular expression to detect the YYYY pattern (and end after those years, avoiding pct columns)
+    .cols = matches("^population\\d{4}$"),
+    .fn = ~ paste0(., "_count") # add _count to the end of those column names
+  )
+
+# ---- tidy ----
+coastal_prop_tidy <- coastal_prop %>% 
+  # first pivot: longer --> collapse cols into "name": populationYYYY_count|pct and values into "value"
+  tidyr::pivot_longer(
+    cols = starts_with("population"),
+    names_to = "name",
+    values_to = "value"
+  ) %>%
+  # create "year" column and simplified "type" (count or pct) column
+  dplyr::mutate(
+    # use a regular expression to pull out the YYYY values
+    year = as.numeric(str_extract(name, "\\d{4}")),
+    # if "_count" is detected, rename to "count", else "pct"
+    type = if_else(str_detect(name, "_count$"), "count", "pct")
+  ) %>%
+  # drop old name column (we've already extracted the relevant information)
+  dplyr::select(-name) %>%
+  # second pivot: wider --> values into "population_count" and "population_pct"
+  tidyr::pivot_wider(
+    names_from = type,
+    values_from = value,
+    names_prefix = "population_"
+  )
+
+# there should now be three rows for each area (note: not countryname, as there is data on multiple areas (urban and rural) for most countries),
+# as there are three years (1990, 2000, 2010)
 
 # note: there are two designations: rural and urban
 # so we're going to have to aggregate these to get a total proportion
 ```
 
-tomorrow:
+
+
+
 - figure out if population pct is of rural/urban or of total population
 - check: add population counts for both designations for one country in 1 year, then divide rural count by total count, see if this equals rural pct or something else
-- if it is %rural and %urban OF coastal pop, combine counts, divide by total pop (from another df? -- check in with Mel about commonly used ones since UN data seems to always have lots of gaps and not all of the regions)
+
+```{r}
+# check for grouping
+# is_grouped_df(coastal_prop_tidy)
+
+# make subset to test population values
+prop_coast_test <- coastal_prop_tidy %>% 
+  # select first country to test
+  filter(countryname == "Aruba" & year == 1990)
+
+# make rural and urban subsets
+rural_test <- prop_coast_test %>% filter(designationname == "RURAL")
+urban_test <- prop_coast_test %>% filter(designationname == "URBAN")
+
+# extract values (for shorter math statements)
+rural_pop_count <- rural_test$population_count
+urban_pop_count <- urban_test$population_count
+
+# find proportion of rural out of total coastal pop
+rural_test_prop <- rural_pop_count / (rural_pop_count + urban_pop_count)
+
+# see if rural proporiton is equal to pop pct value
+rural_test$population_pct == round((rural_test_prop * 100), 0)
+
+```
+
+Okay! Now we know what this data is showing -- out of the total coastal population per country, what percent (and count) is Rural or Urban.
+
+So, to make a coastal tourism multiplier, we need to aggregate the coastal population counts (rural + urban), then divide that coastal population count by the total population of the country (which we'll pull in from another dataset).
+
+
+Overview of next steps
+
+-   aggregate by countryname to get total coastal population count in 2010
+-   run `ohicore::name_2_rgn`
+-   bring in world population data 
+
+    -   clean & tidy, select 2010 values
+    -   run `ohicore::name_2_rgn`
+
+-   join coastal population + total population in 2010
+-   calculate coastal population proportion
+-   join with appropriate tourism dataset & calculate appx. coastal tourism value 
+
+
+
+
+```{r WDI-test, eval=FALSE}
+# tried using WDI package but got 502 Bad Gateway warning & timed out
+# find code for World Bank total population dataset
+wdi_datasets <- WDI::WDI_data$series
+
+wb_pop_df_info <- wdi_datasets %>% 
+  filter(name %in% c("Population, total"))
+
+wb_pop_code <- wb_pop_df_info$indicator
+# SP.POP.TOTL
+
+WDI::WDI(country = "all", indicator = "SP.POP.TOTL", start = 2010, end = 2010)
+```
+
+```{r}
+# read in total pop data from world bank
+# world bank dir, "WorldBank_global_country_population_1960-2023", "API_SP.POP.TOTL_DS2_en_csv_v2_1584446.csv"
+
+```
+
 
 
 ```{r}
