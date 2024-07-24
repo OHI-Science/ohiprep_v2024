@@ -168,23 +168,56 @@ Initially, there are three scripts, each with different starting units of value,
 -   `liv_cf_quality_prep.Rmd`
 
     -   Commercial fishing quality of jobs (wages)
-    -   
+    -   Labor Force & Employment Data
+        -   Labor Force data from World Bank (downloaded June 28. 2024)
+
+            -   <https://data.worldbank.org/indicator/SL.TLF.TOTL.IN>
+
+        -   OECD (Employment in fisheries, aquaculture and processing, 2009 - 2021) (downloaded July 2, 2024) -- for cf job data
+
+            -   [https://data-explorer.oecd.org/vis?fs[0]=Topic%2C1%7CAgriculture%20and%20fisheries%23AGR%23%7CFisheries%20and%20aquaculture%23AGR_FSA%23&pg=0&fc=Topic&bp=true&snb=6&vw=ov&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_FISH_EMP%40DF_FISH_EMPL&df[ag]=OECD.TAD.ARP&df[vs]=1.0&dq=.A....\_T.\_T&pd=2009%2C&to[TIME_PERIOD]=false&ly[cl]=TIME_PERIOD&ly[rs]=REF_AREA&ly[rw]=DOMAIN](https://data-explorer.oecd.org/vis?fs%5B0%5D=Topic%2C1%7CAgriculture%20and%20fisheries%23AGR%23%7CFisheries%20and%20aquaculture%23AGR_FSA%23&pg=0&fc=Topic&bp=true&snb=6&vw=ov&df%5Bds%5D=dsDisseminateFinalDMZ&df%5Bid%5D=DSD_FISH_EMP%40DF_FISH_EMPL&df%5Bag%5D=OECD.TAD.ARP&df%5Bvs%5D=1.0&dq=.A...._T._T&pd=2009%2C&to%5BTIME_PERIOD%5D=false&ly%5Bcl%5D=TIME_PERIOD&ly%5Brs%5D=REF_AREA&ly%5Brw%5D=DOMAIN){.uri}
+
+        -   FAO Yearbook (downloaded July 2, 2024) -- for cf job gapfilling if needed
+
+            -   <https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content>
+
+        -   OECD and FAO joint collection data (1995 - 2022) from Fabiana Cerasa (OECD) and Orsolya Mikecz (FAO)
+
+            -   `/home/shares/ohi/git-annex/globalprep/_raw_data/OECD_FAO_joint_collection/d2024`
+
+            -   Data was provided by email for Marine fishing (among other sectors) and aggregated by geo area and year for all sexes.
 
 -   `liv_mar_jobs_prep.Rmd`
 
     -   Mariculture number of jobs (employment)
-    -   
+        -   Partially obtained from [FAO Fisheries and Aquaculture Statistical Yearbook](https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content)
+        -   Also brought in OECD data from their online [OECD Data Explorer](https://data-explorer.oecd.org/vis?df%5Bds%5D=DisseminateFinalDMZ&df%5Bid%5D=DSD_SOE%40DF_SOE&df%5Bag%5D=OECD.ENV.EPI&dq=.A....&pd=1995%2C2024&to%5BTIME_PERIOD%5D=false&vw=tb)
 
 -   `liv_tour_dataprep.Rmd`
 
     -   Tourism number and quality of jobs
-    -   
+        -   Labor Force data from World Bank (downloaded June 28, 2024)
+
+            ```         
+            - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+            ```
+
+            -   Jobs data from UN Tourism / UNWTO (downloaded June 26th, 2024)
+
+                -   Key Tourism Statistics <https://www.unwto.org/tourism-statistics/key-tourism-statistics>
+                -   According to the website, the latest update of the dataset took place in 31 January 2024.
+
+            -   Quality/Wage data from ILOSTAT (downloaded July 2, 2024) -- for tour/cf wage data
+
+                -   <https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A>
 
 -   `liv_labor_force_dataprep.Rmd`
 
     -   Proportion of Tourism Jobs per Country/Region per Year, data from World Bank
     -   saves as liv_labor_force.csv
-    -   
+        -   Labor Force data from World Bank (downloaded June 28. 2024)
+
+            -   <https://data.worldbank.org/indicator/SL.TLF.TOTL.IN>
 
 #### Economies (ECO)
 
