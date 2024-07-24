@@ -209,14 +209,10 @@ length(unique(gdp_prop_clean$geo_area_name))
 # v2024: 117
 
 # make all geographic areas have the same date range (and fill missing values with NAs)
-years_df <- tibble(geo_area_name = gdp_prop_clean$geo_area_name) %>% 
-  dplyr::group_by(geo_area_name) %>% 
-  dplyr::summarize(year = seq(min(gdp_prop_clean$year),
-                       max(gdp_prop_clean$year)))
-
-# ---- join with gdp prop data ----
-gdp_prop_yrs <- dplyr::left_join(years_df, gdp_prop_clean,
-                          by = c("geo_area_name", "year"))
+gdp_prop_yrs <- gdp_prop_clean %>% 
+  tidyr::complete(geo_area_name, 
+           year = min(year):max(year),
+           fill = list(value = NA))
 
 # here we can see that the update has been made:
 gdp_prop_yrs[46:60,] # for countries without data in certain years,
@@ -1255,70 +1251,22 @@ coastal_prop_tidy <- coastal_prop %>%
 # note: there are two designations: rural and urban
 # so we're going to have to aggregate these to get a total proportion
 
+# # investigating values for 1 country
+# coastal_2010_pop_subset <- coastal_prop_tidy %>% 
+#   dplyr::filter(year == 2010) %>% 
+#   dplyr::select(c(country_name = countryname, designation = designationname, year, population_count, population_pct))
+# 
+# coastal_2010_pop_subset %>% filter(country_name %in% c("United States of America"))
 ```
 
-
-
-
-- figure out if population pct is of rural/urban or of total population
-- check: add population counts for both designations for one country in 1 year, then divide rural count by total count, see if this equals rural pct or something else
-
-```{r}
-# check for grouping
-# is_grouped_df(coastal_prop_tidy)
-
-# make subset to test population values
-prop_coast_test <- coastal_prop_tidy %>% 
-  # select first country to test
-  filter(countryname == "Aruba" & year == 1990)
-
-# make rural and urban subsets
-rural_test <- prop_coast_test %>% filter(designationname == "RURAL")
-urban_test <- prop_coast_test %>% filter(designationname == "URBAN")
-
-# extract values (for shorter math statements)
-rural_pop_count <- rural_test$population_count
-urban_pop_count <- urban_test$population_count
-
-# find proportion of rural out of total coastal pop
-rural_test_prop <- rural_pop_count / (rural_pop_count + urban_pop_count)
-
-# see if rural proporiton is equal to pop pct value
-rural_test$population_pct == round((rural_test_prop * 100), 0)
-
-```
-
-Okay! Now we know what this data is showing -- out of the total coastal population per country, what percent (and count) is Rural or Urban.
-
-So, to make a coastal tourism multiplier, we need to aggregate the coastal population counts (rural + urban), then divide that coastal population count by the total population of the country (which we'll pull in from another dataset).
-
-
-Overview of next steps
-
--   aggregate by countryname to get total coastal population count in 2010
--   run `ohicore::name_2_rgn`(subset out Macao & Hong Kong first)
--   bring in world population data 
-
-    -   clean & tidy, select 2010 values
-    -   run `ohicore::name_2_rgn`
-
--   join coastal population + total population in 2010
--   calculate coastal population proportion
--   join with appropriate tourism dataset & calculate appx. coastal tourism value 
+Okay! Now that the data is tidy, we need to aggregate the coastal population percentages (Rural + Urban = Total Coastal) per country per year. We could also just filter to year == 2010, since we're only going to be using that year's data, but I want to filter that out as late as possible in case future years decide to incorporate updated data or use 1990 and 2000 values to make projections beyond 2010. 
 
 
 #### Coastal population
 
-Aggregate by `countryname` to get total coastal population count in 2010. We'll use this to calculate a fixed coastal population proportion multiplier to estimate coastal tourism value.
+Aggregate by `country_name` to get total coastal population (count and percent) in 2010. We'll use this to calculate a fixed coastal population proportion multiplier to estimate coastal tourism value.
 
 ```{r}
-# investigating values for 1 country
-coastal_2010_pop_subset <- coastal_prop_tidy %>% 
-  dplyr::filter(year == 2010) %>% 
-  dplyr::select(c(country_name = countryname, designation = designationname, year, population_count, population_pct))
-
-coastal_2010_pop_subset %>% filter(country_name %in% c("United States of America"))
-
 # ---- create subset for fixed multiplier calculation ----
 coastal_pop_subset <- coastal_prop_tidy %>% 
   dplyr::select(c(country_name = countryname, designation = designationname, year, population_count, population_pct))
@@ -1328,21 +1276,38 @@ coastal_pop_subset <- coastal_prop_tidy %>%
 coastal_pop <- coastal_pop_subset %>% 
   dplyr::group_by(country_name, year) %>% 
   dplyr::summarise(coastal_pop = sum(population_count, na.rm = TRUE),
-                   coastal_pct = sum(population_pct, na.rm = TRUE)) 
+                   coastal_pct = sum(population_pct, na.rm = TRUE),
+                   .groups = "keep") 
   # note: the raw data has zeros instead of NAs in many cases
   
 # check to see if this step worked
-coastal_pop %>% filter(country_name %in% c("United States of America"))
+(coastal_pop %>% filter(country_name %in% c("United States of America")) %>% 
+    knitr::kable(format = "markdown", booktabs = TRUE)) %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>% 
+  kableExtra::kable_styling("striped", full_width = FALSE) 
 
-# create proportion multiplier (to estimate coastal proportion of tourism value)
+kableExtra::kable_classic(usa_coastal_check)
+
+# ---- create proportion multiplier ---- (to estimate coastal proportion of tourism value)
 coastal_multipliers <- coastal_pop %>% 
   dplyr::mutate(coastal_proportion = coastal_pct / 100)
+
+
+# inspect data
+(coastal_multipliers %>% filter(country_name == "Guam")) %>% 
+  knitr::kable(format = "markdown", booktabs = TRUE) %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>% 
+  kableExtra::kable_styling("striped", full_width = FALSE) 
+
+# note: data gap in 2010 -- clear data for 1990 and 2000, but "0" for 2010... it's not like Guam's population suddenly vanished within 100km of the coast
 ```
 
-pseudo code:
+To address these case-specific datagaps for countries with "0" values that should actually be "NA", we'll replace those zeroes with NA placeholders, then gap fill using `na.approx` and `rule = 2` to copy over the 2000 value to 2010. Methodologically this shouldn't be adding major errors, as coastal population levels are relatively stable over this type of limited time frame.
 
--   for each `country_name` (group by?)
-(do the rest in a mutate(case_when)?)
+*pseudo code:*
+
+-   for each `country_name` (group by)
+(do the rest in a mutate(case_when))
     -   if coastal_proportion != 0 in 1990 and/or 2000 
     -   AND coastal_proportion == 0 in 2010
     -   replace coastal_prportion value of 0 with NA for 2010 
@@ -1370,11 +1335,17 @@ coastal_fixed <- coastal_multipliers %>%
 
 # check to see if this worked ----
 # proper NA filling:
-coastal_fixed %>% filter(country_name == "Guam") 
+coastal_fixed %>% filter(country_name == "Guam") %>% 
+  knitr::kable(format = "markdown", booktabs = TRUE) %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>% 
+  kableExtra::kable_styling("striped", full_width = FALSE)
 # nice! we can see "NA" in 2010's coastal_prop_fixed column
 
 # maintaining appropriate zeroes for landlocked countries
-coastal_fixed %>% filter(country_name == "Afghanistan") 
+coastal_fixed %>% filter(country_name == "Afghanistan") %>% 
+  knitr::kable(format = "markdown", booktabs = TRUE) %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>% 
+  kableExtra::kable_styling("striped", full_width = FALSE)
 # great! zeroes are maintained when appropriate
 
 # ---- gapfilling ----
@@ -1389,11 +1360,10 @@ coastal_gf <- coastal_fixed %>%
   dplyr::ungroup()
 
 # check:
-guam_gf_check <- coastal_gf %>% 
-  dplyr::filter(country_name == "Guam") %>% 
-  knitr::kable()
-
-kableExtra::kable_classic_2(guam_gf_check)
+coastal_gf %>% dplyr::filter(country_name == "Guam") %>% 
+  knitr::kable(format = "markdown", booktabs = TRUE) %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>% 
+  kableExtra::kable_styling("striped", full_width = FALSE)
 # great! coastal_prop_gf is now 1 for 2010 
 ```
 
@@ -1519,15 +1489,42 @@ coastal_rgn_agg <- coastal_rgn %>%
 
 ```
 
-Next steps:
+#### Coastal joins 
 
--   join 
+**Next steps:**
+
+*joining:*
+-   join (1) Macao + HK coastal proportion subset and tourism value subset, implement multipliers
+-   join (2) China coastal subset and China tourism value subset, implement multiplier
+-   join Macao + HK coastal tourism value + China coastal tourism value, aggregate to get total China coastal tourism value
+-   join (3) no China, HK, or Macao coastal proportion subset with non-China (which is also non-USA) tourism value subset
+-   prep + implement multiplier to get coastal tourism value
 
 ```{r}
+# ---- Macao + HK coastal tourism ----
+m_hk_prep <- macao_hk_coastal %>% 
+  select(-year) %>% 
+  group_by(country_name, coastal_prop_gf) %>% 
+  reframe(year = seq(start_year, stop_year))
+
+# join with OHI regions
+coastal_tourism_full <- dplyr::full_join(rgn_yr_df, coastal_tourism_join,
+                                         by = join_by("rgn_id", "rgn_name", "year")) %>% 
+  select(rgn_id, rgn_name, year, coastal_tour_value)
+
+macao_hk_coastal_tour <- dplyr::full_join(macao_hk_value, m_hk_prep)
+
+# ---- mainland China coastal tourism ----
 
 
+# ---- total China coastal tourism ----
 
 ```
+
+
+
+
+
 
 
 Basic plot to visually inspect data
