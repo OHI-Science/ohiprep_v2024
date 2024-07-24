@@ -99,6 +99,7 @@ cf_df_adj <- inflation_adjustment(
 
 
 # ---- Mariculture (mar) ----
+# if you run into the warning about the worldbank API connection failing and a "502 Bad Gateway" error, wait a few minutes before trying to run this again (and don't run anything else in the meantime)
 mar_df_adj <- inflation_adjustment(mar_df_pre, conversion_date = 2017,
                                    country = "US", current_year = current_year)
 
@@ -132,7 +133,7 @@ stop_year <- min(min_max_df$max_year) # take minimum of maximum years
 # ----- create aggregated adjusted data frame ------------
 
 eco_usd_filter <- eco_usd_bind %>% 
-  filter(year %in% c(start_year:stop_year)) # filter to date range
+  dplyr::filter(year %in% c(start_year:stop_year)) # filter to date range
 
 
 # make all geographic areas have the same date range (and fill missing values with NAs)
@@ -147,6 +148,13 @@ eco_years_df <- tibble(rgn_name = eco_usd_filter$rgn_name,
 # ---- join with gdp prop data ----
 eco_usd_years <- left_join(eco_years_df, eco_usd_filter,
                           by = c("rgn_id", "rgn_name", "year"))
+
+
+# come back to this -- makes 1.7 million rows bc expands df for all combinations of rgn_id, rgn_name, sector, for all years
+eco_years_test <- eco_usd_filter %>% 
+  tidyr::complete(rgn_id, rgn_name, sector, 
+           year = min(year):max(year),
+           fill = list(value = NA))
 ```
 
 Join with OHI regions before aggregating by region for all sectors
@@ -156,12 +164,13 @@ Join with OHI regions before aggregating by region for all sectors
 region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>%
   dplyr::select(-Notes) # drop notes column
 
-# ---- join OHI regions with years df ----
-rgn_yr_df <- tibble(rgn_name = region_names$rgn_name,
-                       rgn_id = region_names$rgn_id) %>% # take the regions from region_names, which is all of the regions, even the ones we dont have data for
-  dplyr::group_by(rgn_id, rgn_name) %>% 
-  dplyr::summarize(year = seq(start_year,
-                       stop_year)) # each region should have a row for each year as well now, filled with NA
+# ---- add years to OHI regions ----
+rgn_yr_df <- region_names %>% 
+  # expand() generates all combinations of variables found in a dataset
+  # nesting() finds combinations of rgn_id & rgn_name already present in the df
+  tidyr::expand(nesting(rgn_id, rgn_name), # note: you can't expand on a grouping column
+                year = start_year:stop_year) %>% # within each group combination, add sequence of years in new "year" column
+  dplyr::arrange(rgn_id, year)
 
 # ---- final data frame before aggregation, in which all regions and sectors are present ----
 eco_usd_rgn_full <- dplyr::left_join(rgn_yr_df, eco_usd_filter,
@@ -171,7 +180,7 @@ eco_usd_rgn_full <- dplyr::left_join(rgn_yr_df, eco_usd_filter,
 
 -   plot heatmap of sectors we have data for within date range
 
--   find
+-   find data gaps (there should be none since we gapfilled earlier)
 
 ```{r}
 # ---- make NA status column ----
@@ -192,7 +201,8 @@ agg_test <- eco_status %>%
 agg_test_sum <- agg_test %>% 
   dplyr::ungroup() %>% 
   dplyr::group_by(rgn_name, year) %>% 
-  dplyr::summarize(data_status = sum(status, na.rm = TRUE))
+  dplyr::summarize(data_status = sum(status, na.rm = TRUE), 
+                   .groups = "drop")
 
 #View(agg_test_sum)
 
@@ -213,27 +223,22 @@ agg_heatmap_plot <- ggplot(data = agg_test_sum) +
        fill = "Number of Sectors with Data") +
   theme_bw() 
 
-agg_heatmap_plot
+# static:
+#agg_heatmap_plot
 
-
+# interactive:
+# (note: this may take a minute or so to render)
 plotly::ggplotly(agg_heatmap_plot) 
-# %>% 
-#   add_trace(
-#     x = ~year, 
-#     y = ~rgn_name, 
-#     fill = ~as.factor(data_status),
-#     showlegend = T,
-#     hovertemplate = paste('<i>Year</i>: $%{x}',
-#                         '<br><b>Region Name</b>: %{y}<br>',
-#                         '<b>%{fill}</b>')
-#   )
+
 ```
+
 
 ```{r}
 # calculate aggregate value across all sectors 
 eco_usd_adj <- eco_usd_rgn_full %>% 
   group_by(rgn_id, rgn_name, year) %>% # group by places & years
-  summarize(value = sum(adj_usd, na.rm = TRUE)) %>%  # sum values
+  summarize(value = sum(adj_usd, na.rm = TRUE),
+            .groups = "keep") %>%  # sum values
   mutate(value = case_when( 
     value == 0 ~ NA, # replace 0s with NAs (flag of no data that was lost in summing)
     .default = value

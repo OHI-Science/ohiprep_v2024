@@ -1398,7 +1398,7 @@ coastal_rgn_agg <- coastal_rgn %>%
 m_hk_prep <- macao_hk_coastal %>% 
   dplyr::select(-year) %>% 
   # match naming conventions across dataframes
-  mutate(country_name = case_when(
+  dplyr::mutate(country_name = case_when(
     country_name == "Hong Kong" ~ "Hong Kong SAR, China",
     country_name == "Macao" ~ "Macao SAR, China",
   )) %>% 
