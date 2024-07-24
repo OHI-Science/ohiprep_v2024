@@ -42,6 +42,8 @@ We started with LIV, which included both the number and quality of jobs within a
     -   Mariculture number of jobs (employment)
 -   `liv_tour_dataprep.Rmd`
     -   Tourism number and quality of jobs
+-   `fp_dataprep.Rmd`
+    -   Fish Processing: Proportion of Jobs per Country per Year (2019-2021)
 -   `liv_labor_force_dataprep.Rmd`
     -   Proportion of Tourism Jobs per Country/Region per Year, data from World Bank
     -   saves as liv_labor_force.csv
@@ -150,6 +152,20 @@ Initially, there are three scripts, each with different starting units of value,
             -   Quality/Wage data from ILOSTAT (downloaded July 2, 2024) -- for tour/cf wage data
 
                 -   <https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A>
+
+-   `fp_dataprep.Rmd`
+
+    -   Fish Processing: Proportion of Jobs per Country per Year (2019-2021)
+
+        -   **Data:** [OECD Employment in Fisheries, Aquaculture, and Processing Dataset](https://data-explorer.oecd.org/vis?fs%5B0%5D=Topic%2C1%7CAgriculture%20and%20fisheries%23AGR%23%7CFisheries%20and%20aquaculture%23AGR_FSA%23&pg=0&fc=Topic&bp=true&snb=6&df%5Bds%5D=dsDisseminateFinalDMZ&df%5Bid%5D=DSD_FISH_EMP%40DF_FISH_EMPL&df%5Bag%5D=OECD.TAD.ARP&df%5Bvs%5D=1.0&dq=.A...PROC._T._T&pd=2009%2C2021&to%5BTIME_PERIOD%5D=false&ly%5Bcl%5D=TIME_PERIOD&ly%5Brs%5D=REF_AREA&vw=tb)
+
+        Filtered to select: - Time Period 2009-2021 (2009-most recent year of data as of July 5th, 2024). - "Working domain" --\> "Processing" - "Sex" --\> "Total" - "Working status" --\> "Total"
+
+        -   **Data:** Labor Force Data
+
+            -   Labor Force data from World Bank (downloaded June 28. 2024)
+
+                -   <https://data.worldbank.org/indicator/SL.TLF.TOTL.IN>
 
 -   `liv_labor_force_dataprep.Rmd`
 
