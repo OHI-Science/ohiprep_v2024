@@ -685,17 +685,31 @@ interactive_heatmap_gf <- plotly::ggplotly(heatmap_gf)
 # YAY! it worked the way we wanted it to.  The heatmap is a solid color; there are only TRUEs, which indicates that there is a value present for every observation.
 ```
 
+## Implementing Sector Multipliers
+
+Refer to the OHI Methods <https://ohi-science.org/ohi-methods/goals/goal-models-data.html#livelihoods-and-economies> or [Ben Halpern's Supplementary Information](https://static-content.springer.com/esm/art%3A10.1038%2Fnature11397/MediaObjects/41586_2012_BFnature11397_MOESM79_ESM.pdf) **(page 29)** for the multipliers to apply towards revenue values by sector. For commercial fishing revenue, the multiplier is 1.568 for developed and developing countries.
+
+```{r}
+# As described in table 6.10: "Sector-specific multipliers are used to calculate total jobs and total revenue created by sector-based employment in developing and developed nations."
+
+# -------- implement multiplier ------------
+cf_multiplier <- heatmap_gf_df %>% 
+  mutate(mult_value = appx_value * 1.568) %>% #multiply all values with the multiplier to account for ripple effects commercial fishing may have on revenue
+  select(-appx_value)
+```
+
+
 ## Saving intermediate data
 
 ```{r}
 # columns should be: rgn_id, rgn_name, year, usd (previously value), unit, sector, usd_yr (in this case = year)
 
-cf_revenue_int <- heatmap_gf_df %>% 
-  mutate(usd = appx_value,
+cf_revenue_int <- cf_multiplier %>% 
+  mutate(usd = mult_value,
          unit = "USD (1)",
          sector = "cf",
          usd_yr = year) %>% 
-  select(-c(appx_value, status))
+  select(-c(mult_value, status))
 
 # write_csv(cf_revenue_int, here(int_dir, "eco_cf_usd_pre.csv"))
 ```
