@@ -1204,6 +1204,7 @@ prettyNum(max_tour_val,big.mark = ",", scientific = FALSE)
 -   create dataframe of proportion of coastal population per region
 -   multiply percentage decimal by total tourism value to get approximation for coastal tourism 
 
+Resources: <https://dcl-wrangle.stanford.edu/pivot-advanced.html> used for regular expression implementation
 
 ```{r}
 library(tidyverse)
@@ -1402,17 +1403,18 @@ We have a subset of Hong Kong and Macao tourism value separated out as `macao_hk
 
 **Next steps:**
 
--   create coastal subsets for (1) Hong Kong + Macao, (2) China, (3) no China, HK, or Macao
--   drop "year" column, see if this works for joining subsets. If not, create new years df, apply to coastal subset so that multiplier is copied along range of years for each country.
+-   create coastal subsets for (1) Hong Kong + Macao (`macao_hk_coastal`), (2) China (`china_coastal`), (3) no China, HK, or Macao (`no_china_coastal`)
+-   run `name_2_rgn` on (3) no-china subset
+    -   address duplicates, rename, aggregate, etc.
+    
+-   drop "year" column of coastal subsets, see if this works for joining subsets. If not, create new years df, apply to coastal subset so that multiplier is copied along range of years for each country.
+
 -   join (1) Macao + HK coastal proportion subset and tourism value subset, implement multipliers
 -   join (2) China coastal subset and China tourism value subset, implement multiplier
 -   join Macao + HK coastal tourism value + China coastal tourism value, aggregate to get total China coastal tourism value
 
---
-
-*Non-China subset:*
-
 -   join (3) no China, HK, or Macao coastal proportion subset with non-China (which is also non-USA) tourism value subset
+
 -   prep + implement multiplier to get coastal tourism value
 
 --
@@ -1446,9 +1448,6 @@ no_china_coastal <- coastal_gf %>%
   dplyr::filter(!country_name %in% c("China", "Hong Kong", "Macao")) %>% 
   dplyr::select(country_name, year, coastal_prop_gf)
 ```
-
-
-
 
 
 Run `name_2_rgn`
