@@ -135,7 +135,7 @@ region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-glob
 
 ```
 
-# Employment Data
+# Employment (number of jobs)
 
 (put this within previous chunk, read in data etc. for number of tourism jobs, join with labor_regions, make new proportion of tourism jobs column, group by year, do prelim plotting etc. and evaluate data quality etc.)
 
@@ -251,7 +251,7 @@ line_plot
 ```
 
 
-## ILO wage data
+# Quality (ILO wage data)
   - note: this data came from many sources and was compiled by ILO
 
 ```{r}
