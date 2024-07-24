@@ -1377,11 +1377,7 @@ We have a subset of Hong Kong and Macao tourism value separated out as `macao_hk
 -   join (2) China coastal subset and China tourism value subset, implement multiplier
 -   join Macao + HK coastal tourism value + China coastal tourism value, aggregate to get total China coastal tourism value
 
--   join (3) no China, HK, or Macao coastal proportion subset with non-China (which is also non-USA) tourism value subset
-
--   prep + implement multiplier to get coastal tourism value
-
---
+-   join (3) no China, HK, or Macao coastal proportion subset with appropriate tourism value subset; prep + implement multiplier to get coastal tourism value
 
 *Final:*
 
@@ -1476,10 +1472,12 @@ coastal_rgn <- ohicore::name_2_rgn(
 
 # ---- aggregate ----
 coastal_rgn_agg <- coastal_rgn %>% 
+  dplyr::mutate(rgn_id = as.character(rgn_id)) %>% # set data type
   dplyr::ungroup() %>% 
   dplyr::group_by(rgn_id, rgn_name, year) %>% 
   # taking the mean 
-  dplyr::summarize(coastal_prop_gf = mean(coastal_prop_gf, na.rm = TRUE))
+  dplyr::summarize(coastal_prop_gf = mean(coastal_prop_gf, na.rm = TRUE)) %>% 
+  dplyr::filter(rgn_name != "United States") # drop USA because we have separate coastal data for it
 
 ```
 
@@ -1491,8 +1489,7 @@ coastal_rgn_agg <- coastal_rgn %>%
 -   join (1) Macao + HK coastal proportion subset and tourism value subset, implement multipliers
 -   join (2) China coastal subset and China tourism value subset, implement multiplier
 -   join Macao + HK coastal tourism value + China coastal tourism value, aggregate to get total China coastal tourism value
--   join (3) no China, HK, or Macao coastal proportion subset with non-China (which is also non-USA) tourism value subset
--   prep + implement multiplier to get coastal tourism value
+-   join (3) no China, HK, or Macao coastal proportion subset with appropriate tourism value subset; prep + implement multiplier to get coastal tourism value
 
 ```{r}
 # ---- Macao + HK coastal tourism ----
@@ -1561,44 +1558,74 @@ china_coastal_tour_agg <- china_rgn %>%
 
 ```
 
-# come back
-
------------
-
-Now we can join the coastal population proportion dataframe with the tourism value dataframe to calculate the coastal tourism value.
-
 ```{r}
-# ---- join coastal prop + tourism value ----
-coastal_tourism <- dplyr::full_join(tourism_value, coastal_multipliers,
-                                    by = join_by("rgn_id", "year"))
-
-# ---- calculate coastal tourism value ----
-coastal_tourism_value <- coastal_tourism %>% 
-  mutate(coastal_tour_value = (tour_value * coastal_prop))
-
-# making a clean subset so we can keep a full version of the dataframe for reference if needed
-coastal_value_clean <- coastal_tourism_value %>% 
-  select(rgn_id, rgn_name, year, coastal_tour_value) %>% 
-  # drop United States because we already have their values and don't want duplicates
-  filter(!rgn_name %in% c("United States"))
-```
-
-Basic plot to visually inspect data
-```{r}
-coastal_val_plot <- plotly::plot_ly(data = (coastal_value_clean %>% ungroup()),
+china_coastal_tour_plot <- plotly::plot_ly(data = china_coastal_tour_agg,
                                      x = ~year,
                                      y = ~coastal_tour_value,
                                      color = ~rgn_name, 
                                      type = "scatter", mode = "lines") %>% 
   # update layout: text, margins
-  plotly::layout(title = "Coastal Tourism Value",
+  plotly::layout(title = paste0("Coastal Tourism Value in Constant 2015 US$ (", start_year, "-", stop_year, ")"),
                  margin = m, # set margins
                  xaxis = list(title = "Year"),
-                 yaxis = list(title = "Tourism Value (constant 2015 USD)"))
+                 yaxis = list(title = "Coastal Tourism Value (constant 2015 USD)"))
 
-coastal_val_plot
+china_coastal_tour_plot
 ```
 
+
+
+-   join (3) no China, HK, or Macao coastal proportion subset with appropriate tourism value subset; prep + implement multiplier to get coastal tourism value
+
+```{r}
+# ---- coastal tourism (excluding China regions, USA) ----
+# prep coastal prop subset for joining
+coastal_rgns_prep <- coastal_rgn_agg %>% 
+  # filter to 2010 (we'll copy these values for the full time range)
+  dplyr::filter(year == 2010) %>% 
+  dplyr::select(-year) %>% 
+  dplyr::group_by(rgn_id, rgn_name, coastal_prop_gf) %>% 
+  # fill with full year range for joining
+  dplyr::reframe(year = seq(start_year, stop_year))
+
+# make subset that doesn't contain China or United States
+filtered_tourism_value <- nc_tourism_value %>% 
+  dplyr::filter(rgn_name != "United States") # drop United States (we have separate data for it)
+
+# join with tourism value subset
+coastal_subset_tour <- dplyr::full_join(filtered_tourism_value, coastal_rgns_prep,
+                                          by = c("rgn_id", "rgn_name", "year")) %>% 
+  # multiply total tourism value (constant 2015 USD) by coastal population proportion
+  dplyr::mutate(coastal_tour_value = (tour_value * coastal_prop_gf)) %>% 
+  dplyr::select(rgn_id, rgn_name, year, coastal_tour_value) %>% 
+  dplyr::ungroup()
+
+```
+
+```{r , eval=FALSE}
+# preliminary plot to visually inspect data post-implementation of multiplier
+
+coastal_subset_tour_plot <- plotly::plot_ly(data = coastal_subset_tour,
+                                     x = ~year,
+                                     y = ~coastal_tour_value,
+                                     color = ~rgn_name, 
+                                     type = "scatter", mode = "lines") %>% 
+  # update layout: text, margins
+  plotly::layout(title = "Coastal Tourism Value in Constant 2015 US$ (2008-2019)",
+                 margin = m, # set margins
+                 xaxis = list(title = "Year"),
+                 yaxis = list(title = "Coastal Tourism Value (constant 2015 USD)"))
+
+coastal_subset_tour_plot
+```
+
+
+Now we are ready to join our coastal tourism value subsets (once we process the USA coastal tourism data, which we'll do in the chunks below). After processing the United States coastal tourism value data, we will: 
+-   join USA coastal tour value + China coastal tour value + everything else coastal tour value
+-   prep for export
+-   save to `int` as `.csv`
+
+-----------
 
 
 ## Coastal Tourism: The United States of America
