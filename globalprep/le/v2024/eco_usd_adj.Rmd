@@ -87,7 +87,7 @@ tour_df_pre <- read_csv(here(int_dir, "eco_tour_usd_pre.csv"))
 
 ```
 
-## Implement `inflation_adjustment.R`
+## Implement `inflation_adjustment.R` from `workflow/R`
 
 ```{r}
 # ---- Fishing (cf) ----
