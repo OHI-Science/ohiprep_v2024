@@ -652,7 +652,7 @@ wb_gdp_clean <- wb_gdp_raw %>%
 -  create China subset of GDP data `china_gdp`, join with `macao_hk_gf` (gdp proportion subset of Macao and Hong Kong, gapfilled)
 -  calculate value (will be in Constant 2015 US$): `macao_hk_value`
 
-## Tourism Value (no China)
+## Tourism Value (excluding China)
 
 Now we'll prep to join our GDP and % GDP data frames by first making a subset without China, Macao, or Hong Kong. Then, we'll run `name_2_rgn` from {ohicore} and see what else we need to fix before joining.
 
@@ -755,6 +755,7 @@ no_china_join <- dplyr::full_join(nc_gdp_rgn_agg, no_china_gf,
 
 # ---- calculate tourism value ----
 nc_tourism_value <- no_china_join %>% 
+  dplyr::filter(rgn_name != "United States") %>% # drop US (we have separate coastal tourism data for this)
   dplyr::ungroup() %>% 
   dplyr::group_by(rgn_id, rgn_name, year) %>% 
   # get proportion to use as multiplier, multiply by GDP to get value
@@ -762,11 +763,34 @@ nc_tourism_value <- no_china_join %>%
   # fix data types
   dplyr::mutate(rgn_id = as.character(rgn_id)) %>% 
   # select relevant columns for joining
-  dplyr::select(c(rgn_id, rgn_name, year, tour_value))
+  dplyr::select(c(rgn_id, rgn_name, year, tour_value)) %>% 
+  dplyr::ungroup()
 
 #View(nc_tourism_value)
 #summary(nc_tourism_value)
 ```
+
+```{r}
+# plot to visually inspect changes
+# ---- create plotly interactive plot ----
+nc_tourism_plot <- plot_ly(data = nc_tourism_value,
+                          x = ~year,
+                          y = ~tour_value,
+                          color = ~rgn_name, 
+                          type = "scatter", mode = "lines") %>% 
+  # update layout: text, margins
+  layout(title = "Tourism Value in Constant 2015 USD, Gapfilled \n (Exluding United States, China, Macao & Hong Kong)",
+         margin = m, # set margins
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Tourism Value (2015 USD)"))
+
+# display plot
+nc_tourism_plot
+
+```
+
+
+
 
 ## Tourism Value: China (including Macao and Hong Kong)
 
@@ -1036,161 +1060,10 @@ ggplot(data = china_usd_value,
   )
 ```
 
-Here we can see that China's earnings from tourism far exceed any of the values we've seen before, surpassing 1.6 Trillion by 2019. These numbers will be slightly higher once we add on the values for Macao and Hong Kong (likely no more than an added 50 Billion or so).
-
-#### China Join
-
-Now we can join this newly created China tourism value data frame with the `macao_hk_value` data frame of tourism value (in Constant 2015 USD). Then, we'll run `name_2_rgn` and aggregate values to get combined tourism values for China as an OHI region. We'll call this `china_agg`.
-
-```{r}
-# ---- join ----
-china_value_join <- dplyr::full_join(x = china_usd_value, y = macao_hk_value,
-                                     by = c("geo_area_name", "year",
-                                            "usd" = "tour_value"))
+Here we can see that China's earnings from tourism far exceed any of the values we've seen before, surpassing 1.6 Trillion by 2019. These numbers will be slightly higher once we add on the values for Macao and Hong Kong.
 
 
-# ---- run ohicore name_2_rgn function ----
 
-china_rgn <- ohicore::name_2_rgn(
-  df_in = china_value_join, 
-  fld_name = "geo_area_name",
-  flds_unique = c("year")
-)
-
-# as expected, we get a "DUPLICATES found" warning. Now that the rgn_name and rgn_id have been added to our data frame, we can use those to aggregate by region
-
-# ---- aggregate for OHI region cohesion ----
-china_agg <- china_rgn %>% 
-  dplyr::ungroup() %>% 
-  dplyr::group_by(rgn_name, rgn_id, year) %>% 
-  dplyr::summarize(tour_value = sum(usd, na.rm = T)) %>% 
-  dplyr::mutate(rgn_id = as.character(rgn_id)) # fix data type
-
-```
-
-Great! Now we're ready to reunite this china tourism value data with the rest of our tourism value data :) 
-
-### Full Tourism Value
-
-```{r}
-# ---- joining china + no china dfs ----
-tourism_value <- dplyr::full_join(nc_tourism_value, china_agg,
-                           by = join_by(rgn_id, rgn_name, year, tour_value))
-
-#View(tourism_value)
-#summary(tourism_value)
-```
-
-
-#### Exploratory plots
-
-**Static plot**
-
-```{r}
-library(ggplot2) # so we don't have to namespace
-# ---- preliminary plotting: static ----
-# make subset
-tour_val_subset <- tourism_value %>% 
-  filter(!is.na(tour_value))
-
-# preliminary plot to check this out!
-ggplot(data = tour_val_subset, 
-       aes(x = as.numeric(year), 
-           y = tour_value,
-           color = rgn_id)) +
-  geom_point() +
-  geom_line() +
-  scale_color_viridis_d() +
-  scale_x_continuous(breaks = c(seq(min(tour_val_subset$year),
-                                    max(tour_val_subset$year), 1))) +
-  scale_y_continuous(labels = scales::label_currency(scale = 0.000000001, suffix = "B")) +
-  theme_bw() +
-  labs(title = paste0("Tourism Value ", "(",
-                      min(tour_val_subset$year),
-                      "-", max(tour_val_subset$year), ")"),
-       subtitle = "Data Sources: UNWTO, World Bank",
-       x = "Year",
-       y = "Tourism Value (Constant 2015 US$)") +
-  theme(
-    axis.text.x = element_text(angle = 45, vjust = 0.8, hjust = 0.9),
-    axis.title.x = element_text(margin = margin(t = 1.2, b = 0.2, unit = "lines")),
-    axis.title.y = element_text(margin = margin(l = 0.5, r = 0.5, unit = "lines")),
-    panel.grid.minor.x = element_blank()
-  )
-```
-
-
-We can see that the scale of tourism value in China dwarfs all other countries' values. This is obviously a fairly rudimentary (and not very helpful or informative) plot.
-It is tedious to have to refer back to a table of the region IDs to understand which region is which, and is overall what I would call a "spaghetti plot". 
-Let's use an interactive plot to more usefully visualize what's going on with the data in a subset without the USA.
-
-
-**Interactive plot**
-
-```{r scrapped-china-usa-plot, eval=FALSE}
-# ---- exploratory plotting: interactive ----
-
-no_china_value <- tour_val_subset %>% 
-  dplyr::filter(!rgn_name %in% c("China")) %>% 
-  dplyr::ungroup()
-
-# ---- China subset ----
-# with China 
-# chn_usa <- tourism_value %>% 
-#   filter(rgn_name %in% c("China"
-#                          #, "United States" # filtered out earlier due to lack of data
-#                          )) %>% 
-#   ungroup() # lines have a tendency to not show up in plotly if the data is grouped
-# 
-# # without China or USA
-# no_chn_usa <- tourism_value %>% 
-#   filter(!rgn_name %in% c("China"
-#                           #, "United States"
-#                           )) %>% 
-#   ungroup()
-# 
-# # ---- create updated interactive plot ----
-# chn_plotly <- plotly::plot_ly(data = chn_usa,
-#                                   x = ~year,
-#                                   y = ~tour_value,
-#                                   color = ~rgn_name,
-#                                   type = "scatter", mode = "lines") %>% 
-#   layout(title = "Tourism Value",
-#          margin = m,
-#          xaxis = list(title = "Year"),
-#          yaxis = list(title = "Tourism Value (2015 US$)")
-#   ) 
-# 
-# chn_plotly
-
-
-# ---- Plot wihtout China ----
-no_china_plotly <- plotly::plot_ly(data = no_china_value,
-                                     x = ~year,
-                                     y = ~tour_value,
-                                     color = ~rgn_name,
-                                     type = "scatter", mode = "lines") %>% 
-  plotly::layout(title = "Tourism Value",
-         margin = m,
-         xaxis = list(title = "Year"),
-         yaxis = list(title = "Tourism Value (2015 US$)")
-  ) 
-
-no_china_plotly
-```
-
-
-```{r}
-# check max value
-max_tour_val <- max(tourism_value$tour_value, na.rm = TRUE)
-
-tourism_value %>% 
-  dplyr::filter(tour_value == max_tour_val)
-
-prettyNum(max_tour_val,big.mark = ",", scientific = FALSE)
-
-# 1.69 trillion in China in 2019 out of 14.28 trillion total GDP
-```
 
 # Coastal Tourism
 
@@ -1286,8 +1159,6 @@ coastal_pop <- coastal_pop_subset %>%
   kableExtra::row_spec(0, bold = TRUE) %>% 
   kableExtra::kable_styling("striped", full_width = FALSE) 
 
-kableExtra::kable_classic(usa_coastal_check)
-
 # ---- create proportion multiplier ---- (to estimate coastal proportion of tourism value)
 coastal_multipliers <- coastal_pop %>% 
   dplyr::mutate(coastal_proportion = coastal_pct / 100)
@@ -1367,7 +1238,30 @@ coastal_gf %>% dplyr::filter(country_name == "Guam") %>%
 # great! coastal_prop_gf is now 1 for 2010 
 ```
 
-Great! Now we can make subsets to apply to our tourism value data.
+
+Basic plot to visually inspect data
+
+```{r}
+coastal_pct_plot <- plotly::plot_ly(data = coastal_gf,
+                                     x = ~year,
+                                     y = ~coastal_prop_gf,
+                                     color = ~country_name, 
+                                     type = "scatter", mode = "lines") %>% 
+  # update layout: text, margins
+  plotly::layout(title = "Coastal Population (% per region)",
+                 margin = m, # set margins
+                 xaxis = list(title = "Year"),
+                 yaxis = list(title = "Coastal Population % (gapfilled)"))
+
+coastal_pct_plot
+```
+
+A true spaghetti plot. Wow. 
+
+Awful visuals aside, this seems pretty solid -- we'd expect coastal population % to be relatively stable over this time frame.
+
+
+Now we can make subsets to apply to our tourism value data.
 
 We have a subset of Hong Kong and Macao tourism value separated out as `macao_hk_value`. We should apply appropriate multipliers to this subset and to the China subset created with the Bureau of Statistics of China data. After the multipliers have been applied, we can then aggregate their values within the greater OHI region classification of China. 
 
@@ -1383,11 +1277,7 @@ We have a subset of Hong Kong and Macao tourism value separated out as `macao_hk
 -   join (2) China coastal subset and China tourism value subset, implement multiplier
 -   join Macao + HK coastal tourism value + China coastal tourism value, aggregate to get total China coastal tourism value
 
--   join (3) no China, HK, or Macao coastal proportion subset with non-China (which is also non-USA) tourism value subset
-
--   prep + implement multiplier to get coastal tourism value
-
---
+-   join (3) no China, HK, or Macao coastal proportion subset with appropriate tourism value subset; prep + implement multiplier to get coastal tourism value
 
 *Final:*
 
@@ -1482,10 +1372,12 @@ coastal_rgn <- ohicore::name_2_rgn(
 
 # ---- aggregate ----
 coastal_rgn_agg <- coastal_rgn %>% 
+  dplyr::mutate(rgn_id = as.character(rgn_id)) %>% # set data type
   dplyr::ungroup() %>% 
   dplyr::group_by(rgn_id, rgn_name, year) %>% 
   # taking the mean 
-  dplyr::summarize(coastal_prop_gf = mean(coastal_prop_gf, na.rm = TRUE))
+  dplyr::summarize(coastal_prop_gf = mean(coastal_prop_gf, na.rm = TRUE), .groups = "drop") %>% 
+  dplyr::filter(rgn_name != "United States") # drop USA because we have separate coastal data for it
 
 ```
 
@@ -1497,89 +1389,141 @@ coastal_rgn_agg <- coastal_rgn %>%
 -   join (1) Macao + HK coastal proportion subset and tourism value subset, implement multipliers
 -   join (2) China coastal subset and China tourism value subset, implement multiplier
 -   join Macao + HK coastal tourism value + China coastal tourism value, aggregate to get total China coastal tourism value
--   join (3) no China, HK, or Macao coastal proportion subset with non-China (which is also non-USA) tourism value subset
--   prep + implement multiplier to get coastal tourism value
+-   join (3) no China, HK, or Macao coastal proportion subset with appropriate tourism value subset; prep + implement multiplier to get coastal tourism value
 
 ```{r}
 # ---- Macao + HK coastal tourism ----
+# we don't even really need to do this, since all of the multipliers for Macao and Hong Kong = 1, but I'm creating the infrastructure for it in case we use a different coastal population metric in the future (which may impact the multiplier value)
+# prep coastal data for joining
 m_hk_prep <- macao_hk_coastal %>% 
-  select(-year) %>% 
-  group_by(country_name, coastal_prop_gf) %>% 
-  reframe(year = seq(start_year, stop_year))
+  dplyr::select(-year) %>% 
+  # match naming conventions across dataframes
+  mutate(country_name = case_when(
+    country_name == "Hong Kong" ~ "Hong Kong SAR, China",
+    country_name == "Macao" ~ "Macao SAR, China",
+  )) %>% 
+  dplyr::group_by(country_name, coastal_prop_gf) %>% 
+  # fill with full year range for joining
+  dplyr::reframe(year = seq(start_year, stop_year))
 
-# join with OHI regions
-coastal_tourism_full <- dplyr::full_join(rgn_yr_df, coastal_tourism_join,
-                                         by = join_by("rgn_id", "rgn_name", "year")) %>% 
-  select(rgn_id, rgn_name, year, coastal_tour_value)
-
-macao_hk_coastal_tour <- dplyr::full_join(macao_hk_value, m_hk_prep)
+# join with tourism value subset
+macao_hk_coastal_tour <- dplyr::full_join(macao_hk_value, m_hk_prep,
+                                          by = c("geo_area_name" = "country_name", "year")) %>% 
+  # multiply total tourism value (constant 2015 USD) by coastal population proportion
+  dplyr::mutate(coastal_tour_value = (tour_value * coastal_prop_gf)) %>% 
+  dplyr::select(geo_area_name, year, coastal_tour_value)
 
 # ---- mainland China coastal tourism ----
+# prep for joining
+china_coastal_prep <- china_coastal %>% 
+  dplyr::select(-year) %>% 
+  dplyr::group_by(country_name, coastal_prop_gf) %>% 
+  # fill with full year range for joining
+  dplyr::reframe(year = seq(start_year, stop_year))
 
+# join with tourism value subset
+china_coastal_tour <- dplyr::full_join(china_usd_value, china_coastal_prep,
+                                          by = c("geo_area_name" = "country_name", "year")) %>% 
+  # multiply total tourism value (constant 2015 USD) by coastal population proportion
+  dplyr::mutate(coastal_tour_value = (usd * coastal_prop_gf)) %>% 
+  dplyr::select(geo_area_name, year, coastal_tour_value)
+```
 
+Now we can join these newly created China & Macao + Hong Kong coastal tourism value data frames. Then, we'll run `name_2_rgn` and aggregate values to get combined tourism values for China as an OHI region. We'll call this `china_coastal_tour_agg`.
+
+```{r}
 # ---- total China coastal tourism ----
 
+# ---- join ----
+china_value_join <- dplyr::full_join(x = china_coastal_tour, y = macao_hk_coastal_tour,
+                                     by = c("geo_area_name", "year","coastal_tour_value"))
+
+# ---- run ohicore name_2_rgn function ----
+
+china_rgn <- ohicore::name_2_rgn(
+  df_in = china_value_join, 
+  fld_name = "geo_area_name",
+  flds_unique = c("year")
+)
+
+# as expected, we get a "DUPLICATES found" warning. Now that the rgn_name and rgn_id have been added to our data frame, we can use those to aggregate by region
+
+# ---- aggregate for OHI region cohesion ----
+china_coastal_tour_agg <- china_rgn %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(rgn_name, rgn_id, year) %>% 
+  # get aggregate coastal tourism value
+  dplyr::summarize(coastal_tour_value = sum(coastal_tour_value, na.rm = T),
+                   .groups = "drop") %>% 
+  dplyr::mutate(rgn_id = as.character(rgn_id)) # fix data type
+
 ```
 
-
-
-
-
-
-
-Basic plot to visually inspect data
 ```{r}
-coastal_pct_plot <- plotly::plot_ly(data = coastal_multipliers,
-                                     x = ~year,
-                                     y = ~coastal_pct,
-                                     color = ~rgn_id, 
-                                     type = "scatter", mode = "lines") %>% 
-  # update layout: text, margins
-  plotly::layout(title = "Coastal Population (% per region)",
-                 margin = m, # set margins
-                 xaxis = list(title = "Year"),
-                 yaxis = list(title = "Coastal Population %"))
-
-coastal_pct_plot
-```
-
-This seems pretty solid -- we'd expect coastal population % to be relatively stable over this time frame.
-
-
-Now we can join the coastal population proportion dataframe with the tourism value dataframe to calculate the coastal tourism value.
-
-```{r}
-# ---- join coastal prop + tourism value ----
-coastal_tourism <- dplyr::full_join(tourism_value, coastal_multipliers,
-                                    by = join_by("rgn_id", "year"))
-
-# ---- calculate coastal tourism value ----
-coastal_tourism_value <- coastal_tourism %>% 
-  mutate(coastal_tour_value = (tour_value * coastal_prop))
-
-# making a clean subset so we can keep a full version of the dataframe for reference if needed
-coastal_value_clean <- coastal_tourism_value %>% 
-  select(rgn_id, rgn_name, year, coastal_tour_value) %>% 
-  # drop United States because we already have their values and don't want duplicates
-  filter(!rgn_name %in% c("United States"))
-```
-
-Basic plot to visually inspect data
-```{r}
-coastal_val_plot <- plotly::plot_ly(data = (coastal_value_clean %>% ungroup()),
+china_coastal_tour_plot <- plotly::plot_ly(data = china_coastal_tour_agg,
                                      x = ~year,
                                      y = ~coastal_tour_value,
                                      color = ~rgn_name, 
                                      type = "scatter", mode = "lines") %>% 
   # update layout: text, margins
-  plotly::layout(title = "Coastal Tourism Value",
+  plotly::layout(title = paste0("Coastal Tourism Value in Constant 2015 US$ (", start_year, "-", stop_year, ")"),
                  margin = m, # set margins
                  xaxis = list(title = "Year"),
-                 yaxis = list(title = "Tourism Value (constant 2015 USD)"))
+                 yaxis = list(title = "Coastal Tourism Value (constant 2015 USD)"))
 
-coastal_val_plot
+china_coastal_tour_plot
 ```
 
+
+
+-   join (3) no China, HK, or Macao coastal proportion subset with appropriate tourism value subset; prep + implement multiplier to get coastal tourism value
+
+```{r}
+# ---- coastal tourism (excluding China regions, USA) ----
+# prep coastal prop subset for joining
+coastal_rgns_prep <- coastal_rgn_agg %>% 
+  # filter to 2010 (we'll copy these values for the full time range)
+  dplyr::filter(year == 2010) %>% 
+  dplyr::select(-year) %>% 
+  dplyr::group_by(rgn_id, rgn_name, coastal_prop_gf) %>% 
+  # fill with full year range for joining
+  dplyr::reframe(year = seq(start_year, stop_year))
+
+# join with tourism value subset
+coastal_subset_tour <- dplyr::full_join(nc_tourism_value, coastal_rgns_prep,
+                                          by = c("rgn_id", "rgn_name", "year")) %>% 
+  # multiply total tourism value (constant 2015 USD) by coastal population proportion
+  dplyr::mutate(coastal_tour_value = (tour_value * coastal_prop_gf)) %>% 
+  dplyr::select(rgn_id, rgn_name, year, coastal_tour_value) %>% 
+  dplyr::ungroup()
+
+```
+
+```{r , eval=FALSE}
+# preliminary plot to visually inspect data post-implementation of multiplier
+
+coastal_subset_tour_plot <- plotly::plot_ly(data = coastal_subset_tour,
+                                     x = ~year,
+                                     y = ~coastal_tour_value,
+                                     color = ~rgn_name, 
+                                     type = "scatter", mode = "lines") %>% 
+  # update layout: text, margins
+  plotly::layout(title = "Coastal Tourism Value in Constant 2015 US$ (2008-2019)",
+                 margin = m, # set margins
+                 xaxis = list(title = "Year"),
+                 yaxis = list(title = "Coastal Tourism Value (constant 2015 USD)"))
+
+coastal_subset_tour_plot
+```
+
+
+Now we are ready to join our coastal tourism value subsets (once we process the USA coastal tourism data, which we'll do in the chunks below). After processing the United States coastal tourism value data, we will: 
+
+-   join USA coastal tour value + China coastal tour value + everything else coastal tour value
+-   prep for export
+-   save to `int` as `.csv`
+
+-----------
 
 
 ## Coastal Tourism: The United States of America
