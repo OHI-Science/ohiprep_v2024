@@ -1528,7 +1528,13 @@ Now we are ready to join our coastal tourism value subsets (once we process the 
 
 ## Coastal Tourism: The United States of America
 
-The data currently includes states that border/contain the Great Lakes, so we'll need to filter those out. To do that, first we'll clean the data and select tourism sector GDP data. Then we'll make two subsets: one that contains only the great lakes states and one that only contains the total coastal aggregate values. We can then subtract the great lakes subset values from the total to obtain the true coastal tourism GDP values.
+This dataset contains coastal tourism values (USD, current and adjusted) for states in the United States of America from the Economics: National Ocean Watch (ENOW).
+
+The data currently includes states that border/contain the Great Lakes, so we'll need to filter those out. To do that, we will:
+
+-   clean the data and select tourism sector GDP data
+-   make two subsets: one that contains only the great lakes states and one that only contains the total coastal aggregate values
+-   subtract the great lakes subset values from the total to obtain the true coastal tourism GDP values
 
 ```{r}
 # ---- Preliminary cleaning & tidying ----
@@ -1573,7 +1579,7 @@ coastal_lakes_join <- dplyr::full_join(coastal_total, great_lakes_total,
 
 # subtract great lakes values from coastal total values
 true_coastal_value <- coastal_lakes_join %>% 
-  mutate(coastal_tour_gdp = (gdp - gl_gdp),
+  dplyr::mutate(coastal_tour_gdp = (gdp - gl_gdp),
          coastal_tour_real_gdp = (real_gdp - gl_real_gdp))
 
 # check:
@@ -1599,8 +1605,8 @@ usa_coastal_adj <- true_coastal_value %>%
 
 # for gdp (not real_gdp) method: check
 usa_check_subset <- usa_coastal_adj %>% 
-  filter(year == 2015) %>% # or change to whichever year you've adjusted the data to for inflation
-  select(year, coastal_tour_gdp, coastal_tour_value)
+  dplyr::filter(year == 2015) %>% # or change to whichever year you've adjusted the data to for inflation
+  dplyr::select(year, coastal_tour_gdp, coastal_tour_value)
 
 if (usa_check_subset$coastal_tour_gdp == usa_check_subset$coastal_tour_value) {
   print(paste("USA Coastal tourism values have been successfully adjusted to", usa_check_subset$year, "USD."))
@@ -1611,8 +1617,8 @@ if (usa_check_subset$coastal_tour_gdp == usa_check_subset$coastal_tour_value) {
 
 # ---- Prep for joining with full coastal tourism dataset ----
 usa_coastal_prep <- usa_coastal_adj %>% 
-  mutate(country_name = "United States of America") %>% 
-  select(country_name, year, coastal_tour_value)
+  dplyr::mutate(country_name = "United States of America") %>% 
+  dplyr::select(country_name, year, coastal_tour_value)
 
 # run ohicore name_2_rgn
 usa_coastal_rgn <- ohicore::name_2_rgn(usa_coastal_prep,
@@ -1622,14 +1628,13 @@ usa_coastal_rgn <- ohicore::name_2_rgn(usa_coastal_prep,
 # select columns for joining
 # full because we haven't filtered to the standardized date range
 usa_coastal_tourism_full <- usa_coastal_rgn %>% 
-  select(rgn_id, rgn_name, year, coastal_tour_value)
+  dplyr::select(rgn_id, rgn_name, year, coastal_tour_value)
 ```
 
 
 Preliminary plot to inspect data
 
 ```{r}
-
 ggplot(data = usa_coastal_tourism_full, 
        aes(x = year, y = coastal_tour_value)) +
   # old glory red hex code from flag
@@ -1662,37 +1667,43 @@ ggplot(data = usa_coastal_tourism_full,
 
 This seems to be fairly reflective of the $143 Billion value associated with US coastal tourism according to [NOAA](https://coast.noaa.gov/states/fast-facts/tourism-and-recreation.html), and the sharp fall in 2020 reflects the trend we expect to see due to COVID-19 Pandemic impacts on tourism globally.
 
-## Final Coastal Tourism
+## Final Joins: Total Coastal Tourism
 
-Now, let's filter to the date range of the rest of the data and join to get a full coastal tourism value dataset!
+Now, let's filter to the date range of the rest of the data and join with the subset excluding China & USA and the China aggregate subset to get a full coastal tourism value dataset!
 ```{r}
 # filter USA data
 usa_coastal_tourism <- usa_coastal_tourism_full %>% 
   filter(year %in% c(date_range)) %>% 
-  mutate(rgn_id = as.character(rgn_id))
+  mutate(rgn_id = as.character(rgn_id)) # fix data type for joining
 
 # optional: check that year filtering worked
 #max(usa_coastal_tourism$year) == stop_year
 
-
 # ---- join coastal tourism datasets ----
-coastal_tourism_join <- dplyr::full_join(coastal_value_clean, usa_coastal_tourism,
+# join USA + China aggregate:
+usa_china_coastal <- dplyr::full_join(usa_coastal_tourism, china_coastal_tour_agg,
+                                      by = join_by("rgn_id", "rgn_name", "year", "coastal_tour_value"))
+
+# join with final coastal tourism subset
+coastal_tourism_join <- dplyr::full_join(coastal_subset_tour, usa_china_coastal,
                                          by = join_by("rgn_id", "rgn_name", "year", "coastal_tour_value")) %>% 
-  ungroup() %>% 
-  mutate(rgn_id = as.numeric(rgn_id)) # prep for joining with OHI regions
+  dplyr::ungroup() %>% 
+  dplyr::mutate(rgn_id = as.numeric(rgn_id)) # prep for joining with OHI regions
 
 # ---- join OHI regions with years df ----
-rgn_yr_df <- tibble(rgn_name = region_names$rgn_name,
-                       rgn_id = region_names$rgn_id) %>% # take the regions from region_names, even the ones we don't have data for
-  group_by(rgn_id, rgn_name) %>% 
-  summarize(year = seq(start_year,
-                       stop_year)) %>% # each region should have a row for each year as well now, filled with NA
-  ungroup()
+# expand OHI regions to have sequence of years for joining
+ohi_region_yrs <- region_names %>% 
+  # expand() generates all combinations of variables found in a dataset
+  # nesting() finds combinations of rgn_id & rgn_name already present in the df
+  tidyr::expand(nesting(rgn_id, rgn_name), # note: you can't expand on a grouping column
+                year = start_year:stop_year) %>% # within each group combination, add sequence of years in new "year" column
+  dplyr::arrange(rgn_id, year)
 
-# join with OHI regions
-coastal_tourism_full <- dplyr::full_join(rgn_yr_df, coastal_tourism_join,
+# join OHI regions with full coastal tourism df
+coastal_tourism_full <- dplyr::full_join(ohi_region_yrs, coastal_tourism_join,
                                          by = join_by("rgn_id", "rgn_name", "year")) %>% 
-  select(rgn_id, rgn_name, year, coastal_tour_value)
+  dplyr::select(rgn_id, rgn_name, year, coastal_tour_value) %>% 
+  dplyr::ungroup()
 
 ```
 
@@ -1709,32 +1720,14 @@ coastal_tour_plot <- plotly::plot_ly(data = coastal_tourism_full,
   plotly::layout(title = "Coastal Tourism Value",
                  margin = m, # set margins
                  xaxis = list(title = "Year"),
-                 yaxis = list(title = "Tourism Value (constant 2015 USD)"))
+                 yaxis = list(title = "Tourism Value (constant 2015 USD)", 
+                              tickprefix = "$"))
 
 coastal_tour_plot
-
-
-
-# make non-USA subset
-coastal_no_usa <- coastal_tourism_full %>% 
-  filter(!rgn_name %in% c("United States"))
-
-
-no_usa_coastal_plot <- plotly::plot_ly(data = coastal_no_usa,
-                                     x = ~year,
-                                     y = ~coastal_tour_value,
-                                     color = ~rgn_name, 
-                                     type = "scatter", mode = "lines") %>% 
-  # update layout: text, margins
-  plotly::layout(title = "Coastal Tourism Value",
-                 margin = m, # set margins
-                 xaxis = list(title = "Year"),
-                 yaxis = list(title = "Tourism Value (constant 2015 USD)"))
-
-no_usa_coastal_plot
 ```
 
-
+Intuition check: does it make sense for China's values to be so high? 
+Yes! Their total tourism in 2019 was roughly $1.6 trillion (2015 USD)
 
 ## Implementing sector multipliers
 
