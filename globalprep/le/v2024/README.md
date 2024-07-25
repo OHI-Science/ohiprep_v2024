@@ -69,7 +69,7 @@ The individual LE::ECO scripts from other sectors will all be adjusted for infla
 
 Initially, there are three scripts, each with different starting units of value, shown below:
 
-#### Adjustment Units Pre/Post-Inflation 
+#### Adjustment Units Pre/Post-Inflation
 
 +---------------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
 |                     | Metadata documentation                                                | Pre-Adjustment Unit                | Post-Adjustment Unit           |

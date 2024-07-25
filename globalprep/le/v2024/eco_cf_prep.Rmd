@@ -88,41 +88,37 @@ if (!require(librarian)){
 librarian::shelf(
   here,
   janitor,
-  terra,
-  readxl,
-  RColorBrewer,
   foreach,
-  doParallel, # for using multiple cores
+  doParallel, # for using multiple cores, if needed
   tidyverse, 
-  httr,
   plotly,
   zoo, # for gapfilling
-  pdftools,
-  ohicore,
+  pdftools, # for FAO yearbook
+  ohicore, 
   ggplot2
 )
 #remotes::install_github("skgrange/threadr") # for na_extrapolate
 library(threadr) # for gapfilling, if necessary
 
-
-# sources! 
+# ---- sources! ----
 source(here("workflow/R/common.R")) # file creates objects to process data
 
 source(here('workflow/R/fao_fxn.R')) # fxn for cleaning old version of FAO data 
 
 source(here('workflow/R/fao_online_portal_clean.R')) # fxn for obtaining FAO data
 
-# set year and file path info
+# ---- set year and file path info ----
 current_year <- 2024 # Update this in the future!!
-
 version_year <- paste0("v",current_year)
 data_dir_version_year <- paste0("d", current_year)
 data_path <- here("globalprep", "le", version_year)
 
+# ---- data directories ----
+
 # Raw data directory (on Mazu)
 raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
-# world bank raw data directory
+# World Bank raw data directory
 wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
 
 # ILO raw data directory
@@ -147,13 +143,14 @@ int_dir <- here(data_path, "int")
 ### Read in Data
 
 ```{r read_data}
-# FAO Capture raw data
+# FAO Capture raw data, downloaded July 10, 2024.  Data goes from 1950 - 2022. This was downloaded to exemplify what the raw FAO Capture data looks like, though it will not need to be used in this script.
 fao_capture_raw <- read_csv(here(fao_capture_dir, "Global_capture_production_Quantity_1950-2021.csv"))
 
-# Ex-Vessel raw data, from EmLab, who projected Melnycuk's data (see README)
+# Ex-Vessel raw data, from EmLab, who projected Melnycuk's data (see README, or overview)
 exvessel_prices_raw <- read_csv(here(ex_vess_dir, "price-db-results", "exvessel_price_database_1976_2019.csv"))
 
-# read in cf revenue data from v2023, using FAO Capture data and Ex-vessel data
+# read in cf revenue data from v2023, that already used FAO Capture data and Ex-vessel data
+## this will be used for v2024 as well, considering that the EmLab exvessel data is not projected further than 2019
 cf_revenue <- read_csv(here("globalprep", "le", "v2023", "int", "cf_revenue.csv"))
 ```
 
@@ -167,7 +164,7 @@ revenue from fishing for each country.
 Here we do some basic cleanup of the global capture production database.
 
 ```{r fao_capture_cleaning, eval = FALSE}
-
+# reading in FAO capture data and cleaning
 fao_capture_clean <- fao_capture %>% 
    dplyr::rename(country = "Country Name En",
                 asfis_species = "ASFIS species Name En",
@@ -184,20 +181,19 @@ fao_capture_clean <- fao_capture_clean %>%
   filter(year >= 1976 & year <= 2019) %>% #filter to years in the price database
   filter(!is.na(value) & value > 0) %>% # we do not need the nas or 0, only want the ones with value for tonnes
   filter(`Unit Name` == "Tonnes - live weight") # we don't have price data for species measured in whole animals
-  
 ```
 
 Next we'll clean up and gapfill the exvessel price data. This has
 exvessel price in usd/metric tonne.
 
 ```{r gapfill_exvessel, eval = FALSE}
+# cleaning up exvessel price data
 exvessel_prices_clean <- exvessel_prices %>% 
   clean_names() %>% 
   mutate(year = as.numeric(year)) %>% 
   group_by(asfis_species, scientific_name, pooled_commodity, isscaap_group, isscaap_division, year) %>% 
   summarize(exvessel = mean(exvessel, na.rm = TRUE)) %>%   #there are some duplicate prices for a species-average when this is the case
-   filter(!(is.na(year) & is.na(exvessel))) %>% #we can't use rows that are na for price and year
- 
+  filter(!(is.na(year) & is.na(exvessel))) %>% #we can't use rows that are na for price and year
   dplyr::group_by(asfis_species) %>%
   #counts the numbers of non-missing values for each country (logical TRUEs regarded as one)
   dplyr::mutate(value_num = sum(!is.na(exvessel))) %>% 
@@ -245,14 +241,14 @@ not_sig <- filtered_data %>% filter(pr_t > 0.05)
 #based on code from ao_need data prep
 price_model <- function(df) {lm(exvessel~year, data = df)}
 
-
+# use the lm() to gapfill 
 exvessel_prices_gapfilled <- exvessel_prices_clean %>% 
   dplyr::group_by(asfis_species) %>% 
   tidyr::nest() %>% 
   dplyr::mutate(
     ### Apply the model to all country groupings
     model = purrr::map(data, price_model),
-    #Use the trained model to get predicted values
+    # Use the trained model to get predicted values
     predictions = purrr::map2(data, model, add_predictions)) %>% 
   tidyr::unnest(cols = c(predictions)) %>% 
   dplyr::select(-data, -model, prediction = pred) %>%
@@ -267,8 +263,10 @@ exvessel_prices_gapfilled <- exvessel_prices_clean %>%
   filter(exvessel > 0) #remove price less than 0. This doesn't make sense and never occurs after 1998 anyway so would not be used to calculate any scores. 
 ```
 
-```{r combine_exvessel, eval = FALSE}
+Next, the exvessel data that has now been gapfilled will be joined with
+the fao capture data.
 
+```{r combine_exvessel, eval = FALSE}
 #combine the price data with the capture data 
 fao_capture_price <- fao_capture_clean %>% 
   left_join(exvessel_prices_gapfilled, by = c("asfis_species", "year", "isscaap_group")) %>% 
@@ -284,7 +282,7 @@ group_average_price_year <- exvessel_prices_gapfilled %>%
   group_by(isscaap_group,year) %>% 
   summarize(mean_group_price = mean(exvessel))
 
-
+# finish the join
 fao_capture_price_final <- 
   fao_capture_price %>% 
   left_join(group_average_price_year, by = c("isscaap_group", "year")) %>% 
@@ -315,6 +313,7 @@ fishing_revenue <- fao_capture_price_final %>%
          sector = "cf",
          data_source = "FAO capture production and ex-vessel prices")
 
+# save intermediate data!
 # write_csv(fishing_revenue, here(data_path, "int/cf_revenue.csv"))
 ```
 
@@ -367,7 +366,7 @@ cf_revenue_fix <- cf_revenue %>%
   ))
 ```
 
-Re-run names_2_rgn after fixing names
+Re-run names_2_rgn after fixing names.
 
 ```{r fix_names}
 # re-run names_2_rgn, check which countries are still dropped
@@ -380,10 +379,10 @@ cf_revenue_rgn_fix <- ohicore::name_2_rgn(df_in = cf_revenue_fix,
 
 **Regions to disaggregate:**
 
-Channel Islands --\> Guernsey (228) and Jersey (227)
+Channel Islands ➞ Guernsey (228) and Jersey (227)
 
-Bonaire/S.Eustatius/Saba --\> Bonaire (245), Sint Eustatius (249), and
-Saba (248)
+Bonaire/S.Eustatius/Saba ➞ Bonaire (245), Sint Eustatius (249), and Saba
+(248)
 
 To do this, look at the rasterized fishing effort calculated in 2017
 within the FIS subgoal, to determine the relative proportion of
@@ -441,6 +440,8 @@ prop_e <- mean_catch_bes_agg$prop[2]
 prop_s <- mean_catch_bes_agg$prop[3]
 ```
 
+Now, use the proportions to disaggregate.
+
 ```{r disaggregation}
 # use proportions to disaggregate Channel Islands 
 split_ci <- cf_revenue %>%
@@ -484,7 +485,7 @@ cf_revenue_disaggregated <- cf_revenue_fix %>%
   select(-new_value) # not needed anymore
 ```
 
-Final names_2_rgn after disaggregation
+Use a final names_2_rgn after disaggregation.
 
 ```{r final_names}
 # using disaggregated revenue data within the name_2_rgn fxn: looks good!!
@@ -498,12 +499,9 @@ cf_revenue_rgn_final <- name_2_rgn(df_in = cf_revenue_disaggregated,
 # to see how many duplicates there are after names_2_rgn
 rev_duplicates <- cf_revenue_rgn_final[duplicated(cf_revenue_rgn_final[, c("country", "year")]),]
 
-# save the unique duplicates for country and rgn_name to see if the function worked well
-rev_ref_duplicates <- unique(rev_duplicates$country)
-rev_rgn_duplicates <- unique(rev_duplicates$rgn_name)
-
+# look at the unique duplicates for country and rgn_name to see if the function worked well
 # setdiff to determine which observations are not the same in the country and rgn_id duplicates
-rev_diff <- setdiff(rev_rgn_duplicates, rev_ref_duplicates)
+rev_diff <- setdiff(unique(rev_duplicates$rgn_name), unique(rev_duplicates$country))
 rev_diff # none! Move on
 
 #=========== Aggregate by rgn_id and year ==============
@@ -556,6 +554,7 @@ visualize how well the gapfilling worked in this case.
 heatmap_df <- cf_revenue_yrs %>% 
   mutate(status = !is.na(value))  #so that if there is data, the heatmap will be filled in
 
+# make an interactive heatmap using ggplotly
 heatmap_plot <- ggplot(data = heatmap_df) +
   geom_tile(aes(x = year,
                 y = rgn_name,
@@ -578,8 +577,11 @@ that cutting regions is consistent across sectors.
 
 ## Cleaning for GF
 
-Rule in order to be preserved: \* must have at least one data point in
-the last five years & \* must have more than three data points over time
+Rule in order to be preserved:
+
+-   must have at least one data point in the last five years &
+
+-   must have more than three data points over time
 
 Otherwise, the region needs to be removed.
 
@@ -634,11 +636,7 @@ filtered_heatmap_df <- heatmap_df %>%
 
 Here we'll use `na.approx()` from {zoo} to interpolate missing values
 and extrapolate missing extremes (NA values that do not fall between
-non-NA values) by copying the nearest extreme value. After speaking with
-Melanie Frazier about our methodology, she recommended to not fill in
-any values for countries with only 1 data point. If you choose to do
-this in future years, we've provided commented-out code following the
-chunk below for assessing how much of your data this impacts.
+non-NA values) by copying the nearest extreme value.
 
 Since we already filtered out any region that does not adhere to the
 rule above, any regions left that have NAs can be gapfilled.
@@ -687,7 +685,13 @@ interactive_heatmap_gf <- plotly::ggplotly(heatmap_gf)
 
 ## Implementing Sector Multipliers
 
-Refer to the OHI Methods <https://ohi-science.org/ohi-methods/goals/goal-models-data.html#livelihoods-and-economies> or [Ben Halpern's Supplementary Information](https://static-content.springer.com/esm/art%3A10.1038%2Fnature11397/MediaObjects/41586_2012_BFnature11397_MOESM79_ESM.pdf) **(page 29)** for the multipliers to apply towards revenue values by sector. For commercial fishing revenue, the multiplier is 1.568 for developed and developing countries.
+Refer to the OHI Methods
+<https://ohi-science.org/ohi-methods/goals/goal-models-data.html#livelihoods-and-economies>
+or [Ben Halpern's Supplementary
+Information](https://static-content.springer.com/esm/art%3A10.1038%2Fnature11397/MediaObjects/41586_2012_BFnature11397_MOESM79_ESM.pdf)
+**(page 29)** for the multipliers to apply towards revenue values by
+sector. For commercial fishing revenue, the multiplier is 1.568 for
+developed and developing countries.
 
 ```{r}
 # As described in table 6.10: "Sector-specific multipliers are used to calculate total jobs and total revenue created by sector-based employment in developing and developed nations."
@@ -697,7 +701,6 @@ cf_multiplier <- heatmap_gf_df %>%
   mutate(mult_value = appx_value * 1.568) %>% #multiply all values with the multiplier to account for ripple effects commercial fishing may have on revenue
   select(-appx_value)
 ```
-
 
 ## Saving intermediate data
 
