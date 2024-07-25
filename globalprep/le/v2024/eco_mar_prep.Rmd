@@ -1,5 +1,5 @@
 ---
-title: "OHI `r format(Sys.Date(), '%Y')` - Mariculture Livelihoods & Economies Data Preparation"
+title: "OHI `r format(Sys.Date(), '%Y')` - Mariculture Economies Data Preparation"
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
@@ -19,8 +19,6 @@ editor_options:
   markdown: 
     wrap: 72
 ---
-
-# Livelihoods: Proportion of Tourism Jobs per Country/Region per Year
 
 ## Overview
 
@@ -208,141 +206,36 @@ fao_new <- fao_new %>%
 
 # Filter to only marine habitats
  mariculture_revenue <- fao_new %>% 
-   filter(environment %in% c("Brackishwater", "Marine"))
-
-new.spp <- setdiff(mariculture_revenue$species, mar_sp$FAO_name)
-
-new.spp # I suppose there are 17 new species in the 2024 data 
-
-## Adding new species to species_list.csv ----
-mar_sp <- read.csv(here::here('globalprep/mar/v2023/raw/species_list.csv'), stringsAsFactors=FALSE) %>%
-  select(FAO_name, exclude,Taxon_code, family, notes, notes_2)
-
-# Species to add: 
-FAO_names = c("Tarpon Snook", 
-              "Clown crab", 
-              "Coarse shrimp", 
-              "Freshwater crustaceans nei", 
-              "Whiskered velvet shrimp",
-              "Hard clams nei", 
-              "Bonefish", 
-              "Mexican spiny lobster", 
-              "Mojarras, etc. nei", 
-              "Northern brown shrimp", 
-              "Sea catfishes nei", 
-              "Smalleyed squillid mantis shri", 
-              "Fine flounder", 
-              "Ascidiaceans", 
-              "Red king crab", 
-              "Truncate donax", 
-              "White grouper")
-
-exclude = c(0, 
-            1,
-            1,
-            1,
-            1,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-            )
-
-Taxon_codes = c("F",
-                "CRUST",
-                "CRUST",
-                "CRUST",
-                "CRUST",
-                "BI",
-                "F",
-                "CRUST",
-                "F",
-                "CRUST",
-                "F",
-                "CRUST",
-                "F",
-                "TUN",
-                "CRUST",
-                "BI",
-                "F"
-                )
+   filter(environment %in% c("Brackishwater", "Marine")) %>% 
+   mutate(species = case_when(
+     species == "Mexican spiny loster" ~ "Mexican spiny lobster",
+     TRUE ~ species
+   ))
  
-families = c("Centropomidae",
-             "Xanthidae",
-             "Penaeidae",
-             "Crustaceans",
-             "Penaeidae",
-             "Veneridae",
-             "Albulidae",
-             "Palinuridae",
-             "Gerreidae",
-             "Penaeidae",
-             "Ariidae",
-             "Odontodactylidae",
-             "Paralichthyidae",
-             "Pyuridae",
-             "Lithodidae",
-             "Donacidae.",
-             "Serranidae"
-             )
-
-notes = c(NA,
-          NA,
-          "Not fully certain, but species distribution adds up.",
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA
-          )
-
-notes2 = c(NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA,
-          NA
-          )
-
-new_spp_add <- tibble(FAO_name = FAO_names, exclude = exclude, Taxon_code = Taxon_codes, family = families, notes = notes, notes_2 = notes2)
-
-new_spp_add <- new_spp_add %>% 
-  mutate(notes_2 = as.character(notes_2))
-
-mar_sp_2 <- mar_sp %>% rbind(new_spp_add)
-
-write.csv(mar_sp_2, here::here('globalprep/mar/v2023/raw/species_list.csv'))
-
-mar_sp <- read.csv(here::here('globalprep/mar/v2023/raw/species_list.csv'), stringsAsFactors=FALSE) %>%
-  select(FAO_name, exclude,Taxon_code, family, notes, notes_2)
+# 
+# mar_sp <- read.csv(here::here('globalprep/mar/v2023/raw/species_list.csv'), stringsAsFactors=FALSE) %>%
+#   select(FAO_name, exclude,Taxon_code, family, notes, notes_2)
+# 
+# mar_sp_fix <- read.csv(here::here('globalprep/mar/v2022/raw/species_list.csv'), stringsAsFactors=FALSE)
+# 
+# new.spp <- setdiff(mariculture_revenue$species, mar_sp$FAO_name)
+# 
+# new.spp # I suppose there are 17 new species in the 2024 data
+# 
+# 
+# 
+# mariculture_revenue <- mariculture_revenue %>%
+#   dplyr::rename(FAO_name = species)
+# 
+# mar_test <- mariculture_revenue %>% left_join(mar_sp, by="FAO_name")
+# 
+# mar_test <- mariculture_test %>% dplyr::filter(exclude < 1)
+# 
+# mar_test <- mar_test %>%
+#   dplyr::mutate(include = 1 - exclude)
+# 
+# mar_test <- mar_test %>%
+#   mutate(value_include = value*include)
 
 # Sum by region and year (we need total revenue)
 total_mar_rev <- mariculture_revenue %>%
@@ -366,13 +259,9 @@ total_mar_rev %>%
 -   **NOTE**: This year used the names_2_rgn function to find out which
     country names needed to be hardcoded to align with the reference
     regions.
-    -   To do this: Hold cmd (or ctrl) and click name_2_rgn
-    -   This should open up the script for the function
-    -   From there, hold cmd (or ctrl) and click rgn_synonyms on
-        line 31. This will pull up the synonyms for region names so that
-        you can check if yours align. If they do not, you can use
-        case_when() as seen below to revalue specific countries to their
-        relevant synonyms
+    - Run the names_2_rgn function on your data, and the output should tell you any countries that    were removed for not having a match in the look-up table 
+    - Depending on which regions show up as not having a match, you may be required to hard-code the names to those of synonyms using case_when() (see chunk below for an example)
+    - call 'rgn_synonyms <- ohicore::rgn_synonyms' in a code chunk to load the OHI Region synonyms for review 
 
 ```{r}
 # Need to join with regions and assign each country its respective OHI Region ----
@@ -398,7 +287,26 @@ mar_rev_rgn <- total_mar_rev %>%
     country=="Netherlands Antilles" ~ "Curacao",
     TRUE ~ country
   ))
-  
+
+## Need to split the Channel Islands into Jersey and Guernsey 
+m_CI <- mar_rev_rgn %>%
+  filter(country == 'Channel Islands') %>%
+  mutate(
+    value            = value/2,
+    'Guernsey'        = value,
+    'Jersey'           = value) %>%
+  ungroup() %>% 
+  dplyr::select(-c(value, Country)) %>% 
+  pivot_longer(cols = c(Guernsey, Jersey), values_to = "value", names_to = "Country") %>% 
+  mutate(Country = as.character(Country),
+         country = Country) %>% 
+    dplyr::relocate(value, .before = unit)
+
+mar_rev_rgn <- mar_rev_rgn %>%
+  filter(country != 'Channel Islands') %>%
+      bind_rows(m_CI)
+  arrange(country, fao, environment, species, year, value) 
+
 # Using name_2_rgn function to populate values for rgn_id and rgn_name for each of the countries listed in the dataframe
 mar_rev_rgn_temp <- ohicore::name_2_rgn(df_in = mar_rev_rgn, 
                        fld_name='Country', # Check to make sure that the case matches
@@ -540,6 +448,9 @@ mar_rev_fixed <- mar_rev_rgn_no_dupes %>%
   rbind(., joined_186) %>% 
   rbind(., joined_73)
 
+# Checking for duplicates one more times --> No observations = no duplicates 
+duplicates <- mar_rev_fixed[duplicated(mar_rev_fixed[, c('rgn_id','year')]),  ]
+
 # Binding duplicate data and ensuring dataframe is in the CORRECT format to write out to /int folder ----
 eco_mar_usd_raw <- mar_rev_fixed %>% 
   relocate(c(rgn_id, rgn_name), .before = country) %>% # Relocating columns in the order specified by README
@@ -561,8 +472,9 @@ heatmap <- ggplot(mar_heatmap, aes(x = year, y = rgn_name, fill = as.factor(stat
   geom_tile(color = "black") + 
   scale_fill_manual(values = c("darkgrey", "lightgreen")) + 
   theme_bw()
+heatmap
 
-plotly::ggplotly(heatmap) # rgn_id 249, 244, 98, and 116 have missing data for almost all years, aside from that what's in there is pretty good and those countries likely are present from freshwater aquaculture data im assuming 
+# plotly::ggplotly(heatmap) # rgn_id 249, 244, 98, and 116 have missing data for almost all years, aside from that what's in there is pretty good and those countries likely are present from freshwater aquaculture data im assuming 
 
 total_na <- mar_heatmap %>% 
   group_by(rgn_name) %>% 
@@ -579,7 +491,23 @@ duplicates <- eco_mar_usd_raw[duplicated(eco_mar_usd_raw[, c('rgn_id','year')]),
 ## Find out which countries can be gapfilled versus the countries that cant be
 
 ```{r}
-# For 2024: The countries that can be gapfilled are: 
+# For 2024: The countries that can be gapfilled are: Yemen, Uruguay, Togo, Sint Eustatius, Seychelles (needs > three data points over time), Qatar, Puerto Rico, Poland, Libya, Jordan, Falkland Islands, Estonia, Dominica, Curacao, Cape Verde
+
+eco_mar_usd_raw_cut <- eco_mar_usd_raw %>% 
+  filter(!rgn_name %in% c("Yemen", "Uruguay", "Togo", "Sint Eustatius", "Seychelles", "Qatar", "Puerto Rico and Virgin Islands of the United States", "Poland", "Libya", "Jordan", "Falkland Islands", "Estonia", "Dominica", "Curacao", "Cape Verde"))
+
+mar_heatmap <- eco_mar_usd_raw_cut %>% 
+  mutate(status = case_when(
+    usd == 0 ~ FALSE,
+    usd > 0 ~ TRUE
+  )) %>% 
+  filter(year %in% 2009:2019)
+heatmap <- ggplot(mar_heatmap, aes(x = year, y = rgn_name, fill = as.factor(status))) + 
+  geom_tile(color = "black") + 
+  scale_fill_manual(values = c("darkgrey", "lightgreen")) + 
+  theme_bw()
+
+heatmap
 ```
 
 
@@ -590,21 +518,116 @@ Here we'll use `na.approx()` from {zoo} to interpolate missing values and extrap
 ```{r}
 # gapfilling ----
 # estimate tourism GDP proportion for geo areas with missing data
-gdp_filled <- gdp_prop_yrs %>% 
-  group_by(geo_area_name) %>% 
+eco_mar_usd_gf <- eco_mar_usd_raw_cut %>% 
+  mutate(usd = case_when(
+    usd == 0 ~ NA,
+    TRUE ~ usd
+  )) %>% 
+  group_by(rgn_name) %>% 
   # interpolate (fill missing values between 2 values)
-  mutate(appx_gdp_pct = zoo::na.approx(gdp_prop_percent, # using values in this column
+  mutate(appx_usd = zoo::na.approx(usd, # using values in this column
                                        na.rm = FALSE, # don't replace (internal) NAs in new column that can't be approximated
                                        #  extrapolate using rule = 2 from approx(),
                                        # which uses closest data extreme to
                                        #  extrapolate for leading and trailing NAs
                                        rule = 2
   ))
+
+mar_heatmap <- eco_mar_usd_gf %>% 
+  mutate(status = case_when(
+    appx_usd == 0 ~ FALSE,
+    appx_usd > 0 ~ TRUE
+  )) %>% 
+  filter(year %in% 2009:2019)
+
+heatmap <- ggplot(mar_heatmap, aes(x = year, y = rgn_name, fill = as.factor(status))) + 
+  geom_tile(color = "black") + 
+  scale_fill_manual(values = c("lightgreen")) + 
+  theme_bw()
+
+heatmap
+
+# Doing some data prep so that we have both the raw gapfilled data as well as the one that we're writing out ----
+eco_mar_usd_write <- eco_mar_usd_gf %>% 
+  select(-usd) %>% 
+  rename(usd = appx_usd) %>% 
+  relocate(usd, .before = unit)
+
+# Gut check ---- 
+check <- is.na(eco_mar_usd_write$usd)
+summary(check) # Cool no NAs
 ```
 
-## Finish up and write out .csv  
+## Weighting by Developed vs Developing Country 
+
+Refer to the OHI Methods or [Ben Halpern's Supplementary Information](https://static-content.springer.com/esm/art%3A10.1038%2Fnature11397/MediaObjects/41586_2012_BFnature11397_MOESM79_ESM.pdf) **(page 29)** for the multipliers to apply towards revenue values by sector for developing versus developed countries. For mariculture revenue, the multipliers are 1.59 for developing countries and 2.377 for developed countries.
 
 ```{r}
-# write_csv(eco_mar_usd_raw, here::here(data_path, "int", "eco_mar_usd_pre.csv"))
+# Finally: Applying the multiplier to mariculture for developed versus developing countries ----
+# Setting filepath to unsd data on developing versus developed countries 
+fp_unsd <- file.path(dir_M,"git-annex/globalprep/_raw_data/UNSD/d2024/historical-classification-of-developed-and-developing-regions.xlsx")
+
+# Reading in unsd data 
+unsd_class <- read_excel(fp_unsd,col_names=TRUE, sheet = "Distinction as of May 2022") %>% 
+  janitor::clean_names()
+
+# Reading in OHI Regions data for gut checks/individual country checks 
+ohi_regions <- readr::read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  janitor::clean_names() %>% 
+  dplyr::select(-notes)
+
+# Fixing a couple of the countries that are present under different synonyms in the unsd dataset OR Duplicated. Do this AFTER running name_2_rgn!!! 
+unsd_class_fix <- unsd_class %>% 
+  mutate(country_or_area = case_when(
+  country_or_area == "Bonaire, Sint Eustatius and Saba" ~ "Sint Eustasius",
+  country_or_area == "China, Hong Kong Special Administrative Region" ~ "China",
+  country_or_area == "China, Macao Special Administrative Region" ~ "China",
+  country_or_area == "Åland Islands" ~ "Finland",
+  TRUE ~ country_or_area
+  ))
+  # dplyr::filter(!m49_code %in% c(630, 316, 474))
+
+# Using name to rgn function to assign rgn_id to country names 
+class_temp <- ohicore::name_2_rgn(df_in = unsd_class_fix, 
+                       fld_name='country_or_area')
+
+# Identifying duplicates  
+duplicates <- class_temp[duplicated(class_temp$rgn_id), ]
+
+# Removing countries with duplicated rgn_id by using their iso2 code 
+class_temp <- class_temp %>% 
+  dplyr::filter(!iso_alpha2_code %in% c("HK", "MO", "AX", "MP", "VI", "MQ")) %>% 
+  dplyr::select(rgn_id, rgn_name, developed_developing_regions)
+
+# Left joining the new developed/developing country classes to their respective rgn_id
+eco_mar_usd_class <- eco_mar_usd_write %>% 
+  left_join(y = class_temp, by = c("rgn_id"))
+
+# 140, 116, 13 Were duplicated so hard removing those above with their m49_code (Puerto Rico and the US virgin Islands, Guam and Nothern Mariana Islands, Guadaloupe and Martinique)
+
+# Removing unecessary columns from the joined df
+eco_mar_usd_class <- eco_mar_usd_class %>% 
+  dplyr::select(-c(rgn_name.y)) %>% 
+  dplyr::rename(rgn_name = rgn_name.x)
+
+# Applying weights to mariculture revenue data -----
+eco_mar_usd_final <- eco_mar_usd_class %>% 
+  mutate(usd_weighted = ifelse(developed_developing_regions == "Developing", usd*1.59, usd*2.377))
+
+# Tidying up data for export to the 'int' folder 
+eco_mar_usd_final <- eco_mar_usd_final %>% 
+  mutate(usd = usd_weighted) %>% 
+  select(-c(usd_weighted, developed_developing_regions))
+
+#One last ggplot to gut check that the weighting did what we wanted it to do 
+
+# ggplot(eco_mar_usd_final, aes(x = as.numeric(year), y = usd, color = rgn_name)) +
+#   geom_line() +
+#   theme(legend.position = "none") +
+#   scale_y_continuous(labels = scales::label_dollar(scale = 0.000000001, suffix = "B"))
+
+
+# Writing out csv FINALLY -----
+# write_csv(eco_mar_usd_final, here::here(data_path, "int", "eco_mar_usd_pre.csv"))
 ```
 

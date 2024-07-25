@@ -49,14 +49,22 @@ The Ultraviolet Radiation pressure layer is generated from daily data on Local N
 
 **Values**: Level-3 OMI Surface UV Irradiance and Erythemal Dose- OMUVBd  
 
-**Time Range**: Daily data from 2005 - 2022 (10/1/2004 through 06/26/2023, but only full years of data are used)  
+**Time Range**: Daily data from 2005 - 2023 (10/1/2004 through 07/14/2024, but only full years of data are used)  
 **Format**: NetCDF HDF5 (.he5.nc)  
 
-**Downloaded**: June 26, 2023 (three files manually replaced on June 28, 2023)
+**Downloaded**: file list: July 16, 2024; data files: July 17, 2024 
+
+**README** 
+
+    -   General: <https://acdisc.gesdisc.eosdis.nasa.gov/data/Aura_OMI_Level3/OMUVBd.003/doc/OMUVB_L3d_readme.pdf>
+
+    -   Data User's Guide: <https://docserver.gesdisc.eosdis.nasa.gov/repository/Mission/OMI/3.3_ScienceDataProductDocumentation/3.3.2_ProductRequirements_Designs/README.OMI_DUG.pdf>
+
+
 
 # Data citation information  
 
-Jari Hovila, Antii Arola, and Johanna Tamminen (2013), OMI/Aura Surface UVB Irradiance and Erythemal Dose Daily L3 Global Gridded 1.0 degree x 1.0 degree V3, NASA Goddard Space Flight Center, Goddard Earth Sciences Data and Information Services Center (GES DISC), Accessed: June 26, 2023, 10.5067/Aura/OMI/DATA3009
+Jari Hovila, Antii Arola, and Johanna Tamminen (2013), OMI/Aura Surface UVB Irradiance and Erythemal Dose Daily L3 Global Gridded 1.0 degree x 1.0 degree V3, NASA Goddard Space Flight Center, Goddard Earth Sciences Data and Information Services Center (GES DISC), Accessed: July 17, 2024, 10.5067/Aura/OMI/DATA3009
 
 ***
   
@@ -274,11 +282,21 @@ files_df <- files %>%
 
 check_ndays <- files_df %>%
   group_by(year, mo) %>% # group_by(year) %>% 
-  summarize(ndays = n()) #%>% # View(check_ndays)
-  #filter(ndays < 28)
+  summarize(ndays = n()) # %>% # View(check_ndays)
+  # filter(ndays < 28)
+
+# View(check_ndays)
+
+# gap_08 <- files_df %>% filter(year == "2008" & mo == "09") # missing 27th-30
+
 
 ## For some reason June 2016 is missing 14 days (June 1-14, 2016). I checked the website and those files don't seem to exist. It is just a gap in the data. Days are also missing from November 2004 (missing November 20-30, 2004; 11 days), September 2008 (missing September 27-30, 2008; 4 days), and March 2017 (missing March 12-16, 2017; 5 days). The rest seem ok. - v2023
+
+#v2024: I found the exact same data gaps as v2023. September 2008 (2008-09) only has 26 days (missing 27th-30th). Similar issue to v2023 2016 -- also only have 16 days of data in June 2016 (2016-06); only have 26 days in March 2017 (2017-03). 
 ```
+
+After checking the [Data Calendar](https://disc.gsfc.nasa.gov/datasets/OMUVBd_003/summary) on the NASA's GES DISC OMI/Aura Surface UVB Irradiance and Erythemal Dose Daily L3 Global Gridded 1.0 degree x 1.0 degree V3 (OMUVBd) [summary page](https://disc.gsfc.nasa.gov/datasets/OMUVBd_003/summary), I also found that there are 15 dates without data in 2016 (missing 1 in May and 14 in June), 
+
 
 ### Calculate Weekly Means and Standard Deviations
 
@@ -287,7 +305,7 @@ Calculate weekly means and standard deviations across all years:
 ```{r calc weekly means and st devs, eval = F}
 tic()
 ## for every week in each year of the time series, calculate weekly mean and standard deviation
-registerDoParallel(10)
+registerDoParallel(30)
 
 ## note: 2016 wk 22 has only 4 layers (4th layer all NAs) and length(days)=52; missing all week 23
 ## note: so far some 2005 files appear to have been downloaded incorrectly... replace them manually or just retry download??
@@ -377,7 +395,23 @@ foreach(yr = yrs) %dopar% { # for (yr in yrs) {
 }
 toc()
 # v2023: 28.403 sec elapsed
+
+# v2024: 14.204 sec elapsed
 ```
+
+v2024: had to manually re-download the following files:
+
+    -   OMI-Aura_L3-OMUVBd_2021m1123_v003-2021m1127t093001.he5.nc4
+    
+Downloaded by navigating to the [summary page](https://disc.gsfc.nasa.gov/datasets/OMUVBd_003/summary) and:
+-   selecting "Subset/Get Data"
+-   Get File Subsets using OPeNDAP  
+-   Date Range: selecting the date of the probelmatic file in start and end date
+-   ErythemalDailyDose: Erythemal Daily Dose
+-   File format: NetCDF
+
+then download the individual file, upload to data folder on Mazu and replace old file
+
 
 ```{r calc weekly climatologies, eval = F}
 tic()
@@ -426,6 +460,7 @@ foreach(i = match_weeks) %dopar% {
 }
 toc()
 # v2023: get Error in x@ptr$nrow() : external pointer is not valid. does not seem to affect anything. however, the results of tic/toc() don't show.
+# v2024: got same error. Again, the files are being written out to int/weekly_climatologies appropriately
 ```
 
 ## Compare to Climatology
@@ -433,6 +468,7 @@ toc()
 Compare each week in each year to the climatology for that week. The climatology is equal to the mean plus one standard deviation.
 
 ```{r compare week to climatology, eval = F}
+#doParallel::registerDoParallel(30)
 ## loop to calculate annual positive anomalies
 tic()
 foreach (i = yrs) %dopar% {
