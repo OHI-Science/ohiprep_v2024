@@ -77,8 +77,8 @@ library(WDI) #reinstall to access new years of population data
 source('https://raw.githubusercontent.com/OHI-Science/ohiprep_v2021/gh-pages/workflow/R/common.R')
 
 #update these each year
-version_year <- paste0("v", 2023) 
-previous_version_year <- paste0("v", 2021)
+version_year <- paste0("v", 2024) 
+previous_version_year <- paste0("v", 2023)
 data_start <- 2000
 data_end <- 2022
 ```
@@ -97,7 +97,7 @@ url <- "https://sdmx.data.unicef.org/ws/public/sdmxapi/rest/data/UNICEF,WASH_HOU
 sanitation <- readSDMX(url) %>% as_tibble()
 
 #save to the raw data folder for reproduceability in case the data changes
-write_csv(sanitation,  here("globalprep/prs_cw_pathogen", version_year, "raw/2023_WASH.csv"))
+write_csv(sanitation,  here("globalprep/prs_cw_pathogen", version_year, "raw/2024_WASH.csv"))
 
 ```
 
