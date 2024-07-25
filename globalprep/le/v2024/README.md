@@ -69,11 +69,11 @@ The individual LE::ECO scripts from other sectors will all be adjusted for infla
 
 Initially, there are three scripts, each with different starting units of value, shown below:
 
-#### Adjustment Units Pre/Post-Inflation 
+#### Adjustment Units Pre/Post-Inflation
 
 +---------------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
 |                     | Metadata documentation                                                | Pre-Adjustment Unit                | Post-Adjustment Unit           |
-+=====================+=======================================================================+====================================+================================+
++---------------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
 | cf                  | [FAO Capture Data](https://www.fao.org/fishery/en/collection/capture) | Final: USD (current year)          | USD inflation adjusted to 2017 |
 |                     |                                                                       |                                    |                                |
 | `eco_cf_prep.Rmd`   | [Ex-Vessel Price Data](https://github.com/SFG-UCSB/price-db-sfg)      | FAO Capture: tonnes                |                                |
@@ -140,9 +140,7 @@ Initially, there are three scripts, each with different starting units of value,
     -   Tourism number and quality of jobs
         -   Labor Force data from World Bank (downloaded June 28, 2024)
 
-            ```         
-            - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
-            ```
+            \- <https://data.worldbank.org/indicator/SL.TLF.TOTL.IN>
 
             -   Jobs data from UN Tourism / UNWTO (downloaded June 26th, 2024)
 
@@ -179,20 +177,7 @@ Initially, there are three scripts, each with different starting units of value,
 
 -   `aqf_dataprep.Rmd`
 
-```         
--   The original data source for aquarium fishing revenue had been updated since this goal was originally calculated: [FAO global trade value data.](https://www.fao.org/fishery/en/collection/global_commodity_prod)
--   Revenue data was prepared as is described in the methods: export data from the FAO Global Commodities database for 'Ornamental fish' for all available years, ornamental freshwater fish were excluded. The global commodities database is a component of the Global Aquatic Trade Statistic Collection published by FAO.
--   **v2024:** downloaded using on July 3rd, 2024 using the FAO status query interface/dashboard (data exploration & download portal, seems to be relatively new):
--   [Global aquatic trade - By partner country Value (2019 - 2021)](https://www.fao.org/fishery/statistics-query/en/trade_partners/trade_partners_value)
--   under "Trade Flow" in the Dimensions filtering section, select "Exports" (alternatively, you could skip this and filter to "Export" in R)
--   scroll to the bottom of the page, click the "download" button/icon, then select "csv", "Flag enabled" (we clean this later), then "Yes" for "Include null values"
--   select "Preferences", then:
-    -   for "Show unavailable values" select "NA"
-    -   for "Thousands separator" select "No space"
-        -   (all years -- 2019, 2020, and 2021 are selected by default, no countries or commodities etc. are selected for any filtering)
-        -   © FAO 2024. Global Aquatic Trade Statistics. In: Fisheries and Aquaculture. Rome. [Cited Wednesday, July 3rd 2024]. <https://www.fao.org/fishery/en/collection/global_commodity_prod>
--   [Metadata](https://www.fao.org/fishery/en/collection/global_commodity_prod)
-```
+\- The original data source for aquarium fishing revenue had been updated since this goal was originally calculated: [FAO global trade value data.](https://www.fao.org/fishery/en/collection/global_commodity_prod) - Revenue data was prepared as is described in the methods: export data from the FAO Global Commodities database for 'Ornamental fish' for all available years, ornamental freshwater fish were excluded. The global commodities database is a component of the Global Aquatic Trade Statistic Collection published by FAO. - \*\*v2024:\*\* downloaded using on July 3rd, 2024 using the FAO status query interface/dashboard (data exploration & download portal, seems to be relatively new): - [Global aquatic trade - By partner country Value (2019 - 2021)](https://www.fao.org/fishery/statistics-query/en/trade_partners/trade_partners_value) - under "Trade Flow" in the Dimensions filtering section, select "Exports" (alternatively, you could skip this and filter to "Export" in R) - scroll to the bottom of the page, click the "download" button/icon, then select "csv", "Flag enabled" (we clean this later), then "Yes" for "Include null values" - select "Preferences", then: - for "Show unavailable values" select "NA" - for "Thousands separator" select "No space" - (all years -- 2019, 2020, and 2021 are selected by default, no countries or commodities etc. are selected for any filtering) - © FAO 2024. Global Aquatic Trade Statistics. In: Fisheries and Aquaculture. Rome. [Cited Wednesday, July 3rd 2024]. \<[https://www.fao.org/fishery/en/collection/global_commodity_prod\\](https://www.fao.org/fishery/en/collection/global_commodity_prod\){.uri}\> - [Metadata](https://www.fao.org/fishery/en/collection/global_commodity_prod)
 
 -   `eco_mar_prep.Rmd`
     -   Mariculture Revenue Data (1984 - 2022)
