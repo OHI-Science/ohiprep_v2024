@@ -1,0 +1,267 @@
+---
+title: 'OHI 2024: Ocean Acidification Data Prep'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 3
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../src/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+# Summary
+
+**Overview**
+
+The [data source product](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description) corresponds to a REP L4 time series of monthly global reconstructed surface ocean pCO2, air-sea fluxes of CO2, pH, total alkalinity, dissolved inorganic carbon, saturation state with respect to calcite and aragonite, and associated uncertainties on a 0.25° x 0.25° regular grid.
+The product is obtained from an ensemble-based forward feed neural network approach mapping situ data for surface ocean fugacity (SOCAT data base, Bakker et al. 2016, <https://www.socat.info/>) and sea surface salinity, temperature, sea surface height, chlorophyll a, mixed layer depth and atmospheric CO2 mole fraction.
+Sea-air flux fields are computed from the air-sea gradient of pCO2 and the dependence on wind speed of Wanninkhof (2014).
+Surface ocean pH on total scale, dissolved inorganic carbon, and saturation states are then computed from surface ocean pCO2 and reconstructed surface ocean alkalinity using the CO2sys speciation software [See: Citation information].
+
+Specifically, we want to evaluate aragonite saturation.
+This is because it is a good metric for ocean acidification pressure on marine organisms.
+Some sources referring to this include:
+
+[Ocean Acidification \| Learn Science at Scitable](https://www.nature.com/scitable/knowledge/library/ocean-acidification-25822734/)
+
+1)  $CO_2(aq) + H_2O ↔ H_2CO_3$
+2)  $H_2CO_3 ↔ HCO_3^- + H^+$
+3)  $HCO_3^- ↔ CO_3^{2-} + H^+$
+4)  $CO_2(aq) + CO_3^{2-} + H_2O → 2HCO_3^-$
+
+For **supersaturated** (Ω \> 1) conditions, with an excess of [ $CO_3^{2-}$ ]seawater, a crystal of $CaCO_3$ will tend to grow, and in **undersaturated** (Ω \< 1) conditions, \$CaCO_3\$ will dissolve.
+[$CO_3^{2-}$]saturation is a weak function of temperature and salinity but a strong function of water depth (pressure) meaning that deeper waters are typically more corrosive.
+How [saturation level] affects calcifying organisms is difficult to predict however, because different species exert varying degrees of biological control on the calcification process.
+**Therefore, it may be a better idea to look at the current level of aragonite.**
+
+[Ocean Acidification: Saturation State - Science On a Sphere](https://sos.noaa.gov/catalog/datasets/ocean-acidification-saturation-state/#:~:text=Aragonite%20saturation%20state%20is%20commonly,organisms%20with%20calcium%20carbonate%20structures)
+
+Aragonite saturation state is commonly used to track ocean acidification because **it is a measure of carbonate ion concentration**.
+Aragonite is one of the more soluble forms of calcium carbonate and is [widely used by marine calcifiers]{.underline} (organisms with calcium carbonate structures).
+
+[Climate Change Indicators: Ocean Acidity \| US EPA.](https://www.epa.gov/climate-indicators/climate-change-indicators-ocean-acidity#:~:text=The%20global%20map%20in%20Figure,data%20(2006%E2%80%932015).)
+
+Aragonite is a specific form of calcium carbonate that many organisms produce and use to build their skeletons and shells, and the saturation state is a measure of how easily aragonite can dissolve in the water.
+
+The **lower** the saturation level, the **more difficult** it is for organisms to build and maintain their protective skeletons and shells.
+
+Aragonite saturation has only been measured at selected locations during the last few decades, but it can be calculated reliably for different times and locations based on the relationships scientists have observed among aragonite saturation, pH, dissolved carbon, water temperature, concentrations of carbon dioxide in the atmosphere, and other factors that can be measured.
+
+# Updates from 2024 assessment
+
+Will be filled as the data is evaluated...
+
+# Data Source
+
+### Classification
+
+**Reference:** [Copernicus Marine Service](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description)
+
+**Downloaded:**
+
+**Description**: Aragonite Saturation State $\Omega_{arg}$
+
+**Full name:** Global Ocean Surface Carbon
+
+**Product ID:** MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008
+
+**Source:** In-situ observations
+
+**Spatial extent:** Global OceanLat -88.12° to 89.88°Lon -179.87° to 179.88°
+
+**Spatial resolution:** 0.25° × 0.25°
+
+**Temporal extent:** 31 Dec 1984 to 30 Nov 2022
+
+**Temporal resolution:** Monthly
+
+**Processing level:** Level 4
+
+**Variables:** Dissolved inorganic carbon in sea water (DIC), Sea water pH reported on total scale (pH), Surface partial pressure of carbon dioxide in sea water (spCO2), Surface downward mass flux of carbon dioxide expressed as carbon (fpCO2), Total alkalinity in sea water
+
+**Feature type:** Grid
+
+**Blue markets:** Conservation & biodiversity, Climate & adaptation, Science & innovation, Marine food
+
+**Projection:** WGS 84 / World Mercator (EPSG 3395)
+
+**Data assimilation:** None
+
+**Update frequency:** Annually
+
+**Format:** NetCDF-4
+
+**Originating centre:** LSCE (France)
+
+**Last metadata update:** 30 November 2023
+
+# Methods
+
+## Setup
+
+```{r setup,message=FALSE,warning=FALSE,verbose=FALSE}
+
+#set options for all chunks in code
+knitr::opts_chunk$set(warning=FALSE, message=FALSE,fig.width=6, fig.height=6)
+
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  janitor,
+  raster,
+  terra,
+  maps,
+  purrr,
+  tictoc,
+  sf,
+  googleVis,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores, if needed
+  tidyverse, 
+  plotly,
+  zoo, # for gapfilling
+  pdftools, # for FAO yearbook
+  ohicore, 
+  ggplot2,
+  threadr #remotes::install_github("skgrange/threadr") # for na_extrapolate, GAPFILLING (if necessary)
+)
+
+# ---- sources! ----
+source(here("workflow/R/common.R")) # file creates objects to process data
+
+# ---- set year and file path info ----
+current_year <- 2024 # Update this in the future!!
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- here("globalprep", "prs_oa", version_year)
+
+# ---- data directories ----
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# CMS (Copernicus Marine Service) raw data directory
+cms_dir <- here(raw_data_dir, "CMS", data_dir_version_year)
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
+
+# set colors
+cols = rev(colorRampPalette(brewer.pal(9, 'Spectral'))(255)) # rainbow color scheme
+
+# Assign the mollweide projection label, this does not transform the crs (for that we would use the function project(raster_name) after we create the raster) 
+mollCRS <- CRS("+proj=moll") 
+
+# Read in ocean raster with cells at 1km -- template for resampling (held on an NCEAS server)
+ocean <- terra::rast(here(dir_M, "git-annex","globalprep", "spatial", "v2017", "ocean.tif"))
+```
+
+## Load raw data
+
+We received new data from
+
+```{r}
+library(ncmeta)
+library(ncdf4)
+
+# Open the NetCDF file
+nc <- nc_open(here::here(cms_dir, "dataset-carbon-rep-monthly_20220815T0000Z_P20230821T1545Z.nc"))
+```
+
+# Historical Mean
+
+```{r}
+
+```
+
+# Create annual means
+
+```{r}
+
+```
+
+## Rescale from 0 to 1
+
+This pressure layer is rescaled so that all values lie between 0 and 1 using both a historical reference period and a biological reference point.
+All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1.
+For all other cells, rescaling the aragonite staturation state value to between 0 and 1 relies upon the change in saturation relative to the reference period.
+
+Deviation from aragonite saturation state is determined for each year in the study period using this equation:
+
+$$\Delta \Omega_{year} = \frac{(\Omega_{base} - \Omega_{year})}{(\Omega_{base} - 1)}$$
+
+Note that the current value is subtracted from the baseline; this way, a reduction in $\Omega$ becomes a positive pressure value.
+It is then normalized by the current mean state; so a decrease in $\Omega$ while the current state is high indicates less pressure than the same decrease when the current state is near 1.
+
+$\Delta \Omega_{year}$ is then modified to account for increases in aragonite saturation state (pressure = 0) and arag sat state less than 1 (pressure = 1).
+
+The `oaRescale` function rescales each of the annual rasters.
+If the current value is less than or equal to 1, it is set to 1, otherwise the value is calculated from the above equation.
+
+```{r}
+
+```
+
+## Interpolate?
+
+Since there are oceanic cells with no information in the raw data, we need to fill in these gaps.
+We do this by interpolating across the globe using the data we have with an Inverse Distance Weighting (IDW) function.
+Previously this was done using `arcpy` from ArcGIS.
+
+```{r}
+
+```
+
+## Resample & Land Mask
+
+All pressure layers need to be resampled to 1km^2^ cell resolution.
+We have a template ocean raster with cells at this resolution that we use to resample all pressure layers.
+You won't see any difference between the plot above and this one since we are using the nearest neighbor method when resampling which maintains the original cell value for each of resampled cell.
+
+```{r}
+
+```
+
+# Final Pressure Layer
+
+```{r plot_final}
+
+```
+
+# Gap-filled cells
+
+We want to create a raster layer that shows all cells that were gap-filled.
+Since they were the same cells interpolated across all years, we only need to create one raster.
+
+```{r}
+
+```
+
+# Citation information
+
+**Product Citation:**
+
+Please refer to our Technical FAQ for citing products: <http://marine.copernicus.eu/faq/cite-cmems-products-cmems-credit/?idpage=169>.
+
+**DOI (product):**
+
+<https://doi.org/10.48670/moi-00047>
+
+**References:**
+
+Chau, T. T. T., Gehlen, M., and Chevallier, F.: A seamless ensemble-based reconstruction of surface ocean pCO2 and air–sea CO2 fluxes over the global coastal and open oceans, Biogeosciences, 19, 1087–1109, <https://doi.org/10.5194/bg-19-1087-2022>, 2022.
