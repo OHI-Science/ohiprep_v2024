@@ -422,7 +422,7 @@ write.csv(all_together, "int/all_sp_vars.csv", row.names = FALSE)
 
 ```{r, eval = FALSE}
 
-spi_calc <- read.csv("int/Country_spi.csv", stringsAsFactors = FALSE)
+spi_calc <- read.csv(here::here("globalprep/prs_res_spi/v2022/int/Country_spi.csv"), stringsAsFactors = FALSE)
 
 spi_calc <- spi_calc %>%
   mutate(Country = case_when(
@@ -443,11 +443,16 @@ spi_rgn <- name_2_rgn(df_in = spi_calc,
 
 # Weight the following duplicates by population
 # China, Guadeloupe, Guam, Hong Kong, Macao, Martinique, Northern Mariana Islands, Puerto Rico, Virgin Islands (U.S.)... Populations taken from google
+tmp <- filter(spi_rgn, year==2022)
+sum(duplicated(tmp$rgn_id))
+summary(spi_rgn)
+unique(spi_rgn$rgn_name)
 
+## This is currently not doing anything. These regions are not included.
 pop_weights <- data.frame(Country = c("China", "Hong Kong", "Macao",
                  "Guadeloupe", "Martinique",
                  "Guam", "Northern Mariana Islands",
-                 "Puerto Rico", "Virgin Islands (U.S.)"),
+                  <- <- ),
                  pop = c(1452883897, 7632334, 669037,
                          400276, 367507,
                          172069, 49551,
