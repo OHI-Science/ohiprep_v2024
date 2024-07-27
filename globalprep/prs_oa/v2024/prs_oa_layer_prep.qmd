@@ -1,6 +1,8 @@
 ---
 title: 'OHI 2024: Ocean Acidification Data Prep'
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+title: "My Quarto Document"
+jupyter: /home/lecuona/.virtualenvs/r-reticulate/bin/python
 output: 
   html_document:
     code_folding: show
@@ -175,57 +177,131 @@ mollCRS <- CRS("+proj=moll")
 ocean <- terra::rast(here(dir_M, "git-annex","globalprep", "spatial", "v2017", "ocean.tif"))
 ```
 
-## Download raw data
+```{r}
+plot(ocean)
+```
+
+
+## Automated download of raw data
+
+```{python}
+#| eval: false
+!pip install copernicusmarine
+
+import os
+import copernicusmarine
+
+# Set your credentials
+copernicusmarine.configure(username='slecuona', password='OceanHealth2024')
+
+# Define the cms_dir
+dir_M = "/home/shares/ohi"
+current_year = 2024
+version_year = f"v{current_year}"
+data_dir_version_year = f"d{current_year}"
+raw_data_dir = os.path.join(dir_M, "git-annex", "globalprep", "_raw_data")
+cms_dir = os.path.join(raw_data_dir, "CMS", data_dir_version_year)
+
+# Ensure the directory exists
+os.makedirs(cms_dir, exist_ok=True)
+
+# Use copernicusmarine to download the data
+copernicusmarine.subset(
+    dataset_id="dataset-carbon-rep-monthly",
+    dataset_version="202311",
+    variables=["omega_ar"],
+    minimum_longitude=-179.875,
+    maximum_longitude=179.875,
+    minimum_latitude=-88.125,
+    maximum_latitude=89.875,
+    start_datetime="2010-01-01T00:00:00",
+    end_datetime="2022-12-01T00:00:00",
+    force_download=True,
+    subset_method="strict",
+    disable_progress_bar=False,
+    output_filename=os.path.join(cms_dir, "carbon_data.nc")
+)
+
+print(f"Data downloaded to: {os.path.join(cms_dir, 'carbon_data.nc')}")
+```
+
 
 ```{r}
 library(reticulate)
 
-# specify the path to the raw data download script
-copernicus_data_download <- here::here(data_path, "copernicus_data_download.py")
+# # specify the path to the raw data download script
+# copernicus_data_download <- here::here(data_path, "copernicus_data_download.py")
+# 
+# # run the .py script to download data from Copernicus Marine Service
+# tic()
+# system2("/usr/bin/python3", args = c(copernicus_data_download, cms_dir))
+# toc()
 
-# run the .py script to download data from Copernicus Marine Service
-tic()
-system2("/usr/bin/python3", args = c(copernicus_data_download, cms_dir))
-toc()
+# write the cms_dir path to a file that python can read
+writeLines(cms_dir, "cms_dir.txt")
 ```
+
 ```{python}
-import copernicusmarine
-import os
+import sys
+print(sys.executable)
+```
 
-copernicusmarine.login()
+```{python}
+import sys
+import subprocess
 
-def download_dataset(cms_dir):
-    # check that the cms_dir folder exists
-    os.makedirs(cms_dir, exist_ok=True)
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
-    # make the current working directory the cms_dir folder, defined above in an r chunk
-    os.chdir(cms_dir)
+try:
+    import copernicusmarine
+except ImportError:
+    print(f"Installing copernicusmarine...")
+    install("copernicusmarine")
+    import copernicusmarine
 
-    # download the data using python API, taken from CMS site
-    copernicusmarine.subset(
-        dataset_id="dataset-carbon-rep-monthly",
-        dataset_version="202311",
-        variables=["omega_ar"],
-        minimum_longitude=-179.875,
-        maximum_longitude=179.875,
-        minimum_latitude=-88.125,
-        maximum_latitude=89.875,
-        start_datetime="2012-01-01T00:00:00",
-        end_datetime="2022-12-01T00:00:00",
-        force_download=True,
-        subset_method="strict",
-        disable_progress_bar=True,
-    )
+print(f"copernicusmarine version: {copernicusmarine.__version__}")
+```
+Based on the response and error when trying to install `copernicusmarine`, it looks like there are dependency conflicts or incompatibilities.
 
-    print(f"Download completed. Files saved in {cms_dir}")
+There's also a specific error related to NumPy: "numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject"
 
-if __name__ == "__main__":
-    import sys
-    if len(sys.argv) > 1:
-        cms_dir = sys.argv[1]
-        download_dataset(cms_dir)
-    else:
-        print("Please provide an cms_dir folder path as an argument.")
+There might be a version mismatch between NumPy and some of its dependencies, or between NumPy and other packages that depend on it... I may need to ask Thomas whether I can update python packages.  For now, I am going to move on to try using CLI to automate, instead of python API.
+
+```{python}
+# import copernicusmarine
+# import os
+# 
+# # Read the cms_dir from the file
+# with open("cms_dir.txt", "r") as f:
+#     cms_dir = f.read().strip()
+# 
+# # Ensure the cms_dir folder exists
+# os.makedirs(cms_dir, exist_ok=True)
+# 
+# # Set the current working directory to the cms_dir folder
+# os.chdir(cms_dir)
+# 
+# # Login to Copernicus Marine Service
+# copernicusmarine.login()
+# 
+# # Download the data using python API
+# copernicusmarine.subset(
+#     dataset_id="dataset-carbon-rep-monthly",
+#     dataset_version="202311",
+#     variables=["omega_ar"],
+#     minimum_longitude=-179.875,
+#     maximum_longitude=179.875,
+#     minimum_latitude=-88.125,
+#     maximum_latitude=89.875,
+#     start_datetime="2012-01-01T00:00:00",
+#     end_datetime="2022-12-01T00:00:00",
+#     force_download=True,
+#     subset_method="strict",
+#     disable_progress_bar=True,
+# )
+# 
+# print(f"Download completed. Files saved in {cms_dir}")
 ```
 
 
@@ -239,6 +315,30 @@ userpasswd <- readline("Type CMS username and password, separated by colon no sp
 # example from v2024 => slecuona:OceanHealth2024
 # username <- slecuona
 # password <- OceanHealth2024
+
+CopernicusMarine::cms_login(username = "slecuona", password = "OceanHealth2024")
+
+bbox <- c(xmin = -179.875, ymin = -88.125, xmax = 179.875, ymax = 89.875)
+
+timerange_vector <- c(
+  as.POSIXct("2012-01-01T00:00:00", format="%Y-%m-%dT%H:%M:%S", tz="UTC"),
+  as.POSIXct("2022-12-01T00:00:00", format="%Y-%m-%dT%H:%M:%S", tz="UTC")
+)
+
+destination <- tempfile(cms_dir, fileext = ".nc")
+
+CopernicusMarine::cms_download_subset(
+  username = "slecuona", 
+  password = "OceanHealth2024", 
+  destination = destination,
+  product = "MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008", 
+  layer = "dataset-carbon-rep-monthly",
+  # dataset_version = "202311", 
+  variable = "omega_ar", # name of a desired variable in a specific layer of a product (type character). it can be obtained with copernicus_product_details
+  # output = "netcdf", # file type for output
+  region = bbox, # in documentation: should be "Specification of the bounding box as a vector of numerics WGS84 lat and lon coordinates. Should be in the order of: xmin, ymin, xmax, ymax."  So the start and end date from the website was taken to make a vector "bbox".
+  timerange = timerange_vector, # using the vector created above that has two elements (lower and upper value) for a requested time range. The vector should be coercible to POSIXct, so as.POSIXct was used.
+  overwrite = TRUE)
 ```
 
 
@@ -277,6 +377,57 @@ system("/home/lecuona/.local/bin/copernicusmarine login")
 system("/home/lecuona/.local/bin/copernicusmarine login --verbose", intern = TRUE)
 
 ```
+
+## Manual download of raw data
+
+```{r}
+library(ncmeta)
+library(ncdf4)
+
+# open the NetCDF file
+file_path <- here::here(cms_dir, "dataset-carbon-rep-monthly_1722109120120.nc")
+
+# load the file as a SpatRaster to begin with, for greater usability with terra
+nc_raster <- rast(file_path)
+plot(nc_raster)
+
+# reproject to Mollewide for OHI consistency
+nc_raster_mollweide <- project(nc_raster, mollCRS)
+```
+Save as individual rasters
+
+```{r}
+# since nc_raster is already loaded as a SpatRaster object
+# check the number of layers
+num_layers <- nlyr(nc_raster)
+print(num_layers) # v2024: 156 layers, which makes sense because the data goes from 2010 - 2022 monthly
+
+# get the time attribute for each layer, to check that it goes from 2010 - 2022 (v2024)
+time_attribute <- time(nc_raster)
+print(time_attribute)
+
+# Create a list to store individual rasters
+individual_rasters <- list()
+
+# loop through each layer and create individual rasters from the spatraster
+for (i in 1:num_layers) {
+  layer <- nc_raster[[i]]
+  date <- time_attribute[i]
+  layer_name <- format(date, "%Y-%m-%d")
+  individual_rasters[[layer_name]] <- layer
+}
+
+# print the names of the individual rasters
+names(individual_rasters) # v2024: "2010-01-01" - "2022-12-01"
+
+# save individual rasters to files on filezilla at `cms_dir`
+for (name in names(individual_rasters)) {
+  output_file <- file.path(cms_dir, paste0(name, ".tif")) # move each raster to filezilla
+  writeRaster(individual_rasters[[name]], filename = output_file, overwrite = TRUE) # if files already exist, overwrite them
+  print(paste("Saved:", output_file)) # allows us to see the files being saved
+} #great! check filezilla that files are all there
+```
+
 
 # Historical Mean
 
