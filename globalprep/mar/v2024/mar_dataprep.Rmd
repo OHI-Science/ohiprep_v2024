@@ -99,6 +99,8 @@ library(plotly)
 current_year <- 2024 # update this
 version_year <- paste0("v", current_year)
 
+current_mar_dir <- here::here("globalprep", "mar", version_year)
+
 ## Load FAO-specific user-defined functions
 source(here::here("globalprep", "mar", version_year, "mar_fxs.R")) # functions specific to mariculture dealing with compound countries
 source(here::here("workflow", "R", "fao_fxn.R")) # old function for cleaning fao data
@@ -194,7 +196,7 @@ The species_list.csv is a master list of all the mariculture species in the FAO 
 ```{r update-species, eval = FALSE}
 
 ## Commented out 'read.csv' lines are different versions of the dataset, representing the three different seaweed exclusion methods (exclude some seaweed, all seaweed, all seaweed nei (nei = not elsewhere identified)). Use at the end for data checking. The first one is the one which is saved to the "output" folder, and the main analysis to run. 
-mar_sp <- read.csv(here::here('globalprep/mar/v2023/raw/species_list.csv'), stringsAsFactors=FALSE) %>%
+mar_sp <- read.csv(here::here(current_mar_dir, "raw", "species_list.csv"), stringsAsFactors=FALSE) %>%
   dplyr::select(FAO_name, exclude, Taxon_code, family, notes, notes_2)
 
 new_spp <- setdiff(mar$FAO_name, mar_sp$FAO_name)
@@ -303,7 +305,7 @@ For example: Production of blue shrimp in Maine starts in 1983 -- don't include 
 Checked to make sure that there weren't instances in which it made more sense to carry the previous year's data forward as a method of gapfilling. This didn't seem to be the case.
 
 
-```{r}
+```{r test-yrs, eval=FALSE}
 # v2024 method 
 tic()
 
@@ -326,26 +328,23 @@ toc()
 
 
 ```{r gapfill-missing-0, eval = FALSE}
-tic()
-## Spread mar_rgn to create a value for every year-species-region (if missing it will be given a NA)
+# ---- fill "years" column for gapfilling ----
+# Spread mar_rgn to create a value for every year-species-region (if missing it will be given a NA)
 mar_rgn_spread <- tidyr::pivot_wider(mar_rgn_agg,
                                      names_from = year,
                                      values_from = value)
-#dim(mar_rgn_spread)
+dim(mar_rgn_spread)
 
-## Turn data frame back into long format
-mar_rgn_gf <- pivot_longer(mar_rgn_spread,
+# Turn data frame back into long format
+mar_rgn_yrs_filled <- pivot_longer(mar_rgn_spread,
                            cols = num_range("",paste0(1950:latest_data_year)),
                            names_to = "year",
                            values_to = "value") %>% 
   arrange(rgn_id, species, year, Taxon_code, family, fao, environment)
-toc()
-```
 
 
-```{r gapfill-missing-0, eval = FALSE}
 ## NA values are converted to zero.
-mar_rgn_gf <- mar_rgn_gf %>%
+mar_rgn_gf <- mar_rgn_yrs_filled %>%
   mutate(year = as.numeric(year)) %>%
   mutate(value_w_0 = ifelse(is.na(value), 0, value)) %>%
   group_by(fao, environment, species, Taxon_code, family, rgn_id) %>% 
@@ -368,20 +367,21 @@ table(mar_rgn_gf$gap_0_fill)
 ## 6441 of these out of 30170 + 6441 cases had NA values converted to 0 - 2021 assessment
 ## 7037 of these out of 30975 + 7037 cases had NA values converted to 0 - 2022 assessment
 ##7367 of these out of 34187 + 7367 cases had NA values converted to 0 -2023 assessment
+## 8200 of these out of 35023 + 8200 (43223) cases had NA values converted to 0 - 2024 assessment = 0.1897 ≈ 19% of values
 ```
 
 Remove family-region-environment time series with less than four years of mariculture production \> 0 tonnes (assume these are not established mariculture programs).
 
 ```{r remove-less-four-years, eval = FALSE}
 
-mar_rgn_gf = mar_rgn_gf %>% 
+mar_rgn_gf_filter <- mar_rgn_gf %>% 
   group_by(rgn_id, family, fao, environment) %>%
-  mutate (not_0 = length(value[value>0])) %>% # Length of vector of years greater than 0
-  filter (not_0>3) %>% # Filter for groups that have at least four years of mariculture production 
+  mutate (not_0 = length(value[value > 0])) %>% # Length of vector of years greater than 0
+  filter (not_0 > 3) %>% # Filter for groups that have at least four years of mariculture production 
   ungroup() %>% 
   select(rgn_id, species, fao, environment, year, value, Taxon_code, family, gap_0_fill) 
 
-maric <- mar_rgn_gf
+maric <- mar_rgn_gf_filter
 ```
 
 # Save mariculture file
@@ -391,7 +391,8 @@ Used to estimate total mariculture yield per country.
 Saves the Mariculture-FP file
 
 ```{r save-mariculture-yield, eval = FALSE}
-write.csv(maric, 'output/MAR_FP_data.csv', row.names=FALSE)
+write.csv(maric, file = here::here(current_mar_dir, "output", "MAR_FP_data.csv"),
+          row.names = FALSE)
 ```
 
 # Sustainability Scores from Seafood Watch Data
@@ -539,7 +540,7 @@ maric <- maric %>%
 #also sums duplicates due to multiple fao codes for the same region/species
 maric <- maric %>%
   group_by(environment, species, year, Taxon_code, rgn_id, family) %>% 
-  summarize(value = sum(value), gap_0_fill =first(gap_0_fill)) %>%
+  summarize(value = sum(value), gap_0_fill = first(gap_0_fill)) %>%
   ungroup()
 
 #run this code to check that there are no duplicates for any species, year, rgn_id combinations. If there are they will be unintentionally deleted later, so you may need to change family or taxon codes to match and rerun the above group by
@@ -822,7 +823,9 @@ mar_sw_sus_final = mar_sw_sus %>%
 
   #### final tidying ####
   mutate(taxa_code = paste(species, species_code, sep="_")) %>%
-  select(rgn_id, species, species_code, taxa_code, taxa_group=Taxon_code, family, year, gapfill_sus, gapfill_esc, gapfill_fao = gap_0_fill, tonnes=value, Sust, esc_score) %>%
+  select(rgn_id, species, species_code, taxa_code, taxa_group = Taxon_code,
+         family, year, gapfill_sus, gapfill_esc, gapfill_fao = gap_0_fill,
+         tonnes = value, Sust, esc_score) %>%
   mutate(Sust = round(Sust/10, 2),
          esc_score = 1 - round(esc_score/10, 2))
 
