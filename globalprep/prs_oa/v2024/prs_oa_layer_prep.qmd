@@ -1,0 +1,496 @@
+---
+title: 'OHI 2024: Ocean Acidification Data Prep'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+title: "My Quarto Document"
+jupyter: /home/lecuona/.virtualenvs/r-reticulate/bin/python
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 3
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../src/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+# Summary
+
+**Overview**
+
+The [data source product](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description) corresponds to a REP L4 time series of monthly global reconstructed surface ocean pCO2, air-sea fluxes of CO2, pH, total alkalinity, dissolved inorganic carbon, saturation state with respect to calcite and aragonite, and associated uncertainties on a 0.25° x 0.25° regular grid.
+The product is obtained from an ensemble-based forward feed neural network approach mapping situ data for surface ocean fugacity (SOCAT data base, Bakker et al. 2016, <https://www.socat.info/>) and sea surface salinity, temperature, sea surface height, chlorophyll a, mixed layer depth and atmospheric CO2 mole fraction.
+Sea-air flux fields are computed from the air-sea gradient of pCO2 and the dependence on wind speed of Wanninkhof (2014).
+Surface ocean pH on total scale, dissolved inorganic carbon, and saturation states are then computed from surface ocean pCO2 and reconstructed surface ocean alkalinity using the CO2sys speciation software [See: Citation information].
+
+Specifically, we want to evaluate aragonite saturation.
+This is because it is a good metric for ocean acidification pressure on marine organisms.
+Some sources referring to this include:
+
+[Ocean Acidification \| Learn Science at Scitable](https://www.nature.com/scitable/knowledge/library/ocean-acidification-25822734/)
+
+1)  $CO_2(aq) + H_2O ↔ H_2CO_3$
+2)  $H_2CO_3 ↔ HCO_3^- + H^+$
+3)  $HCO_3^- ↔ CO_3^{2-} + H^+$
+4)  $CO_2(aq) + CO_3^{2-} + H_2O → 2HCO_3^-$
+
+For **supersaturated** (Ω \> 1) conditions, with an excess of [ $CO_3^{2-}$ ]seawater, a crystal of $CaCO_3$ will tend to grow, and in **undersaturated** (Ω \< 1) conditions, \$CaCO_3\$ will dissolve.
+[$CO_3^{2-}$]saturation is a weak function of temperature and salinity but a strong function of water depth (pressure) meaning that deeper waters are typically more corrosive.
+How [saturation level] affects calcifying organisms is difficult to predict however, because different species exert varying degrees of biological control on the calcification process.
+**Therefore, it may be a better idea to look at the current level of aragonite.**
+
+[Ocean Acidification: Saturation State - Science On a Sphere](https://sos.noaa.gov/catalog/datasets/ocean-acidification-saturation-state/#:~:text=Aragonite%20saturation%20state%20is%20commonly,organisms%20with%20calcium%20carbonate%20structures)
+
+Aragonite saturation state is commonly used to track ocean acidification because **it is a measure of carbonate ion concentration**.
+Aragonite is one of the more soluble forms of calcium carbonate and is [widely used by marine calcifiers]{.underline} (organisms with calcium carbonate structures).
+
+[Climate Change Indicators: Ocean Acidity \| US EPA.](https://www.epa.gov/climate-indicators/climate-change-indicators-ocean-acidity#:~:text=The%20global%20map%20in%20Figure,data%20(2006%E2%80%932015).)
+
+Aragonite is a specific form of calcium carbonate that many organisms produce and use to build their skeletons and shells, and the saturation state is a measure of how easily aragonite can dissolve in the water.
+
+The **lower** the saturation level, the **more difficult** it is for organisms to build and maintain their protective skeletons and shells.
+
+Aragonite saturation has only been measured at selected locations during the last few decades, but it can be calculated reliably for different times and locations based on the relationships scientists have observed among aragonite saturation, pH, dissolved carbon, water temperature, concentrations of carbon dioxide in the atmosphere, and other factors that can be measured.
+
+# Updates from 2024 assessment
+
+Will be filled as the data is evaluated...
+
+# Data Source
+
+### Classification
+
+**Reference:** [Copernicus Marine Service](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description)
+
+**Downloaded:**
+
+**Description**: Aragonite Saturation State $\Omega_{arg}$
+
+**Full name:** Global Ocean Surface Carbon
+
+**Product ID:** MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008
+
+**Source:** In-situ observations
+
+**Spatial extent:** Global OceanLat -88.12° to 89.88°Lon -179.87° to 179.88°
+
+**Spatial resolution:** 0.25° × 0.25°
+
+**Temporal extent:** 31 Dec 1984 to 30 Nov 2022
+
+**Temporal resolution:** Monthly
+
+**Processing level:** Level 4
+
+**Variables:** Dissolved inorganic carbon in sea water (DIC), Sea water pH reported on total scale (pH), Surface partial pressure of carbon dioxide in sea water (spCO2), Surface downward mass flux of carbon dioxide expressed as carbon (fpCO2), Total alkalinity in sea water
+
+**Feature type:** Grid
+
+**Blue markets:** Conservation & biodiversity, Climate & adaptation, Science & innovation, Marine food
+
+**Projection:** WGS 84 / World Mercator (EPSG 3395)
+
+**Data assimilation:** None
+
+**Update frequency:** Annually
+
+**Format:** NetCDF-4
+
+**Originating centre:** LSCE (France)
+
+**Last metadata update:** 30 November 2023
+
+# Methods
+
+## Setup
+
+```{r setup,message=FALSE,warning=FALSE,verbose=FALSE}
+
+#set options for all chunks in code
+knitr::opts_chunk$set(warning=FALSE, message=FALSE,fig.width=6, fig.height=6)
+
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  CopernicusMarine,
+  janitor,
+  raster,
+  terra,
+  maps,
+  httr,
+  jsonlite,
+  purrr,
+  tictoc,
+  sf,
+  googleVis,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores, if needed
+  tidyverse, 
+  plotly,
+  zoo, # for gapfilling
+  pdftools, # for FAO yearbook
+  ohicore,
+  reticulate,
+  ggplot2,
+  reticulate, # for python coding
+  threadr #remotes::install_github("skgrange/threadr") # for na_extrapolate, GAPFILLING (if necessary)
+)
+
+# ---- sources! ----
+source(here("workflow/R/common.R")) # file creates objects to process data
+
+# ---- set year and file path info ----
+current_year <- 2024 # Update this in the future!!
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+
+# ---- data directories ----
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# CMS (Copernicus Marine Service) raw data directory
+cms_dir <- here(raw_data_dir, "CMS", data_dir_version_year)
+
+# prs_oa dir
+oa_dir <- here(dir_M, "git-annex", "globalprep", "prs_oa")
+
+# output data dir for intermediate data products
+int_dir <- here(oa_dir, version_year, "int")
+dir.create(int_dir)
+
+# set colors
+cols = rev(colorRampPalette(brewer.pal(9, 'Spectral'))(255)) # rainbow color scheme
+
+# Assign the mollweide projection label, this does not transform the crs (for that we would use the function project(raster_name) after we create the raster) 
+mollCRS <- CRS("+proj=moll") 
+
+# Read in ocean raster with cells at 1km -- template for resampling (held on an NCEAS server)
+ocean <- terra::rast(here(dir_M, "git-annex","globalprep", "spatial", "v2017", "ocean.tif"))
+```
+
+```{r, eval = FALSE}
+plot(ocean) # examine the .tif and ensure it looks correct
+crs(ocean) # v2024: "PROJCRS[\"Mollweide\",\n
+```
+
+## Download copernicusmarine tool in python
+
+```{python}
+import sys
+import subprocess
+
+def install(package): # a function to download the copernicusmarine package
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package]) # `sys.executable` is the path to the python executable. for example, "/usr/bin/python3" 
+    #"-m" tells the Python interpreter to run a module, in this case "pip", as a script, using the new function "install" that we created using `def` and inputting the name of the function for the variable "package"
+
+try:
+    install("copernicusmarine") # use the function to download the package
+    import copernicusmarine # will import the package copernicusmarine.
+    # if the package is already installed, the rest of the code will be skipped
+except ImportError:
+    print(f"Installing copernicusmarine...") # if it does not work, this will print in the console. 
+
+print(f"copernicusmarine version: {copernicusmarine.__version__}") # if correctly downloaded, then it will print the version
+# v2024: copernicusmarine version: 1.3.1
+```
+
+## Automated download of raw data
+
+```{python}
+#| eval: false
+!pip install copernicusmarine # to not run every time, but show how to install copernicusmarine package via pip if needed
+
+import os
+import copernicusmarine
+
+# set the credentials made on the CMS website
+copernicusmarine.configure(username='slecuona', password='OceanHealth2024') # ERROR: need to work on this
+
+# define cms_dir, since the python chunk cannot necessarily read objects from previous R chunks/in the environment
+dir_M = "/home/shares/ohi"
+current_year = 2024
+version_year = f"v{current_year}" # using an f-string
+data_dir_version_year = f"d{current_year}"
+raw_data_dir = os.path.join(dir_M, "git-annex", "globalprep", "_raw_data") # os.path.join is part of the os module and will merge into a single path
+cms_dir = os.path.join(raw_data_dir, "CMS", data_dir_version_year) # for the specific CMS folder within _raw_data
+
+# make sure the directory exists
+os.makedirs(cms_dir, exist_ok=True) # will create the dir if it does not already exist
+
+# use copernicusmarine to download the data --this is from the python API copyable code on the CMS site
+copernicusmarine.subset(
+    dataset_id="dataset-carbon-rep-monthly",
+    dataset_version="202311",
+    variables=["omega_ar"],
+    minimum_longitude=-179.875,
+    maximum_longitude=179.875,
+    minimum_latitude=-88.125,
+    maximum_latitude=89.875,
+    start_datetime="2010-01-01T00:00:00",
+    end_datetime="2022-12-01T00:00:00",
+    force_download=True,
+    subset_method="strict",
+    disable_progress_bar=False,
+    output_filename=os.path.join(cms_dir, "carbon_data.nc")
+)
+
+print(f"Data downloaded to: {os.path.join(cms_dir, 'carbon_data.nc')}") # print in console: data download finished!
+```
+
+
+## Downloading data from CLI (Command Line Interface), instead of python
+
+```{r login_info, eval=FALSE}
+# This layer lags by 2 years, since we need a full year of data. 
+
+## need CMS username and password, define the following line of code in console (as is), then when prompted, enter the username and password string, don't save the login information here in the script
+## if either password or username contain the @ symbol, replace with '%40' (percent-encoding for reserved characters)
+userpasswd <- readline("Type CMS username and password, separated by colon no space:")
+# example from v2024 => slecuona:OceanHealth2024
+# username <- slecuona
+# password <- OceanHealth2024
+
+CopernicusMarine::cms_login(username = "slecuona", password = "OceanHealth2024")
+
+bbox <- c(xmin = -179.875, ymin = -88.125, xmax = 179.875, ymax = 89.875)
+
+timerange_vector <- c(
+  as.POSIXct("2012-01-01T00:00:00", format="%Y-%m-%dT%H:%M:%S", tz="UTC"),
+  as.POSIXct("2022-12-01T00:00:00", format="%Y-%m-%dT%H:%M:%S", tz="UTC")
+)
+
+destination <- tempfile(cms_dir, fileext = ".nc")
+
+CopernicusMarine::cms_download_subset(
+  username = "slecuona", 
+  password = "OceanHealth2024", 
+  destination = destination,
+  product = "MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008", 
+  layer = "dataset-carbon-rep-monthly",
+  # dataset_version = "202311", 
+  variable = "omega_ar", # name of a desired variable in a specific layer of a product (type character). it can be obtained with copernicus_product_details
+  # output = "netcdf", # file type for output
+  region = bbox, # in documentation: should be "Specification of the bounding box as a vector of numerics WGS84 lat and lon coordinates. Should be in the order of: xmin, ymin, xmax, ymax."  So the start and end date from the website was taken to make a vector "bbox".
+  timerange = timerange_vector, # using the vector created above that has two elements (lower and upper value) for a requested time range. The vector should be coercible to POSIXct, so as.POSIXct was used.
+  overwrite = TRUE)
+```
+
+
+```{r}
+library(ncmeta)
+library(ncdf4)
+
+# Open the NetCDF file
+nc <- nc_open(here::here(cms_dir, "dataset-carbon-rep-monthly_20220815T0000Z_P20230821T1545Z.nc"))
+
+# ===================== Download Data from CLI tool =============================
+
+# since Mazu does not have Conda, instead install the CopernicusMarine package using pip:
+system("pip install --user copernicusmarine")
+## receives a warning, "The script f2py is installed in '/home/lecuona/.local/bin' which is not on PATH. Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location", that means some scripts (like f2py, which is part of NumPy) were installed in a directory that's not in my system's PATH. This means that while the Python package is installed, I might not be able to run some associated command-line tools directly.
+
+# check that it installed correctly by checking the version
+system("/usr/bin/python3 -c 'import copernicusmarine; print(copernicusmarine.__version__)'") # v2024: 1.3.1
+
+# couldn't find the copernicusmarine executable, so I added its location to my PATH:
+Sys.setenv(PATH = paste0(Sys.getenv("PATH"), ":/home/lecuona/.local/bin"))
+system("copernicusmarine --version") # v2024: copernicusmarine, version 1.3.1
+
+# check where the copernicusmarine executable is located
+system("which copernicusmarine")
+# v2024: /home/lecuona/.local/bin/copernicusmarine
+
+# run python script
+# result <- system("/usr/bin/python3 ohiprep_v2024/globalprep/prs_oa/v2024/copernicus_data_download.py", intern = TRUE)
+# print(result)
+
+# use system calls:
+system("/home/lecuona/.local/bin/copernicusmarine login")
+# didn't work, lets try this:
+system("/home/lecuona/.local/bin/copernicusmarine login --verbose", intern = TRUE)
+
+```
+
+## Manual download of raw data, if automation has issues
+
+```{r}
+library(ncmeta)
+library(ncdf4)
+
+# open the NetCDF file
+file_path <- here::here(cms_dir, "dataset-carbon-rep-monthly_1722109120120.nc") # file path to the raw data in cms_dir
+
+# load the file as a SpatRaster to begin with, for greater usability with terra
+nc_raster <- terra::rast(file_path)
+crs(nc_raster) # v2024: ""GEOGCRS[\"WGS 84 (CRS84)\",\n".  Will need to be reprojected to mollewide so that the OHI "ocean.tif"
+plot(nc_raster) # to get a quick visualiaztion of the multi-layer SpatRaster
+
+# reproject to Mollewide for OHI consistency
+# the `terra::project` function by default uses bilinear interpolation for continuous data (used bc the dataset does not have clear boundaries) and nearest neighbor for categorical data (not used in this case, but just to know)
+moll_crs <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs" # mollweide EPSG for reprojecting
+
+tic()
+nc_raster_moll <- terra::project(nc_raster, moll_crs) # using terra::project, which inherently resamples using bilinear interpolation
+toc() # v2024: 99.427 sec elapsed
+```
+
+### Save as individual rasters
+
+```{r}
+# since nc_raster is already loaded as a SpatRaster object
+# check the number of layers
+num_layers <- terra::nlyr(nc_raster_moll)
+print(num_layers) # v2024: 156 layers, which makes sense because the data goes from 2010 - 2022 monthly
+
+# get the time attribute for each layer, to check that it goes from 2010 - 2022 (v2024)
+time_attribute <- terra::time(nc_raster)
+print(time_attribute)
+
+# Create a list to store individual rasters
+individual_rasters <- list()
+
+# loop through each layer and create individual rasters from the SpatRaster
+for (i in 1:num_layers) {
+  layer <- nc_raster[[i]] # the layer in the seq from 1:156 (v2024)
+  date <- time_attribute[i] # the month, in this case, of the raster
+  layer_name <- format(date, "%Y-%m-%d") # the name for the .tif when it is saved
+  individual_rasters[[layer_name]] <- layer # put them in the list 
+}
+
+# print the names of the individual rasters in the list, to ensure the loop worked
+names(individual_rasters) # v2024: "2010-01-01" - "2022-12-01"
+
+# save individual rasters to files on filezilla at `cms_dir`
+for (name in names(individual_rasters)) {
+  output_file <- file.path(cms_dir, paste0(name, ".tif")) # move each raster to filezilla
+  writeRaster(individual_rasters[[name]], filename = output_file, overwrite = TRUE) # if files already exist, overwrite them
+  print(paste("Saved:", output_file)) # allows us to see the names of the files as they are being saved
+} #great! check filezilla that files are all there
+
+rast_2010_01_01 <- rast(here::here(cms_dir, "2010-01-01.tif"))
+plot(rast_2010_01_01)
+```
+
+
+# Annual mean aragonite saturation
+
+Annual mean aragonite saturation rasters calculated from the monthly data. 
+
+```{r msla_monthly_to_annual, eval = F}
+## remember from "Setup" chunk: int_dir
+## individual_rasters is the list of .tifs
+
+# make a list of the already saved monthly rasters
+oa_monthly_files <- list.files(path = here(cms_dir),
+                               pattern = "\\.tif$", # to ensure we only grab the .tif files, not the .tif.aux.json files
+                               full.names = TRUE) # returns the full path, not just the file name
+
+minyr <- substr(oa_monthly_files, 59, 62) %>% # taking the string that defines the year the raster's data was from 
+  as.numeric() %>% 
+  min()
+
+maxyr <- substr(oa_monthly_files, 59, 62) %>% # taking the string that defines the year the raster's data was from 
+  as.numeric() %>% 
+  max() # take the max of all the years for the data downloaded
+
+tic()
+## stack all rasters for each year, calculate the annual mean, then write as a raster
+registerDoParallel(6)
+foreach(yr = c(minyr:maxyr)) %dopar% { #v2024: 2010:2022, change this in future years
+  
+  files <- oa_monthly_files[str_detect(oa_monthly_files, as.character(yr))] # of the list earlier, detect the year from each file so that we can stack them by year
+  
+  rast_annual_mean <- stack(files) %>%
+    calc(mean, na.rm = TRUE) %>%
+    terra::writeRaster(filename = sprintf("%s/oa_annual_mean/oa_annual_%s.tif", int_dir, yr),
+                       overwrite = TRUE)
+}
+toc()
+# v2024 - 8.112 sec elapsed
+```
+
+## Rescale from 0 to 1
+
+### rescale then clip
+
+This pressure layer is rescaled so that all values lie between 0 and 1 using both a historical reference period and a biological reference point.
+All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1.
+For all other cells, rescaling the aragonite staturation state value to between 0 and 1 relies upon the change in saturation relative to the reference period.
+
+Deviation from aragonite saturation state is determined for each year in the study period using this equation:
+
+$$\Delta \Omega_{year} = \frac{(\Omega_{base} - \Omega_{year})}{(\Omega_{base} - 1)}$$
+
+Note that the current value is subtracted from the baseline; this way, a reduction in $\Omega$ becomes a positive pressure value.
+It is then normalized by the current mean state; so a decrease in $\Omega$ while the current state is high indicates less pressure than the same decrease when the current state is near 1.
+
+$\Delta \Omega_{year}$ is then modified to account for increases in aragonite saturation state (pressure = 0) and arag sat state less than 1 (pressure = 1).
+
+The `oaRescale` function rescales each of the annual rasters.
+If the current value is less than or equal to 1, it is set to 1, otherwise the value is calculated from the above equation.
+
+```{r}
+
+```
+
+## Interpolate?
+
+Since there are oceanic cells with no information in the raw data, we need to fill in these gaps.
+We do this by interpolating across the globe using the data we have with an Inverse Distance Weighting (IDW) function.
+Previously this was done using `arcpy` from ArcGIS.
+
+```{r}
+
+```
+
+## Resample & Land Mask
+
+All pressure layers need to be resampled to 1km^2^ cell resolution.
+We have a template ocean raster with cells at this resolution that we use to resample all pressure layers.
+You won't see any difference between the plot above and this one since we are using the nearest neighbor method when resampling which maintains the original cell value for each of resampled cell.
+
+```{r}
+
+```
+
+# Final Pressure Layer
+
+```{r plot_final}
+
+```
+
+# Gap-filled cells
+
+We want to create a raster layer that shows all cells that were gap-filled.
+Since they were the same cells interpolated across all years, we only need to create one raster.
+
+```{r}
+
+```
+
+# Citation information
+
+**Product Citation:**
+
+Please refer to our Technical FAQ for citing products: <http://marine.copernicus.eu/faq/cite-cmems-products-cmems-credit/?idpage=169>.
+
+**DOI (product):**
+
+<https://doi.org/10.48670/moi-00047>
+
+**References:**
+
+Chau, T. T. T., Gehlen, M., and Chevallier, F.: A seamless ensemble-based reconstruction of surface ocean pCO2 and air–sea CO2 fluxes over the global coastal and open oceans, Biogeosciences, 19, 1087–1109, <https://doi.org/10.5194/bg-19-1087-2022>, 2022.

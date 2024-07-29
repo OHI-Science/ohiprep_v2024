@@ -460,7 +460,7 @@ foreach(i = match_weeks) %dopar% {
 }
 toc()
 # v2023: get Error in x@ptr$nrow() : external pointer is not valid. does not seem to affect anything. however, the results of tic/toc() don't show.
-# v2024: got same error. Again, the files are being written out to int/weekly_climatologies appropriately
+# v2024: got same error. Again, the files are being written out to int/weekly_climatologies appropriately. 41.013 sec elapsed
 ```
 
 ## Compare to Climatology
@@ -500,6 +500,7 @@ foreach (i = yrs) %dopar% {
 }
 toc()
 # v2023: get Error in x@ptr$nrow() : external pointer is not valid. does not seem to affect anything. however, the results of tic/toc() don't show.
+# v2024: 40.229 sec elapsed
 ```
 
 ## Calculate Differences
@@ -536,11 +537,13 @@ foreach(i = 2005:(max(yrs) - 4)) %dopar% {
 }
 toc()
 # v2023: get Error in x@ptr$nrow() : external pointer is not valid. does not seem to affect anything. however, the results of tic/toc() don't show.
+# v2024: got Error: external pointer is not valid
 ```
 
 ## Rescale
 
 ```{r rescale, eval = F}
+#registerDoParallel(30)
 ref_files <- list.files(file.path(int_sp_data, "annual_anomalies_diff"), 
                         full.names = TRUE, pattern = "diff")
 
@@ -565,8 +568,9 @@ for(i in 2006:(max(yrs) - 4)){
 } 
 toc()
 # v2023: 280.28 sec elapsed
+# v2024: 209.313 sec elapsed
 
-## 42 for v2018; 46 for v2019; 49 for v2020; 47 for v2021; X for v2022; 55 for v2023
+## 42 for v2018; 46 for v2019; 49 for v2020; 47 for v2021; X for v2022; 55 for v2023; 41 for v2024
 resc_num  <- stats::quantile(vals, prob = 0.9999, na.rm = TRUE)
 
 ## rescale using reference point
@@ -584,13 +588,14 @@ for(file in ref_files){
 }
 toc()
 # v2023: 0.583 sec elapsed
+# v2024: 0.498 sec elapsed
 
 resc_files <- list.files(file.path(int_sp_data, "rescaled"), 
                         full.names = TRUE, pattern = "rescaled.tif")
 
 ## resample to ocean raster scale (~1km) and then mask
 tic()
-registerDoParallel(4)
+registerDoParallel(30)
 foreach(i = 2005:(max(yrs) - 4)) %dopar% {
   t <- as.numeric(format(Sys.time(), "%s"))
   max_yr <- i + 4
@@ -613,6 +618,7 @@ foreach(i = 2005:(max(yrs) - 4)) %dopar% {
 }
 toc()
 # v2023: 413.808 sec elapsed
+# v2024: 1.023 sec elapsed (switched from 4 cores to 30 cores); individual year groups took ~1.5-2 min each
 ```
 
 ***
@@ -630,7 +636,7 @@ plot(out, box = FALSE, col = cols, axes = FALSE, main = paste("UV Pressure Layer
 ```{r extract_region_data, eval=F}
 ## load raster/zonal data
 zones <- terra::rast(file.path(dir_M, "git-annex/globalprep/spatial/v2017/regions_eez_with_fao_ant.tif"))
-rgn_data <- read.csv("~/ohi-global/eez/spatial/regions_list.csv") %>%
+rgn_data <- read_csv("~/github/ohi/ohi-global/eez/spatial/regions_list.csv") %>% # update if your path to ohi-global is different
   filter(rgn_id <= 250)
 
 ## get raster data
@@ -638,7 +644,7 @@ rasts <- list.files(out_dir, full = TRUE, pattern = "uv_.*_mol_1km.tif")
 extracted_names <- str_extract(rasts, "uv_\\d{4}_\\d{4}-\\d{4}_\\d{4}_mol_1km") %>% 
   str_replace("-", ".") # this part may not be necessary; kept for consistency with v2022 names
 pressure_stack <- terra::rast(rasts)
-names(pressure_stack) <- extracted_names # ensure these are correct!
+names(pressure_stack) <- extracted_names # ensure these are correct! #pressure_stack@ptr[["names"]]
 ```
 
 ```{r gif, eval=F}
@@ -653,6 +659,7 @@ saveGIF({
   ani.width = 750,
   ani.height = 400,
   movie.name = "uv.gif")
+# v2024: Output at: uv.gif display-im6.q16: unable to open X server `:0' @ error/display.c/DisplayImageCommand/412.
 ```
 
 ```{r extract_region_results, eval = F}
@@ -661,6 +668,7 @@ tic()
 pressure_stack_same_crs <- terra::project(pressure_stack, crs(zones), method = "near") # v2023: ensure CRSs are exactly the same for zonal (got Warning: [zonal] SRS do not match originally)
 toc()
 # v2023: 1452.395 sec elapsed
+# v2024: 1316.3 sec elapsed
 
 ## extract data for each region
 tic()
@@ -668,6 +676,7 @@ regions_stats <- terra::zonal(pressure_stack_same_crs, zones, fun = "mean", na.r
   data.frame()
 toc()
 # v2023: 529.873 sec elapsed
+# v2024: 538.123 sec elapsed
 
 # v2023: make column names correct (match v2022)
 regions_stats <- rename(regions_stats, "zone" = "regions_eez_with_fao_ant")
