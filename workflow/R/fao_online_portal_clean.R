@@ -8,7 +8,7 @@
 #' @param sub_N value to substitute for rows that have the flaf of N
 #'
 #' @return returns a cleaned version of the fao data
-fao_online_portal_clean <- function(fao,initial_data_year, last_data_year, sub_N = 0.1) {
+fao_online_portal_clean <- function(fao, initial_data_year, last_data_year, sub_N = 0.1) {
 
 fao <- fao %>% 
   mutate(row_id = row_number())
