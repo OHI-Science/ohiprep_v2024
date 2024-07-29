@@ -165,7 +165,7 @@ Here we do some basic cleanup of the global capture production database.
 
 ```{r fao_capture_cleaning, eval = FALSE}
 # reading in FAO capture data and cleaning
-fao_capture_clean <- fao_capture %>% 
+fao_capture_clean <- fao_capture_raw %>% 
    dplyr::rename(country = "Country Name En",
                 asfis_species = "ASFIS species Name En",
                 area = "FAO major fishing area Name En",
