@@ -144,6 +144,7 @@ librarian::shelf(
   ohicore,
   reticulate,
   ggplot2,
+  reticulate, # for python coding
   threadr #remotes::install_github("skgrange/threadr") # for na_extrapolate, GAPFILLING (if necessary)
 )
 
@@ -154,7 +155,6 @@ source(here("workflow/R/common.R")) # file creates objects to process data
 current_year <- 2024 # Update this in the future!!
 version_year <- paste0("v",current_year)
 data_dir_version_year <- paste0("d", current_year)
-data_path <- here("globalprep", "prs_oa", version_year)
 
 # ---- data directories ----
 
@@ -164,8 +164,12 @@ raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 # CMS (Copernicus Marine Service) raw data directory
 cms_dir <- here(raw_data_dir, "CMS", data_dir_version_year)
 
+# prs_oa dir
+oa_dir <- here(dir_M, "git-annex", "globalprep", "prs_oa")
+
 # output data dir for intermediate data products
-int_dir <- here(data_path, "int")
+int_dir <- here(oa_dir, version_year, "int")
+dir.create(int_dir)
 
 # set colors
 cols = rev(colorRampPalette(brewer.pal(9, 'Spectral'))(255)) # rainbow color scheme
@@ -177,35 +181,56 @@ mollCRS <- CRS("+proj=moll")
 ocean <- terra::rast(here(dir_M, "git-annex","globalprep", "spatial", "v2017", "ocean.tif"))
 ```
 
-```{r}
-plot(ocean)
+```{r, eval = FALSE}
+plot(ocean) # examine the .tif and ensure it looks correct
+crs(ocean) # v2024: "PROJCRS[\"Mollweide\",\n
 ```
 
+## Download copernicusmarine tool in python
+
+```{python}
+import sys
+import subprocess
+
+def install(package): # a function to download the copernicusmarine package
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package]) # `sys.executable` is the path to the python executable. for example, "/usr/bin/python3" 
+    #"-m" tells the Python interpreter to run a module, in this case "pip", as a script, using the new function "install" that we created using `def` and inputting the name of the function for the variable "package"
+
+try:
+    install("copernicusmarine") # use the function to download the package
+    import copernicusmarine # will import the package copernicusmarine.
+    # if the package is already installed, the rest of the code will be skipped
+except ImportError:
+    print(f"Installing copernicusmarine...") # if it does not work, this will print in the console. 
+
+print(f"copernicusmarine version: {copernicusmarine.__version__}") # if correctly downloaded, then it will print the version
+# v2024: copernicusmarine version: 1.3.1
+```
 
 ## Automated download of raw data
 
 ```{python}
 #| eval: false
-!pip install copernicusmarine
+!pip install copernicusmarine # to not run every time, but show how to install copernicusmarine package via pip if needed
 
 import os
 import copernicusmarine
 
-# Set your credentials
-copernicusmarine.configure(username='slecuona', password='OceanHealth2024')
+# set the credentials made on the CMS website
+copernicusmarine.configure(username='slecuona', password='OceanHealth2024') # ERROR: need to work on this
 
-# Define the cms_dir
+# define cms_dir, since the python chunk cannot necessarily read objects from previous R chunks/in the environment
 dir_M = "/home/shares/ohi"
 current_year = 2024
-version_year = f"v{current_year}"
+version_year = f"v{current_year}" # using an f-string
 data_dir_version_year = f"d{current_year}"
-raw_data_dir = os.path.join(dir_M, "git-annex", "globalprep", "_raw_data")
-cms_dir = os.path.join(raw_data_dir, "CMS", data_dir_version_year)
+raw_data_dir = os.path.join(dir_M, "git-annex", "globalprep", "_raw_data") # os.path.join is part of the os module and will merge into a single path
+cms_dir = os.path.join(raw_data_dir, "CMS", data_dir_version_year) # for the specific CMS folder within _raw_data
 
-# Ensure the directory exists
-os.makedirs(cms_dir, exist_ok=True)
+# make sure the directory exists
+os.makedirs(cms_dir, exist_ok=True) # will create the dir if it does not already exist
 
-# Use copernicusmarine to download the data
+# use copernicusmarine to download the data --this is from the python API copyable code on the CMS site
 copernicusmarine.subset(
     dataset_id="dataset-carbon-rep-monthly",
     dataset_version="202311",
@@ -222,89 +247,11 @@ copernicusmarine.subset(
     output_filename=os.path.join(cms_dir, "carbon_data.nc")
 )
 
-print(f"Data downloaded to: {os.path.join(cms_dir, 'carbon_data.nc')}")
+print(f"Data downloaded to: {os.path.join(cms_dir, 'carbon_data.nc')}") # print in console: data download finished!
 ```
 
 
-```{r}
-library(reticulate)
-
-# # specify the path to the raw data download script
-# copernicus_data_download <- here::here(data_path, "copernicus_data_download.py")
-# 
-# # run the .py script to download data from Copernicus Marine Service
-# tic()
-# system2("/usr/bin/python3", args = c(copernicus_data_download, cms_dir))
-# toc()
-
-# write the cms_dir path to a file that python can read
-writeLines(cms_dir, "cms_dir.txt")
-```
-
-```{python}
-import sys
-print(sys.executable)
-```
-
-```{python}
-import sys
-import subprocess
-
-def install(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-try:
-    import copernicusmarine
-except ImportError:
-    print(f"Installing copernicusmarine...")
-    install("copernicusmarine")
-    import copernicusmarine
-
-print(f"copernicusmarine version: {copernicusmarine.__version__}")
-```
-Based on the response and error when trying to install `copernicusmarine`, it looks like there are dependency conflicts or incompatibilities.
-
-There's also a specific error related to NumPy: "numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject"
-
-There might be a version mismatch between NumPy and some of its dependencies, or between NumPy and other packages that depend on it... I may need to ask Thomas whether I can update python packages.  For now, I am going to move on to try using CLI to automate, instead of python API.
-
-```{python}
-# import copernicusmarine
-# import os
-# 
-# # Read the cms_dir from the file
-# with open("cms_dir.txt", "r") as f:
-#     cms_dir = f.read().strip()
-# 
-# # Ensure the cms_dir folder exists
-# os.makedirs(cms_dir, exist_ok=True)
-# 
-# # Set the current working directory to the cms_dir folder
-# os.chdir(cms_dir)
-# 
-# # Login to Copernicus Marine Service
-# copernicusmarine.login()
-# 
-# # Download the data using python API
-# copernicusmarine.subset(
-#     dataset_id="dataset-carbon-rep-monthly",
-#     dataset_version="202311",
-#     variables=["omega_ar"],
-#     minimum_longitude=-179.875,
-#     maximum_longitude=179.875,
-#     minimum_latitude=-88.125,
-#     maximum_latitude=89.875,
-#     start_datetime="2012-01-01T00:00:00",
-#     end_datetime="2022-12-01T00:00:00",
-#     force_download=True,
-#     subset_method="strict",
-#     disable_progress_bar=True,
-# )
-# 
-# print(f"Download completed. Files saved in {cms_dir}")
-```
-
-
+## Downloading data from CLI (Command Line Interface), instead of python
 
 ```{r login_info, eval=FALSE}
 # This layer lags by 2 years, since we need a full year of data. 
@@ -342,7 +289,6 @@ CopernicusMarine::cms_download_subset(
 ```
 
 
-
 ```{r}
 library(ncmeta)
 library(ncdf4)
@@ -378,70 +324,107 @@ system("/home/lecuona/.local/bin/copernicusmarine login --verbose", intern = TRU
 
 ```
 
-## Manual download of raw data
+## Manual download of raw data, if automation has issues
 
 ```{r}
 library(ncmeta)
 library(ncdf4)
 
 # open the NetCDF file
-file_path <- here::here(cms_dir, "dataset-carbon-rep-monthly_1722109120120.nc")
+file_path <- here::here(cms_dir, "dataset-carbon-rep-monthly_1722109120120.nc") # file path to the raw data in cms_dir
 
 # load the file as a SpatRaster to begin with, for greater usability with terra
-nc_raster <- rast(file_path)
-plot(nc_raster)
+nc_raster <- terra::rast(file_path)
+crs(nc_raster) # v2024: ""GEOGCRS[\"WGS 84 (CRS84)\",\n".  Will need to be reprojected to mollewide so that the OHI "ocean.tif"
+plot(nc_raster) # to get a quick visualiaztion of the multi-layer SpatRaster
 
 # reproject to Mollewide for OHI consistency
-nc_raster_mollweide <- project(nc_raster, mollCRS)
+# the `terra::project` function by default uses bilinear interpolation for continuous data (used bc the dataset does not have clear boundaries) and nearest neighbor for categorical data (not used in this case, but just to know)
+moll_crs <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs" # mollweide EPSG for reprojecting
+
+tic()
+nc_raster_moll <- terra::project(nc_raster, moll_crs) # using terra::project, which inherently resamples using bilinear interpolation
+toc() # v2024: 99.427 sec elapsed
 ```
-Save as individual rasters
+
+### Save as individual rasters
 
 ```{r}
 # since nc_raster is already loaded as a SpatRaster object
 # check the number of layers
-num_layers <- nlyr(nc_raster)
+num_layers <- terra::nlyr(nc_raster_moll)
 print(num_layers) # v2024: 156 layers, which makes sense because the data goes from 2010 - 2022 monthly
 
 # get the time attribute for each layer, to check that it goes from 2010 - 2022 (v2024)
-time_attribute <- time(nc_raster)
+time_attribute <- terra::time(nc_raster)
 print(time_attribute)
 
 # Create a list to store individual rasters
 individual_rasters <- list()
 
-# loop through each layer and create individual rasters from the spatraster
+# loop through each layer and create individual rasters from the SpatRaster
 for (i in 1:num_layers) {
-  layer <- nc_raster[[i]]
-  date <- time_attribute[i]
-  layer_name <- format(date, "%Y-%m-%d")
-  individual_rasters[[layer_name]] <- layer
+  layer <- nc_raster[[i]] # the layer in the seq from 1:156 (v2024)
+  date <- time_attribute[i] # the month, in this case, of the raster
+  layer_name <- format(date, "%Y-%m-%d") # the name for the .tif when it is saved
+  individual_rasters[[layer_name]] <- layer # put them in the list 
 }
 
-# print the names of the individual rasters
+# print the names of the individual rasters in the list, to ensure the loop worked
 names(individual_rasters) # v2024: "2010-01-01" - "2022-12-01"
 
 # save individual rasters to files on filezilla at `cms_dir`
 for (name in names(individual_rasters)) {
   output_file <- file.path(cms_dir, paste0(name, ".tif")) # move each raster to filezilla
   writeRaster(individual_rasters[[name]], filename = output_file, overwrite = TRUE) # if files already exist, overwrite them
-  print(paste("Saved:", output_file)) # allows us to see the files being saved
+  print(paste("Saved:", output_file)) # allows us to see the names of the files as they are being saved
 } #great! check filezilla that files are all there
+
+rast_2010_01_01 <- rast(here::here(cms_dir, "2010-01-01.tif"))
+plot(rast_2010_01_01)
 ```
 
 
-# Historical Mean
+# Annual mean aragonite saturation
 
-```{r}
+Annual mean aragonite saturation rasters calculated from the monthly data. 
 
-```
+```{r msla_monthly_to_annual, eval = F}
+## remember from "Setup" chunk: int_dir
+## individual_rasters is the list of .tifs
 
-# Create annual means
+# make a list of the already saved monthly rasters
+oa_monthly_files <- list.files(path = here(cms_dir),
+                               pattern = "\\.tif$", # to ensure we only grab the .tif files, not the .tif.aux.json files
+                               full.names = TRUE) # returns the full path, not just the file name
 
-```{r}
+minyr <- substr(oa_monthly_files, 59, 62) %>% # taking the string that defines the year the raster's data was from 
+  as.numeric() %>% 
+  min()
 
+maxyr <- substr(oa_monthly_files, 59, 62) %>% # taking the string that defines the year the raster's data was from 
+  as.numeric() %>% 
+  max() # take the max of all the years for the data downloaded
+
+tic()
+## stack all rasters for each year, calculate the annual mean, then write as a raster
+registerDoParallel(6)
+foreach(yr = c(minyr:maxyr)) %dopar% { #v2024: 2010:2022, change this in future years
+  
+  files <- oa_monthly_files[str_detect(oa_monthly_files, as.character(yr))] # of the list earlier, detect the year from each file so that we can stack them by year
+  
+  rast_annual_mean <- stack(files) %>%
+    calc(mean, na.rm = TRUE) %>%
+    terra::writeRaster(filename = sprintf("%s/oa_annual_mean/oa_annual_%s.tif", int_dir, yr),
+                       overwrite = TRUE)
+}
+toc()
+# v2024 - 8.112 sec elapsed
 ```
 
 ## Rescale from 0 to 1
+
+### rescale then clip
 
 This pressure layer is rescaled so that all values lie between 0 and 1 using both a historical reference period and a biological reference point.
 All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1.
