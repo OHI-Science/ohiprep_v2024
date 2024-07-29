@@ -301,13 +301,36 @@ For example: Production of blue shrimp in Maine starts in 1983 -- don't include 
 
 Checked to make sure that there weren't instances in which it made more sense to carry the previous year's data forward as a method of gapfilling. This didn't seem to be the case.
 
+
+```{r}
+# v2024 method 
+
+# update dataframe -- fill out "years" column for all countries -- fill with NAs if no data for value
+# mar_rgn_agg with years (yrs) filled
+mar_rgn_yrs <- mar_rgn_agg %>% 
+  mutate(year = as.numeric(year),
+         rgn_id = as.character(rgn_id)) %>% 
+  tidyr::complete(expand(nesting(rgn_id, rgn_name, species, Taxon_code, family, fao, environment)),
+           year = min(mar_rgn_agg$year):max(mar_rgn_agg$year),
+           fill = list(value = NA)) %>% 
+  mutate(rgn_id = as.numeric(rgn_id)) %>% 
+  arrange(rgn_id, species, year, Taxon_code, family, fao, environment)
+```
+
+
 ```{r gapfill-missing-0, eval = FALSE}
 ## Spread mar_rgn to create a value for every year-species-region (if missing it will be given a NA)
-mar_rgn_spread <- pivot_wider(mar_rgn, names_from = year, values_from = value)
+mar_rgn_spread <- tidyr::pivot_wider(mar_rgn_agg,
+                                     names_from = year,
+                                     values_from = value)
 dim(mar_rgn_spread)
 
 ## Turn data frame back into long format
-mar_rgn_gf <- pivot_longer(mar_rgn_spread, cols = num_range("",paste0(1950:latest_data_year)), names_to = "year", values_to = "value") %>% arrange(rgn_id, species, year, Taxon_code, family, fao, environment)
+mar_rgn_gf <- pivot_longer(mar_rgn_spread,
+                           cols = num_range("",paste0(1950:latest_data_year)),
+                           names_to = "year",
+                           values_to = "value") %>% 
+  arrange(rgn_id, species, year, Taxon_code, family, fao, environment)
 
 ## NA values are converted to zero.
 mar_rgn_gf <- mar_rgn_gf %>%
