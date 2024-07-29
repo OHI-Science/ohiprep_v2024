@@ -94,7 +94,8 @@ librarian::shelf(
   plotly,
   zoo, # for gapfilling
   pdftools, # for FAO yearbook
-  ohicore, 
+  ohicore,
+  modelr, # needed for gapfilling exvessel price data
   ggplot2
 )
 #remotes::install_github("skgrange/threadr") # for na_extrapolate
@@ -164,8 +165,11 @@ revenue from fishing for each country.
 Here we do some basic cleanup of the global capture production database.
 
 ```{r fao_capture_cleaning, eval = FALSE}
+# this is code from the `livelihood_economies_dataprep.Rmd` in v2023, so that future reviewers can understand where the object cf_revenue came from (which is what will be used going forward), aka "cf_revenue.csv", the final output from v2023
+fao_latest_data_year <- 2021 #update to the last year available in FAO data, likely the same for all FAO data included. 
+
 # reading in FAO capture data and cleaning
-fao_capture_clean <- fao_capture %>% 
+fao_capture_clean <- fao_capture_raw %>% 
    dplyr::rename(country = "Country Name En",
                 asfis_species = "ASFIS species Name En",
                 area = "FAO major fishing area Name En",
@@ -188,7 +192,7 @@ exvessel price in usd/metric tonne.
 
 ```{r gapfill_exvessel, eval = FALSE}
 # cleaning up exvessel price data
-exvessel_prices_clean <- exvessel_prices %>% 
+exvessel_prices_clean <- exvessel_prices_raw %>% 
   clean_names() %>% 
   mutate(year = as.numeric(year)) %>% 
   group_by(asfis_species, scientific_name, pooled_commodity, isscaap_group, isscaap_division, year) %>% 
@@ -373,6 +377,8 @@ Re-run names_2_rgn after fixing names.
 cf_revenue_rgn_fix <- ohicore::name_2_rgn(df_in = cf_revenue_fix, 
                              fld_name='country',
                              flds_unique = c("year"))
+
+# we are left with regions that are not associated with OHI, and also some that need to be disaggregated so that name_2_rgn can recognize them. Let's do that:
 ```
 
 ## Disaggregation
@@ -525,7 +531,7 @@ cf_rev_plot
 # looks great! China has a very large revenue, which makes sense.  Indonesia and Peru are the have the next highest revenue in 2019.  Interesting to see a decrease in the early 2000s for most regions.
 ```
 
-## Join with a "year" tibble df
+## Join with a "year" tibble df --in the future, replace this with `reframe()`!!
 
 ```{r year_join}
 # make all geographic areas have the same date range (and fill missing values with NAs) to avoid problems downstream
