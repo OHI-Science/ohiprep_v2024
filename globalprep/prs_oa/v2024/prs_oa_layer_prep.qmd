@@ -398,6 +398,10 @@ oa_monthly_files <- list.files(path = here(cms_dir),
                                pattern = "\\.tif$", # to ensure we only grab the .tif files, not the .tif.aux.json files
                                full.names = TRUE) # returns the full path, not just the file name
 
+minyr <- substr(oa_monthly_files, 59, 62) %>% # taking the string that defines the year the raster's data was from 
+  as.numeric() %>% 
+  min()
+
 maxyr <- substr(oa_monthly_files, 59, 62) %>% # taking the string that defines the year the raster's data was from 
   as.numeric() %>% 
   max() # take the max of all the years for the data downloaded
@@ -405,7 +409,7 @@ maxyr <- substr(oa_monthly_files, 59, 62) %>% # taking the string that defines t
 tic()
 ## stack all rasters for each year, calculate the annual mean, then write as a raster
 registerDoParallel(6)
-foreach(yr = c(2010:maxyr)) %dopar% { #v2024: 2010:2022, change this in future years
+foreach(yr = c(minyr:maxyr)) %dopar% { #v2024: 2010:2022, change this in future years
   
   files <- oa_monthly_files[str_detect(oa_monthly_files, as.character(yr))] # of the list earlier, detect the year from each file so that we can stack them by year
   
@@ -419,6 +423,8 @@ toc()
 ```
 
 ## Rescale from 0 to 1
+
+### rescale then clip
 
 This pressure layer is rescaled so that all values lie between 0 and 1 using both a historical reference period and a biological reference point.
 All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1.
