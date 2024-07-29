@@ -23,12 +23,15 @@ This analysis converts FAO mariculture and seafood watch sustainability data int
 
 -   fixed issues system-dependent file paths using `{here}` package
 -   made file names reproducible with updated entries in setup chunks
+-   updated formatting
+-   rewrote data cleaning to follow tidyverse style more closely and be more reproducible & less prone to human error 
+-   `mar_split()` function in `mar_fxs.R` was updated to use pivot_longer instead of gather, and the new grouped name of "Bonaire, Sint Eustatius and Saba" was accounted for
 
 # 2023 updates from 2022 assessment
 
 -   New year of FAO mariculture yield data for 2021. Downloaded the data online through Fishstat online query instead of using the fishstatj software. Updated instructions for downloading the data. Updated the script to work with minor changes in formatting in the new data.
 
--   updated the species_list.csv so that any of the duplicate species that were relevant and had been excluded are now included. Also updated this file with any new species names in the fao data. Removed the alias column, as it was being inconsistently used, and instead grouped by family when removing species with less than four years of mariculture for a region. Reorganized code as needed to keep this from creating errors.
+-   updated the species_list.csv so that any of the duplicate species that were relevant and had been excluded are now included. Also updated this file with any new species names in the FAO data. Removed the alias column, as it was being inconsistently used, and instead grouped by family when removing species with less than four years of mariculture for a region. Reorganized code as needed to keep this from creating errors.
 
 -   updated code to programmatically fill in analysis and data years throughout script
 
@@ -98,7 +101,8 @@ version_year <- paste0("v", current_year)
 ## Load FAO-specific user-defined functions
 source(here::here("globalprep", "mar", version_year, "mar_fxs.R")) # functions specific to mariculture dealing with compound countries
 source(here::here("workflow", "R", "fao_fxn.R")) # old function for cleaning fao data
-source(here::here("workflow", "R", "fao_online_portal_clean.R")) #new fao cleaning function
+#source(here::here("workflow", "R", "fao_online_portal_clean.R")) #new fao cleaning function # switched to new version in 2024
+source(here::here("workflow", "R", "fao_query_data_tidy.R")) # 2024 version of FAO data tidying function
 source(here::here("workflow", "R", "common.R")) # directory locations
 ```
 
@@ -120,11 +124,11 @@ current_data_folder <- paste0("d", current_year) # assessment year for file path
 previous_data_folder <- paste0("d", last_year)  # previous assessment year
 
 #update the data file name to the current last year of data 
-mar <- read_csv(file.path(dir_M, "git-annex", "globalprep", "_raw_data",
+mar_raw <- read_csv(file.path(dir_M, "git-annex", "globalprep", "_raw_data",
                           "FAO_mariculture", current_data_folder,
                           paste0("FAO_GlobalAquacultureProduction_Quantity_1950_", latest_data_year, ".csv")))
 
-head(mar)
+head(mar_raw)
 ```
 
 # Wrangle:
@@ -133,31 +137,48 @@ head(mar)
 
 Filter freshwater mariculture, make long format, and clean FAO codes.
 
-```{r tidy-data, eval = FALSE}
+```{r fao-data-prep}
+# v2024 update:
+# source 2024 FAO query data tidying function
+source(here::here("workflow", "R", "fao_query_data_tidy.R"))
 
-mar <- mar %>%
-  dplyr::select(-`Unit Name`) %>% #should all be "Tonnes - live weight"
-  rename(country = `Country Name En`,
-         FAO_name = `ASFIS species Name En`, 
-         fao = `FAO major fishing area Name En`, 
-         environment = `Environment Name En`,
-         family_scientific = `Family Scientific name`) %>% 
-    mutate(FAO_name = ifelse(!is.na(FAO_name), FAO_name, family_scientific)) #if species name is NA then use the family name
+mar_tidy <- fao_query_data_tidy(fao = mar_raw, # FAO data frame
+                                initial_data_year = 1950, # first year of data in mar df
+                                last_data_year = latest_data_year, # most recent year of data in df
+                                sub_N = 0.1 # what flagged values are substituted with (same as default value in function)
+                                )
+
+#names(mar_tidy) # run to easily copy+paste column names
+
+#table(mar_tidy$unit_name)
+
+mar_clean <- mar_tidy %>% 
+  dplyr::select(-c(unit_name)) %>% # all are "Tonnes - live weight"
+  dplyr::rename(
+    country = country_name_en,
+    FAO_name = asfis_species_name_en,
+    fao = fao_major_fishing_area_name_en,
+    environment = environment_name_en,
+    family_scientific = family_scientific_name
+  ) %>% 
+  dplyr::mutate(FAO_name = ifelse(!is.na(FAO_name), FAO_name, # if species name is not NA, keep species name
+                                  family_scientific)) #if species name is NA, use the family name
 
 
-table(mar$environment) 
+# investigate environment types
+table(mar_clean$environment)
 
-## Include only marine environments
-mar <- mar %>%
-filter(environment %in% c("Brackishwater", "Marine")) 
+# filter out Freshwater, only keep Brackishwater and Marine
+mar_filter <- mar_clean %>% 
+  dplyr::filter(environment %in% c("Brackishwater", "Marine"))
 
-#As of 2023 we no longer need to run the fao_clean_data_new function
-# NAs are no longer saved as ... and the flags are in a separate column
-#however we should still replace columns where the flag is N w/.1
+# check
+table(mar_filter$environment)
 
-
-mar <- mar %>% fao_online_portal_clean(initial_data_year = 1950, last_data_year = latest_data_year)
+# rename cleaned, tidied, and filtered data to "mar"
+mar <- mar_filter
 ```
+
 
 ## Update species names
 
@@ -167,43 +188,33 @@ Update species name in the `raw/species_list.csv` file with names in the `mar` d
 
 More information can be found in issues #8, #81, #241, #246 for reference.
 
-The species_list.csv is a master list of all the mariculture species in the FAO data. Every year there are potential changes to the FAO data, additional species may be added or names can change, etc. When a species is in the FAO data, but not the species_list.csv it will need to be added to the species_list.csv. To do this, do a quick search within the species_list.csv to make sure it wasn't some small change to the name (e.g. "long-back eel" vs. "longback eel"). Otherwise, do some research to see if any of the synonyms for the FAO species match the names in species_list.csv. If it is one of these scenarios, the information can be copied to a new row with the name modification. If it seems to be a new taxa, You need to add the species output from this (new.spp) to species_list.csv and fill out the corresponding information. Add the new taxa name, Taxon_code (categories defined in the README in the /raw folder), and family (general family from google) to the species_list.csv. Do some research to make sure the species is being used for food and is marine/brackish. If it is not used for food or is freshwater then it is excluded from the analysis (i.e., an 1 in the exclude column). I.e. add FAO_name, exclude (whether to include in assessment or not. If they are only harvested for medicinal purposes, do not include, or not eaten by humans do not include). Because seaweeds are generally used for both human and non-human consumption, we quantify whether to exclude or not for seaweed species as proportions. For example, if a seaweed species is 80% used for non-human consumption, we would exclude 80% of the harvest (exclude = 0.8). However, for fish species, we only classify as 0 or 1.
+The species_list.csv is a master list of all the mariculture species in the FAO data. Every year there are potential changes to the FAO data, additional species may be added or names can change, etc. When a species is in the FAO data, but not the species_list.csv it will need to be added to the species_list.csv. To do this, do a quick search within the species_list.csv to make sure it wasn't some small change to the name (e.g. "long-back eel" vs. "longback eel"). Otherwise, do some research to see if any of the synonyms for the FAO species match the names in species_list.csv. If it is one of these scenarios, the information can be copied to a new row with the name modification. If it seems to be a new taxa, You need to add the species output from this (new_spp) to species_list.csv and fill out the corresponding information. Add the new taxa name, Taxon_code (categories defined in the README in the /raw folder), and family (general family from Google) to the species_list.csv. Do some research to make sure the species is being used for food and is marine/brackish. If it is not used for food or is freshwater then it is excluded from the analysis (i.e., an 1 in the exclude column). I.e. add FAO_name, exclude (whether to include in assessment or not. If they are only harvested for medicinal purposes, do not include, or not eaten by humans do not include). Because seaweeds are generally used for both human and non-human consumption, we quantify whether to exclude or not for seaweed species as proportions. For example, if a seaweed species is 80% used for non-human consumption, we would exclude 80% of the harvest (exclude = 0.8). However, for fish species, we only classify as 0 or 1.
 
 ```{r update-species, eval = FALSE}
 
-## Commented out 'read.csv' lines are different versions of the dataset, representing the three different seaweed exclusion methods (exclude some seaweed, all seaweed, all seaweed nei). Use at the end for data checking. The first one is the one which is saved to the "output" folder, and the main analysis to run. 
+## Commented out 'read.csv' lines are different versions of the dataset, representing the three different seaweed exclusion methods (exclude some seaweed, all seaweed, all seaweed nei (nei = not elsewhere identified)). Use at the end for data checking. The first one is the one which is saved to the "output" folder, and the main analysis to run. 
 mar_sp <- read.csv(here::here('globalprep/mar/v2023/raw/species_list.csv'), stringsAsFactors=FALSE) %>%
-  select(FAO_name, exclude,Taxon_code, family, notes, notes_2)
+  dplyr::select(FAO_name, exclude, Taxon_code, family, notes, notes_2)
 
-new.spp <- setdiff(mar$FAO_name, mar_sp$FAO_name)
+new_spp <- setdiff(mar$FAO_name, mar_sp$FAO_name)
 
-new.spp # Check: if dim has 0 rows it means all match
+new_spp # Check: if dim has 0 rows it means all match
 ## If there is a list of species, hand check species_list.csv to see whether to keep (exclude seaweeds and species harvested for ornamental/medicinal). See instructions above.
 
-### NOTE: if the list of species to add is huge, and it is unmanagable to do by hand, see the mar_dataprep.Rmd in the v2020 folder, and it will have code to use Taxize. Otherwise just do it by hand, because taxize is a pain, and most of them won't be found in taxize anyways... 
+### NOTE: if the list of species to add is huge, and it is unmanageable to do by hand, see the mar_dataprep.Rmd in the v2020 folder, and it will have code to use Taxize. Otherwise just do it by hand, because taxize is a pain, and most of them won't be found in taxize anyways... 
 
 ## REMOVE SPECIES not relevant to mariculture goal (i.e., non-food species)
-mar <- mar %>% left_join(mar_sp, by="FAO_name")
+mar_sp_join <- mar %>% dplyr::left_join(mar_sp, by="FAO_name")
 
-## Filters out species that should be excluded from the MAR subgoal Searches for column name "exclude"
-mar <- mar %>% filter(exclude < 1)
-
-## create an "include" column (1-exclude) 
-mar <- mar %>%
-   mutate(include = 1-exclude)
-
-#rename FAO_name to species
-mar <- mar %>% rename(species = FAO_name)
-
-
-## Multiply value by proportion of harvest to include (include column)
-# value column is 
-mar <- mar %>%
-  mutate(value_include = value*include)
+# create intermediate table, perform data wrangling and prep for analysis
+mar_join_int <- mar_sp_join %>%
+  dplyr::filter(exclude < 1) %>% # filter out species that should be excluded from the MAR subgoal
+  dplyr::mutate(include = 1-exclude) %>% # create an "include" column (1-exclude) 
+  dplyr::rename(species = FAO_name) %>%  # rename FAO_name to species
+  dplyr::mutate(value_include = value*include) # multiply value by proportion of harvest to include
 
 ## Check to see if 85% of seaweed goes to human consumption... filter for seaweeds, sum the tonnes included, divide by total tonnes seaweed
-
-# seaweed_check2 <- mar %>%
+# seaweed_check2 <- mar_join_int %>%
 #   filter(!is.na(value)) %>%
 #   filter(Taxon_code == "AL") %>%
 #   group_by(year) %>%
@@ -211,32 +222,30 @@ mar <- mar %>%
 #             overall_total = sum(value)) %>%
 #   mutate(percent = include_total/overall_total)
 # 
-#  mean(seaweed_check2$percent) ## 81%.... matches pretty darn well.
+#  mean(seaweed_check2$percent)
+#  ## v2023: 81% .... matches pretty darn well.
+#  # v2024: 80.1% 
 
 
-
-##remove NA values 
-mar <- mar %>%
-  filter(!is.na(value_include)) %>%
-  select(country, fao, environment, species, year, Taxon_code, family, value = value_include) 
-
-## Eliminate country-species data with zero production throughout the time-series (1950-recent)
-mar <- mar %>%
-  group_by(country, species) %>%
-  mutate(total_value = sum(value)) %>%
-  filter(total_value > 0) %>%
-  select(-total_value) %>%
-  ungroup()
+mar_value_filter <- mar_join_int %>%
+  dplyr::filter(!is.na(value_include)) %>% # remove NA values 
+  dplyr::select(country, fao, environment, species, year, # select relevant columns
+                Taxon_code, family, value = value_include) %>% 
+  dplyr::group_by(country, species) %>% # for each country-species combination
+  dplyr::mutate(total_value = sum(value)) %>% # create total_value column
+  # eliminate country-species data with zero production across the entire time-series (1950-recent)
+  dplyr::filter(total_value > 0) %>%
+  dplyr::select(-total_value) %>% # drop temporary column
+  dplyr::ungroup() # remove groupigng
 
 ```
 
 ## Convert country names to OHI regions
 
 ```{r convert-regions, eval = FALSE}
+# update names before using name_to_rgn
 
-#update names before using name_to_rgn
-
-mar <- mar %>%
+mar_name_split <- mar_value_filter %>%
   mar_split()  # function in mar_fxs.R 
 #Divides mariculture from countries that we report as separate regions (assume equal production in all regions)
   # Netherlands Antilles: Conch restoration among Aruba, Bonaire, Curacao
@@ -244,27 +253,44 @@ mar <- mar %>%
   # Bonaire/S.Eustatius/Saba
   # Yugoslavia SFR: no longer a country after 1992, no values 
 
+# note: this function was updated in 2024 to use pivot_longer instead of gather, and the new grouped name of "Bonaire, Sint Eustatius and Saba" was accounted for
+
+mar_rgn <- name_2_rgn(df_in = mar_name_split, 
+                       fld_name ='country', 
+                       flds_unique = c('species', 'fao', 'environment', 'Taxon_code', 'year')) 
+
+# v2024 notes:
+## deletes Yugoslavia SFR -- this is okay because after 1991 (starting in 1992), the dataset differentiates between the countries that used to make up Yugoslavia (like Croatia, Serbia and Montenegro (Serbia is landlocked and we'll need to deal with the duplicates from this group), Bosnia and Herzegovina, Slovenia) starting in 1992.
+
+## Serbia and Montenegro: separate data for Montenegro beginning in 2006; Serbia is landlocked; 
 
 
-mar_rgn <- name_2_rgn(df_in = mar, 
-                       fld_name='country', 
-                       flds_unique=c('species', 'fao', 'environment', 'Taxon_code', 'year')) 
+## China & Hong Kong: sum Hong Kong values within China OHI region classification
+
+## Guadeloupe and Martinique: have data for each separately -- need to aggregate (sum) values for OHI grouped region
+
+## Northern Mariana Islands and Guam: have data for Guam for full range, started having data for Northern Mariana Islands in 2007. Can sum both for OHI grouped region. 
+
+## United Republic of Tanzania + United Republic of Tanzania, Zanzibar: According to Wikipedia, "Zanzibar is an insular semi-autonomous region which united with Tanganyika in 1964 to form the United Republic of Tanzania." 
+### in past years, these values have been summed under the OHI region "Tanzania"
 
 
-## Sum values of regions with multiple subregions
-mar_rgn <- mar_rgn %>%
-  group_by(fao, environment, species, year, Taxon_code, rgn_id, family) %>% 
-  summarize(value = sum(value)) %>%
-  ungroup()
+# ---- Aggregation: sum values of regions with multiple subregions ----
+mar_rgn_agg <- mar_rgn %>%
+  dplyr::group_by(fao, environment, species, year, Taxon_code, rgn_id, rgn_name, family) %>% 
+  dplyr::summarize(value = sum(value)) %>%
+  dplyr::ungroup()
 
 ```
 
 Take a look at the tidied data for a single year and region
 
 ```{r see-tidy-data, eval = FALSE}
-test <- data.frame(filter(mar_rgn, rgn_id==207) %>%
-  filter(year==2020) %>%
+test <- data.frame(
+  dplyr::filter(mar_rgn_agg, rgn_id == 207) %>% # Vietnam
+  dplyr::filter(year == 2020) %>%
   arrange(species))
+#View(test)
 ```
 
 # Gapfilling
