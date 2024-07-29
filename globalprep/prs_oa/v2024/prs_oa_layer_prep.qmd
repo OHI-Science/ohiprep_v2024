@@ -380,8 +380,9 @@ for (name in names(individual_rasters)) {
   print(paste("Saved:", output_file)) # allows us to see the names of the files as they are being saved
 } #great! check filezilla that files are all there
 
-rast_2010_01_01 <- rast(here::here(cms_dir, "2010-01-01.tif"))
-plot(rast_2010_01_01)
+# let's take a look at one of the monthly rasters we just saved
+rast_2010_01_01 <- rast(here::here(cms_dir, "2010-01-01.tif")) # read it in and rasterize it using terra
+plot(rast_2010_01_01, main = "Aragonite Saturation Raster - January 1, 2010", xlab = "Longitude", ylab = "Latitude") # plot it!
 ```
 
 
@@ -427,6 +428,7 @@ toc()
 ### rescale then clip
 
 This pressure layer is rescaled so that all values lie between 0 and 1 using both a historical reference period and a biological reference point.
+
 All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1.
 For all other cells, rescaling the aragonite staturation state value to between 0 and 1 relies upon the change in saturation relative to the reference period.
 
