@@ -68,10 +68,12 @@ librarian::shelf(
   modelr
 ) 
 ## if the data has been updated you will need to re install the WDI package to get the updated data 
+###needed to re install for v2024 for 2023 data
+#install.packages("WDI")
 update.packages("WDI")
 ### directory paths and relevant files
 source(here::here('workflow', 'R', 'common.R'))
-current_year = 2023
+current_year = 2024
 version_year = paste0("v", current_year)
 version_dir = here::here("globalprep", "ao", version_year)
 ```
@@ -83,7 +85,7 @@ version_dir = here::here("globalprep", "ao", version_year)
 ```{r load_data, eval=F}
 ### check website to see what years are available
 yr_start = 1990
-yr_end   = 2022
+yr_end   = 2023
 
 ### get description of variables    
 ### NOTE: these descriptions appear out of date, they aren't in sync with the definitions of the World Bank):
@@ -105,7 +107,8 @@ gdppcppp_raw <- WDI(
   start = yr_start, end=yr_end)
 summary(gdppcppp_raw)
 
-### check if 'raw', 'intermediate', and 'final' folders exist in the current assessment folder, if not, then create them
+
+### check if 'raw', 'intermediate', and 'output' folders exist in the current assessment folder, if not, then create them
 if (!file.exists(file.path(version_dir, "raw"))){
   dir.create(file.path(version_dir, "raw"))
 } 
@@ -129,8 +132,8 @@ readr::write_csv(gdppcppp_raw, here(paste0(version_dir, '/raw/raw_gdppcppp_', da
 
 
 ```{r raw check, eval=FALSE}
-new_saved_date <- "2023-07-12" # update when new data are downloaded.
-old_saved_date <- "2022-06-30"
+new_saved_date <- "2024-07-30" # update when new data are downloaded.
+old_saved_date <- "2023-07-12"
 
 new <- here::here(version_dir, "raw", paste0('raw_gdppcppp_', new_saved_date,'.csv')) %>% 
   readr::read_csv()
