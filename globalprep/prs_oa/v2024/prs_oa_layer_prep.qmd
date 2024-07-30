@@ -25,14 +25,9 @@ editor_options:
 
 **Overview**
 
-The [data source product](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description) corresponds to a REP L4 time series of monthly global reconstructed surface ocean pCO2, air-sea fluxes of CO2, pH, total alkalinity, dissolved inorganic carbon, saturation state with respect to calcite and aragonite, and associated uncertainties on a 0.25° x 0.25° regular grid.
-The product is obtained from an ensemble-based forward feed neural network approach mapping situ data for surface ocean fugacity (SOCAT data base, Bakker et al. 2016, <https://www.socat.info/>) and sea surface salinity, temperature, sea surface height, chlorophyll a, mixed layer depth and atmospheric CO2 mole fraction.
-Sea-air flux fields are computed from the air-sea gradient of pCO2 and the dependence on wind speed of Wanninkhof (2014).
-Surface ocean pH on total scale, dissolved inorganic carbon, and saturation states are then computed from surface ocean pCO2 and reconstructed surface ocean alkalinity using the CO2sys speciation software [See: Citation information].
+The [data source product](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description) corresponds to a REP L4 time series of monthly global reconstructed surface ocean pCO2, air-sea fluxes of CO2, pH, total alkalinity, dissolved inorganic carbon, saturation state with respect to calcite and aragonite, and associated uncertainties on a 0.25° x 0.25° regular grid. The product is obtained from an ensemble-based forward feed neural network approach mapping situ data for surface ocean fugacity (SOCAT data base, Bakker et al. 2016, <https://www.socat.info/>) and sea surface salinity, temperature, sea surface height, chlorophyll a, mixed layer depth and atmospheric CO2 mole fraction. Sea-air flux fields are computed from the air-sea gradient of pCO2 and the dependence on wind speed of Wanninkhof (2014). Surface ocean pH on total scale, dissolved inorganic carbon, and saturation states are then computed from surface ocean pCO2 and reconstructed surface ocean alkalinity using the CO2sys speciation software \[See: Citation information\].
 
-Specifically, we want to evaluate aragonite saturation.
-This is because it is a good metric for ocean acidification pressure on marine organisms.
-Some sources referring to this include:
+Specifically, we want to evaluate aragonite saturation. This is because it is a good metric for ocean acidification pressure on marine organisms. Some sources referring to this include:
 
 [Ocean Acidification \| Learn Science at Scitable](https://www.nature.com/scitable/knowledge/library/ocean-acidification-25822734/)
 
@@ -41,15 +36,11 @@ Some sources referring to this include:
 3)  $HCO_3^- ↔ CO_3^{2-} + H^+$
 4)  $CO_2(aq) + CO_3^{2-} + H_2O → 2HCO_3^-$
 
-For **supersaturated** (Ω \> 1) conditions, with an excess of [ $CO_3^{2-}$ ]seawater, a crystal of $CaCO_3$ will tend to grow, and in **undersaturated** (Ω \< 1) conditions, \$CaCO_3\$ will dissolve.
-[$CO_3^{2-}$]saturation is a weak function of temperature and salinity but a strong function of water depth (pressure) meaning that deeper waters are typically more corrosive.
-How [saturation level] affects calcifying organisms is difficult to predict however, because different species exert varying degrees of biological control on the calcification process.
-**Therefore, it may be a better idea to look at the current level of aragonite.**
+For **supersaturated** (Ω \> 1) conditions, with an excess of \[ $CO_3^{2-}$ \]seawater, a crystal of $CaCO_3$ will tend to grow, and in **undersaturated** (Ω \< 1) conditions, \$CaCO_3\$ will dissolve. \[$CO_3^{2-}$\]saturation is a weak function of temperature and salinity but a strong function of water depth (pressure) meaning that deeper waters are typically more corrosive. How \[saturation level\] affects calcifying organisms is difficult to predict however, because different species exert varying degrees of biological control on the calcification process. **Therefore, it may be a better idea to look at the current level of aragonite.**
 
 [Ocean Acidification: Saturation State - Science On a Sphere](https://sos.noaa.gov/catalog/datasets/ocean-acidification-saturation-state/#:~:text=Aragonite%20saturation%20state%20is%20commonly,organisms%20with%20calcium%20carbonate%20structures)
 
-Aragonite saturation state is commonly used to track ocean acidification because **it is a measure of carbonate ion concentration**.
-Aragonite is one of the more soluble forms of calcium carbonate and is [widely used by marine calcifiers]{.underline} (organisms with calcium carbonate structures).
+Aragonite saturation state is commonly used to track ocean acidification because **it is a measure of carbonate ion concentration**. Aragonite is one of the more soluble forms of calcium carbonate and is [widely used by marine calcifiers]{.underline} (organisms with calcium carbonate structures).
 
 [Climate Change Indicators: Ocean Acidity \| US EPA.](https://www.epa.gov/climate-indicators/climate-change-indicators-ocean-acidity#:~:text=The%20global%20map%20in%20Figure,data%20(2006%E2%80%932015).)
 
@@ -186,14 +177,27 @@ plot(ocean) # examine the .tif and ensure it looks correct
 crs(ocean) # v2024: "PROJCRS[\"Mollweide\",\n
 ```
 
-## Download copernicusmarine tool in python
+## Install copernicusmarine tool in python
+
+For the next two chunks, we will be using a Python Library API (Application Programming Interface) to automate the download of the data. In Quarto documents, you are able to fluidly exchange between python and R code by specifying what language will be used in the chunk name. This is extremely helpful for us, as it allows us to use the python API on the [CMS website](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/download). Here are the steps to download the data properly:
+
+1.  Login to CMS: go to their website and make your username and password. It is quick and should be usable immediately after the credentials have been made.
+2.  Go to <https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description>. This is the link to the "Global Ocean Surface Carbon" product. Ensure that you read the overview and check for any changes from the previous year (references, characteristics, etc).
+3.  Click the "Download data" button. FYI: the button itself does not have words on it, it is just an arrow pointing downwards. It is in the upper right hand corner of the page, next to the star and map icons.
+4.  This will bring you to their graphical tool download page. For the **Variables**, "Clear all" and select only "Aragonite saturation state in sea water: *omega_ar \[-\]*". Scroll to the bottom of the page, and under **Date Range**, specify 2010-01-01 at a time of 00:00:00 to your current year, 20xx-12-01 at a time of 00:00:00, to ensure you are obtaining the full year.
+5.  After, instead of clicking the dark blue "Download" button, you will select the grey "Automate" button. Select Python API, and copy the `copernicusmarine.subset()` code. **Part of this code will be pasted on line 243 - 255.**
+
+[![](python_api_code_ex.png){fig-align="center"}](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/download)
 
 ```{python}
+# first, we need to install the CMS tool using python!
+
+# these are "modules", much like packages in R
 import sys
 import subprocess
 
 def install(package): # a function to download the copernicusmarine package
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package]) # `sys.executable` is the path to the python executable. for example, "/usr/bin/python3" 
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package]) # `sys.executable` is the path to the python executable. for example, "/usr/bin/python3".  This makes the process more reproducible because on the server the sys.executable for python could be different based on the individual.
     #"-m" tells the Python interpreter to run a module, in this case "pip", as a script, using the new function "install" that we created using `def` and inputting the name of the function for the variable "package"
 
 try:
@@ -209,19 +213,23 @@ print(f"copernicusmarine version: {copernicusmarine.__version__}") # if correctl
 
 ## Automated download of raw data
 
+See steps above for clarification.
+
 ```{python}
-#| eval: false
-!pip install copernicusmarine # to not run every time, but show how to install copernicusmarine package via pip if needed
+# This layer lags by 2 years, since we need a full year of data. 
+
+# v2024: username <- slecuona; password <- OceanHealth2024
 
 import os
 import copernicusmarine
 
 # set the credentials made on the CMS website
-copernicusmarine.configure(username='slecuona', password='OceanHealth2024') # ERROR: need to work on this
+copernicusmarine.login(username='slecuona', password='OceanHealth2024') 
+# v2024: INFO - 2024-07-30T16:04:43Z - Credentials file stored in /home/lecuona/.copernicusmarine/.copernicusmarine-credentials.
 
-# define cms_dir, since the python chunk cannot necessarily read objects from previous R chunks/in the environment
+# define cms_dir, since the python chunk cannot read objects from previous R chunks/in your environment
 dir_M = "/home/shares/ohi"
-current_year = 2024
+current_year = 2024 # UPDATE!
 version_year = f"v{current_year}" # using an f-string
 data_dir_version_year = f"d{current_year}"
 raw_data_dir = os.path.join(dir_M, "git-annex", "globalprep", "_raw_data") # os.path.join is part of the os module and will merge into a single path
@@ -231,6 +239,7 @@ cms_dir = os.path.join(raw_data_dir, "CMS", data_dir_version_year) # for the spe
 os.makedirs(cms_dir, exist_ok=True) # will create the dir if it does not already exist
 
 # use copernicusmarine to download the data --this is from the python API copyable code on the CMS site
+# ============== Update each year!!!!================
 copernicusmarine.subset(
     dataset_id="dataset-carbon-rep-monthly",
     dataset_version="202311",
@@ -244,10 +253,53 @@ copernicusmarine.subset(
     force_download=True,
     subset_method="strict",
     disable_progress_bar=False,
-    output_filename=os.path.join(cms_dir, "carbon_data.nc")
-)
+    
+    output_filename=os.path.join(cms_dir, "global_aragonite_saturation_raw.nc") ## This line is not copied!!! Need it to specify the filezilla directory for the data to download to
+    
+) # v2024 python API download code, which will download as a singular multi-layer NetCDF file (nc-file)
 
-print(f"Data downloaded to: {os.path.join(cms_dir, 'carbon_data.nc')}") # print in console: data download finished!
+print(f"Data downloaded to: {os.path.join(cms_dir, 'global_aragonite_saturation_raw.nc')}") # print in console: data download finished!
+```
+
+### Historical Data Download
+
+This will be used as a reference point when rescaling later on.  The mean of the historical data (1985 - 2000) from CMS will be used.  The download process is the same as for the new yearly data, however it has a different **Date Range** (1985-01-01T00:00:00 - 2000-12-01T00:00:00).  Each year, the only thing that should change is the "current_year" object, unless there has been a reevaluation and the dates used for the historical reference point is changed. 
+
+```{python}
+import os
+import copernicusmarine
+
+# define cms_dir, since the python chunk cannot read objects from previous R chunks/in your environment
+dir_M = "/home/shares/ohi"
+current_year = 2024 # UPDATE!
+version_year = f"v{current_year}" # using an f-string
+data_dir_version_year = f"d{current_year}"
+raw_data_dir = os.path.join(dir_M, "git-annex", "globalprep", "_raw_data") # os.path.join is part of the os module and will merge into a single path
+cms_dir = os.path.join(raw_data_dir, "CMS", data_dir_version_year) # for the specific CMS folder within _raw_data
+
+# make sure the directory exists
+os.makedirs(cms_dir, exist_ok=True) # will create the dir if it does not already exist
+
+# use copernicusmarine to download the data --this is from the python API copyable code on the CMS site
+copernicusmarine.subset(
+  dataset_id="dataset-carbon-rep-monthly",
+  dataset_version="202311",
+  variables=["omega_ar"],
+  minimum_longitude=-179.875,
+  maximum_longitude=179.875,
+  minimum_latitude=-88.125,
+  maximum_latitude=89.875,
+  start_datetime="1985-01-01T00:00:00",
+  end_datetime="2000-12-01T00:00:00",
+  force_download=True,
+  subset_method="strict",
+  disable_progress_bar=True,
+  
+  output_filename=os.path.join(cms_dir, "historical_1985_2000_aragonite_saturation_raw.nc") ## This line is not copied!!! Need it to specify the filezilla directory for the data to download to
+    
+) # v2024 python API download code, which will download as a singular multi-layer NetCDF file for the historical data (nc-file)
+  
+print(f"Data downloaded to: {os.path.join(cms_dir, 'historical_1985_2000_aragonite_saturation_raw.nc')}") # print in console: data download finished!
 ```
 
 
@@ -256,10 +308,7 @@ print(f"Data downloaded to: {os.path.join(cms_dir, 'carbon_data.nc')}") # print 
 ```{r login_info, eval=FALSE}
 # This layer lags by 2 years, since we need a full year of data. 
 
-## need CMS username and password, define the following line of code in console (as is), then when prompted, enter the username and password string, don't save the login information here in the script
-## if either password or username contain the @ symbol, replace with '%40' (percent-encoding for reserved characters)
-userpasswd <- readline("Type CMS username and password, separated by colon no space:")
-# example from v2024 => slecuona:OceanHealth2024
+# v2024:
 # username <- slecuona
 # password <- OceanHealth2024
 
@@ -287,7 +336,6 @@ CopernicusMarine::cms_download_subset(
   timerange = timerange_vector, # using the vector created above that has two elements (lower and upper value) for a requested time range. The vector should be coercible to POSIXct, so as.POSIXct was used.
   overwrite = TRUE)
 ```
-
 
 ```{r}
 library(ncmeta)
@@ -385,10 +433,19 @@ rast_2010_01_01 <- rast(here::here(cms_dir, "2010-01-01.tif")) # read it in and 
 plot(rast_2010_01_01, main = "Aragonite Saturation Raster - January 1, 2010", xlab = "Longitude", ylab = "Latitude") # plot it!
 ```
 
+# Historical Mean Reference
+
+The historical mean; aragonite saturation state from 1880 - 1889 was calculated for OHI 2015. The same raster was used for OHI 2016 and is again used here for comparison.
+
+```{r hist_mean}
+hist <- raster(here::here(dir_M, "git-annex", "globalprep", "prs_oa", "v2015", "working", "global_oa_1880_1889_arag_mean_moll.tif"))
+
+plot(hist,main='Mean Ωaragonite 1880-1889', col=rev(cols), box=F,axes=F)
+```
 
 # Annual mean aragonite saturation
 
-Annual mean aragonite saturation rasters calculated from the monthly data. 
+Annual mean aragonite saturation rasters calculated from the monthly data.
 
 ```{r msla_monthly_to_annual, eval = F}
 ## remember from "Setup" chunk: int_dir
@@ -423,26 +480,21 @@ toc()
 # v2024 - 8.112 sec elapsed
 ```
 
-## Rescale from 0 to 1
-
-### rescale then clip
+## Rescale from 0 to 1, then clip to eez
 
 This pressure layer is rescaled so that all values lie between 0 and 1 using both a historical reference period and a biological reference point.
 
-All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1.
-For all other cells, rescaling the aragonite staturation state value to between 0 and 1 relies upon the change in saturation relative to the reference period.
+All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1. For all other cells, rescaling the aragonite staturation state value to between 0 and 1 relies upon the change in saturation relative to the reference period.
 
 Deviation from aragonite saturation state is determined for each year in the study period using this equation:
 
 $$\Delta \Omega_{year} = \frac{(\Omega_{base} - \Omega_{year})}{(\Omega_{base} - 1)}$$
 
-Note that the current value is subtracted from the baseline; this way, a reduction in $\Omega$ becomes a positive pressure value.
-It is then normalized by the current mean state; so a decrease in $\Omega$ while the current state is high indicates less pressure than the same decrease when the current state is near 1.
+Note that the current value is subtracted from the baseline; this way, a reduction in $\Omega$ becomes a positive pressure value. It is then normalized by the current mean state; so a decrease in $\Omega$ while the current state is high indicates less pressure than the same decrease when the current state is near 1.
 
 $\Delta \Omega_{year}$ is then modified to account for increases in aragonite saturation state (pressure = 0) and arag sat state less than 1 (pressure = 1).
 
-The `oaRescale` function rescales each of the annual rasters.
-If the current value is less than or equal to 1, it is set to 1, otherwise the value is calculated from the above equation.
+The `oaRescale` function rescales each of the annual rasters. If the current value is less than or equal to 1, it is set to 1, otherwise the value is calculated from the above equation.
 
 ```{r}
 
@@ -450,9 +502,7 @@ If the current value is less than or equal to 1, it is set to 1, otherwise the v
 
 ## Interpolate?
 
-Since there are oceanic cells with no information in the raw data, we need to fill in these gaps.
-We do this by interpolating across the globe using the data we have with an Inverse Distance Weighting (IDW) function.
-Previously this was done using `arcpy` from ArcGIS.
+Since there are oceanic cells with no information in the raw data, we need to fill in these gaps. We do this by interpolating across the globe using the data we have with an Inverse Distance Weighting (IDW) function. Previously this was done using `arcpy` from ArcGIS.
 
 ```{r}
 
@@ -460,9 +510,7 @@ Previously this was done using `arcpy` from ArcGIS.
 
 ## Resample & Land Mask
 
-All pressure layers need to be resampled to 1km^2^ cell resolution.
-We have a template ocean raster with cells at this resolution that we use to resample all pressure layers.
-You won't see any difference between the plot above and this one since we are using the nearest neighbor method when resampling which maintains the original cell value for each of resampled cell.
+All pressure layers need to be resampled to 1km^2^ cell resolution. We have a template ocean raster with cells at this resolution that we use to resample all pressure layers. You won't see any difference between the plot above and this one since we are using the nearest neighbor method when resampling which maintains the original cell value for each of resampled cell.
 
 ```{r}
 
@@ -476,8 +524,7 @@ You won't see any difference between the plot above and this one since we are us
 
 # Gap-filled cells
 
-We want to create a raster layer that shows all cells that were gap-filled.
-Since they were the same cells interpolated across all years, we only need to create one raster.
+We want to create a raster layer that shows all cells that were gap-filled. Since they were the same cells interpolated across all years, we only need to create one raster.
 
 ```{r}
 
