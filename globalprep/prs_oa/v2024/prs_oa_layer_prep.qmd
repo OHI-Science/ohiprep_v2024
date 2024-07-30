@@ -136,6 +136,8 @@ librarian::shelf(
   reticulate,
   ggplot2,
   reticulate, # for python coding
+  ncmeta,
+  ncdf4,
   threadr #remotes::install_github("skgrange/threadr") # for na_extrapolate, GAPFILLING (if necessary)
 )
 
@@ -156,10 +158,10 @@ raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 cms_dir <- here(raw_data_dir, "CMS", data_dir_version_year)
 
 # prs_oa dir
-oa_dir <- here(dir_M, "git-annex", "globalprep", "prs_oa")
+oa_dir <- here(dir_M, "git-annex", "globalprep", "prs_oa", version_year)
 
 # output data dir for intermediate data products
-int_dir <- here(oa_dir, version_year, "int")
+int_dir <- here(oa_dir, "int")
 dir.create(int_dir)
 
 # set colors
@@ -302,98 +304,33 @@ copernicusmarine.subset(
 print(f"Data downloaded to: {os.path.join(cms_dir, 'historical_1985_2000_aragonite_saturation_raw.nc')}") # print in console: data download finished!
 ```
 
-
-## Downloading data from CLI (Command Line Interface), instead of python
-
-```{r login_info, eval=FALSE}
-# This layer lags by 2 years, since we need a full year of data. 
-
-# v2024:
-# username <- slecuona
-# password <- OceanHealth2024
-
-CopernicusMarine::cms_login(username = "slecuona", password = "OceanHealth2024")
-
-bbox <- c(xmin = -179.875, ymin = -88.125, xmax = 179.875, ymax = 89.875)
-
-timerange_vector <- c(
-  as.POSIXct("2012-01-01T00:00:00", format="%Y-%m-%dT%H:%M:%S", tz="UTC"),
-  as.POSIXct("2022-12-01T00:00:00", format="%Y-%m-%dT%H:%M:%S", tz="UTC")
-)
-
-destination <- tempfile(cms_dir, fileext = ".nc")
-
-CopernicusMarine::cms_download_subset(
-  username = "slecuona", 
-  password = "OceanHealth2024", 
-  destination = destination,
-  product = "MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008", 
-  layer = "dataset-carbon-rep-monthly",
-  # dataset_version = "202311", 
-  variable = "omega_ar", # name of a desired variable in a specific layer of a product (type character). it can be obtained with copernicus_product_details
-  # output = "netcdf", # file type for output
-  region = bbox, # in documentation: should be "Specification of the bounding box as a vector of numerics WGS84 lat and lon coordinates. Should be in the order of: xmin, ymin, xmax, ymax."  So the start and end date from the website was taken to make a vector "bbox".
-  timerange = timerange_vector, # using the vector created above that has two elements (lower and upper value) for a requested time range. The vector should be coercible to POSIXct, so as.POSIXct was used.
-  overwrite = TRUE)
-```
+### Manual download of raw data, if automation has issues
 
 ```{r}
-library(ncmeta)
-library(ncdf4)
-
-# Open the NetCDF file
-nc <- nc_open(here::here(cms_dir, "dataset-carbon-rep-monthly_20220815T0000Z_P20230821T1545Z.nc"))
-
-# ===================== Download Data from CLI tool =============================
-
-# since Mazu does not have Conda, instead install the CopernicusMarine package using pip:
-system("pip install --user copernicusmarine")
-## receives a warning, "The script f2py is installed in '/home/lecuona/.local/bin' which is not on PATH. Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location", that means some scripts (like f2py, which is part of NumPy) were installed in a directory that's not in my system's PATH. This means that while the Python package is installed, I might not be able to run some associated command-line tools directly.
-
-# check that it installed correctly by checking the version
-system("/usr/bin/python3 -c 'import copernicusmarine; print(copernicusmarine.__version__)'") # v2024: 1.3.1
-
-# couldn't find the copernicusmarine executable, so I added its location to my PATH:
-Sys.setenv(PATH = paste0(Sys.getenv("PATH"), ":/home/lecuona/.local/bin"))
-system("copernicusmarine --version") # v2024: copernicusmarine, version 1.3.1
-
-# check where the copernicusmarine executable is located
-system("which copernicusmarine")
-# v2024: /home/lecuona/.local/bin/copernicusmarine
-
-# run python script
-# result <- system("/usr/bin/python3 ohiprep_v2024/globalprep/prs_oa/v2024/copernicus_data_download.py", intern = TRUE)
-# print(result)
-
-# use system calls:
-system("/home/lecuona/.local/bin/copernicusmarine login")
-# didn't work, lets try this:
-system("/home/lecuona/.local/bin/copernicusmarine login --verbose", intern = TRUE)
-
-```
-
-## Manual download of raw data, if automation has issues
-
-```{r}
-library(ncmeta)
-library(ncdf4)
-
 # open the NetCDF file
-file_path <- here::here(cms_dir, "dataset-carbon-rep-monthly_1722109120120.nc") # file path to the raw data in cms_dir
+file_path <- here::here(raw_data_dir, "CMS", "d2024_manual", "dataset-carbon-rep-monthly_1722109120120.nc") # file path to the manually downloaded raw data
+```
+
+## Rasterize and Project the Multi-Layer NetCDF
+
+```{r}
+# open the NetCDF file
+raw_file_path <- here::here(cms_dir, "global_aragonite_saturation_raw.nc") # file path to the API downloaded raw data
 
 # load the file as a SpatRaster to begin with, for greater usability with terra
-nc_raster <- terra::rast(file_path)
-crs(nc_raster) # v2024: ""GEOGCRS[\"WGS 84 (CRS84)\",\n".  Will need to be reprojected to mollewide so that the OHI "ocean.tif"
-plot(nc_raster) # to get a quick visualiaztion of the multi-layer SpatRaster
+oa_multi_raster <- terra::rast(raw_file_path)
+crs(oa_multi_raster) # v2024: ""GEOGCRS[\"WGS 84 (CRS84)\",\n".  Will need to be reprojected to mollweide so that it can be clipped to the OHI eez layer
+plot(oa_multi_raster) # to get a quick visualiaztion of the multi-layer SpatRaster
 
-# reproject to Mollewide for OHI consistency
+# reproject to Mollweide for OHI consistency
 # the `terra::project` function by default uses bilinear interpolation for continuous data (used bc the dataset does not have clear boundaries) and nearest neighbor for categorical data (not used in this case, but just to know)
-moll_crs <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs" # mollweide EPSG for reprojecting
+mollCRS <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs" # mollweide EPSG for reprojecting
 
 tic()
-nc_raster_moll <- terra::project(nc_raster, moll_crs) # using terra::project, which inherently resamples using bilinear interpolation
-toc() # v2024: 99.427 sec elapsed
+nc_raster_moll <- terra::project(oa_multi_raster, mollCRS) # using terra::project, which inherently resamples using bilinear interpolation
+toc() # v2024: 98.562 sec elapsed
 ```
+
 
 ### Save as individual rasters
 
@@ -404,7 +341,7 @@ num_layers <- terra::nlyr(nc_raster_moll)
 print(num_layers) # v2024: 156 layers, which makes sense because the data goes from 2010 - 2022 monthly
 
 # get the time attribute for each layer, to check that it goes from 2010 - 2022 (v2024)
-time_attribute <- terra::time(nc_raster)
+time_attribute <- terra::time(nc_raster_moll)
 print(time_attribute)
 
 # Create a list to store individual rasters
@@ -412,7 +349,7 @@ individual_rasters <- list()
 
 # loop through each layer and create individual rasters from the SpatRaster
 for (i in 1:num_layers) {
-  layer <- nc_raster[[i]] # the layer in the seq from 1:156 (v2024)
+  layer <- nc_raster_moll[[i]] # the layer in the seq from 1:156 (v2024)
   date <- time_attribute[i] # the month, in this case, of the raster
   layer_name <- format(date, "%Y-%m-%d") # the name for the .tif when it is saved
   individual_rasters[[layer_name]] <- layer # put them in the list 
@@ -421,29 +358,58 @@ for (i in 1:num_layers) {
 # print the names of the individual rasters in the list, to ensure the loop worked
 names(individual_rasters) # v2024: "2010-01-01" - "2022-12-01"
 
-# save individual rasters to files on filezilla at `cms_dir`
+# ---- create directory for storing the monthly individual rasters ----
+int_monthly_dir <- here::here(int_dir, "oa_monthly_rasters")
+dir.create(int_monthly_dir, showWarnings = TRUE) # to create the directory in case it has not already been made in filezilla
+
+# save individual rasters to files on filezilla at `int_monthly_dir`
+tic()
 for (name in names(individual_rasters)) {
-  output_file <- file.path(cms_dir, paste0(name, ".tif")) # move each raster to filezilla
+  output_file <- file.path(int_monthly_dir, paste0(name, ".tif")) # move each raster to the specified path in filezilla
   writeRaster(individual_rasters[[name]], filename = output_file, overwrite = TRUE) # if files already exist, overwrite them
   print(paste("Saved:", output_file)) # allows us to see the names of the files as they are being saved
 } #great! check filezilla that files are all there
+toc() #v2024: 1904.563 sec elapsed
 
 # let's take a look at one of the monthly rasters we just saved
-rast_2010_01_01 <- rast(here::here(cms_dir, "2010-01-01.tif")) # read it in and rasterize it using terra
+rast_2010_01_01 <- rast(here::here(int_monthly_dir, "2010-01-01.tif")) # read it in and rasterize it using terra
 plot(rast_2010_01_01, main = "Aragonite Saturation Raster - January 1, 2010", xlab = "Longitude", ylab = "Latitude") # plot it!
+
+is.lonlat(rast_2010_01_01) # FALSE, so it does not currently have a long/lat crs...
 ```
 
 # Historical Mean Reference
 
-The historical mean; aragonite saturation state from 1880 - 1889 was calculated for OHI 2015. The same raster was used for OHI 2016 and is again used here for comparison.
+The historical mean of aragonite saturation from 1985 - 2000 used here for comparison.
 
 ```{r hist_mean}
-hist <- raster(here::here(dir_M, "git-annex", "globalprep", "prs_oa", "v2015", "working", "global_oa_1880_1889_arag_mean_moll.tif"))
+oa_hist_multilayer_nc <- terra::rast(here::here(cms_dir, "historical_1985_2000_aragonite_saturation_raw.nc")) # read in NetCDF file we downloaded using the API
 
-plot(hist,main='Mean Ωaragonite 1880-1889', col=rev(cols), box=F,axes=F)
+crs(oa_hist_multilayer_nc) # v2024: GEOGCRS[\"WGS 84 (CRS84)\",\n
+# needs to be reprojected
+
+oa_hist_moll_nc <- project(oa_hist_multilayer_nc, mollCRS) # reproject to Mollweide
+
+plot(oa_hist_moll_nc) # this is monthly data; we need to stack the raster layers by year and calculate the overall mean across all years for a historical average reference
+```
+```{r}
+# since it already multilayer and we plan on averaging across all years, we can make it a RasterBrick. It is similar to a RasterStack (that can be created with `stack()`), but processing time should be shorter when using a RasterBrick (from documentation)
+oa_hist_moll_brick <- brick(oa_hist_moll_nc)
+
+# Calculate the mean across all layers and years
+tic()
+oa_historical_average <- calc(oa_hist_moll_brick, mean, na.rm = TRUE) 
+toc() # v2024: 88.751 sec elapsed
+
+# write the result to a new raster file for future use
+terra::writeRaster(oa_historical_average, 
+            filename = here::here(int_dir, "oa_1985_2000_historical_average.tif"), # save to filezilla
+            format = "GTiff",
+            overwrite = TRUE)
 ```
 
-# Annual mean aragonite saturation
+
+# FIX: Annual mean aragonite saturation
 
 Annual mean aragonite saturation rasters calculated from the monthly data.
 
@@ -452,7 +418,7 @@ Annual mean aragonite saturation rasters calculated from the monthly data.
 ## individual_rasters is the list of .tifs
 
 # make a list of the already saved monthly rasters
-oa_monthly_files <- list.files(path = here(cms_dir),
+oa_monthly_files <- list.files(path = here(int_monthly_dir),
                                pattern = "\\.tif$", # to ensure we only grab the .tif files, not the .tif.aux.json files
                                full.names = TRUE) # returns the full path, not just the file name
 
