@@ -329,12 +329,18 @@ mollCRS <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m
 tic()
 nc_raster_moll <- terra::project(oa_multi_raster, mollCRS) # using terra::project, which inherently resamples using bilinear interpolation
 toc() # v2024: 98.562 sec elapsed
+
+plot(nc_raster_moll)
 ```
 
 
 ### Save as individual rasters
 
 ```{r}
+# ---- create directory for storing the monthly individual rasters ----
+int_monthly_dir <- here::here(int_dir, "oa_monthly_rasters")
+dir.create(int_monthly_dir, showWarnings = TRUE) # to create the directory in case it has not already been made in Mazu
+
 # since nc_raster is already loaded as a SpatRaster object
 # check the number of layers
 num_layers <- terra::nlyr(nc_raster_moll)
@@ -358,14 +364,10 @@ for (i in 1:num_layers) {
 # print the names of the individual rasters in the list, to ensure the loop worked
 names(individual_rasters) # v2024: "2010-01-01" - "2022-12-01"
 
-# ---- create directory for storing the monthly individual rasters ----
-int_monthly_dir <- here::here(int_dir, "oa_monthly_rasters")
-dir.create(int_monthly_dir, showWarnings = TRUE) # to create the directory in case it has not already been made in filezilla
-
 # save individual rasters to files on filezilla at `int_monthly_dir`
 tic()
 for (name in names(individual_rasters)) {
-  output_file <- file.path(int_monthly_dir, paste0(name, ".tif")) # move each raster to the specified path in filezilla
+  output_file <- file.path(int_monthly_dir, paste0(name, ".tif")) # move each raster to the specified path in Mazu
   writeRaster(individual_rasters[[name]], filename = output_file, overwrite = TRUE) # if files already exist, overwrite them
   print(paste("Saved:", output_file)) # allows us to see the names of the files as they are being saved
 } #great! check filezilla that files are all there
@@ -398,7 +400,7 @@ oa_hist_moll_brick <- brick(oa_hist_moll_nc)
 
 # Calculate the mean across all layers and years
 tic()
-oa_historical_average <- calc(oa_hist_moll_brick, mean, na.rm = TRUE) 
+oa_historical_average <- terra::mean(oa_hist_moll_brick) 
 toc() # v2024: 88.751 sec elapsed
 
 # write the result to a new raster file for future use
@@ -414,6 +416,10 @@ terra::writeRaster(oa_historical_average,
 Annual mean aragonite saturation rasters calculated from the monthly data.
 
 ```{r msla_monthly_to_annual, eval = F}
+# ---- create directory for storing the monthly individual rasters ----
+oa_annual_mean_dir <- here::here(int_dir, "oa_annual_mean")
+dir.create(oa_annual_mean_dir, showWarnings = TRUE) # to create the directory in case it has not already been made in filezilla
+
 ## remember from "Setup" chunk: int_dir
 ## individual_rasters is the list of .tifs
 
@@ -422,28 +428,30 @@ oa_monthly_files <- list.files(path = here(int_monthly_dir),
                                pattern = "\\.tif$", # to ensure we only grab the .tif files, not the .tif.aux.json files
                                full.names = TRUE) # returns the full path, not just the file name
 
-minyr <- substr(oa_monthly_files, 59, 62) %>% # taking the string that defines the year the raster's data was from 
+# the minimum year of the individual rasters
+minyr <- substr(oa_monthly_files, 75, 78) %>% # taking the string that defines the year the raster's data was from 
   as.numeric() %>% 
   min()
 
-maxyr <- substr(oa_monthly_files, 59, 62) %>% # taking the string that defines the year the raster's data was from 
+# the maximum year of the individual rasters
+maxyr <- substr(oa_monthly_files, 75, 78) %>% # taking the string that defines the year the raster's data was from 
   as.numeric() %>% 
   max() # take the max of all the years for the data downloaded
 
 tic()
 ## stack all rasters for each year, calculate the annual mean, then write as a raster
 registerDoParallel(6)
-foreach(yr = c(minyr:maxyr)) %dopar% { #v2024: 2010:2022, change this in future years
+foreach(yr = c(minyr:maxyr)) %dopar% { # check that the minyr and maxyr are correct with what you downloaded
   
   files <- oa_monthly_files[str_detect(oa_monthly_files, as.character(yr))] # of the list earlier, detect the year from each file so that we can stack them by year
   
   rast_annual_mean <- stack(files) %>%
-    calc(mean, na.rm = TRUE) %>%
+    calc(mean, na.rm = TRUE) %>% # calculate the average for each year for each cell in the raster over all the months, creating a raster of the average values for that year
     terra::writeRaster(filename = sprintf("%s/oa_annual_mean/oa_annual_%s.tif", int_dir, yr),
                        overwrite = TRUE)
 }
 toc()
-# v2024 - 8.112 sec elapsed
+# v2024 - 23.944 sec elapsed
 ```
 
 ## Rescale from 0 to 1, then clip to eez
