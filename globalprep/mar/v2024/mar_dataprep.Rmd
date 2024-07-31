@@ -19,27 +19,22 @@ editor_options:
 
 This analysis converts FAO mariculture and seafood watch sustainability data into data used to calculate the OHI global mariculture status score. This also calculates the genetic escapee from mariculture pressure data.
 
-# 2024 updates
+# 2024 updates from 2023 assessment
 
 -   fixed issues system-dependent file paths using `{here}` package
+
 -   made file names reproducible with updated entries in setup chunks
--   updated formatting
+
+-   updated formatting of code and comments
+
 -   rewrote data cleaning to follow tidyverse style more closely and be more reproducible & less prone to human error 
--   `mar_split()` function in `mar_fxs.R` was updated to use pivot_longer instead of gather, and the new grouped name of "Bonaire, Sint Eustatius and Saba" was accounted for
 
-# 2023 updates from 2022 assessment
+-   updated `mar_split()` function in `mar_fxs.R` to use `pivot_longer()` instead of `gather()`, and the new grouped name of "Bonaire, Sint Eustatius and Saba" was accounted for
 
--   New year of FAO mariculture yield data for 2021. Downloaded the data online through Fishstat online query instead of using the fishstatj software. Updated instructions for downloading the data. Updated the script to work with minor changes in formatting in the new data.
+-   fixed an issue in `mar_fxs.R` where updated data was not being properly bound to original data
 
--   updated the species_list.csv so that any of the duplicate species that were relevant and had been excluded are now included. Also updated this file with any new species names in the FAO data. Removed the alias column, as it was being inconsistently used, and instead grouped by family when removing species with less than four years of mariculture for a region. Reorganized code as needed to keep this from creating errors.
+-   renamed variables so that iterations of data processing steps weren't overwriting the same variable -- allows for comparison between different stages of dataprep
 
--   updated code to programmatically fill in analysis and data years throughout script
-
--   fixed an issue in the mar_split function (`mar_fxs.R`) that was duplicating Netherlands Antilles data (Aruba, Bonaire, 'Curacao') by binding the same rows multiple times.
-
--   Fixed a problem that was removing data due to duplicates in the fao column (FAO major fishing area (Name)) for some species/region/environment/year combinations in the FAO data. 
-
--   updated outdated function gather to pivot_longer
 
 ------------------------------------------------------------------------
 
@@ -85,34 +80,44 @@ Obtained upon request of SFW.
 
 knitr::opts_chunk$set(eval=FALSE)
   
-## Load libraries, set directories
-library(ohicore)  #devtools::install_github('ohi-science/ohicore@dev')
-library(dplyr)
-library(stringr)
-library(tidyr)
-library(tidyverse)
-library(tictoc)
-#library(taxize) had issues installing taxize because its dependency phanghorn is not compatible with this version of R
-library(knitr)
-library(kableExtra)
-library(here)
-library(plotly)
+# ---- Load packages ----
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  ohicore,  #devtools::install_github('ohi-science/ohicore@dev')
+  dplyr,
+  tidyverse, # loads readr, stringr, tidyr, etc.
+  tictoc,
+  knitr,
+  kableExtra,
+  here,
+  plotly
+)
 
+#library(taxize) had issues installing taxize because its dependency phanghorn is not compatible with this version of R
+
+
+# ---- Set directories & source functions ----
 current_year <- 2024 # update this!
 version_year <- paste0("v", current_year)
-
 current_mar_dir <- here::here("globalprep", "mar", version_year)
-raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
-
-FAO_mariculture_dir <- here::here(raw_data_dir, "FAO_mariculture")
-seafood_watch_dir <- here::here(raw_data_dir, "seafood_watch_mar_sustainability")
 
 ## Load FAO-specific user-defined functions
 source(here::here("globalprep", "mar", version_year, "mar_fxs.R")) # functions specific to mariculture dealing with compound countries
 source(here::here("workflow", "R", "fao_fxn.R")) # old function for cleaning fao data
 #source(here::here("workflow", "R", "fao_online_portal_clean.R")) #new fao cleaning function # switched to new version in 2024
 source(here::here("workflow", "R", "fao_query_data_tidy.R")) # 2024 version of FAO data tidying function
-source(here::here("workflow", "R", "common.R")) # directory locations
+source(here::here("workflow", "R", "common.R")) # directory locations, OHI essentials
+
+# general raw data directory in Mazu
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+# FAO data directory in Mazu
+FAO_mariculture_dir <- here::here(raw_data_dir, "FAO_mariculture")
+# Seafood Watch data directory in Mazu
+seafood_watch_dir <- here::here(raw_data_dir, "seafood_watch_mar_sustainability")
+
 ```
 
 # Import Raw Data: FAO Mariculture data
@@ -146,10 +151,10 @@ head(mar_raw)
 Filter freshwater mariculture, make long format, and clean FAO codes.
 
 ```{r fao-data-prep}
-# v2024 update:
-# source 2024 FAO query data tidying function
-source(here::here("workflow", "R", "fao_query_data_tidy.R"))
+# source 2024 FAO query data tidying function here if you skipped it in the setup chunk
+# source(here::here("workflow", "R", "fao_query_data_tidy.R"))
 
+# ---- preliminary tidying of FAO data ----
 mar_tidy <- fao_query_data_tidy(fao = mar_raw, # FAO data frame
                                 initial_data_year = 1950, # first year of data in mar df
                                 last_data_year = latest_data_year, # most recent year of data in df
@@ -160,6 +165,7 @@ mar_tidy <- fao_query_data_tidy(fao = mar_raw, # FAO data frame
 
 #table(mar_tidy$unit_name)
 
+# ---- clean tidied FAO data ----
 mar_clean <- mar_tidy %>% 
   dplyr::select(-c(unit_name)) %>% # all are "Tonnes - live weight"
   dplyr::rename(
@@ -201,9 +207,11 @@ The species_list.csv is a master list of all the mariculture species in the FAO 
 ```{r update-species, eval = FALSE}
 
 ## Commented out 'read.csv' lines are different versions of the dataset, representing the three different seaweed exclusion methods (exclude some seaweed, all seaweed, all seaweed nei (nei = not elsewhere identified)). Use at the end for data checking. The first one is the one which is saved to the "output" folder, and the main analysis to run. 
-mar_sp <- read.csv(here::here(current_mar_dir, "raw", "species_list.csv"), stringsAsFactors=FALSE) %>%
+# Read in species list
+mar_sp <- readr::read_csv(here::here(current_mar_dir, "raw", "species_list.csv")) %>%
   dplyr::select(FAO_name, exclude, Taxon_code, family, notes, notes_2)
 
+# find differences between species names in new FAO data vs. species list
 new_spp <- setdiff(mar$FAO_name, mar_sp$FAO_name)
 
 new_spp # Check: if dim has 0 rows it means all match
@@ -211,13 +219,13 @@ new_spp # Check: if dim has 0 rows it means all match
 
 ### NOTE: if the list of species to add is huge, and it is unmanageable to do by hand, see the mar_dataprep.Rmd in the v2020 folder, and it will have code to use Taxize. Otherwise just do it by hand, because taxize is a pain, and most of them won't be found in taxize anyways... 
 
-## REMOVE SPECIES not relevant to mariculture goal (i.e., non-food species)
-mar_sp_join <- mar %>% dplyr::left_join(mar_sp, by="FAO_name")
+# Remove species not relevant to mariculture goal (i.e., non-food species)
+mar_sp_join <- mar %>% dplyr::left_join(mar_sp, by = "FAO_name")
 
-# create intermediate table, perform data wrangling and prep for analysis
+# Create intermediate table, perform data wrangling and prep for analysis
 mar_join_int <- mar_sp_join %>%
   dplyr::filter(exclude < 1) %>% # filter out species that should be excluded from the MAR subgoal
-  dplyr::mutate(include = 1-exclude) %>% # create an "include" column (1-exclude) 
+  dplyr::mutate(include = 1 - exclude) %>% # create an "include" column (1-exclude) 
   dplyr::rename(species = FAO_name) %>%  # rename FAO_name to species
   dplyr::mutate(value_include = value*include) # multiply value by proportion of harvest to include
 
@@ -234,28 +242,26 @@ mar_join_int <- mar_sp_join %>%
 #  ## v2023: 81% .... matches pretty darn well.
 #  # v2024: 80.1% 
 
-
+# ---- Eliminate country-species data with zero production across the entire time-series (1950-recent) ----
 mar_value_filter <- mar_join_int %>%
   dplyr::filter(!is.na(value_include)) %>% # remove NA values 
   dplyr::select(country, fao, environment, species, year, # select relevant columns
                 Taxon_code, family, value = value_include) %>% 
   dplyr::group_by(country, species) %>% # for each country-species combination
   dplyr::mutate(total_value = sum(value)) %>% # create total_value column
-  # eliminate country-species data with zero production across the entire time-series (1950-recent)
-  dplyr::filter(total_value > 0) %>%
+  dplyr::filter(total_value > 0) %>% # omit data with zero production
   dplyr::select(-total_value) %>% # drop temporary column
-  dplyr::ungroup() # remove groupigng
+  dplyr::ungroup() # remove grouping
 
 ```
 
 ## Convert country names to OHI regions
 
 ```{r convert-regions, eval = FALSE}
-# update names before using name_to_rgn
-
+# ---- update names before using name_to_rgn ----
 mar_name_split <- mar_value_filter %>%
   mar_split()  # function in mar_fxs.R 
-#Divides mariculture from countries that we report as separate regions (assume equal production in all regions)
+# Divides mariculture from countries that we report as separate regions (assume equal production in all regions)
   # Netherlands Antilles: Conch restoration among Aruba, Bonaire, Curacao
   # Channel Islands: Jersey and Guernsey
   # Bonaire/S.Eustatius/Saba
@@ -263,15 +269,16 @@ mar_name_split <- mar_value_filter %>%
 
 # note: this function was updated in 2024 to use pivot_longer instead of gather, and the new grouped name of "Bonaire, Sint Eustatius and Saba" was accounted for
 
+# ---- Run name_2_rgn ----
 mar_rgn <- name_2_rgn(df_in = mar_name_split, 
                        fld_name ='country', 
                        flds_unique = c('species', 'fao', 'environment', 'Taxon_code', 'year')) 
 
+# ---- Addressing duplicates, warnings ----
 # v2024 notes:
 ## deletes Yugoslavia SFR -- this is okay because after 1991 (starting in 1992), the dataset differentiates between the countries that used to make up Yugoslavia (like Croatia, Serbia and Montenegro (Serbia is landlocked and we'll need to deal with the duplicates from this group), Bosnia and Herzegovina, Slovenia) starting in 1992.
 
-## Serbia and Montenegro: separate data for Montenegro beginning in 2006; Serbia is landlocked; 
-
+## Serbia and Montenegro: separate data for Montenegro beginning in 2006; Serbia is landlocked, so these values only apply to Montenegro (data is from FAO major fishing area classifications: Mediterranean and Black Sea)
 
 ## China & Hong Kong: sum Hong Kong values within China OHI region classification
 
@@ -870,7 +877,7 @@ Gapfill values in output file are the proportion of data that is gapfilled.
 genEscapes_gf <- tonnes_esc %>%
   mutate(gapfill = ifelse(gapfill_esc == "none", 0, 1)) %>%
   group_by(rgn_id, year) %>%
-  summarize(genEscapes = weighted.mean(gapfill, tonnes, na.rm=TRUE)) %>%
+  summarize(genEscapes = weighted.mean(gapfill, tonnes, na.rm = TRUE)) %>%
   ungroup() %>%
   filter(year == latest_data_year) %>%
   select(rgn_id, pressures.score=genEscapes) %>%
@@ -977,7 +984,7 @@ Comparing this year's data to previous year's data. Expect small variation from 
 ```{r data-check, eval = FALSE}
 
 # Read in old and new data for plots
-mar_old_data <- read.csv(file.path("..", paste0( "v", last_year), "output/MAR_FP_data.csv")) 
+mar_old_data <- read.csv(file.path("..", paste0( "v", last_year), "output", "MAR_FP_data.csv")) 
 mar_new_data <- read.csv("output/MAR_FP_data.csv") 
 
 
@@ -1211,7 +1218,7 @@ old <- read.csv(file.path("..", paste0( "v", last_year), "output", "GenEsc.csv")
   filter(rgn_id == 175) %>% 
   select(rgn_id, year, prs_score_old = pressure_score)
 
-new <- read.csv("output/GenEsc.csv") %>%
+new <- read.csv(here(current_mar_dir, "output", "GenEsc.csv")) %>%
   filter(rgn_id == 175) %>% 
   select(rgn_id, year, pressure_score)
 
