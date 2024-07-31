@@ -124,7 +124,7 @@ seafood_watch_dir <- here::here(raw_data_dir, "seafood_watch_mar_sustainability"
 
 Mariculture production in tonnes.
 
-```{r import-data, eval = FALSE}
+```{r import-data}
 ## UPDATE THESE!
 current_year <- current_year # update in previous chunk
 last_year <- 2023 #last year of analysis
@@ -204,7 +204,7 @@ More information can be found in issues #8, #81, #241, #246 for reference.
 
 The species_list.csv is a master list of all the mariculture species in the FAO data. Every year there are potential changes to the FAO data, additional species may be added or names can change, etc. When a species is in the FAO data, but not the species_list.csv it will need to be added to the species_list.csv. To do this, do a quick search within the species_list.csv to make sure it wasn't some small change to the name (e.g. "long-back eel" vs. "longback eel"). Otherwise, do some research to see if any of the synonyms for the FAO species match the names in species_list.csv. If it is one of these scenarios, the information can be copied to a new row with the name modification. If it seems to be a new taxa, You need to add the species output from this (new_spp) to species_list.csv and fill out the corresponding information. Add the new taxa name, Taxon_code (categories defined in the README in the /raw folder), and family (general family from Google) to the species_list.csv. Do some research to make sure the species is being used for food and is marine/brackish. If it is not used for food or is freshwater then it is excluded from the analysis (i.e., an 1 in the exclude column). I.e. add FAO_name, exclude (whether to include in assessment or not. If they are only harvested for medicinal purposes, do not include, or not eaten by humans do not include). Because seaweeds are generally used for both human and non-human consumption, we quantify whether to exclude or not for seaweed species as proportions. For example, if a seaweed species is 80% used for non-human consumption, we would exclude 80% of the harvest (exclude = 0.8). However, for fish species, we only classify as 0 or 1.
 
-```{r update-species, eval = FALSE}
+```{r update-species}
 
 ## Commented out 'read.csv' lines are different versions of the dataset, representing the three different seaweed exclusion methods (exclude some seaweed, all seaweed, all seaweed nei (nei = not elsewhere identified)). Use at the end for data checking. The first one is the one which is saved to the "output" folder, and the main analysis to run. 
 # Read in species list
@@ -257,7 +257,7 @@ mar_value_filter <- mar_join_int %>%
 
 ## Convert country names to OHI regions
 
-```{r convert-regions, eval = FALSE}
+```{r convert-regions}
 # ---- update names before using name_to_rgn ----
 mar_name_split <- mar_value_filter %>%
   mar_split()  # function in mar_fxs.R 
@@ -300,7 +300,7 @@ mar_rgn_agg <- mar_rgn %>%
 
 Take a look at the tidied data for a single year and region
 
-```{r see-tidy-data, eval = FALSE}
+```{r see-tidy-data}
 test <- data.frame(
   dplyr::filter(mar_rgn_agg, rgn_id == 207) %>% # Vietnam
   dplyr::filter(year == 2020) %>%
@@ -317,7 +317,7 @@ For example: Production of blue shrimp in Maine starts in 1983 -- don't include 
 Checked to make sure that there weren't instances in which it made more sense to carry the previous year's data forward as a method of gapfilling. This didn't seem to be the case.
 
 
-```{r test-yrs, eval=FALSE}
+```{r test-yrs}
 # v2024 method 
 tic()
 
@@ -339,7 +339,7 @@ toc()
 ```
 
 
-```{r gapfill-missing-0, eval = FALSE}
+```{r gapfill-missing-0}
 # ---- fill "years" column for gapfilling ----
 # Spread mar_rgn to create a value for every year-species-region (if missing it will be given a NA)
 mar_rgn_spread <- tidyr::pivot_wider(mar_rgn_agg,
@@ -421,6 +421,10 @@ sw_sus <- read.csv(file.path(seafood_watch_dir, current_data_folder,
                              "SFW_Aquaculture_ratings_053123.csv"), # update with name of new data file
                    check.names = FALSE, stringsAsFactors = FALSE, na.strings = c("NA", ""))
 
+# v2024: potential rewrite:
+# sw_sus_raw <- read_csv(file.path(seafood_watch_dir, current_data_folder, "SFW_Aquaculture_ratings_XXXXXX.csv"),
+#                        na = c("NA", ""))
+
 head(sw_sus)
 
 # Read in Seafood Watch data from previous year
@@ -435,8 +439,91 @@ old_sw_sus <- read.csv(file.path(seafood_watch_dir, previous_data_folder,
 
 Rename columns to match with MAR data and fill in species column
 
-```{r tidy_sw-sus, eval = FALSE}
+```{r}
+# v2024 potential rewrite:
+sw_sus <- sw_sus_raw %>% 
+  # rename columns ----
+  janitor::clean_names() %>% 
+  dplyr::rename(sw_species = "common_names",
+                fao_species = "fao_common_name", 
+                fdo_species = "fdo_common_name",
+                water_body = "bo_ws", # so curious as to why this is what janitor::clean_names does to BOWs
+                country = "countries",
+                method = "methods",
+                score = "assessment_score",
+                escapes_score = "c6score", # 
+                rec = "assessment_color"
+                ) %>% 
+  # select relevant columns
+  dplyr::select(report_title, published_date, sw_species, scientific_name, fao_species, fda_species, country, water_body, method, escapes_score, score, rec) %>%
+  # filter out freshwater aquaculture
+  filter(!(method %in% c("Freshwater net pen"))) %>% 
+  # set scores less than 0 equal to 0
+  mutate(score = case_when(score < 0 ~ 0,
+            TRUE ~ score))
+  
+```
 
+Notes on AssessmentScore column:
+
+This column represents the Overall Score, which is a combination of 7 primary criteria and 3 "exceptional criterion that may not be relevant to all aquaculture production, yet can be a significant concern for those production practices where it is relevant" (pg. 57). These criteria are named as follows:
+
+-   Criterion 1 (C1): Data
+-   C2: Effluent
+-   C3: Habitat
+-   C4: Chemical Use
+-   C5: Feed
+-   C6: Escapes
+-   C7: Disease, pathogen and parasite interaction
+
+-   C8X: Source of Stock – Independence from wild fish stocks
+-   C9X: Wildlife Mortalities
+-   C10X: Introduction of Secondary Species 
+
+The Final numerical score = 
+
+$$\mathrm{final \:score} = \frac{\sum{(C1–C7 \mathrm{\:scores})} + (C8X + C9X + C10X)}{7}$$
+ with the final score having a range of 0-10. 
+
+
+Note on C6Score column -- C6: Escapes
+
+From pages 43-52 of the [Aquaculture Sustainability Standards document](https://www.seafoodwatch.org/globalassets/sfw/pdf/standards/aquaculture/seafood-watch-aquaculture-standard-version-a4.pdf)
+
+Criterion 6 (C6) final scores are a combination of Factor 6.1 and 6.2.
+
+Factor 6.1: 
+> "Factor 6.1 assigns a level of risk to each type of production system based on the ability of
+farmed species to escape the system and enter the surrounding ecosystem. Production
+system escape risks are categorized as Low to High based on openness, management
+practices, escape trends, and vulnerability to environmental factors (e.g., tsunami, flood,
+predator damage, etc.)." (pg. 44)
+
+-   basically assigns a risk level based on the ability of farmed species to escape -- "Risk of escape"
+-   adjustments made based on factors such as recapture of "escapes" before they have an impact
+
+Factor 6.2:
+>   "Invasiveness, referred to as the risk of competitive and genetic interactions (CGI), is defined
+as “…the degree to which an organism is able to spread from site of primary introduction, to
+establish a viable population in the ecosystem, to negatively affect biodiversity on the
+individual, community, or ecosystem level and cause adverse socioeconomic consequence”
+(Panov et al. 2008). According to this definition, Factor 6.2 considers both the short-term and
+long-term ecological impacts of escape. This factor has been adapted (and greatly simplified)
+from the Marine Fish Invasiveness Screening Kit (MFISK) (and other similar tools developed by
+Copp et al. [2007, 2009]), and from the Global Aquaculture Performance Index (GAPI)’s similar
+use and adaptation of the same tools (Volpe et al. 2013)." (pg. 45)
+
+-   basically another quantification of risk based on the threat escapees pose on the environment -- "Competitiveness and genetic interactions"
+
+> "The risk of impacts resulting from repeated escapes of farmed stock (regardless of their ability
+to establish), or the risks resulting in the establishment of escapees differs according to
+species-specific characteristics, and particularly between native and non-native species..." (pg. 45)
+
+A C6 score of 10 indicates a very low risk of escape with low estimated competitiveness and genetic interactions. An Escape Criterion (C6) score ≤ 1 is considered "Critical" (pg. 52), and may indicate a "High Concern" risk of escape and "High Concern" potential for competitiveness and genetic impact. 
+
+
+```{r tidy_sw-sus, eval = FALSE}
+# ---- Tidy Seafood Watch (SFW) data ----
 ## Rename columns
 sw_sus <- sw_sus %>%
   rename(report_title = 'ReportTitle',
@@ -507,7 +594,7 @@ setdiff(old_sw_sus$CommonNames, sw_sus_rgn$sw_species)
 Check that the non-matches between Seafood Watch sustainability data species (sw_sus_rgn) and the FAO mariculture species in the wrangled FAO Aquaculture Production data table (maric) are not due to spelling errors or slightly different names. We want to include as many species that have sustainability scores as possible
 
 ```{r sw-sus_check-non-matches, eval = FALSE}
-maric <- read_csv(here(current_mar_dir, "output", "MAR_FP_data.csv"))
+maric <- read_csv(here::here(current_mar_dir, "output", "MAR_FP_data.csv"))
 
 ## Make sure same species are spelled the same in the two data tables (e.g. check that there are no extra spaces)
 sort(setdiff(sw_sus_rgn$species, maric$species)) # Seafood Watch species with no FAO data
@@ -521,23 +608,27 @@ sort(setdiff(maric$species, sw_sus_rgn$species)) # FAO species with no Seafood W
 
 Fix the non matches
 
+v2024 note to self [COME BACK]: could be good to rename variables instead of continuously rewriting "maric" -- takes up more space in the environment but feels like better code hygeine
+
+
 ```{r sw-sus_fix-non-matches, eval = FALSE}
 
-## Rename species in Seafood Watch data to match FAO species data
+# Rename species in Seafood Watch data to match FAO species data 
 sw_sus_rgn$species <- gsub("Atlantic Bluefin tuna", "Atlantic bluefin tuna", sw_sus_rgn$species)
 #sw_sus_rgn$species <- gsub("Scallops", "Scallops nei", sw_sus_rgn$species)
 
-## rename any "mistakes" in the FAO data, such as species names whose first word is uncapitalized  
+# ---- Fix FAO species names ----
+# rename any "mistakes" in the FAO data, such as species names whose first word is uncapitalized  
 maric$species <- gsub("blood cockle", "Blood cockle", maric$species)
 maric$species <- gsub("\\[Solea spp\\]", "Common sole", maric$species)
 
-#rename FAO species to general categories when used in seafood watch data 
+# rename FAO species to general categories when used in Seafood Watch data 
 maric <- maric %>% 
   # Oysters
   mutate(species = case_when(
     family == "Cardiidae" ~ "Cockles",
     str_detect(species,"oyster") ~ "Oysters",
-    #clams
+    # Clams
     species == "CORBICULIDAE" ~ "Clams",
     str_detect(species, "clam") ~ "Clams",
     str_detect(species, "Clam") ~ "Clams",
@@ -545,11 +636,12 @@ maric <- maric %>%
     Taxon_code == "AL" ~ "Seaweed",
     family == "Haliotidae" ~ "Abalones", 
     family == "Pectinidae" ~ "Scallops",
-    TRUE ~ species)) %>% 
+    TRUE ~ species)
+    ) %>% 
   mutate(family = case_when(species == "Clams" ~ NA,
                             species == "Oysters"~ NA,
-                            TRUE ~family
-         )) #setting family as NA when the group contains more than one family
+                            TRUE ~ family
+  )) #setting family as NA when the group contains more than one family
 
 
 #updating the names combines species and creates creates duplicate species which we will need to sum
@@ -566,12 +658,12 @@ unique(duplicate_check$n) #should be one
 
 
 #Add a unique identifier per cultivated stock that describes each species, region, and environment grouping.
-identifier = maric %>% 
+identifier <- maric %>% 
   select(rgn_id, species, environment) %>% 
   unique() %>% 
   mutate(species_code = 1:n())
 
-maric = left_join(maric, identifier)
+maric <- left_join(maric, identifier)
 
 #run again after cleaning to check there are no remaining mismatched species
 sort(setdiff(sw_sus_rgn$species, maric$species)) # Seafood Watch species with no FAO data
@@ -656,11 +748,11 @@ Merge the three Seafood Watch type categories into a single sustainability score
 For example, if Sust_sw_sp_c is missing, use Sust_sw_sp_w and so on.
 
 ```{r sw-fao-sust-scores, eval = FALSE}
-mar_sw_sus = mar_sw_sus %>% 
+mar_sw_sus <- mar_sw_sus %>% 
   dplyr::mutate(Sust = ifelse(!is.na(Sust_sw_sp_c), Sust_sw_sp_c, Sust_sw_sp_w)) %>%
   dplyr::mutate(Sust = ifelse(is.na(Sust), Sust_sw_sp_g, Sust)) %>%
   dplyr::mutate(gapfill_sus = case_when(Sust_sw_sp_c == 
-                                        Sust ~ "none",
+                                          Sust ~ "none",
                                         is.na(Sust_sw_sp_c) & Sust_sw_sp_w == Sust ~ "water_body",
                                         is.na(Sust_sw_sp_c) & is.na(Sust_sw_sp_w) & Sust_sw_sp_g == Sust ~ "global_species")) %>%
   dplyr::mutate(esc_score = ifelse(!is.na(esc_sw_sp_c), esc_sw_sp_c, esc_sw_sp_w)) %>%
@@ -683,6 +775,7 @@ Average sustainability scores within regions with more than one score (due to mo
 anyDuplicated(mar_sw_sus)
 # 2022 scenario year: 532
 #2023 280
+# 2024 scenario year: 
 
 mar_sw_sus <- mar_sw_sus %>% 
   dplyr::group_by(rgn_id, species) %>% 
@@ -716,6 +809,7 @@ Now look at a summary after appending all the Seafood Watch data
 summary(mar_sw_sus) 
 # 21215 NA values out of 32051 total obs; ~68% without scores (2022)
 # 16378 NA values out of 33732 total obs ~ 49% without scores (2023)
+# _____ NA values out of ___ total obs; ~ __ without scores (2024)
 ```
 
 Gapfilling based on families and taxon_code
