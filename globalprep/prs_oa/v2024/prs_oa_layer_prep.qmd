@@ -265,7 +265,7 @@ print(f"Data downloaded to: {os.path.join(cms_dir, 'global_aragonite_saturation_
 
 ### Historical Data Download
 
-This will be used as a reference point when rescaling later on.  The mean of the historical data (1985 - 2000) from CMS will be used.  The download process is the same as for the new yearly data, however it has a different **Date Range** (1985-01-01T00:00:00 - 2000-12-01T00:00:00).  Each year, the only thing that should change is the "current_year" object, unless there has been a reevaluation and the dates used for the historical reference point is changed. 
+This will be used as a reference point when rescaling later on. The mean of the historical data (1985 - 2000) from CMS will be used. The download process is the same as for the new yearly data, however it has a different **Date Range** (1985-01-01T00:00:00 - 2000-12-01T00:00:00). Each year, the only thing that should change is the "current_year" object, unless there has been a reevaluation and the dates used for the historical reference point is changed.
 
 ```{python}
 import os
@@ -333,6 +333,55 @@ toc() # v2024: 98.562 sec elapsed
 plot(nc_raster_moll)
 ```
 
+### Resample and Mask
+
+As seen above, after projecting to Mollweide, the rasters have purple rectangles in areas where there should not be values. To fix this and avoid issues in the future, it may be good to use the `ocean.tif` read as an object "ocean" within the setup chunk and make the resolution equal to our data's resolution. We can then mask the multi-layer SpatRaster of our data to the resampled `ocean`, ensuring that the CRS, extent, and resolution is all the same between the two.
+
+```{r}
+
+nc_moll_ocean <- terra::project(oa_multi_raster, terra::crs(ocean))
+
+# > terra::res(ocean) == terra::res(nc_moll_ocean)
+# [1] FALSE FALSE
+# > terra::res(ocean) > terra::res(nc_moll_ocean)
+# [1] FALSE FALSE
+# > terra::res(ocean) < terra::res(nc_moll_ocean)
+# [1] TRUE TRUE
+
+plot(nc_moll_ocean)
+
+ocean_res_to_nc <- terra::resample(x = ocean, y = nc_moll_ocean)
+
+# > terra::res(ocean_res_to_nc) == terra::res(nc_moll_ocean)
+# [1] TRUE TRUE
+# > terra::ext(ocean_res_to_nc) == terra::ext(nc_moll_ocean)
+# [1] TRUE
+
+```
+
+```{r}
+tic()
+ocean_mask_test <- terra::mask(x = nc_moll_ocean, mask = ocean_res_to_nc)
+toc()
+
+plot(ocean_mask_test)
+
+# ---- mask to `rgns_3nm_offshore_mol.tif`----
+# read it in
+rgns_3nm_offshore <- terra::rast(here(dir_M, "git-annex","globalprep","spatial","v2018","rgns_3nm_offshore_mol.tif"))
+
+crs(rgns_3nm_offshore)
+
+# resample to same resolution as nc_moll_ocean
+resamp_3nm_offshore <- terra::resample(x = rgns_3nm_offshore, y = nc_moll_ocean)
+
+# mask nc_moll_ocean to the eezs by region
+tic()
+oa_global_eez_multi <- terra::mask(x = nc_moll_ocean, mask = resamp_3nm_offshore)
+toc()
+
+plot(oa_global_eez_multi$omega_ar_1)
+```
 
 ### Save as individual rasters
 
@@ -394,6 +443,7 @@ oa_hist_moll_nc <- project(oa_hist_multilayer_nc, mollCRS) # reproject to Mollwe
 
 plot(oa_hist_moll_nc) # this is monthly data; we need to stack the raster layers by year and calculate the overall mean across all years for a historical average reference
 ```
+
 ```{r}
 # since it already multilayer and we plan on averaging across all years, we can make it a RasterBrick. It is similar to a RasterStack (that can be created with `stack()`), but processing time should be shorter when using a RasterBrick (from documentation)
 oa_hist_moll_brick <- brick(oa_hist_moll_nc)
@@ -410,8 +460,7 @@ terra::writeRaster(oa_historical_average,
             overwrite = TRUE)
 ```
 
-
-# FIX: Annual mean aragonite saturation
+# Annual mean aragonite saturation
 
 Annual mean aragonite saturation rasters calculated from the monthly data.
 
@@ -454,9 +503,11 @@ toc()
 # v2024 - 23.944 sec elapsed
 ```
 
-## Rescale from 0 to 1, then clip to eez
+# Rescale from 0 to 1
 
 This pressure layer is rescaled so that all values lie between 0 and 1 using both a historical reference period and a biological reference point.
+
+As a reminder, **supersaturated** conditions are when Ω \> 1, with an excess of \[ $CO_3^{2-}$ \]seawater, where a crystal of $CaCO_3$ will tend to grow. **Undersaturated** conditions are when Ω \< 1, of which $CaCO_3$ will dissolve.
 
 All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1. For all other cells, rescaling the aragonite staturation state value to between 0 and 1 relies upon the change in saturation relative to the reference period.
 
@@ -466,28 +517,100 @@ $$\Delta \Omega_{year} = \frac{(\Omega_{base} - \Omega_{year})}{(\Omega_{base} -
 
 Note that the current value is subtracted from the baseline; this way, a reduction in $\Omega$ becomes a positive pressure value. It is then normalized by the current mean state; so a decrease in $\Omega$ while the current state is high indicates less pressure than the same decrease when the current state is near 1.
 
-$\Delta \Omega_{year}$ is then modified to account for increases in aragonite saturation state (pressure = 0) and arag sat state less than 1 (pressure = 1).
+Afterwards, $\Delta \Omega_{year}$ is then modified to account for increases in aragonite saturation state (pressure = 0) and aragonite sat state less than 1 (pressure = 1).
 
 The `oaRescale` function rescales each of the annual rasters. If the current value is less than or equal to 1, it is set to 1, otherwise the value is calculated from the above equation.
 
-```{r}
+```{r rescale}
+# function written in v2016, updated v2024
+# for each layer, all values <=1 are assigned a 1, otherwise old-new/(old-1)
+annual_avg_moll_rescaled_dir <- here::here(oa_dir, "int","annual_avg_moll_rescaled") 
+dir.create(annual_avg_moll_rescaled_dir) # create Mazu directory for rescaled rasters if not already created
 
+# Read in historical raster data from earlier
+hist <- terra::rast(here::here(int_dir, "oa_1985_2000_historical_average.tif"))
+
+# make a list of the already saved annual rasters
+oa_annual_files <- list.files(path = here(oa_annual_mean_dir),
+                              full.names = TRUE) # returns the full path, not just the file name
+
+oaRescale <- function(file){
+  
+  yr = as.numeric(substr(file, nchar(file)-7, nchar(file)-4)) # get year of file using the file's path/name
+  annual_mean = terra::rast(file) # rasterize annual mean aragonite raster for each given year 
+  hist[hist <= 1] = 1 # all values at or less than 1 are given a value of 1 (undersaturated conditions)
+  annual_mean[annual_mean <= 1] <- 1 # all values at or less than 1 are given a value of 1 (undersaturated conditions)
+  diff = (hist - annual_mean)/(hist) # deviation from aragonite saturation state for each year in the study period
+  annual_mean[annual_mean > 1] <- diff[annual_mean > 1] # all cells with values greater than 1 are swapped out with their amount of change scaled to how close to 1 
+  annual_mean[annual_mean < 0] <- 0 # all values less than 0 (indicating a decrease in acidity, increase in aragonite saturation) are capped at 0
+  
+writeRaster(annual_mean, 
+            filename = paste0(annual_avg_moll_rescaled_dir, '/oa_rescaled_', yr, ".tif"),
+            overwrite = TRUE)
+}
+
+# ---- apply the function to the list of annual mean files -----
+lapply(oa_annual_files, oaRescale)
 ```
 
-## Interpolate?
+
+```{r}
+# plot the rescaled rasters to ensure it looks correct
+ff <- list.files(path = here::here(annual_avg_moll_rescaled_dir), pattern = '.tif$',
+                 full.names = TRUE) 
+oa_rescaled <- terra::rast(ff)
+plot(oa_rescaled)
+```
+
+## Interpolate if needed?
 
 Since there are oceanic cells with no information in the raw data, we need to fill in these gaps. We do this by interpolating across the globe using the data we have with an Inverse Distance Weighting (IDW) function. Previously this was done using `arcpy` from ArcGIS.
 
 ```{r}
-
+# check for NAs
+global(oa_rescaled, fun="isNA", na.rm=FALSE)
 ```
 
-## Resample & Land Mask
-
-All pressure layers need to be resampled to 1km^2^ cell resolution. We have a template ocean raster with cells at this resolution that we use to resample all pressure layers. You won't see any difference between the plot above and this one since we are using the nearest neighbor method when resampling which maintains the original cell value for each of resampled cell.
+# Zonal Statistics and Results
 
 ```{r}
+# from `/home/shares/ohi/git-annex/globalprep/spatial/v2017`
+# regions_eez_with_fao_ant.tif: This includes all the ocean regions (eez/fao/antarctica), but the raster cell values correspond to the rgn_ant_id in regions_2017_update.  This file is most often used to extract pressure values for each region.
 
+zones <- terra::rast(here::here(dir_M, "git-annex", "globalprep","spatial","v2017","regions_eez_with_fao_ant.tif"))
+crs(zones) # "PROJCRS[\"Mollweide\",\n  good, matches our rescaled rasters!
+ext(zones) == ext(oa_rescaled) # FALSE, does not match our rescaled rasters
+
+# resample the data to make the extents equal so zonal statistics can be calculated
+tic() # may need to add parallelization this takes a while
+oa_resampled <- terra::resample(x = oa_rescaled, y = zones) # rename object
+toc()
+
+# check that the extents are the same now
+ext(zones_resampled) == ext(oa_rescaled) # TRUE, matches our rescaled multilayer raster!
+
+# use zonal statistics to calculate the average score of all the cells within each region
+tic()
+regions_stats <- zonal(oa_resampled, zones, fun = "mean", na.rm = TRUE, progress = "text") %>% 
+  data.frame() 
+toc() # 
+
+# all OHI regions to compare to our zonal statistics and see what is missing
+rgn_data <- read_sf(here(dir_M, "git-annex", "globalprep", "spatial", "v2017"), "regions_2017_update") %>%
+  st_set_geometry(NULL) %>%
+  dplyr::filter(rgn_type == "eez") %>%
+  dplyr::select(rgn_id = rgn_ant_id, rgn_name)
+
+# use `setdiff()` to see if any regions are missing
+setdiff(regions_stats$zone, rgn_data$rgn_id) # v2024: NULL -- great!!
+setdiff(rgn_data$rgn_id, regions_stats$zone) # CHECK BACK ON THIS!!
+
+regions_stats_clean <- regions_stats %>%
+  rename(rgn_id = zone) %>%
+  filter(rgn_id <= 250) %>%
+  gather("year", "pressure_score", -1) %>%
+  mutate(year = as.numeric(as.character(substring(year, 7, 8)))) %>%
+  mutate(year = 1993 + year - 1) # convert from numbers to actual years
 ```
 
 # Final Pressure Layer
