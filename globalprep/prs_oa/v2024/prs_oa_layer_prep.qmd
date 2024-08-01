@@ -19,6 +19,7 @@ output:
 editor_options: 
   markdown: 
     wrap: sentence
+  chunk_output_type: console
 ---
 
 # Summary
@@ -319,8 +320,10 @@ raw_file_path <- here::here(cms_dir, "global_aragonite_saturation_raw.nc") # fil
 
 # load the file as a SpatRaster to begin with, for greater usability with terra
 oa_multi_raster <- terra::rast(raw_file_path)
-crs(oa_multi_raster) # v2024: ""GEOGCRS[\"WGS 84 (CRS84)\",\n".  Will need to be reprojected to mollweide so that it can be clipped to the OHI eez layer
-plot(oa_multi_raster) # to get a quick visualiaztion of the multi-layer SpatRaster
+
+# check the current CRS: will need to be reprojected to mollweide so that it can be clipped to the OHI eez layer
+crs(oa_multi_raster) # v2024: ""GEOGCRS[\"WGS 84 (CRS84)\",\n".  
+plot(oa_multi_raster) # to get a quick visualization of the multi-layer SpatRaster
 
 # reproject to Mollweide for OHI consistency
 # the `terra::project` function by default uses bilinear interpolation for continuous data (used bc the dataset does not have clear boundaries) and nearest neighbor for categorical data (not used in this case, but just to know)
@@ -338,7 +341,7 @@ plot(nc_raster_moll)
 As seen above, after projecting to Mollweide, the rasters have purple rectangles in areas where there should not be values. To fix this and avoid issues in the future, it may be good to use the `ocean.tif` read as an object "ocean" within the setup chunk and make the resolution equal to our data's resolution. We can then mask the multi-layer SpatRaster of our data to the resampled `ocean`, ensuring that the CRS, extent, and resolution is all the same between the two.
 
 ```{r}
-
+# project the data to the `ocean.tif` 
 nc_moll_ocean <- terra::project(oa_multi_raster, terra::crs(ocean))
 
 # > terra::res(ocean) == terra::res(nc_moll_ocean)
@@ -348,18 +351,19 @@ nc_moll_ocean <- terra::project(oa_multi_raster, terra::crs(ocean))
 # > terra::res(ocean) < terra::res(nc_moll_ocean)
 # [1] TRUE TRUE
 
-plot(nc_moll_ocean)
+# plot(nc_moll_ocean)
 
+# resample the `ocean.tif` to the same resolution as our data, allowing us to mask
 ocean_res_to_nc <- terra::resample(x = ocean, y = nc_moll_ocean)
 
 # > terra::res(ocean_res_to_nc) == terra::res(nc_moll_ocean)
 # [1] TRUE TRUE
 # > terra::ext(ocean_res_to_nc) == terra::ext(nc_moll_ocean)
 # [1] TRUE
-
 ```
 
 ```{r}
+# mask to ocean extent
 tic()
 ocean_mask_test <- terra::mask(x = nc_moll_ocean, mask = ocean_res_to_nc)
 toc()
@@ -431,15 +435,16 @@ is.lonlat(rast_2010_01_01) # FALSE, so it does not currently have a long/lat crs
 
 # Historical Mean Reference
 
-The historical mean of aragonite saturation from 1985 - 2000 used here for comparison.
+The historical mean of aragonite saturation from 1985 - 2000 will be used for comparison, to calculate the pressure scores.
 
 ```{r hist_mean}
-oa_hist_multilayer_nc <- terra::rast(here::here(cms_dir, "historical_1985_2000_aragonite_saturation_raw.nc")) # read in NetCDF file we downloaded using the API
+# read in NetCDF file we downloaded using the API
+oa_hist_multilayer_nc <- terra::rast(here::here(cms_dir, "historical_1985_2000_aragonite_saturation_raw.nc")) 
 
-crs(oa_hist_multilayer_nc) # v2024: GEOGCRS[\"WGS 84 (CRS84)\",\n
 # needs to be reprojected
+crs(oa_hist_multilayer_nc) # v2024: GEOGCRS[\"WGS 84 (CRS84)\",\n
 
-oa_hist_moll_nc <- project(oa_hist_multilayer_nc, mollCRS) # reproject to Mollweide
+oa_hist_moll_nc <- project(oa_hist_multilayer_nc, ocean) # reproject to Mollweide
 
 plot(oa_hist_moll_nc) # this is monthly data; we need to stack the raster layers by year and calculate the overall mean across all years for a historical average reference
 ```
@@ -574,11 +579,14 @@ global(oa_rescaled, fun="isNA", na.rm=FALSE)
 # Zonal Statistics and Results
 
 ```{r}
+# come back and do each individual annual raster and parallelize!!
+
 # from `/home/shares/ohi/git-annex/globalprep/spatial/v2017`
 # regions_eez_with_fao_ant.tif: This includes all the ocean regions (eez/fao/antarctica), but the raster cell values correspond to the rgn_ant_id in regions_2017_update.  This file is most often used to extract pressure values for each region.
 
 zones <- terra::rast(here::here(dir_M, "git-annex", "globalprep","spatial","v2017","regions_eez_with_fao_ant.tif"))
 crs(zones) # "PROJCRS[\"Mollweide\",\n  good, matches our rescaled rasters!
+res(zones) # 934.4789 934.4789
 ext(zones) == ext(oa_rescaled) # FALSE, does not match our rescaled rasters
 
 # resample the data to make the extents equal so zonal statistics can be calculated
@@ -591,7 +599,7 @@ ext(zones_resampled) == ext(oa_rescaled) # TRUE, matches our rescaled multilayer
 
 # use zonal statistics to calculate the average score of all the cells within each region
 tic()
-regions_stats <- zonal(oa_resampled, zones, fun = "mean", na.rm = TRUE, progress = "text") %>% 
+regions_stats <- terra::zonal(oa_resampled, zones, fun = "mean", na.rm = TRUE, progress = "text") %>% 
   data.frame() 
 toc() # 
 
