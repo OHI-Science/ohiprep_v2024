@@ -370,7 +370,7 @@ mar_rgn_gf <- mar_rgn_yrs_filled %>%
 
 Check how may NA values were converted to 0
 
-```{r table-NA-0, eval = FALSE}
+```{r table-NA-0}
 
 table(mar_rgn_gf$gap_0_fill)
 ## 3790 of these out of 27810+3790 cases had NA values converted to 0 - 2018 assessment
@@ -384,7 +384,7 @@ table(mar_rgn_gf$gap_0_fill)
 
 Remove family-region-environment time series with less than four years of mariculture production \> 0 tonnes (assume these are not established mariculture programs).
 
-```{r remove-less-four-years, eval = FALSE}
+```{r remove-less-four-years}
 
 mar_rgn_gf_filter <- mar_rgn_gf %>% 
   group_by(rgn_id, family, fao, environment) %>%
@@ -402,7 +402,7 @@ Used to estimate total mariculture yield per country.
 
 Saves the Mariculture-FP file
 
-```{r save-mariculture-yield, eval = FALSE}
+```{r save-mariculture-yield, eval=FALSE}
 write.csv(maric, file = here::here(current_mar_dir, "output", "MAR_FP_data.csv"),
           row.names = FALSE)
 ```
@@ -413,7 +413,7 @@ write.csv(maric, file = here::here(current_mar_dir, "output", "MAR_FP_data.csv")
 
 These data describe the sustainability country/species combinations. In cases where these data were not available for a specific county/species, we averaged the data across taxonomic groups to gapfill the missing data. We also calculate the genetic escapes pressure layer from this, based on the column `AqCriteria6`.
 
-```{r sw-scores, eval = FALSE}
+```{r sw-scores}
 
 # ---- Load in Seafood Watch sustainability scores data from Mazu: ----
 # Read in new Seafood Watch data 
@@ -438,31 +438,6 @@ old_sw_sus <- read.csv(file.path(seafood_watch_dir, previous_data_folder,
 ### Tidy Seafood Watch sustainability data
 
 Rename columns to match with MAR data and fill in species column
-
-```{r}
-# v2024 potential rewrite:
-sw_sus <- sw_sus_raw %>% 
-  # rename columns ----
-  janitor::clean_names() %>% 
-  dplyr::rename(sw_species = "common_names",
-                fao_species = "fao_common_name", 
-                fdo_species = "fdo_common_name",
-                water_body = "bo_ws", # so curious as to why this is what janitor::clean_names does to BOWs
-                country = "countries",
-                method = "methods",
-                score = "assessment_score",
-                escapes_score = "c6score", # 
-                rec = "assessment_color"
-                ) %>% 
-  # select relevant columns
-  dplyr::select(report_title, published_date, sw_species, scientific_name, fao_species, fda_species, country, water_body, method, escapes_score, score, rec) %>%
-  # filter out freshwater aquaculture
-  filter(!(method %in% c("Freshwater net pen"))) %>% 
-  # set scores less than 0 equal to 0
-  mutate(score = case_when(score < 0 ~ 0,
-            TRUE ~ score))
-  
-```
 
 Notes on AssessmentScore column:
 
@@ -521,6 +496,31 @@ species-specific characteristics, and particularly between native and non-native
 
 A C6 score of 10 indicates a very low risk of escape with low estimated competitiveness and genetic interactions. An Escape Criterion (C6) score ≤ 1 is considered "Critical" (pg. 52), and may indicate a "High Concern" risk of escape and "High Concern" potential for competitiveness and genetic impact. 
 
+
+```{r}
+# v2024 potential rewrite:
+sw_sus <- sw_sus_raw %>% 
+  # rename columns ----
+  janitor::clean_names() %>% 
+  dplyr::rename(sw_species = "common_names",
+                fao_species = "fao_common_name", 
+                fdo_species = "fdo_common_name",
+                water_body = "bo_ws", # so curious as to why this is what janitor::clean_names does to BOWs
+                country = "countries",
+                method = "methods",
+                score = "assessment_score",
+                escapes_score = "c6score", # 
+                rec = "assessment_color"
+                ) %>% 
+  # select relevant columns
+  dplyr::select(report_title, published_date, sw_species, scientific_name, fao_species, fda_species, country, water_body, method, escapes_score, score, rec) %>%
+  # filter out freshwater aquaculture
+  filter(!(method %in% c("Freshwater net pen"))) %>% 
+  # set scores less than 0 equal to 0
+  mutate(score = case_when(score < 0 ~ 0,
+            TRUE ~ score))
+  
+```
 
 ```{r tidy_sw-sus, eval = FALSE}
 # ---- Tidy Seafood Watch (SFW) data ----
@@ -901,7 +901,7 @@ Steps:
 # escapes_gf_score <- 4 
 #in 2023 this wasn't necessary because these scores were already included in the seafood watch data, and I already applied them to all seaweed species when cleaning seafood watch data. Left the code above in case it is needed in future years. 
 
-mar_sw_sus_final = mar_sw_sus %>%
+mar_sw_sus_final <- mar_sw_sus %>%
   
   #### sustainability scores ####
   mutate(Sust = ifelse(is.na(Sust), avg_rgn_fam_sust, Sust)) %>% # Gapfill with region/family level
@@ -1015,7 +1015,7 @@ write.csv(data, here(current_mar_dir, "output", "GenEsc.csv"), row.names=FALSE)
 ```{r save-mar-sw-harvest-data, eval = FALSE}
 
 ## Save mariculture harvest data
-mar_harvest_tonnes = mar_sw_sus_final %>%
+mar_harvest_tonnes <- mar_sw_sus_final %>%
   select(rgn_id, taxa_code, taxa_group, family, year, tonnes)
 
 anyDuplicated(mar_harvest_tonnes) # Check for duplication
@@ -1025,7 +1025,7 @@ write.csv(mar_harvest_tonnes, here(current_mar_dir, "output", "mar_harvest_tonne
 
 
 ## Save gapfill data for mariculture harvest
-mar_harvest_tonnes_gf = mar_sw_sus_final %>%
+mar_harvest_tonnes_gf <- mar_sw_sus_final %>%
   select(rgn_id, taxa_code, taxa_group, family, year, tonnes=gapfill_fao)
 
 
@@ -1036,7 +1036,7 @@ write.csv(mar_harvest_tonnes_gf, here(current_mar_dir, "output", "mar_harvest_to
 max_sus <- 0.77
 
 ## Save sustainability scores data for 2023 (SFW data year)
-mar_sustainability_score = mar_sw_sus_final %>%
+mar_sustainability_score <- mar_sw_sus_final %>%
   mutate(year = current_year) %>% #change year if data not updated to current year
   select(rgn_id, year, taxa_code, sust_coeff = Sust) %>%
   unique() %>%
@@ -1060,7 +1060,7 @@ write.csv(mar_sustainability_score_gf, here(current_mar_dir, "output", "mar_sust
 
 
 ## save mar sustainability for data checking; rgn_id, species, score
-mar_sustainability_score = mar_sw_sus_final %>%
+mar_sustainability_score <- mar_sw_sus_final %>%
   mutate(year = current_year) %>% # Only 2023 sustainability scores exist (Seafood Watch)
   select(rgn_id, year, species, sust_coeff = Sust) %>%
   unique() %>% 
