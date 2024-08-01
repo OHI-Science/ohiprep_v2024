@@ -23,10 +23,11 @@ editor_options:
 This script generates the "need" layer for the artisanal opportunities goal. 
 
 # Updates from previous assessment
-
+v2023
 One more year of data. 
 Updated so that pop_weights data is also read in through the WDI package, and saved as annual data instead of only the most recent year. 
-
+v2024
+One more year of data
 # Data Source 
 
 **Downloaded**: 2023-07-12
@@ -140,18 +141,37 @@ new <- here::here(version_dir, "raw", paste0('raw_gdppcppp_', new_saved_date,'.c
 
 old <- here::here("globalprep", "ao", paste0("v", current_year-1), 
                   "raw", paste0("raw_gdppcppp_", old_saved_date, ".csv")) %>% 
-  readr::read_csv() %>%
+  readr::read_csv()  %>% 
   dplyr::select(country, old_value = NY.GDP.PCAP.PP.KD, year)
 
 compare <- dplyr::left_join(new, old, by = c("country", "year"))  %>%
   dplyr::filter(year==current_year-2)
  
+unique(compare$year)
+
 plot <- ggplot(compare, aes(x=NY.GDP.PCAP.PP.KD, y=old_value)) + 
   geom_point() + 
   geom_abline(slope = 1, intercept = 0, color="red")
 
 ggplotly(plot)
-  
+#this plot isn't aligned because previous years data(prior to may 2024) most likely used 2017 adjusted PPP values and now the dataset uses 2021 adjusted PPP values- link to where WDI gets their ppp data: https://www.worldbank.org/en/programs/icp - so this next plot compares crude inflation adjusted values just to see if it aligns better
+#don't have to run this for future years calculations until they change the adjusted year of reference again-maybe in 2028
+
+#this adjusts the old values to 2022 inflation 
+#old$old_2022 <- old$old_value*1.048
+#this adjusts the old values to 2023 inflation 
+#old$old_2023 <- old$old_2022*1.0789
+
+#compare_inf_adj <- dplyr::left_join(new, old, by = c("country", "year"))  %>%
+  dplyr::filter(year==current_year-2)
+
+#plot <- ggplot(compare_inf_adj, aes(x=NY.GDP.PCAP.PP.KD, y=old_2023)) + 
+  geom_point() + 
+  geom_abline(slope = 1, intercept = 0, color="red")
+
+#ggplotly(plot)
+#rm(compare_inf_adj)
+
 ```
 
 ## Gapfilling 1: Linear Regression within a country's data
