@@ -70,7 +70,7 @@ source(here('workflow/R/fao_fxn.R')) # function for cleaning old version of FAO 
 
 source(here('workflow/R/fao_online_portal_clean.R'))
 
-current_year <- 2024
+current_year <- 2023
 version_year <- paste0("v",current_year)
 data_path <- paste0("globalprep/le/",version_year)
 ```
