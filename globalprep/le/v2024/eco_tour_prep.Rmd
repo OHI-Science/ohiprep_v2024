@@ -5,7 +5,7 @@ output:
   html_document:
     code_folding: show
     toc: true
-    toc_depth: 1
+    toc_depth: 3
     toc_float: yes
     number_sections: true
     theme: cerulean
@@ -1688,22 +1688,29 @@ usa_china_coastal <- dplyr::full_join(usa_coastal_tourism, china_coastal_tour_ag
 coastal_tourism_join <- dplyr::full_join(coastal_subset_tour, usa_china_coastal,
                                          by = join_by("rgn_id", "rgn_name", "year", "coastal_tour_value")) %>% 
   dplyr::ungroup() %>% 
-  dplyr::mutate(rgn_id = as.numeric(rgn_id)) # prep for joining with OHI regions
+  dplyr::mutate(rgn_id = as.numeric(rgn_id)) # prep for joining with OHI regions downstream
 
-# ---- join OHI regions with years df ----
-# expand OHI regions to have sequence of years for joining
-ohi_region_yrs <- region_names %>% 
-  # expand() generates all combinations of variables found in a dataset
-  # nesting() finds combinations of rgn_id & rgn_name already present in the df
-  tidyr::expand(nesting(rgn_id, rgn_name), # note: you can't expand on a grouping column
-                year = start_year:stop_year) %>% # within each group combination, add sequence of years in new "year" column
-  dplyr::arrange(rgn_id, year)
+# use this copy for exporting if not joining with OHI regions upstream (see code chunk below)
+coastal_tourism_full <- coastal_tourism_join 
+```
 
-# join OHI regions with full coastal tourism df
-coastal_tourism_full <- dplyr::full_join(ohi_region_yrs, coastal_tourism_join,
-                                         by = join_by("rgn_id", "rgn_name", "year")) %>% 
-  dplyr::select(rgn_id, rgn_name, year, coastal_tour_value) %>% 
-  dplyr::ungroup()
+
+Archived (because we do this downstream in `eco_usd_adj.Rmd`)
+```{r, eval=FALSE}
+# # ---- join OHI regions with years df ----
+# # expand OHI regions to have sequence of years for joining
+# ohi_region_yrs <- region_names %>% 
+#   # expand() generates all combinations of variables found in a dataset
+#   # nesting() finds combinations of rgn_id & rgn_name already present in the df
+#   tidyr::expand(nesting(rgn_id, rgn_name), # note: you can't expand on a grouping column
+#                 year = start_year:stop_year) %>% # within each group combination, add sequence of years in new "year" column
+#   dplyr::arrange(rgn_id, year)
+# 
+# # join OHI regions with full coastal tourism df
+# coastal_tourism_full <- dplyr::full_join(ohi_region_yrs, coastal_tourism_join,
+#                                          by = join_by("rgn_id", "rgn_name", "year")) %>% 
+#   dplyr::select(rgn_id, rgn_name, year, coastal_tour_value) %>% 
+#   dplyr::ungroup()
 
 ```
 
@@ -1741,8 +1748,7 @@ There are actually no multipliers for the tourism sector.
 Prep for saving & save to `int` folder
 
 ```{r}
-#--------Prepping data for int saving -------
-
+#---- Prepping data for int saving ----
 tour_revenue_int <- coastal_tourism_full %>% 
   rename(usd = coastal_tour_value) %>% 
   mutate(
@@ -1754,6 +1760,9 @@ tour_revenue_int <- coastal_tourism_full %>%
   select(rgn_id, rgn_name, year, usd, unit, sector, usd_yr) %>% 
   ungroup()
 
+#str(tour_revenue_int) # check datatypes before writing out
+
+# ---- Write out to int folder ----
 #write_csv(tour_revenue_int, here::here(int_dir, "eco_tour_usd_pre.csv"))
 ```
 
