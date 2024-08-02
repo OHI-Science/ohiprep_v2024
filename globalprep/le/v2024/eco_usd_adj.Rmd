@@ -1,6 +1,23 @@
 ---
 title: "Adjusting Economies data by Sector for Inflation"
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 3
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
 ---
 
 ## Overview
@@ -27,14 +44,14 @@ Initially, there are three scripts, each with different starting units of value,
 
 ## Setup
 
-```{r}
-knitr::opts_chunk$set(echo = TRUE)
+```{r render-setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
-options(scipen=99)
+options(scipen=99) # for number of digits printed
 ```
 
-```{r}
-# ---- load packages ----
+```{r library-setup, warning=FALSE}
+# ---- Load packages ----
 if (!require(librarian)){
   install.packages("librarian")
   library(librarian)
@@ -44,52 +61,53 @@ librarian::shelf(
   here,
   janitor,
   tidyverse,
-  ohicore,
-  
+  ohicore, # devtools::install_github('ohi-science/ohicore@dev')
   priceR, # for inflation function
-  
   # for data viz
   RColorBrewer, 
   plotly,
   scales
 )
 
-
 # ---- source functions ----
 # common
-source(here("workflow", "R", "common.R"))
-# inflation function
-source(here("workflow", "R", "inflation_adjustment.R"))
+source(here::here("workflow", "R", "common.R"))
+# inflation function created in 2024, requires priceR package to be loaded
+source(here::here("workflow", "R", "inflation_adjustment.R"))
 
 # ---- set year and file path info ----
 current_year <- 2024 # Update this!!
 
-version_year <- paste0("v",current_year)
+# create version name for GitHub filepaths
+version_year <- paste0("v", current_year) 
 
-data_path <- here("globalprep", "le", version_year)
+# set current LE filepath
+data_path <- here::here("globalprep", "le", version_year) 
 
 # output data dir for intermediate data products
-int_dir <- here(data_path, "int")
+int_dir <- here::here(data_path, "int")
 
 ```
 
 ## Read in pre-adjustment data
 
-```{r}
+```{r read-int-data, message=FALSE}
 # sector 1: Fishing (cf)
-cf_df_pre <- read_csv(here(int_dir, "eco_cf_usd_pre.csv"))
+cf_df_pre <- readr::read_csv(here(int_dir, "eco_cf_usd_pre.csv")
+                             #, show_col_types = FALSE     # include if you want to quiet messages. left in to assess data joining compatibility
+                             )
 
 # sector 2: Mariculture (mar)
-mar_df_pre <- read_csv(here(int_dir, "eco_mar_usd_pre.csv"))
+mar_df_pre <- readr::read_csv(here(int_dir, "eco_mar_usd_pre.csv"))
 
 # sector 3: Tourism (tour)
-tour_df_pre <- read_csv(here(int_dir, "eco_tour_usd_pre.csv"))
+tour_df_pre <- readr::read_csv(here(int_dir, "eco_tour_usd_pre.csv"))
 
 ```
 
 ## Implement `inflation_adjustment.R` from `workflow/R`
 
-```{r}
+```{r inflation-adjustment}
 # ---- Fishing (cf) ----
 cf_df_adj <- inflation_adjustment(
   cf_df_pre, # csv with the following columns: rgn_id, rgn_name, year, usd, unit, sector, usd_yr
@@ -131,30 +149,67 @@ stop_year <- min(min_max_df$max_year) # take minimum of maximum years
 
 
 # ----- create aggregated adjusted data frame ------------
-
 eco_usd_filter <- eco_usd_bind %>% 
   dplyr::filter(year %in% c(start_year:stop_year)) # filter to date range
 
 
 # make all geographic areas have the same date range (and fill missing values with NAs)
 # note: this should also be done upstream, as the sector region should not be NA (important for later aggregation, function implementation)
-eco_years_df <- tibble(rgn_name = eco_usd_filter$rgn_name,
-                       rgn_id = eco_usd_filter$rgn_id) %>% 
-  group_by(rgn_id, rgn_name) %>% 
-  summarize(year = seq(start_year,
-                       stop_year))
-# note: returns warning to use 'reframe' instead, but that function is experimental as of July 2024
+# using expand
+eco_years_expand <- eco_usd_filter %>% 
+  tidyr::expand(nesting(rgn_id, rgn_name), # note: you can't expand on a grouping column
+                year = start_year:stop_year) %>% # within each group combination, add sequence of years in new "year" column
+  dplyr::arrange(rgn_id, year)
 
 # ---- join with gdp prop data ----
-eco_usd_years <- left_join(eco_years_df, eco_usd_filter,
+eco_usd_years <- dplyr::left_join(eco_years_df, eco_usd_filter,
                           by = c("rgn_id", "rgn_name", "year"))
+```
+
+```{r}
+# check grouping
+is.grouped_df(eco_usd_filter) # FALSE
+
+# ---- the following two methods produce identical dataframes ----
+# using expand
+eco_years_expand <- eco_usd_filter %>% 
+  tidyr::expand(nesting(rgn_id, rgn_name), # note: you can't expand on a grouping column
+                year = start_year:stop_year) %>% # within each group combination, add sequence of years in new "year" column
+  dplyr::arrange(rgn_id, year)
+
+# Note from documentation: "With grouped data frames created by dplyr::group_by(), expand() operates within each group. Because of this, you cannot expand on a grouping column."
+
+# using reframe
+eco_years_reframe <- eco_usd_filter %>% 
+  dplyr::group_by(rgn_id, rgn_name) %>% 
+  # fill with full year range for joining
+  dplyr::reframe(year = seq(start_year, stop_year))
+
+# we know that they are equal because:
+length(eco_years_expand) # 3
+#length(eco_years_expand) == length(eco_years_reframe) # TRUE
+nrow(eco_years_expand) # 2268
+#nrow(eco_years_expand) == nrow(eco_years_reframe) # TRUE
+sum(eco_years_expand == eco_years_reframe) # 6804 = ncol * nrow = all values
+
+sum(eco_years_expand == eco_years_reframe) == (nrow(eco_years_expand) * length(eco_years_expand)) # TRUE
 
 
-# come back to this -- makes 1.7 million rows bc expands df for all combinations of rgn_id, rgn_name, sector, for all years
+# These two methods also give you the same output as the summarize() method we got a Warning about:
+# eco_years_df <- tibble(rgn_name = eco_usd_filter$rgn_name,
+#                        rgn_id = eco_usd_filter$rgn_id) %>% 
+#   dplyr::group_by(rgn_id, rgn_name) %>% 
+#   dplyr::summarize(year = seq(start_year,
+#                        stop_year))
+# note: returns warning to use `reframe()` instead. That function is experimental as of July 2024. `reframe()` always returns an ungrouped dataframe.
+
+
+# come back to this -- makes 1.7 million rows because it expands the dataframe for all combinations of rgn_id, rgn_name, sector, for all years
 eco_years_test <- eco_usd_filter %>% 
   tidyr::complete(rgn_id, rgn_name, sector, 
            year = min(year):max(year),
            fill = list(value = NA))
+  
 ```
 
 Join with OHI regions before aggregating by region for all sectors
