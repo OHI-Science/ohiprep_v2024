@@ -62,17 +62,19 @@ Describe what the plotted image is saying?
 
 Given this, what is kind of deceptive about these plots?
 
-*Therefore, you cannot say exactly that there are more fish being caught in a cell near the equator than a cell near antarctica, since the cell area may be smaller and therefore there would be less fish within that cell already.*
+*Therefore, you cannot say exactly that there are more fish being caught in a cell near the equator than a cell near antarctica, since the cell area may be smaller and therefore the values would seem larger than they really are. Cell values are not comparable.*
 
 Let's convert these data to another coordinate reference system:
 
 ```{r}
 moll <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
-fish_moll <- terra::project(fish, crs(moll))
+fish_moll <- terra::project(fish, crs(moll)) # equal area
 
 # take a look
 plot(fish_moll)
 plot(log(fish_moll + 1))
+moll_cell_size <- cellSize(fish_moll)
+moll_cell_size
 
 ## Count the total tonnes
 global(fish_moll, "sum", na.rm=TRUE)
@@ -80,6 +82,7 @@ global(fish_moll, "sum", na.rm=TRUE)
 
 diff_moll_fish <- global(fish_moll, "sum", na.rm=TRUE) - global(fish, "sum", na.rm=TRUE)
 diff_moll_fish # 302,939,946 more fish caught now that the projection is in Mollweide
+# super bad --something went wrong!
 ```
 
 Compare to the original tonnes? What is happening? How can you improve this?
@@ -87,6 +90,22 @@ Compare to the original tonnes? What is happening? How can you improve this?
 *The issue here is related to how area and values are preserved (or not preserved) during map projections. Mollweide preserves equal-area, but that means that cell size changes. To improve this, you can use area-weighted resampling, ensure the original resolution was maintained, or wait to reproject until after raster calculations.*
 
 Q: `terra::project(_,_, threads = TRUE)`
+
+*tonnes/area = density, so multiply by the area to get the true sum of tonnes.*
+
+```{r}
+fish_density <- fish / cell_area
+
+plot(fish_density)
+
+fish_density
+
+# project to mollweide
+fish_dens_moll <- terra::project(fish_density, crs(moll))
+
+cellSize(fish_dens_moll)
+```
+
 
 
 See what happens when we make multiple CRS conversions:
@@ -136,6 +155,6 @@ check
 
 What is this telling us?
 
-*Sometimes, moving between projections can cause changes in cell size and values within each cell.  These discrepancies can shift the values as the cell sizes change, which means that the values are not exactly the same when returning back to lat long.  Despite fish_moll_rob_latlon and fish being in the lon/lat WGS 84 (EPSG:4326) coordinate reference system, they do not have the same summed values.  This shows that moving between CRSs are not perfectly reversible, due to distortions, errors, and/or resampling.*
+*Sometimes, moving between projections can cause changes in cell size and values within each cell.  These discrepancies can shift the values as the cell sizes change, which means that the values are not exactly the same when returning back to lat long.  Despite fish_moll_rob_latlon and fish being in the lon/lat WGS 84 (EPSG:4326) coordinate reference system, they do not have the same summed values.  This shows that moving between CRSs are not perfectly reversible, and that there are errors happening. There should not be negative values!*
 
 
