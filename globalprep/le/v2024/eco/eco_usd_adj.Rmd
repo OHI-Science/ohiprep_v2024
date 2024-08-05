@@ -11,7 +11,7 @@ output:
     theme: cerulean
     highlight: haddock
     includes: 
-      in_header: '../../../workflow/templates/ohi_hdr.html'
+      in_header: '../../../../workflow/templates/ohi_hdr.html'
 pdf_document:
   toc: true
 editor_options: 
@@ -319,6 +319,8 @@ eco_usd_adj <- eco_usd_rgn_full %>%
 # write data frame to int
 #write_csv(eco_usd_adj, here(int_dir, "eco_usd_adj.csv"))
 ```
+
+
 
 ## Calculating scores following OHI methodology
 
