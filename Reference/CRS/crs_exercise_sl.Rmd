@@ -84,7 +84,9 @@ diff_moll_fish # 302,939,946 more fish caught now that the projection is in Moll
 
 Compare to the original tonnes? What is happening? How can you improve this?
 
-*The issue here is related to how area and values are preserved (or not preserved) during map projections. Mollweide preserves equal-area, but that means that cell size changes. *
+*The issue here is related to how area and values are preserved (or not preserved) during map projections. Mollweide preserves equal-area, but that means that cell size changes. To improve this, you can use area-weighted resampling, ensure the original resolution was maintained, or wait to reproject until after raster calculations.*
+
+Q: `terra::project(_,_, threads = TRUE)`
 
 
 See what happens when we make multiple CRS conversions:
@@ -134,4 +136,6 @@ check
 
 What is this telling us?
 
-*Sometimes, moving between projections can cause changes in cell size and values within each cell.  These discrepancies can shift the values as the cell sizes change, which means that the values are not exactly the same when returning back to lat long.  Despite fish_moll_rob_latlon and fish being in the lon/lat WGS 84 (EPSG:4326) coordinate reference system, they do not have the same summed values.*
+*Sometimes, moving between projections can cause changes in cell size and values within each cell.  These discrepancies can shift the values as the cell sizes change, which means that the values are not exactly the same when returning back to lat long.  Despite fish_moll_rob_latlon and fish being in the lon/lat WGS 84 (EPSG:4326) coordinate reference system, they do not have the same summed values.  This shows that moving between CRSs are not perfectly reversible, due to distortions, errors, and/or resampling.*
+
+
