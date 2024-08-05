@@ -11,7 +11,7 @@ output:
     theme: cerulean
     highlight: haddock
     includes: 
-      in_header: '../../../workflow/templates/ohi_hdr.html'
+      in_header: '../../../../workflow/templates/ohi_hdr.html'
 pdf_document:
   toc: true
 editor_options: 
@@ -162,11 +162,13 @@ eco_years_expand <- eco_usd_filter %>%
   dplyr::arrange(rgn_id, year)
 
 # ---- join with gdp prop data ----
-eco_usd_years <- dplyr::left_join(eco_years_df, eco_usd_filter,
+eco_usd_years <- dplyr::left_join(eco_years_expand, eco_usd_filter,
                           by = c("rgn_id", "rgn_name", "year"))
 ```
 
-```{r}
+
+Investigate the difference: `tidyr::expand`, `dplyr::reframe` and `tidyr::complete`
+```{r , eval=FALSE}
 # check grouping
 is.grouped_df(eco_usd_filter) # FALSE
 
@@ -212,8 +214,11 @@ eco_years_test <- eco_usd_filter %>%
   
 ```
 
-Join with OHI regions before aggregating by region for all sectors
 
+## Join with OHI regions
+
+  -   Join with OHI regions before aggregating by region for all sectors
+  
 ```{r}
 # ------------ join with OHI Regions to make clear which regions do not have any data -----
 region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>%
@@ -232,6 +237,12 @@ eco_usd_rgn_full <- dplyr::left_join(rgn_yr_df, eco_usd_filter,
                           by = c("rgn_id", "rgn_name", "year")) # works! We now see NAs for all years within the start:stop seq for each region in OHI.
 
 ```
+
+### Heatmap
+
+-   drop NA values for `usd`
+
+-   aggregate by rgn_name + year + sector
 
 -   plot heatmap of sectors we have data for within date range
 
@@ -288,6 +299,12 @@ plotly::ggplotly(agg_heatmap_plot)
 ```
 
 
+
+
+## Aggregate
+
+Calculate total USD (inflation-adjusted to 2017 USD) across all sectors per region per year.
+
 ```{r}
 # calculate aggregate value across all sectors 
 eco_usd_adj <- eco_usd_rgn_full %>% 
@@ -302,6 +319,8 @@ eco_usd_adj <- eco_usd_rgn_full %>%
 # write data frame to int
 #write_csv(eco_usd_adj, here(int_dir, "eco_usd_adj.csv"))
 ```
+
+
 
 ## Calculating scores following OHI methodology
 
