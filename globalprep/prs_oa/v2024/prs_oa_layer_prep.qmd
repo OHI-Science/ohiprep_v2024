@@ -19,7 +19,7 @@ output:
 editor_options: 
   markdown: 
     wrap: sentence
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 # Summary
@@ -190,13 +190,6 @@ cols = rev(colorRampPalette(brewer.pal(9, 'Spectral'))(255)) # rainbow color sch
 
 # Read in eez raster with cells at 1km -- used for resampling and zonal statistics (held on an NCEAS server)
 zones <- terra::rast(here::here(dir_M, "git-annex", "globalprep","spatial","v2017","regions_eez_with_fao_ant.tif"))
-```
-
-```{r, eval = FALSE}
-# Examine the OHI eez raster
-plot(zones) # examine the .tif and ensure it looks correct
-crs(zones) # v2024: PROJCRS[\"Mollweide\",\n
-res(zones) # 934.4789 934.4789, lower cell size = higher resolution
 ```
 
 ## Install copernicusmarine tool in python
@@ -528,8 +521,8 @@ lapply(oa_annual_files, oaRescale)
 # Re-worked Rescaling
 
 ```{r}
-annual_avg_moll_rescaled_dir <- here::here(oa_dir, "int","annual_avg_moll_rescaled") 
-# dir.create(annual_avg_moll_rescaled_dir) # create Mazu directory for rescaled rasters if not already created
+annual_avg_rescaled_dir <- here::here(oa_dir, version_year, "int","annual_avg_rescaled") 
+# dir.create(annual_avg_rescaled_dir) # create Mazu directory for rescaled rasters if not already created
 
 # Read in historical raster data from earlier
 historical_avg <- terra::rast(here::here(int_dir, "oa_1985_2000_historical_average.tif"))
@@ -558,10 +551,12 @@ oaRescale_updated <- function(file){
   oa_pressure <- terra::ifel(historical_avg > 1 & historical_avg <= 3, diff, oa_pressure) 
   #  if the historic values also land between 1 and 3, we replace the linear interpolation values from `diff`
   
-  # oa_pressure <- (oa_pressure - minmax(oa_pressure)[1]) / (minmax(oa_pressure)[2] - minmax(oa_pressure)[1]) # rescaling values outside 0-1
+  oa_pressure <- terra::ifel(oa_pressure < 0, 0, oa_pressure) # any rescaled values less then 0 should be considered no pressure, because that means the current value was larger than the historical value, and therefore the aragonite sat increased in reference to the historical value
+
+  oa_pressure <- terra::ifel(oa_pressure > 1, 1, oa_pressure) # any rescaled values greater than 1 should be considered 100% pressure, because that means the current value was smaller than the historical value, and therefore the aragonite sat decreased a lot in reference to the historical value
   
   writeRaster(oa_pressure, 
-              filename = paste0(annual_avg_moll_rescaled_dir, '/oa_rescaled_', yr, ".tif"),
+              filename = paste0(annual_avg_rescaled_dir, '/oa_rescaled_', yr, ".tif"),
               overwrite = TRUE)
   
 }
@@ -572,11 +567,23 @@ lapply(oa_annual_files, oaRescale_updated)
 
 ```{r}
 # plot the rescaled rasters to ensure it looks correct
-ff <- list.files(path = here::here(annual_avg_moll_rescaled_dir), pattern = '.tif$',
+ff <- list.files(path = here::here(annual_avg_rescaled_dir), pattern = '.tif$',
                  full.names = TRUE) 
 oa_rescaled <- terra::rast(ff)
 plot(oa_rescaled)
-plot(log(oa_rescaled+1))
+
+# class       : SpatRaster 
+# dimensions  : 713, 1440, 13  (nrow, ncol, nlyr)
+# resolution  : 0.25, 0.25  (x, y)
+# extent      : -180, 180, -88.25, 90  (xmin, xmax, ymin, ymax)
+# coord. ref. : lon/lat WGS 84 (EPSG:4326) 
+# sources     : oa_rescaled_2010.tif  
+#               oa_rescaled_2011.tif  
+#               oa_rescaled_2012.tif  
+#               ... and 10 more source(s)
+# names       : oa_an~_2010, oa_an~_2011, oa_an~_2012, oa_an~_2013, oa_an~_2014, oa_an~_2015, ... 
+# min values  :           0,           0,           0,           0,           0,           0, ... 
+# max values  :           1,           1,           1,           1,           1,           1, .
 ```
 
 ### Testing rescaling
@@ -590,9 +597,88 @@ oa_data <- oa_data %>%
 mutate(diff = (hist-current)/(hist-1)) %>%
 mutate(rescale_low_historic = ifelse(current <= 1, 1, diff))
 
+# test where the data is falling when doing conditionals
+hist_rules <- ifel(historical_avg>1 & historical_avg<3, 1, NA)
+plot(hist_rules)
 
+oa_annual_test_stack <- rast(oa_annual_files)
+global(oa_annual_test_stack, fun="isNA", na.rm=FALSE)
+#                  isNA
+# oa_annual_2010 425310
+# oa_annual_2011 424739
+# oa_annual_2012 426297
+# oa_annual_2013 428050
+# oa_annual_2014 427254
+# oa_annual_2015 425073
+# oa_annual_2016 424615
+# oa_annual_2017 424583
+# oa_annual_2018 424414
+# oa_annual_2019 423821
+# oa_annual_2020 424888
+# oa_annual_2021 426376
+# oa_annual_2022 426376
+
+annual_rules <- ifel(oa_annual_test_stack>1 | oa_annual_test_stack<0, 1, NA)
+plot(annual_rules)
+
+annual_rules_neg <- ifel(oa_annual_test_stack<0, 1, NA)
+plot(annual_rules_neg) # none
+global(annual_rules_neg, fun = "sum", na.rm = TRUE) # NaN, so none
+
+annual_rules_over1 <- ifel(oa_annual_test_stack>1, 1, NA)
+plot(annual_rules_over1)
+annual_rules_over1_sum <- global(annual_rules_over1, fun = "sum", na.rm = TRUE) 
+#                   sum
+# oa_annual_2010 593872
+# oa_annual_2011 594459
+# oa_annual_2012 593699
+# oa_annual_2013 590495
+# oa_annual_2014 592013
+# oa_annual_2015 593592
+# oa_annual_2016 593607
+# oa_annual_2017 593438
+# oa_annual_2018 594143
+# oa_annual_2019 595117
+# oa_annual_2020 593792
+# oa_annual_2021 591525
+# oa_annual_2022 591175
+
+# vs the total number of values
+all_annual_values <- ifel(oa_annual_test_stack>1, 1, 1)
+all_annual_values_sum <- global(all_annual_values, fun = "sum", na.rm = TRUE) 
+#                   sum
+# oa_annual_2010 601410
+# oa_annual_2011 601981
+# oa_annual_2012 600423
+# oa_annual_2013 598670
+# oa_annual_2014 599466
+# oa_annual_2015 601647
+# oa_annual_2016 602105
+# oa_annual_2017 602137
+# oa_annual_2018 602306
+# oa_annual_2019 602899
+# oa_annual_2020 601832
+# oa_annual_2021 600344
+# oa_annual_2022 600344
+
+# how many values in the annual rasters are not over 1
+setdiff(annual_rules_over1_sum, all_annual_values_sum)
+diff_test <- all_annual_values_sum - annual_rules_over1_sum
+#                 sum
+# oa_annual_2010 7538
+# oa_annual_2011 7522
+# oa_annual_2012 6724
+# oa_annual_2013 8175
+# oa_annual_2014 7453
+# oa_annual_2015 8055
+# oa_annual_2016 8498
+# oa_annual_2017 8699
+# oa_annual_2018 8163
+# oa_annual_2019 7782
+# oa_annual_2020 8040
+# oa_annual_2021 8819
+# oa_annual_2022 9169
 ```
-
 
 #### Anna's testing:
 
@@ -677,28 +763,103 @@ ggplot(pressure_df, aes(x = final_press_vals)) +
   x = "final 'pressure' values...")
 ```
 
-```
-
-
 
 ## Interpolate if needed?
 
 Since there are oceanic cells with no information in the raw data, we need to fill in these gaps. We do this by interpolating across the globe using the data we have with an Inverse Distance Weighting (IDW) function. Previously this was done using `arcpy` from ArcGIS.
 
 ```{r}
-# check for NAs
+# how many NAs in each 
 global(oa_rescaled, fun="isNA", na.rm=FALSE)
+
+#
+
+# how many values in the annual rasters are not over 1
+setdiff(annual_rules_over1_sum, all_annual_values_sum)
+diff_test <- all_annual_values_sum - annual_rules_over1_sum
+#                 sum
+# oa_annual_2010 7538
+# oa_annual_2011 7522
+# oa_annual_2012 6724
+# oa_annual_2013 8175
+# oa_annual_2014 7453
+# oa_annual_2015 8055
+# oa_annual_2016 8498
+# oa_annual_2017 8699
+# oa_annual_2018 8163
+# oa_annual_2019 7782
+# oa_annual_2020 8040
+# oa_annual_2021 8819
+# oa_annual_2022 9169
 ```
 
 # Zonal Statistics and Results
 
 ## Reproject, resample, check extents, and mask
 
-```{r}
-# reproject to Mollweide for OHI consistency
-# the `terra::project` function by default uses bilinear interpolation for continuous data (used bc the dataset does not have clear boundaries) and nearest neighbor for categorical data (not used in this case, but just to know)
-mollCRS <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs" # mollweide EPSG for reprojecting, within `common.R`
+```{r, eval = FALSE}
+# Examine the OHI eez raster
+plot(zones) # examine the .tif and ensure it looks correct
+crs(zones) # v2024: PROJCRS[\"Mollweide\",\n
+res(zones) # 934.4789 934.4789, lower cell size = higher resolution
+```
 
+Now, let's reproject the rescaled rasters to `zones`, for OHI consistency
+
+```{r}
+# tic()
+# oa_rescaled_moll <- terra::project(oa_rescaled, zones) # using terra::project, which inherently resamples using bilinear interpolation
+# toc() 
+annual_avg_rescaled_moll_dir <- here::here(oa_dir, version_year, "int","annual_avg_rescaled_moll") 
+# dir.create(annual_avg_rescaled_moll_dir) # create Mazu directory for rescaled rasters if not already created
+
+# make a list of the already saved and rescaled annual rasters
+oa_rescaled_annual_files <- list.files(path = here(annual_avg_rescaled_dir),
+                              full.names = TRUE) # returns the full path, not just the file name
+
+
+# do not run in parallel because it is not compatible with terra::project() (package might be updated in the future to accommodate parallelization)
+# reprojects each rescaled raster, sets the long/lat projection
+terraOptions(threads = 4) # to set number of cores
+
+tic()
+for (i in seq_along(oa_rescaled_annual_files)){
+  
+  yr = as.numeric(substr(oa_rescaled_annual_files, nchar(oa_rescaled_annual_files)-7, nchar(oa_rescaled_annual_files)-4)) # get year of file using the file's path/name
+  
+  # Read in eez raster with cells at 1km -- used for resampling and zonal statistics (held on an NCEAS server)
+  zones <- terra::rast(here::here(dir_M, "git-annex", "globalprep","spatial","v2017","regions_eez_with_fao_ant.tif"))
+  
+  # # supress suxiliary files
+  # setGDALconfig("GDAL_PAM_ENABLED", "FALSE")
+  
+  # read in annual raster
+  r <- terra::rast(oa_rescaled_annual_files[i])
+  
+  # reprojecting to the OHI zones file to ensure they have the same extent and proj
+  r_moll <- terra::project(r, zones)
+  
+  # resample to ensure they have the same resolution
+  r_moll_resample <- terra::resample(x = r_moll, y = zones)
+  
+  ## write raster to int folder in prs_oa
+  writeRaster(r_moll_resample, 
+              filename = paste0(annual_avg_rescaled_moll_dir, '/oa_rescaled_moll_', yr, ".tif"),
+              overwrite = TRUE)
+}
+toc()
+
+# Error: [writeRaster] the number of filenames should either be one, or equal to the number of layers
+# In addition: There were 16 warnings (use warnings() to see them)
+
+# ... 15: In x@ptr$warp(y@ptr, "", method, mask[1], align_only[1],  ... :
+#   GDAL Error 1: Too many points (529 out of 529) failed to transform, unable to compute output bounds.
+# 16: In x@ptr$warp(y@ptr, "", method, mask[1], align_only[1],  ... :
+#   GDAL Message 1: Unable to compute source region for output window 33783,2590,4827,2591, skipping.
+```
+
+
+```{r}
 tic()
 nc_raster_moll <- terra::project(oa_multi_raster, mollCRS) # using terra::project, which inherently resamples using bilinear interpolation
 toc() # v2024: 98.562 sec elapsed
@@ -715,33 +876,6 @@ plot(oa_hist_moll_nc) # this is monthly data; we need to stack the raster layers
 ```
 
 As seen above, after projecting to Mollweide, the rasters have purple rectangles in areas where there should not be values. To fix this and avoid issues in the future, it may be good to use the `ocean.tif` read as an object "ocean" within the setup chunk and make the resolution equal to our data's resolution. We can then mask the multi-layer SpatRaster of our data to the resampled `ocean`, ensuring that the CRS, extent, and resolution is all the same between the two.
-
-```{r}
-# project the data to the `ocean.tif` 
-nc_moll_ocean <- terra::project(oa_multi_raster, terra::crs(ocean))
-
-# > terra::res(ocean) == terra::res(nc_moll_ocean)
-# [1] FALSE FALSE
-
-# terra::res(nc_moll_ocean) # 11256.74 11256.74
-# terra::res(ocean) # 934.4789 934.4789
-
-# > terra::res(ocean) > terra::res(nc_moll_ocean)
-# [1] FALSE FALSE
-
-# > terra::res(ocean) < terra::res(nc_moll_ocean)
-# [1] TRUE TRUE
-
-# plot(nc_moll_ocean)
-
-# resample the `ocean.tif` to the same resolution as our data, allowing us to mask
-ocean_res_to_nc <- terra::resample(x = ocean, y = nc_moll_ocean)
-
-# > terra::res(ocean_res_to_nc) == terra::res(nc_moll_ocean)
-# [1] TRUE TRUE
-# > terra::ext(ocean_res_to_nc) == terra::ext(nc_moll_ocean)
-# [1] TRUE
-```
 
 ```{r}
 # mask to ocean extent

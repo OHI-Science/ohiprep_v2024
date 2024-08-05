@@ -62,7 +62,7 @@ Describe what the plotted image is saying?
 
 Given this, what is kind of deceptive about these plots?
 
-*Therefore, you cannot say exactly that there are more fish being caught in a cell near the equator than a cell near antartica, since the cell area may be smaller and therefore there would be less fish within that cell already.*
+*Therefore, you cannot say exactly that there are more fish being caught in a cell near the equator than a cell near antarctica, since the cell area may be smaller and therefore there would be less fish within that cell already.*
 
 Let's convert these data to another coordinate reference system:
 
@@ -84,6 +84,9 @@ diff_moll_fish # 302,939,946 more fish caught now that the projection is in Moll
 
 Compare to the original tonnes? What is happening? How can you improve this?
 
+*The issue here is related to how area and values are preserved (or not preserved) during map projections. Mollweide preserves equal-area, but that means that cell size changes. *
+
+
 See what happens when we make multiple CRS conversions:
 
 ```{r}
@@ -93,12 +96,24 @@ rob <- "+proj=robin +datum=WGS84 +units=m +no_defs"
 fish_moll_rob <-terra::project(fish_moll, crs(rob))
 plot(log(fish_moll_rob + 1))
 
+# total number of fish caught using the rob projection
+global(fish_moll_rob, "sum", na.rm=TRUE)
+#                                sum
+# commercial_landings_2017 403627720
+
+# the difference between the rob and lat long projection
+global(fish_moll_rob, "sum", na.rm=TRUE) - global(fish, "sum", na.rm=TRUE)
+#                               sum
+# commercial_landings_2017 317296601
+
 # now back to lat long:
 fish_moll_rob_latlon <- project(fish_moll_rob, fish)
 
 plot(log(fish_moll_rob_latlon + 1))
 
 # check to see if it exactly matches the start
+global(fish_moll_rob_latlon, "sum", na.rm=TRUE) # 86,558,468
+global(fish, "sum", na.rm=TRUE) == global(fish_moll_rob_latlon, "sum", na.rm=TRUE) # FALSE, not exactly equal!!
 
 check <- fish_moll_rob_latlon - fish
 plot(log(check+1))
@@ -119,3 +134,4 @@ check
 
 What is this telling us?
 
+*Sometimes, moving between projections can cause changes in cell size and values within each cell.  These discrepancies can shift the values as the cell sizes change, which means that the values are not exactly the same when returning back to lat long.  Despite fish_moll_rob_latlon and fish being in the lon/lat WGS 84 (EPSG:4326) coordinate reference system, they do not have the same summed values.*
