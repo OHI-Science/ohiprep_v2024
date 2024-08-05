@@ -164,12 +164,12 @@ ggplotly(plot)
 #this adjusts the old values to 2023 inflation 
 #old$old_2023 <- old$old_2022*1.0789
 
-#compare_inf_adj <- dplyr::left_join(new, old, by = c("country", "year"))  %>%
-  dplyr::filter(year==current_year-2)
+# compare_inf_adj <- dplyr::left_join(new, old, by = c("country", "year"))  %>%
+#   dplyr::filter(year==current_year-2)
 
-#plot <- ggplot(compare_inf_adj, aes(x=NY.GDP.PCAP.PP.KD, y=old_2023)) + 
-  geom_point() + 
-  geom_abline(slope = 1, intercept = 0, color="red")
+# plot <- ggplot(compare_inf_adj, aes(x=NY.GDP.PCAP.PP.KD, y=old_2023)) +
+#   geom_point() +
+#   geom_abline(slope = 1, intercept = 0, color="red")
 
 #ggplotly(plot)
 #rm(compare_inf_adj)
@@ -178,7 +178,7 @@ ggplotly(plot)
 
 ## Gapfilling 1: Linear Regression within a country's data
 
-If there is only one value for a country, use this value for all years. This is not ideal, but likely better than other forms of gapfilling
+For the countries where there is only one year of data, use this value for all years. This is not ideal, but likely better than other forms of gapfilling
 
 ```{r, eval=F}
 ### Reorganize to create cells for countries that have missing values for some years
@@ -316,23 +316,45 @@ population_weights_all <- d_stand_rgn %>%
   
 #save the population weights file
 population_weights_all %>% select(country,population,year) %>%  write_csv(file.path("globalprep", "supplementary_information", version_year, "pop_weights.csv"))
+###v2024 these next lines of code don't calculate weighted means for VI and PR because they're grouped by 'method' and 'gapfilled' BUT after 2022, VI does have gapfilled values. Commented it out in case its needed again? but most likely the next code where a new dataframe is made should work fine. If for some reason this code is needed, change the df name back to d_stand_rgn rather than d_stand_rgn_with_gf in all future chunks
 
-d_stand_rgn <- population_weights_all %>% dplyr::group_by(rgn_id, year, method, gapfilled) %>% 
+# d_stand_rgn <- population_weights_all %>% dplyr::group_by(rgn_id, year, method, gapfilled) %>%
+#   dplyr::summarize(score = weighted.mean(score, population), # weight the single score value by pop.
+#                    value = weighted.mean(value, population)) %>%
+#   dplyr::ungroup()
+
+####new method- make new copy of df with virgin islands method and gapfilled column values set to NA for specific years
+# there are two years for Virgin Islands (U.S.) that have gapfilled data. This prevents the region "Puerto Rico and Virgin Islands of the United States" (rgn_id = 116) from being aggregated properly (population weights applied after grouping by rgn_id, year, AND method, gapfilled).
+# these are 2022 and 2023, with the method "lm based on N years data: 17" and gapfilled "1"
+#manually changing them to NA so it runs, this doesn't affect any other rows or further calculations
+population_weights_reclass <- population_weights_all %>% 
+  dplyr::mutate(gapfilled = case_when(
+    country %in% c("Virgin Islands (U.S.)") & gapfilled == 1 ~ 0,
+    .default = gapfilled
+  )) %>% 
+  dplyr::mutate(method = case_when(
+    country %in% c("Virgin Islands (U.S.)") & !is.na(method) ~ NA,
+    .default = method
+  ))
+
+#calculate weighted means for those 5 regions
+d_stand_rgn_with_gf <- population_weights_reclass %>% 
+  dplyr::group_by(rgn_id, year, gapfilled, method) %>% 
   dplyr::summarize(score = weighted.mean(score, population), # weight the single score value by pop.
             value = weighted.mean(value, population)) %>%
   dplyr::ungroup() 
 
 ### check again:
-dplyr::filter(d_stand_rgn, rgn_id == 209)
+dplyr::filter(d_stand_rgn_with_gf, rgn_id == 209)
 
 ### Removed `Azerbaijan` (255) because the adjacent body of water is a sea not the ocean - is this not done in names2region? 
-d_stand_rgn <- d_stand_rgn %>%
+d_stand_rgn_with_gf <- d_stand_rgn_with_gf %>%
   dplyr::filter(rgn_id <= 250)
 
-summary(d_stand_rgn) # no NAs
+summary(d_stand_rgn_with_gf) # no NAs
 
 ### save the cleaned gdppcppp for other goals
-gdppcppp_data <- d_stand_rgn %>%
+gdppcppp_data <- d_stand_rgn_with_gf %>%
   dplyr::select(rgn_id, year, value)
 
 readr::write_csv(gdppcppp_data, here::here(version_dir, "intermediate", "gdppcppp_ohi.csv"))
@@ -357,7 +379,7 @@ d_stand_gf <- data.frame(year=min(d_stand_rgn$year):max(d_stand_rgn$year)) %>%
 ### Combine the two data frames by region id and year
 ### Calculate means across increasing geopolitical levels (e.g. r2, r1), using the highest resolution possible
 d_stand_gf <- d_stand_gf %>%  
-  dplyr::left_join(d_stand_rgn, by = c("rgn_id", "year")) %>%
+  dplyr::left_join(d_stand_rgn_with_gf, by = c("rgn_id", "year")) %>%
   dplyr::group_by(r2_label, year) %>%
   dplyr::mutate(r2_value = mean(score, na.rm=TRUE)) %>%
   dplyr::ungroup() %>%
@@ -400,7 +422,7 @@ low_pop <- low_pop %>%
 low_pop_vector <- c(low_pop$rgn_id) 
 
 ### Use NA values in score column for low population areas
-d_stand_gf <- d_stand_gf %>% 
+d_stand_gf_test <- d_stand_gf_test %>% 
   mutate(score = dplyr::case_when(rgn_id %in% low_pop_vector ~ NA_real_, T ~ score))
 
 ### Check number of NAs in score column 
@@ -462,7 +484,7 @@ p1 <- ggplot(compare, aes(x = value, y = old_value, labels = rgn_name)) +
   theme_minimal()
 
 ggplotly(p1)
-#syria is an outlier, score changed by -0.59
+# v2024 syria is an outlier, score changed by -0.59 but this was checked off by Melanie Frazier
 
 ```
 
@@ -481,10 +503,10 @@ compare <- here::here("globalprep", "ao", paste0("v", current_year), "output", "
   dplyr::select(rgn_id, value, old_value) %>%
   dplyr::mutate(difference = value - old_value) %>% 
   left_join(rgns_eez)
-summary(compare) # still 22 NAs - this is because of converting unpopulated/low population regions to NAs
+summary(compare) #v2024 still 22 NAs - this is because of converting unpopulated/low population regions to NAs
 
 
-p1 <- ggplot(compare, aes(x = value, y = old_value, labels = rgn_name)) +
+p2 <- ggplot(compare, aes(x = value, y = old_value, labels = rgn_name)) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0, color = "red") +
   labs(title = paste0("Current vs Previous year", "-", version_year),
@@ -492,6 +514,7 @@ p1 <- ggplot(compare, aes(x = value, y = old_value, labels = rgn_name)) +
   theme_minimal()
 ### if anything was off of abline then something went wrong 
 ### however in v2019 data were positively skewed and we attributed this to source data changes. 
-ggplotly(p1)
+ggplotly(p2)
+#v 2024 Aruba(changed by -0.08) and Guyana(changed by 0.18) are off the line but this was checked off by Melanie Frazier
 ```
 
