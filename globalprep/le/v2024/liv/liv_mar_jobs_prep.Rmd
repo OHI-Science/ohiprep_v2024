@@ -1,0 +1,234 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - Mariculture Livelihoods & Economies Data Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+---
+
+### As of July 2024, we are currently shelving Livelihoods portion of Livelihoods and Economies because it has proven difficult to find data on jobs for certain sectors (cough cough tourism) as well as find their wages to infer some reference point of quality compared to quantity. So This is as far as we got in the current dataprep for Mariculture Jobs before pivoting to focus only on updating economies.
+
+# Livelihoods: Proportion of Tourism Jobs per Country/Region per Year
+
+### Mariculture Jobs Data
+
+-   Partially obtained from [FAO Fisheries and Aquaculture Statistical Yearbook](https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content)
+-   Also brought in OECD data from their online [OECD Data Explorer](https://data-explorer.oecd.org/vis?df%5Bds%5D=DisseminateFinalDMZ&df%5Bid%5D=DSD_SOE%40DF_SOE&df%5Bag%5D=OECD.ENV.EPI&dq=.A....&pd=1995%2C2024&to%5BTIME_PERIOD%5D=false&vw=tb)
+
+
+### Setup
+
+```{r}
+# load packages ---- 
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  ohicore,
+  here,
+  janitor,
+  terra,
+  readxl,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  priceR,
+  pdftools,
+  threadr,
+  tidyverse, 
+  httr,
+  plotly,
+  zoo # for gapfilling
+  
+)
+
+# source common.R ----
+source(here::here("workflow/R/common.R"))
+
+# set year and file path info ----
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year) # Assessment year
+data_dir_version_year <- paste0("d", current_year) # Data folder for assessment year
+data_path <- here::here("globalprep", "le", version_year) # Path to assessment folder (v202X) 
+
+# Raw data directory (on Mazu) ---- 
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# world bank raw data directory
+wb_dir <- here::here(raw_data_dir, "WorldBank", data_dir_version_year)
+
+# FAO Mariculture raw data directory 
+fao_dir <- here::here(raw_data_dir, "FAO_mariculture", data_dir_version_year)
+
+# output data directory for intermediate data products
+int_dir <- here::here(data_path, "int")
+```
+
+## This was copied from Sophia's pdf processing she did for the fao yearbook
+
+```{r}
+#------cf FAO Yearbook Number of Fishers-------
+# turn the number of fishers table from the FAO yearbook into a data frame and clean.
+# note: world total includes countries and regions not within the table.  Unsure of where that data comes from; look for methodology.
+
+# Need To update the fao_dir from above with the pdf of the FAO Fisheries and Aquaculture Statistics Yearbook
+fao_dir <- here::here(raw_data_dir, "FAO", data_dir_version_year)
+
+## Loading the pdf in as an object 
+fao_pdf <- pdf_text(here::here(fao_dir, "fao_statistics_yearbook_07_03_24.pdf"))
+
+## Selecting pdf table 
+fishers_table <- fao_pdf[[170]] %>% # page number of the pdf that the desired table is on 
+  as.data.frame()
+
+## Specify columns 
+columns <- c("country", "1995", "2000", "2005", "2010", "2015", "2017", "2018", "2019", "2020","2021")
+
+## Setting the columns name because mutate wasn't picking up on the "." as a column name.
+colnames(fishers_table) = c("main_column")
+## Checking 
+# colnames(fishers_table)
+
+
+## Turn the pdf page into a clean dataframe
+fao_mar_jobs <- fishers_table %>%
+  separate_rows(main_column, sep = "\n") %>%  #separate rows based on line breaks
+  # rename(main_column = '.') %>%  ## Removed because of above mention of column name 
+  mutate(main_column = str_remove_all(main_column, "\\*")) %>% # Remove the * 
+  mutate(main_column = str_replace_all(main_column, "E(?!\\p{L})", " ")) %>% # Replace all the Es not followed by letters (used to indicate estimate)
+  slice(7:69) %>% #remove all rows not in the table
+  separate(main_column, into = columns, sep = " {2,}", extra = "merge") %>% #separate into columns based on double spaces
+  pivot_longer(cols = -c("country"), names_to = "year") %>% 
+  mutate(value = str_squish(value)) %>% #remove extra spaces
+  mutate(value = str_remove_all(value, " ")) %>% 
+  mutate(value = if_else(value == "…" , NA, value)) %>% 
+  mutate(value = as.numeric(value)) %>% 
+  mutate(unit = "persons (1)",
+         sector = "mar/cf",
+         data_source = "FAO number of aquaculture jobs") %>% 
+  slice(-c(1:44))
+
+## Final cleaning. Removing extraneous rows not necessary 
+fao_mar_jobs_clean <- fao_mar_jobs %>% 
+  dplyr::slice(-c(1:6, 327:516)) %>% # %>% view() # Add view() to check df to make sure its tidy after 
+  mutate(year = as.numeric(year))
+
+########### OECD data on aquaculture employment ###########
+
+oecd.fp <- file.path(dir_M, "git-annex/globalprep/_raw_data/OECD", data_dir_version_year, "OECD.ENV.EPI,DSD_SOE@DF_SOE,+.A.FISH_EMP_AQUACULTURE_TOT....csv")
+
+#### BRING THIS JAWN IN #####
+
+oecd_mar_jobs <- read.csv(oecd.fp) %>% janitor::clean_names()
+
+length(unique(oecd_mar_jobs$reference_area))
+
+oecd_mar_jobs_clean <- oecd_mar_jobs %>% 
+  ## Getting rid of all unnecessary columns 
+  select(-c(obs_status_2, observation_status_2, price_base, price_base_2, ref_year_price, price_reference_year, observation_value, time_period_2, iucn_management_categories, ret_period, freq, measure, structure, structure_id, action, measure_2, unit_measure, designation, return_periods, decimals, decimals_2, obs_status, observation_status, unit_mult, unit_multiplier)) %>% 
+  ## Moving columns to more intuitive order 
+  relocate(c(ref_area, reference_area, time_period, obs_value), .before = structure_name) %>% 
+  ## Multiplying obs_value by 1000 to obtain raw value of jobs per country 
+  mutate(value = obs_value*1000) %>% 
+  ## One more relocate
+  relocate(value, .after = obs_value) %>% 
+  ## Renaming structure_name to source
+  dplyr::rename(data_source = structure_name) %>% 
+  ## Removing redundant/unneeded columns 
+  select(-c(obs_value, frequency_of_observation)) %>% 
+  ## Renaming columns to join with other jobs data from FAO
+  dplyr::rename(year = time_period,
+                country = reference_area) %>% 
+  ## Relocating one last time 
+  relocate(unit_of_measure, .before=data_source)
+
+oecd_mar_jobs_join <- oecd_mar_jobs_clean %>% 
+  select(-c(unit_of_measure, ref_area)) %>% 
+  mutate(unit = "persons (1)",
+         sector = "mar") %>% 
+  relocate(c(unit, sector), .before=data_source)
+
+## With both datasets our total unique regions comes out to 82
+length(unique(fao_mar_jobs_clean$country)) + length(unique(oecd_mar_jobs_join$country))
+
+mar_jobs_tot <- rbind(fao_mar_jobs_final, oecd_mar_jobs_join)
+
+## Joined the unique country names comes out to 65
+length(unique(mar_jobs_tot$country))
+
+duplicates <- as.data.frame(mar_jobs_tot[duplicated(mar_jobs_tot[, c('country', 'year')]),  ])
+
+length(unique(duplicates$country))
+
+```
+
+## This piece of code is for assigning countries to region id when there are dis-aggregated country names (i.e China, Hong Kong, Macao) that are considered one country for the OHI Regions
+
+
+```{r}
+## Hard coding a few of the country names that are either synonyms of countries or difficult to identify with name_2_rgn() function
+mar_jobs_rgn <- fao_mar_jobs_clean %>%
+  filter(!country %in% "World total") %>% 
+  dplyr::rename(Country = country) %>% 
+  mutate(Country = case_when(
+   Country=="China,Taiwan" ~ "China",
+    Country=="Russian Fed" ~ "Russia",
+    Country=="Rep.of Korea" ~ "South Korea",
+    Country=="DPR Korea" ~ "North Korea",
+    Country=="Türkiye" ~ "Turkey",
+   Country=="USA" ~ "United States of America",
+    TRUE ~ Country # Everything else, leave it be
+    ))
+
+# Channel Islands are Jersey and Guernsey, but these are already in the data
+
+mar_jobs_rgn_temp <- name_2_rgn(df_in = mar_jobs_rgn, 
+                       fld_name='Country',
+                      flds_unique = c("year"))
+
+## Received a warning for a duplicated country. Using the following code to display the portion of the dataframe that's duplicated 
+    ## Can see that in this case it was China, even though they actually didn't have any duplicated values. Interesting 
+mar_jobs_rgn_temp[duplicated(mar_jobs_rgn_temp[, c('Country','year')]),  ] 
+
+# Weight the following duplicates by population
+# China, Guadeloupe, Guam, Hong Kong, Macao, Martinique, Northern Mariana Islands, Puerto Rico, Virgin Islands (U.S.)... Populations taken from google
+
+# pop_weights <- data.frame(Country = c("China", "Hong Kong", "Macao",
+#                  "Guadeloupe", "Martinique",
+#                  "Guam", "Northern Mariana Islands",
+#                  "Puerto Rico", "Virgin Islands (U.S.)"),
+#                  pop = c(1452883897, 7632334, 669037,
+#                          400276, 367507,
+#                          172069, 49551,
+#                          3252407, 103910))
+
+# mar_jobs_rgn_final <- mar_jobs_rgn_temp %>%
+#   # left_join(pop_weights, by = "Country") %>%
+#   mutate(pop = ifelse(is.na(pop), 1, pop)) %>%
+#   group_by(rgn_id, rgn_name, year) %>%
+#   dplyr::summarize(score = weighted.mean(score, pop, na.rm=TRUE),
+#             method = paste(unique(method), collapse=" "),
+#             gapfill = weighted.mean(gapfill, pop, na.rm=TRUE))%>%
+#   ungroup() %>% 
+#   dplyr::mutate(year = as.numeric(year))
+
+## Only twenty nine countries with data 
+# length(unique(mar_jobs_rgn_temp$Country))
+```
+

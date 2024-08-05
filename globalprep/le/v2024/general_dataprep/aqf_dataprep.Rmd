@@ -1,0 +1,405 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - Aquarium Fishing Livelihoods & Economies Data Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+---
+
+# Economies: Aquarium Fishing Revenue per Country per Year (2019-2021)
+
+## Overview
+
+* **Data:** Aquarium fishing -- export value (USD) data
+
+-   The original data source for aquarium fishing revenue had been updated since this goal was originally calculated: [FAO global trade value data.](https://www.fao.org/fishery/en/collection/global_commodity_prod)
+-   Revenue data was prepared as is described in the methods: export data from the FAO Global Commodities database for 'Ornamental fish' for all available years, ornamental freshwater fish were excluded. The global commodities database is a component of the Global Aquatic Trade Statistic Collection published by FAO.
+-  **v2024:** downloaded using  on July 3rd, 2024 using the FAO status query interface/dashboard (data exploration & download portal, seems to be relatively new):
+  - [Global aquatic trade - By partner country Value (2019 - 2021)](https://www.fao.org/fishery/statistics-query/en/trade_partners/trade_partners_value)
+  -  under "Trade Flow" in the Dimensions filtering section, select "Exports" (alternatively, you could skip this and filter to "Export" in R)
+  -  scroll to the bottom of the page, click the "download" button/icon, then select "csv", "Flag enabled" (we clean this later), then "Yes" for "Include null values"
+  -  select "Preferences", then:
+      - for "Show unavailable values" select "NA"
+      - for "Thousands separator" select "No space"
+    - (all years -- 2019, 2020, and 2021 are selected by default, no countries or commodities etc. are selected for any filtering)
+    - © FAO 2024. Global Aquatic Trade Statistics. In: Fisheries and Aquaculture. Rome. [Cited Wednesday, July 3rd 2024]. 
+https://www.fao.org/fishery/en/collection/global_commodity_prod
+-   [Metadata](https://www.fao.org/fishery/en/collection/global_commodity_prod)
+
+* **Data:** Labor Force & Employment Data
+
+  * Labor Force data from World Bank (downloaded June 28. 2024)
+
+      - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+      
+  * ILOSTAT (downloaded July 2, 2024) -- for tour/cf wage data
+  
+      - https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A 
+
+
+## Setup
+
+```{r}
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here, # reproducible file paths
+  janitor, # data cleaning: lower_snake_case 
+  terra,
+  countrycode,
+  readxl,
+  paletteer, # custom color palettes for plotting
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  tidyverse, 
+  httr,
+  plotly, # interactive plots
+  kableExtra, # for more aesthetically pleasing tables
+  zoo # for gapfilling
+  
+)
+#remotes::install_github("skgrange/threadr") # for na_extrapolate
+library(threadr)
+
+
+# source 
+source(here("workflow", "R", "common.R"))
+# used to clean FAO online portal data
+# source(here("workflow", "R", "fao_online_portal_clean.R")) # old function
+source(here("workflow", "R", "fao_query_data_tidy.R")) # new function
+
+# set year and file path info
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- here("globalprep", "le", version_year)
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# world bank raw data directory
+wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+fao_comm_dir <- here(raw_data_dir, "FAO_commodities", data_dir_version_year)
+
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
+```
+
+
+Create country code --> iso3 function
+
+```{r}
+library(countrycode)
+
+country_regex_to_iso3c <- function(country_string) {
+  country_string %>%
+    countrycode::countrycode(origin = "country.name", destination = "iso3c", origin_regex = TRUE)
+}
+```
+
+### Read in Data
+
+```{r}
+# OHI regions data ----
+# read in OHI regions for joining
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
+  janitor::clean_names() %>% 
+  select(-notes)
+
+# labor force from World Bank (cleaned, joined with OHI regions)
+labor_force <- read_csv(here(int_dir, "labor_force.csv"))
+
+# Aquarium Fishing FAO data 
+commodities_value_raw <- read_csv(here(fao_comm_dir, "query_portal", "trade_partners_value.csv"))
+
+```
+```{r}
+# check and see if any values are considered negligible
+commodities_value_raw %>% filter(`2021 Flag` == "N")
+```
+
+
+## Data cleaning & Wrangling
+
+```{r}
+# adapted from the v2023 livelihood_economies_dataprep.Rmd
+fao_latest_data_year <- 2021 # update to the last year available in FAO data, likely the same for all FAO data included.
+
+# clean up commodities value data for ornamental fishing revenue
+ornamental_value <- commodities_value_raw %>%
+  janitor::clean_names() %>% 
+  # filter to ornamental commodities 
+  filter(str_detect(commodity_name_en, "Ornamental")) %>% 
+  rename(country = "reporting_country_name_en", 
+         partner_country = "partner_country_name_en",
+         commodity = "commodity_name_en",
+         trade = "trade_flow_name_en") %>%
+  filter(trade == "Exports" & commodity != "Ornamental freshwater fish") %>% # remove all other fish (commodities) that are not ornamentals (bc aquarium = ornamental), don't include the freshwater ornamental fish (interested in saltwater/ocean only)
+  # fao cleaning function found in workflow/R
+  fao_query_data_tidy(initial_data_year = 2019,
+                          last_data_year = 2021) %>% # used function to clean and pivot data, remove Flag columns (definitely check out this script!)
+  mutate(value = (value * 1000), # convert from thousands to single dollar 
+         unit = "USD (1)") %>% 
+  # add iso3 column
+  mutate(iso3 = country_regex_to_iso3c(country)) # get iso3 code of reporting country
+```
+
+## Revenue
+
+Sum annual revenue for each country
+
+```{r}
+# sum for each country 
+ornamental_revenue <- ornamental_value %>% 
+  group_by(country, year) %>% 
+  summarize(value = sum(value, na.rm = TRUE),
+            unit = first(unit)) %>% 
+  mutate(sector = "aqf", # code for aquarium fishing sector
+         data_source = "FAO global trade") %>% 
+  select(country, year, value, unit, sector, data_source) %>% 
+  # add iso3 column
+  mutate(iso3 = country_regex_to_iso3c(country)) %>%  # get iso3 code of reporting country
+  relocate(iso3, .after = country)
+
+# tidy up a couple of country names
+ornamental_revenue_renamed <- ornamental_revenue %>% 
+  # rename to "United Kingdom" (mostly for plotting)
+  mutate(country = str_remove_all(country,
+                                  pattern = " of Great Britain and Northern Ireland")) %>% 
+  # renamed to "Netherlands"
+  mutate(country = str_replace_all(country,
+                                   # using fixed() here is important
+                                   pattern = fixed("Netherlands (Kingdom of the)"),
+                                   replacement = "Netherlands"))
+
+
+# why do we need fixed()? Not entirely sure, but the following 3 methods didn't work as intended. I think it may have to do with the punctuation ()
+# mutate(country = str_remove_all(country, pattern = "(Kingdom of the)")) 
+# yields "Netherlands ()"
+# str_replace_all(country, pattern = " (Kingdom of the)", replacement = "")
+# does nothing
+# str_replace_all(country, pattern = "Netherlands (Kingdom of the)", replacement = "Netherlands")
+# does nothing
+
+
+```
+
+## Join & Save
+
+Join with OHI Regions
+
+```{r}
+aqf_ohi_join <- left_join(region_names, ornamental_revenue_renamed, by = c("eez_iso3" = "iso3")) %>% 
+  # fill in aqf for countries without data
+  mutate(sector = "aqf")
+
+# leaving in "country" column for easy processing later (if "country" is NA, we know that the FAO didn't have any data on that country/region or didn't include that country in its dataset at all)
+
+```
+Save intermediate data (revenue table joined with OHI regions) as csv in `int` folder
+
+```{r}
+# write as intermediate file
+#write_csv(aqf_ohi_join, here(int_dir, "aqf_revenue.csv"))
+
+
+```
+
+
+## Preliminary plotting
+
+### Interactive line plot
+
+```{r}
+m <- list(
+  l = 60,
+ # r = 5,
+  b = 80,
+  t = 80,
+  pad = 4
+)
+
+aqf_plot <- plot_ly(data = ornamental_revenue_renamed,
+                    x = ~year,
+                    y = ~value,
+                    color = ~country,
+                    type = "scatter",
+                    mode = "lines") %>% 
+  layout(title = "Aquarium Fishing Annual Revenue (USD)", 
+         margin = m,
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Revenue (USD)"))
+
+aqf_plot
+
+```
+
+
+Aquarium fishing (AQF) revenue in Spain appears to far exceed any other country. From what little exposure to the aquarium hobbyist world I've had, I expected to see Thailand, Indonesia, Philippines, and the US & UK in the top 10. I'm interested in learning more about how and why the AQF revenue is so high in Spain and the Netherlands. I know that Spain is one of the world's biggest players in the fish and seafood export market, but I have no knowledge about why their aquarium fish exports are showing up as such high values in this dataset.
+
+
+
+
+
+### Highest AQF Revenue 
+Let's look at a comparison of the countries that have the highest revenue from aquarium fishing: 
+
+```{r fig.height=4, fig.width=8}
+# ============ Data exploration, wrangling, subsetting =======================
+# first: view top 10 revenue over all 3 years
+ornamental_revenue_renamed %>% 
+  ungroup() %>% 
+  slice_max(value, n = 10) %>% # select top 10 rows based on "value" column
+  select(country, year, value) %>% # simplify for readability
+  kableExtra::kbl() %>% # using {kableExtra} and styling for customized table output
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"),
+                full_width = F, position = "left",
+                html_font = "Cambria")
+
+# top revenue per year -------------------------------------------
+# top 10
+top_10_revenue_yearly <- ornamental_revenue_renamed %>% 
+  ungroup() %>% 
+  group_by(year) %>% 
+  slice_max(value, n = 10) %>% 
+  select(country, year, value) # %>% 
+#  mutate(year = as.factor(year)) %>% 
+#  mutate(year = fct_relevel(year, "2019", "2020", "2021"))
+
+# top 5 
+top_5_revenue_yearly <- ornamental_revenue_renamed %>% 
+  ungroup() %>% 
+  group_by(year) %>% 
+  slice_max(value, n = 5) %>% 
+  select(country, year, value)
+  
+
+# check:
+unique(top_5_revenue_yearly$country)
+
+# pull out names of top 5 countries
+top_5_countries <- c(unique(top_5_revenue_yearly$country))
+
+
+
+# ================= Plotting ==================================
+# ---------- plot of top 10 countries over time ---------------
+top_10_plot <- ggplot(data = top_10_revenue_yearly,
+       aes(x = as.numeric(year), # needs to be numeric, otherwise geom_line() won't work
+           y = value,
+           color = country,
+           fill = country)) +
+  geom_point() +
+  geom_line() + 
+#  geom_col(position = "dodge") +
+  # custom colorblind-friendly palette
+  paletteer::scale_color_paletteer_d(palette = "colorBlindness::paletteMartin") +
+  scale_fill_paletteer_d(palette = "colorBlindness::paletteMartin") +
+#  paletteer::scale_color_paletteer_d("rcartocolor::Safe") +
+#  scale_fill_paletteer_d("rcartocolor::Safe") +
+#  geom_line() +
+  theme_minimal() +
+  labs(x = "",
+       y = "",
+       color = "",
+       fill = "",
+       title = "Top 10 Countries: Total Annual Value of Aquarium Fishing Exports (USD) (2019-2021)",
+       subtitle = "Data Source: FAO (2024)") +
+  
+  # axis breaks & lables
+  scale_y_continuous(labels = scales::label_dollar(scale = 0.000001, suffix = "M")
+                   #  , breaks = c(25000, 50000, 75000, 100000, 125000)
+                     ) +
+  scale_x_continuous(breaks = c(2019, 2020, 2021))
+
+
+# --------- plot of top 5 countries over time -----------------
+top_5_plot <- ggplot(data = top_5_revenue_yearly,
+       aes(x = as.numeric(year), # needs to be numeric, otherwise geom_line() won't work
+           y = value,
+           color = country,
+           fill = country)) +
+  geom_point() +
+  geom_line() + 
+#  geom_col(position = "dodge") + # couldn't get this to play nicely with fct_reorder() for the 3 years
+  # custom colorblind-friendly palette
+  paletteer::scale_color_paletteer_d("rcartocolor::Safe") +
+  scale_fill_paletteer_d("rcartocolor::Safe") +
+#  geom_line() +
+  theme_minimal() +
+  labs(x = "",
+       y = "",
+       color = "",
+       fill = "",
+       title = "Top 5 Countries: Total Annual Value of Aquarium Fishing Exports (USD) (2019-2021)",
+       subtitle = "Data Source: FAO (2024)") +
+  
+  # axis breaks & lables
+  scale_y_continuous(labels = scales::label_dollar(scale = 0.000001, suffix = "M")
+                   #  , breaks = c(25000, 50000, 75000, 100000, 125000)
+                     ) +
+  scale_x_continuous(breaks = c(2019, 2020, 2021))
+
+
+
+
+# ------- show plots --------
+top_10_plot
+top_5_plot
+```
+
+
+
+
+```{r fig.height=4, fig.width=8}
+ggplot(data = top_5_revenue_yearly,
+       aes(x = fct_reorder(country, value), 
+           y = value,
+           color = country,
+           fill = country)) +
+  geom_col(position = "dodge") +
+  # custom colorblind-friendly palette
+  paletteer::scale_color_paletteer_d("rcartocolor::Safe") +
+  scale_fill_paletteer_d("rcartocolor::Safe") +
+  facet_wrap(~year) +
+   scale_y_continuous(labels = scales::label_dollar(scale = 0.000001, suffix = "M")
+                   #  , breaks = c(25000, 50000, 75000, 100000, 125000)
+                     ) +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = "", 
+       y = "", 
+       color = "",
+       fill = "",
+       title = "Top 5 Aquarium Fishing Countries by Exports (USD) (2019-2021)") +
+  theme(
+    legend.position = "none"
+  )
+```
+
+
+
+
+
+
+

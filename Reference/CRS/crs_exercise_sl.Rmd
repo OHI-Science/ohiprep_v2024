@@ -1,0 +1,137 @@
+---
+title: "CRS Exercise Sophia Lecuona Manos"
+output: html_document
+date: "2024-08-01"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+library(terra)
+library(here)
+
+```
+
+Data describing commercial landings (tonnes) in 2017.
+
+```{r}
+fish <- terra::rast(here("Reference", "CRS", "commercial_landings_2017.tif"))
+
+## Take a look
+plot(fish)
+# lets log so we can visualize this a little better
+plot(log(fish+1))
+```
+
+How many fish were captured?
+
+```{r}
+# `terra::global` documentation: "Compute global statistics, that is summarized values of an entire SpatRaster."
+# This means it takes the sum of all the values for the entire raster.
+global(fish, "sum", na.rm=TRUE)
+# commercial_landings_2017 are 86,331,119!!
+```
+
+[Sea Around Us](https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=taxon&measure=tonnage&limit=10) has the global catch at ~100,000,000, but it uses reconstructed data, meaning they have multiple sources and may have a higher number than we do.
+
+What is the area of each cell?
+
+```{r}
+# from documentation, terra::cellSize "Compute[s] the area covered by individual raster cells." 
+# however, "note that for both angular (longitude/latitude) and for planar (projected) coordinate reference systems raster cells sizes are generally not constant, unless you are using an equal-area coordinate reference system."
+cell_area <- terra::cellSize(fish)
+plot(cell_area) # cell area increases towards the equator
+
+print(cell_area)
+# class       : SpatRaster 
+# dimensions  : 347, 720, 1  (nrow, ncol, nlyr)
+# resolution  : 0.5, 0.5  (x, y)
+# extent      : -180, 180, -85.5, 88  (xmin, xmax, ymin, ymax)
+# coord. ref. : lon/lat WGS 84 (EPSG:4326) 
+# source(s)   : memory
+# varname     : commercial_landings_2017 
+# name        :       area 
+# min value   :  122442386 
+# max value   : 3077249667 
+```
+
+Describe what the plotted image is saying?
+
+*It looks like the cell area is larger towards the equator, which makes sense considering it is a globular picture in a rectangular format.*
+
+Given this, what is kind of deceptive about these plots?
+
+*Therefore, you cannot say exactly that there are more fish being caught in a cell near the equator than a cell near antarctica, since the cell area may be smaller and therefore there would be less fish within that cell already.*
+
+Let's convert these data to another coordinate reference system:
+
+```{r}
+moll <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+fish_moll <- terra::project(fish, crs(moll))
+
+# take a look
+plot(fish_moll)
+plot(log(fish_moll + 1))
+
+## Count the total tonnes
+global(fish_moll, "sum", na.rm=TRUE)
+# commercial_landings_2017 are now 389,271,065! That is a lot more.
+
+diff_moll_fish <- global(fish_moll, "sum", na.rm=TRUE) - global(fish, "sum", na.rm=TRUE)
+diff_moll_fish # 302,939,946 more fish caught now that the projection is in Mollweide
+```
+
+Compare to the original tonnes? What is happening? How can you improve this?
+
+*The issue here is related to how area and values are preserved (or not preserved) during map projections. Mollweide preserves equal-area, but that means that cell size changes. *
+
+
+See what happens when we make multiple CRS conversions:
+
+```{r}
+#Robinson projection
+rob <- "+proj=robin +datum=WGS84 +units=m +no_defs"
+
+fish_moll_rob <-terra::project(fish_moll, crs(rob))
+plot(log(fish_moll_rob + 1))
+
+# total number of fish caught using the rob projection
+global(fish_moll_rob, "sum", na.rm=TRUE)
+#                                sum
+# commercial_landings_2017 403627720
+
+# the difference between the rob and lat long projection
+global(fish_moll_rob, "sum", na.rm=TRUE) - global(fish, "sum", na.rm=TRUE)
+#                               sum
+# commercial_landings_2017 317296601
+
+# now back to lat long:
+fish_moll_rob_latlon <- project(fish_moll_rob, fish)
+
+plot(log(fish_moll_rob_latlon + 1))
+
+# check to see if it exactly matches the start
+global(fish_moll_rob_latlon, "sum", na.rm=TRUE) # 86,558,468
+global(fish, "sum", na.rm=TRUE) == global(fish_moll_rob_latlon, "sum", na.rm=TRUE) # FALSE, not exactly equal!!
+
+check <- fish_moll_rob_latlon - fish
+plot(log(check+1))
+check
+
+#class       : SpatRaster 
+# dimensions  : 347, 720, 1  (nrow, ncol, nlyr)
+# resolution  : 0.5, 0.5  (x, y)
+# extent      : -180, 180, -85.5, 88  (xmin, xmax, ymin, ymax)
+# coord. ref. : lon/lat WGS 84 (EPSG:4326) 
+# source(s)   : memory
+# varname     : commercial_landings_2017 
+# name        : commercial_landings_2017 
+# min value   :                -66229.40 
+# max value   :                 35487.52 
+
+```
+
+What is this telling us?
+
+*Sometimes, moving between projections can cause changes in cell size and values within each cell.  These discrepancies can shift the values as the cell sizes change, which means that the values are not exactly the same when returning back to lat long.  Despite fish_moll_rob_latlon and fish being in the lon/lat WGS 84 (EPSG:4326) coordinate reference system, they do not have the same summed values.*

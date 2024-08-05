@@ -1,0 +1,458 @@
+---
+title: "Adjusting Economies data by Sector for Inflation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 3
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+---
+
+## Overview
+
+The individual LE::ECO scripts from other sectors will all be adjusted for inflation within this script. After, they will be combined into one data frame. Finally, the values will be aggregated by region and year across all sectors, which can then be used to calculate the final score.
+
+Initially, there are three scripts, each with different starting units of value, shown below:
+
++-------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+|             | Metadata documentation                                                | Pre-Adjustment Unit                | Post-Adjustment Unit           |
++=============+=======================================================================+====================================+================================+
+| cf          | [FAO Capture Data](https://www.fao.org/fishery/en/collection/capture) | Final: USD (current year)          | USD inflation adjusted to 2017 |
+|             |                                                                       |                                    |                                |
+|             | [Ex-Vessel Price Data](https://github.com/SFG-UCSB/price-db-sfg)      | FAO Capture: tonnes                |                                |
+|             |                                                                       |                                    |                                |
+|             |                                                                       | Ex-Vessel Prices: USD/metric tonne |                                |
++-------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+| tour        |                                                                       | USD (constant 2015 US\$)           | USD inflation adjusted to 2017 |
++-------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+| mar         |                                                                       | USD (current year)                 | USD inflation adjusted to 2017 |
++-------------+-----------------------------------------------------------------------+------------------------------------+--------------------------------+
+
+: Pre/Post-Inflation Adjustment Units
+
+## Setup
+
+```{r render-setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+options(scipen=99) # for number of digits printed
+```
+
+```{r library-setup, warning=FALSE}
+# ---- Load packages ----
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  # general
+  here,
+  janitor,
+  tidyverse,
+  ohicore, # devtools::install_github('ohi-science/ohicore@dev')
+  priceR, # for inflation function
+  # for data viz
+  RColorBrewer, 
+  plotly,
+  scales
+)
+
+# ---- source functions ----
+# common
+source(here::here("workflow", "R", "common.R"))
+# inflation function created in 2024, requires priceR package to be loaded
+source(here::here("workflow", "R", "inflation_adjustment.R"))
+
+# ---- set year and file path info ----
+current_year <- 2024 # Update this!!
+
+# create version name for GitHub filepaths
+version_year <- paste0("v", current_year) 
+
+# set current LE filepath
+data_path <- here::here("globalprep", "le", version_year) 
+
+# output data dir for intermediate data products
+int_dir <- here::here(data_path, "int")
+
+```
+
+## Read in pre-adjustment data
+
+```{r read-int-data, message=FALSE}
+# sector 1: Fishing (cf)
+cf_df_pre <- readr::read_csv(here(int_dir, "eco_cf_usd_pre.csv")
+                             #, show_col_types = FALSE     # include if you want to quiet messages. left in to assess data joining compatibility
+                             )
+
+# sector 2: Mariculture (mar)
+mar_df_pre <- readr::read_csv(here(int_dir, "eco_mar_usd_pre.csv"))
+
+# sector 3: Tourism (tour)
+tour_df_pre <- readr::read_csv(here(int_dir, "eco_tour_usd_pre.csv"))
+
+```
+
+## Implement `inflation_adjustment.R` from `workflow/R`
+
+```{r inflation-adjustment}
+# ---- Fishing (cf) ----
+cf_df_adj <- inflation_adjustment(
+  cf_df_pre, # csv with the following columns: rgn_id, rgn_name, year, usd, unit, sector, usd_yr
+  conversion_date = 2017, # USD year you want the adjusted values to be in
+  country = "US", # country of unit value
+  current_year = current_year) # assessment year (to index into vYYYY subfolder in "le" folder)
+
+
+# ---- Mariculture (mar) ----
+# if you run into the warning about the worldbank API connection failing and a "502 Bad Gateway" error, wait a few minutes before trying to run this again (and don't run anything else in the meantime)
+mar_df_adj <- inflation_adjustment(mar_df_pre, conversion_date = 2017,
+                                   country = "US", current_year = current_year)
+
+
+# ---- Tourism (tour) ----
+tour_df_adj <- inflation_adjustment(tour_df_pre, conversion_date = 2017,
+                                    country = "US", current_year = current_year)
+
+
+```
+
+
+
+## Combine adjusted data frames
+
+```{r}
+# bind rows of adjusted data frames
+eco_usd_bind <- rbind(cf_df_adj, mar_df_adj, tour_df_adj)
+
+# find maximum and minimum years for each adjusted data frame
+min_max_df <- tibble(
+  min_year = c(min(cf_df_adj$year), min(mar_df_adj$year), min(tour_df_adj$year)),
+  max_year = c(max(cf_df_adj$year), max(mar_df_adj$year), max(tour_df_adj$year))
+)
+
+# set year range based on limiting dataset values
+start_year <- max(min_max_df$min_year) # take maximum of minimum years
+stop_year <- min(min_max_df$max_year) # take minimum of maximum years
+
+
+# ----- create aggregated adjusted data frame ------------
+eco_usd_filter <- eco_usd_bind %>% 
+  dplyr::filter(year %in% c(start_year:stop_year)) # filter to date range
+
+
+# make all geographic areas have the same date range (and fill missing values with NAs)
+# note: this should also be done upstream, as the sector region should not be NA (important for later aggregation, function implementation)
+# using expand
+eco_years_expand <- eco_usd_filter %>% 
+  tidyr::expand(nesting(rgn_id, rgn_name), # note: you can't expand on a grouping column
+                year = start_year:stop_year) %>% # within each group combination, add sequence of years in new "year" column
+  dplyr::arrange(rgn_id, year)
+
+# ---- join with gdp prop data ----
+eco_usd_years <- dplyr::left_join(eco_years_expand, eco_usd_filter,
+                          by = c("rgn_id", "rgn_name", "year"))
+```
+
+
+Investigate the difference: `tidyr::expand`, `dplyr::reframe` and `tidyr::complete`
+```{r , eval=FALSE}
+# check grouping
+is.grouped_df(eco_usd_filter) # FALSE
+
+# ---- the following two methods produce identical dataframes ----
+# using expand
+eco_years_expand <- eco_usd_filter %>% 
+  tidyr::expand(nesting(rgn_id, rgn_name), # note: you can't expand on a grouping column
+                year = start_year:stop_year) %>% # within each group combination, add sequence of years in new "year" column
+  dplyr::arrange(rgn_id, year)
+
+# Note from documentation: "With grouped data frames created by dplyr::group_by(), expand() operates within each group. Because of this, you cannot expand on a grouping column."
+
+# using reframe
+eco_years_reframe <- eco_usd_filter %>% 
+  dplyr::group_by(rgn_id, rgn_name) %>% 
+  # fill with full year range for joining
+  dplyr::reframe(year = seq(start_year, stop_year))
+
+# we know that they are equal because:
+length(eco_years_expand) # 3
+#length(eco_years_expand) == length(eco_years_reframe) # TRUE
+nrow(eco_years_expand) # 2268
+#nrow(eco_years_expand) == nrow(eco_years_reframe) # TRUE
+sum(eco_years_expand == eco_years_reframe) # 6804 = ncol * nrow = all values
+
+sum(eco_years_expand == eco_years_reframe) == (nrow(eco_years_expand) * length(eco_years_expand)) # TRUE
+
+
+# These two methods also give you the same output as the summarize() method we got a Warning about:
+# eco_years_df <- tibble(rgn_name = eco_usd_filter$rgn_name,
+#                        rgn_id = eco_usd_filter$rgn_id) %>% 
+#   dplyr::group_by(rgn_id, rgn_name) %>% 
+#   dplyr::summarize(year = seq(start_year,
+#                        stop_year))
+# note: returns warning to use `reframe()` instead. That function is experimental as of July 2024. `reframe()` always returns an ungrouped dataframe.
+
+
+# come back to this -- makes 1.7 million rows because it expands the dataframe for all combinations of rgn_id, rgn_name, sector, for all years
+eco_years_test <- eco_usd_filter %>% 
+  tidyr::complete(rgn_id, rgn_name, sector, 
+           year = min(year):max(year),
+           fill = list(value = NA))
+  
+```
+
+
+## Join with OHI regions
+
+  -   Join with OHI regions before aggregating by region for all sectors
+  
+```{r}
+# ------------ join with OHI Regions to make clear which regions do not have any data -----
+region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>%
+  dplyr::select(-Notes) # drop notes column
+
+# ---- add years to OHI regions ----
+rgn_yr_df <- region_names %>% 
+  # expand() generates all combinations of variables found in a dataset
+  # nesting() finds combinations of rgn_id & rgn_name already present in the df
+  tidyr::expand(nesting(rgn_id, rgn_name), # note: you can't expand on a grouping column
+                year = start_year:stop_year) %>% # within each group combination, add sequence of years in new "year" column
+  dplyr::arrange(rgn_id, year)
+
+# ---- final data frame before aggregation, in which all regions and sectors are present ----
+eco_usd_rgn_full <- dplyr::left_join(rgn_yr_df, eco_usd_filter,
+                          by = c("rgn_id", "rgn_name", "year")) # works! We now see NAs for all years within the start:stop seq for each region in OHI.
+
+```
+
+### Heatmap
+
+-   drop NA values for `usd`
+
+-   aggregate by rgn_name + year + sector
+
+-   plot heatmap of sectors we have data for within date range
+
+-   find data gaps (there should be none since we gapfilled earlier)
+
+```{r}
+# ---- make NA status column ----
+eco_status <- eco_usd_years %>% 
+  dplyr::mutate(status = !is.na(usd)) # TRUE if we DO have value data
+# %>% 
+#   group_by(rgn_id, rgn_name, year) %>% 
+#eco_status
+
+# ---- using the aggregate function from {stats} ----
+agg_test <- eco_status %>% 
+  # sum of status column for each rgn_name + year + sector combination
+  stats::aggregate(status~rgn_name+year+sector, FUN = sum)
+
+#agg_test
+
+# ---- count number of sectors we have data for for each country per year ----
+agg_test_sum <- agg_test %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(rgn_name, year) %>% 
+  dplyr::summarize(data_status = sum(status, na.rm = TRUE), 
+                   .groups = "drop")
+
+#View(agg_test_sum)
+
+# ---- make heatmap to visualize missing data ----
+agg_heatmap_plot <- ggplot(data = agg_test_sum) +
+  geom_tile(aes(x = year,
+                y = rgn_name,
+                fill = as.factor(data_status)), color = "black") +
+  scale_fill_manual(values = c("white", # 0
+                               "#AACAF9", # 1
+                               #"#5594F2",
+                               "#005FEC", # 2
+                               "darkblue"), # 3
+                    na.value = "grey") +
+  labs(y = "", 
+       x = "Year",
+       title = "Number of Sectors with Data per Region per Year",
+       fill = "Number of Sectors with Data") +
+  theme_bw() 
+
+# static:
+#agg_heatmap_plot
+
+# interactive:
+# (note: this may take a minute or so to render)
+plotly::ggplotly(agg_heatmap_plot) 
+
+```
+
+
+
+
+## Aggregate
+
+Calculate total USD (inflation-adjusted to 2017 USD) across all sectors per region per year.
+
+```{r}
+# calculate aggregate value across all sectors 
+eco_usd_adj <- eco_usd_rgn_full %>% 
+  group_by(rgn_id, rgn_name, year) %>% # group by places & years
+  summarize(value = sum(adj_usd, na.rm = TRUE),
+            .groups = "keep") %>%  # sum values
+  mutate(value = case_when( 
+    value == 0 ~ NA, # replace 0s with NAs (flag of no data that was lost in summing)
+    .default = value
+  ))
+
+# write data frame to int
+#write_csv(eco_usd_adj, here(int_dir, "eco_usd_adj.csv"))
+```
+
+
+
+## Calculating scores following OHI methodology
+
+-   [Methodology](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#economies-subgoal-of-livelihoods-and-economies)
+
+$$
+x_{eco} = \frac { \displaystyle\sum _{ k=1 }^{ N }{ { e }_{ c,k } }  }{ \displaystyle\sum _{ k=1 }^{ N }{ { e }_{ r,k } }  }
+$$
+
+where, $e$ is the total adjusted revenue generated directly and indirectly from sector $k$, at current $c$, and reference $r$, time points
+
+Based on this methodology and equation, we created and defined the `value` column earlier as the sum of the adjusted USD value for the three sectors (fishing, mariculture, and tourism). To calculate the score, we will take that combined sum across sectors per region per year and divide the value in the current (or most recent) year by the reference point value
+
+From the website's methodology:
+
+Because there is no absolute global reference point for revenue (i.e., a target number would be completely arbitrary), the economies subgoal uses a moving baseline as the reference point. Reference revenue is calculated as the value in the current year (or most recent year), relative to the value in a recent moving reference period, defined as 5 years prior to the current year. This reflects an implicit goal of maintaining coastal revenue on short time scales, allowing for decadal or generational shifts in what people want and expect. We allowed for a longer or shorter gap between the current and recent years if a 5 year span was not available from the data, but the gap could not be greater than 10 years. Our preferred gap between years was as follows (in order of preference): 5, 6, 4, 7, 3, 8, 2, 9, 1, and 10 years.
+
+Absolute values for $e$ in the current and reference periods were lumped across all sectors before calculating reference values (even though the current and reference years will not be exactly the same for all sectors), allowing a decrease in one sector to be balanced by an increase in another sector. As such, we do not track the status of individual sectors and instead always focus on the status of all sectors together.
+
+
+## Calculating Scores: value 5 years ago as reference point
+
+
+### Test: calculate score for 1 year (2019)
+```{r}
+calculate_scores <- function(data, stop_year) {
+  data %>%
+    group_by(rgn_id, rgn_name) %>%
+    mutate(
+      # creating columns so we can perform column-wise operations 
+      
+      # set current year equal to stop year or else most recent year of data
+      current_year = max(year[year <= stop_year]),
+      # get value in current or most recent year of data
+      current_value = value[year == current_year],
+      # set year for reference point to 5 years before current or most recent year
+      reference_year = current_year - 5,
+      # get value in reference year
+      reference_value = value[year == reference_year],
+      # calculate score
+      score = current_value / reference_value
+    ) %>%
+    # get year for which score was calculated for each region 
+    filter(year == current_year) %>%
+    # select relevant columns
+    select(rgn_id, rgn_name, year, current_value, reference_value, score) %>%
+    ungroup()
+}
+
+
+
+```
+
+Test new function
+
+```{r}
+single_point_scores_2019 <- calculate_scores(eco_usd_adj, stop_year = 2019)
+single_point_scores_2019
+
+summary(single_point_scores_2019)
+```
+
+```{r}
+paste("Single reference point summary:")
+summary(single_point_scores_2019$score)
+
+```
+
+In 2019, Nauru (and members of the PNA) sold rights to fish in their waters for higher amounts than in previous years, which may explain the extremely high score for this region. 
+
+
+
+### Test: calculate scores for a range of years
+
+```{r}
+calculate_scores <- function(data) {
+  data <- data %>% mutate(rgn_id = as.character(rgn_id))
+  
+  find_reference_year <- function(years, current_year) {
+    gap_preferences <- c(5, 6, 4, 7, 3, 8, 2, 9, 1, 10)
+    for (gap in gap_preferences) {
+      reference_year <- current_year - gap
+      if (reference_year %in% years) {
+        return(reference_year)
+      }
+    }
+    return(NA)
+  }
+  
+  min_year <- min(data$year, na.rm = TRUE)
+  max_year <- max(data$year, na.rm = TRUE)
+  
+  map(seq(min_year + 5, max_year), function(calc_year) {
+    data %>%
+      group_by(rgn_id, rgn_name) %>%
+      reframe(
+        calculation_year = calc_year,
+        current_value = value[year == calc_year],
+        reference_year = find_reference_year(year[year < calc_year], calc_year),
+        reference_value = value[year == reference_year[1]],
+        score = current_value / reference_value
+      )
+  }) %>%
+  list_rbind() %>%
+  select(rgn_id, rgn_name, calculation_year, current_value, reference_value, score)
+}
+```
+
+
+
+
+
+```{r}
+# test
+test_score_fun_1 <- calculate_scores(eco_usd_adj)
+
+
+length(unique(test_score_fun_1$rgn_id))
+
+
+score_test_summary <- summary(test_score_fun_1)
+
+score_test_summary
+```
+
+
+
+```{r}
+plotly::plot_ly(data = test_score_fun_1)
+```
+
+check less than 0.8 scores, check big ones like Nauru
+
+seems typical for values over 1 bc we expect a lot to do better than they were 5 years ago
+

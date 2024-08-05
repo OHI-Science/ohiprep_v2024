@@ -1,0 +1,86 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-01"
+---
+
+```{r setup, include=FALSE}
+
+library(terra)
+library(here)
+
+```
+
+Data describing commercial landings (tonnes) in 2017.
+```{r}
+fish <- rast(here("Reference/CRS/commercial_landings_2017.tif"))
+
+## Take a look
+plot(fish)
+# lets log so we can visualize this a little better
+plot(log(fish+1))
+```
+
+How many fish were captured?
+```{r}
+global(fish, "sum", na.rm=TRUE)
+
+```
+Check against Sea Around Us to make sure this seems generally reasonable.
+
+What is the area of each cell?
+```{r}
+cell_area <- cellSize(fish)
+plot(cell_area)
+```
+Describe what the plotted image is saying?
+
+Given this, what is kind of deceptive about these plots?
+```{r}
+plot(fish)
+# lets log so we can visualize this a little better
+plot(log(fish+1))
+
+```
+
+Let's convert these data to another coordinate reference system:
+```{r}
+moll <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+fish_moll <- terra::project(fish, crs(moll))
+
+# take a look
+plot(fish_moll)
+plot(fish_moll + 1)
+
+## Count the total tonnes
+global(fish_moll, "sum", na.rm=TRUE)
+
+
+```
+
+Compare to the original tonnes? What is happening? How can you improve this?
+
+See what happens when we make multiple CRS conversions:
+
+```{r}
+#Robinson projection
+rob <- "+proj=robin +datum=WGS84 +units=m +no_defs"
+
+fish_moll_rob <-terra::project(fish_moll, crs(rob))
+plot(log(fish_moll_rob + 1))
+
+# now back to lat long:
+fish_moll_rob_latlon <- project(fish_moll_rob, fish)
+
+plot(log(fish_moll_rob_latlon + 1))
+
+# check to see if it exactly matches the start
+
+check <- fish_moll_rob_latlon - fish
+plot(log(check+1))
+check
+
+
+```
+
+What is this telling us?

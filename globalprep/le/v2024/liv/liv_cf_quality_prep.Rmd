@@ -1,0 +1,233 @@
+---
+title: "OHI `r format(Sys.Date(), '%Y')` - CF LIV Quality Preparation"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
+---
+
+# CF Livelihoods: Quality of Tourism Jobs per Country/Region per Year
+
+## Overview
+
+**Data:**
+
+-   ILOSTAT (downloaded July 2, 2024) -- for cf wage data
+
+    ```         
+    - <https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A>
+    - select Rev 3.1.B: Fishing, Sex: Total, all regions, all years
+    - `EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-03-cf-wage.csv`
+    ```
+
+-   OECD (downloaded July 8, 2024) -- for ppp adj
+
+    ```         
+    - <https://data-explorer.oecd.org/vis?lc=en&tm=ppp&pg=0&snb=111&vw=ov&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_NAMAIN10%40DF_TABLE4&df[ag]=OECD.SDD.NAD&df[vs]=1.0&dq=A.AUS%2BAUT%2BBEL%2BCAN%2BCHL%2BCOL%2BCRI%2BCZE%2BDNK%2BEST%2BFIN%2BFRA%2BDEU%2BGRC%2BHUN%2BISL%2BIRL%2BISR%2BITA%2BJPN%2BKOR%2BLVA%2BLTU%2BLUX%2BMEX%2BNLD%2BNZL%2BNOR%2BPOL%2BPRT%2BSVK%2BSVN%2BESP%2BSWE%2BCHE%2BTUR%2BGBR%2BUSA...PPP_B1GQ.......&pd=2009%2C2020&to[TIME_PERIOD]=false>
+    - `OECD_2009-2020_wage_quality_annual_ppp_raw.csv`
+    ```
+
+### Setup
+
+```{r}
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  janitor,
+  terra,
+  readxl,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores
+  tidyverse, 
+  httr,
+  plotly,
+  zoo, # for gapfilling
+  pdftools
+)
+#remotes::install_github("skgrange/threadr") # for na_extrapolate
+library(threadr)
+
+
+# source 
+source(here("workflow/R/common.R"))
+
+source(here('workflow/R/fao_fxn.R')) # function for cleaning old version of FAO data 
+
+source(here('workflow/R/fao_online_portal_clean.R'))
+
+# set year and file path info
+current_year <- 2024 # Update this!!
+
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+data_path <- here("globalprep", "le", version_year)
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# world bank raw data directory
+wb_dir <- here(raw_data_dir, "WorldBank", data_dir_version_year)
+
+# ILO raw data directory
+ilo_dir <- here(raw_data_dir, "ILOSTAT", data_dir_version_year)
+
+# FAO raw data directory
+fao_dir <- here(raw_data_dir, "FAO", data_dir_version_year)
+
+# OECD raw data directory
+oecd_dir <- here(raw_data_dir, "OECD", data_dir_version_year)
+
+# FAO capture raw data directory
+fao_capture_dir <- here(raw_data_dir, "FAO_capture", data_dir_version_year)
+
+# Ex-vessel raw data directory
+ex_vess_dir <- here(raw_data_dir, "ex-vessel-price-database-updated")
+
+# OECD and FAO joint collection raw data directory
+oecd_fao_dir <- here(raw_data_dir, "OECD_FAO_joint_collection", data_dir_version_year)
+
+# output data dir for intermediate data products
+int_dir <- here(data_path, "int")
+```
+
+### Read in Data
+
+```{r}
+#-------cf ILO wage data (2009 - 2021) -------
+# this data has limited entries, so local currency will need to be ppp adjusted to increase the number of observations per geo area
+cf_ilo_wage_raw <- read_csv(here(ilo_dir, "EAR_4MTH_SEX_ECO_CUR_NB_A-filtered-2024-07-03-cf-wage.csv"))
+
+cf_wage_ppp_raw <- read_csv(here(oecd_dir, "OECD_2009-2020_wage_quality_annual_ppp_raw.csv"))
+```
+
+# Livelihood: Quality of Jobs -- cf
+
+-   note: this data came from many sources and was compiled by ILO. PPP
+    GDP adjustments come from OECD
+
+Cleaning and wrangling data
+
+```{r}
+# separating into the different currencies
+cf_ilo_wage <- cf_ilo_wage_raw %>% 
+  janitor::clean_names() %>% 
+  rename(currency = classif2_label, 
+         year = time) %>% 
+  select(ref_area_label, year, currency,obs_value, note_indicator_label, source_label)
+
+length(unique(cf_ilo_wage$ref_area_label)) #32
+
+unique(cf_ilo_wage$currency)
+# "Currency: Local currency" "Currency: 2017 PPP $"     "Currency: U.S. dollars" 
+
+# Local currency -- needs to be PPP adjusted
+cf_wage_local <- cf_ilo_wage %>% 
+  filter(currency %in% "Currency: Local currency")
+
+# Currency: U.S. dollars -- needs to be PPP adjusted
+cf_wage_usd <- cf_ilo_wage %>% 
+  filter(currency %in% "Currency: U.S. dollars")
+
+# 2017 PPP $
+cf_wage_2017ppp <- cf_ilo_wage %>% 
+  filter(currency %in% "Currency: 2017 PPP $")
+
+############# Bring in OECD data to adjust monthly earnings to 2017 PPP
+```
+
+## Next Steps
+
+-   ILOSTAT data does not have enough regions/countries. There are
+    currently only 32 reported geo areas. To combat this, Fabiana Cerasa
+    (OECD), and Orsolya Mikecz (FAO) were contacted via email to obtain
+    more comprehensive data.
+    -   We came across their June 2023 [powerpoint
+        presentation](%22https://www.fao.org/fishery/services/storage/fs/fishery/documents/CWP/presentations/2023/CWP_IS_2023_Pr.6.2.pdf%22)
+        on [Fisheries and aquaculture employment
+        statistics](%22https://www.fao.org/fishery/en/collection/global_fishers%22),
+        a discussion on different topics related to the current joint
+        collection of employment statistics by OECD and FAO.
+-   OECD data was brought in to account for the fact that the ILOSTAT
+    data has three different currency types that need to be
+    standardized. This would not be needed if Fabiana Cerasa and Orsolya
+    Mikecz fail to respond.
+
+### Update on OECD and FAO email:
+
+Mikecz, Orsolya (NFISS)
+[Orsolya.Mikecz\@fao.org](mailto:Orsolya.Mikecz@fao.org){.email} Thu,
+Jul 18, 2024 at 2:45 AM To: Sophia Lecuona
+[sophiamireille\@ucsb.edu](mailto:sophiamireille@ucsb.edu){.email},
+"[Fabiana.Cerasa\@oecd.org](mailto:Fabiana.Cerasa@oecd.org){.email}"
+[Fabiana.Cerasa\@oecd.org](mailto:Fabiana.Cerasa@oecd.org){.email} Cc:
+Melanie Frazier
+[frazier\@nceas.ucsb.edu](mailto:frazier@nceas.ucsb.edu){.email}
+
+Hello Sophia,
+
+We thank you for your message and for your interest in our data. I am
+attaching the data we have for 53 countries that are part of the joint
+collection carried out by FAO and the OECD. These data are publicly
+available through the OECD.
+
+Regarding additional countries only collected by FAO, you can find some
+information in the FAO Fisheries and Aquaculture Yearbooks
+<https://www.fao.org/cwp-on-fishery-statistics/handbook/tools-and-resources/list-of-fao-yearbooks-of-fishery-statistics/en/>
+and the recently published State of the World Fisheries and Aquaculture
+2024
+<https://www.fao.org/publications/home/fao-flagship-publications/the-state-of-world-fisheries-and-aquaculture/en>.
+The dataset is not public and cannot be shared, but if you have a more
+specific request, we may be able to share a subset of aggregated data.
+
+We hope this helps and please do not hesitate to contact us if you have
+any questions regarding the data shared in the attachment.
+
+Best regards,
+
+Orsolya and Fabiana
+
+#### Read in FAO OECD joint collection data
+
+Though this script is in regards to LIV::quality of jobs using wages, the data provided by the OECD and FAO joint collection is only employment data, aka number of jobs.  It will be evaluated in this script, since this script mentions the initial email to Orsolya and Fabiana.
+
+```{r}
+# read in joint data and see how many usable countries are available for marine fishing
+jobs_joint_data_raw <- read_csv(here(oecd_fao_dir, "Fisheries_employment_jointFAOOECD_all_data.csv"))
+
+# clean and subset for marine fishing only, will need to aggregate by year and region for all sexes.
+# U = unspecified, by assumption
+cf_jobs_oecd_fao <- joint_data_raw %>% 
+  janitor::clean_names() %>% 
+  select(-c(oc3, working_time, flag_est_country, flag_est_faooecd, flag, comment)) %>% 
+  rename(type = oc2) %>% 
+  # only have marine fishing for commercial fishing, since mariculture will cover aquaculture and processing is considered a different sector
+  filter(type %in% "Marine fishing")
+
+# aggregate by year and geographic_area
+cf_jobs_oecd_fao_agg <- cf_jobs_oecd_fao %>% 
+  dplyr::group_by(geographic_area, year) %>% 
+  dplyr::summarize(value = sum(value, na.rm = TRUE))
+
+length(unique(cf_jobs_oecd_fao_agg$geographic_area)) # v2024: 47
+```
+
+It appears that we only have 47 geo areas. This will be taken into `liv_cf_jobs_prep.Rmd` so that it can be worked with.

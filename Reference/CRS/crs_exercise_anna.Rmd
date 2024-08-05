@@ -1,0 +1,163 @@
+---
+title: "CRS Prep & Review"
+output: html_document
+date: "2024-08-05"
+---
+
+```{r setup, include=FALSE}
+
+library(terra)
+library(here)
+
+```
+
+Data describing commercial landings (tonnes) in 2017.
+```{r}
+fish <- rast(here("Reference", "CRS", "commercial_landings_2017.tif"))
+
+## Take a look
+plot(fish)
+# lets log so we can visualize this a little better
+plot(log(fish+1))
+```
+
+How many fish were captured?
+```{r}
+global(fish, "sum", na.rm = TRUE)
+# 86.3 million
+```
+Check against Sea Around Us to make sure this seems generally reasonable.
+
+-   seems quite low <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10>
+
+
+What is the area of each cell?
+```{r}
+cell_area <- cellSize(fish)
+plot(cell_area, box = TRUE)
+```
+Describe what the plotted image is saying?
+
+Given this, what is kind of deceptive about these plots?
+```{r}
+plot(fish)
+# lets log so we can visualize this a little better
+plot(log(fish+1))
+
+```
+
+-   the cells in the northern and southern extremes have a much gerater area than those concentrated in the center
+-   this may hide higher commercial fishing values in the center band, as those pixels will appear smaller when plotted
+-   more coarse resolution at the poles can lead to higher catch shown over a greater area than in reality
+-   when we sum values across cells, the area of that cell is relevant when we do a global summation:
+    -   From the documentation on `cellSize()`
+    
+> Compute the area covered by individual raster cells.
+> Computing the surface area of raster cells is especially relevant for longitude/latitude rasters.
+
+> But note that for both angular (longitude/latitude) and for planar (projected) coordinate reference systems raster cells sizes are generally not constant, unless you are using an equal-area coordinate reference system.
+
+> For planar CRSs, the area is therefore not computed based on the linear units of the coordinate reference system, but on the *actual* area by transforming cells to longitude/latitude. If you do not want that correction, you can use transform=FALSE or init(x, prod(res(x)))
+
+
+Let's convert these data to another coordinate reference system:
+```{r}
+moll <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+fish_moll <- terra::project(fish, crs(moll))
+
+# take a look
+par(mar = c(5, 4, 4, 0)) # set margins: bottom, left, top, right
+plot(fish_moll)
+plot(log(fish_moll + 1), main = "Transformed CRS: Mollweide")
+plot(log(fish+1), main = "Original CRS: WGS 84 EPSG 4326")
+
+## Count the total tonnes
+global(fish_moll, "sum", na.rm = TRUE)
+# 389.3 million
+
+# calculate cell area
+cell_area_moll <- cellSize(fish_moll)
+
+#par(mai = c(1, 1, 3, 5)) # set margins: bottom, left, top, right
+#par(oma = c(1, 1, 3, 4))
+#par(mar = c(1,1,1,1))
+plot(cell_area_moll, main = "Mollweide projection cell size")
+
+plot(cell_area, main = "Original projection cell size")
+```
+
+```{r}
+(cell_area_moll$area)
+# min 0
+# max is 547 million
+cell_area$area
+# min: 122442386 (122 million)
+# max: 3077249667 (3 billion)
+```
+
+
+Compare to the original tonnes? What is happening? How can you improve this?
+-   original tons: 86331119
+-   Mollweide tons: 389271065
+-   the cell size area is now relatively consistent across the globe -- old cell sizes have stretched etc., to fit a standardized cell size (I tried to extend the margins to see the full scalebar label values but struggled)
+-     perform global calculations before reprojecting
+
+```{r}
+View(fish)
+
+summary(fish)
+
+fish_polygons <- terra::as.polygons(fish)
+
+fish_df <- terra::values(fish_polygons)
+```
+
+```{r}
+# Get the cell numbers
+cells <- 1:terra::ncell(fish)
+
+# Get the x and y coordinates for each cell
+xy <- terra::xyFromCell(fish, cells)
+
+# Extract the values
+values <- terra::values(fish)
+
+# Combine everything into a data frame
+fish_df <- data.frame(
+  x = xy[,1],
+  y = xy[,2],
+  value = values
+)
+
+fish_no_na <- fish_df %>% 
+  na.omit()
+```
+
+-   
+
+See what happens when we make multiple CRS conversions:
+
+```{r}
+# Robinson projection
+rob <- "+proj=robin +datum=WGS84 +units=m +no_defs"
+
+fish_moll_rob <- terra::project(fish_moll, crs(rob))
+plot(log(fish_moll_rob + 1))
+
+# now back to lat long:
+fish_moll_rob_latlon <- project(fish_moll_rob, fish)
+
+plot(log(fish_moll_rob_latlon + 1))
+
+# check to see if it exactly matches the start
+check <- fish_moll_rob_latlon - fish
+plot(log(check + 1))
+check
+
+
+```
+
+What is this telling us?
+
+
+-   the values have changed notably between projections
