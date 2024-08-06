@@ -60,7 +60,7 @@ Aragonite saturation has only been measured at selected locations during the las
 ### Updates from 2024 assessment
 
 Copernicus Marine Service's Global Ocean Surface Carbon product was found by Melanie Frazier, which has been an excellent resource.
-This layer is a revamped version of previous years', and can be updated in future years now.
+This layer is a revamped version of previous years', and can be updated in future years now. In the future, I would finish updating the script by changing certain `raster::calc` and `raster::stack` functions (etc) to the `terra` package.
 
 # Data Source
 
