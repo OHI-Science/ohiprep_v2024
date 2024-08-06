@@ -1,0 +1,593 @@
+---
+title: "OHI 2023: Food Provision/Fisheries, Identify FAO and OHI regions for RAM stocks"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
+```
+
+# Summary
+
+Generates a dataset describing the OHI and FAO major fishing regions that correspond to each stock's range.  This combines last year's dataset of stock-spatial information from RAM v4.491 database and Christopher M. Free's spatial work at Rutgers as well as newly added stocks from RAM v4.495 with manually assigned ohi and fao region ids. Dataset only contains stocks with B/Bmsy data.
+
+## Updates from previous assessment
+
+- The RAM data changed for v2023 so we re-ran this
+
+## Setup
+
+```{r}
+## Libraries
+library(dplyr)
+library(tidyr)
+library(readr)
+library(sf)
+library(ggplot2)
+library(stringr)
+library(here) 
+setwd(here::here("globalprep","fis","v2023"))
+
+source('../../../workflow/R/common.R')
+```
+
+## Identify Newly Added Stocks
+
+Compare stocks found in previous version of RAM data to new data to see what additional stocks have been added.
+
+Old Stocks: Used `timeseries` table, because in RAM v3.80, this table only contained single assessment for each unique stock. Now we use `timeseries_values_view, since v4.44 (assessment year 2019). 
+```{r}
+## old stocks
+load(file.path(dir_M, "git-annex/globalprep/_raw_data/RAM/d2021/RAMLDB v4.495/R Data/DBdata[asmt][v4.495].RData"))
+
+ram_bmsy_old <- timeseries_values_views %>%
+dplyr::select(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SSBdivSSBmgt) %>%
+  mutate(ram_bmsy = 
+           ifelse(!is.na(TBdivTBmsy), TBdivTBmsy, SSBdivSSBmsy)) %>%
+  mutate(ram_bmsy =
+           ifelse(is.na(TBdivTBmsy) & is.na(SSBdivSSBmsy), TBdivTBmgt, ram_bmsy)) %>%
+  mutate(ram_bmsy = 
+           ifelse(is.na(TBdivTBmsy) & is.na(SSBdivSSBmsy) & is.na(TBdivTBmgt), SSBdivSSBmgt, ram_bmsy)) %>%
+  dplyr::filter(year > 1979) %>%
+  filter(!is.na(ram_bmsy)) %>%
+  dplyr::select(stockid, stocklong, year, ram_bmsy)
+
+## check number of unique entries
+old_stockid <- unique(ram_bmsy_old$stockid) # 488 unique entries
+```
+
+New Stocks: Used `timeseries_values_views` table, because in RAM v4.44, this is the table that contains the most recent assessment for each unique stock. The `timeseries` table has all assessments conducted so there are multiple `assessid` per unique `stockid`.
+```{r}
+## new stocks
+load(file.path(dir_M, "git-annex/globalprep/_raw_data/RAM/d2023/RAMLDB v4.61/R Data/DBdata[asmt][v4.61].RData"))
+
+ram_bmsy <- timeseries_values_views %>%
+dplyr::select(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SSBdivSSBmgt) %>%
+  mutate(ram_bmsy = 
+           ifelse(!is.na(TBdivTBmsy), TBdivTBmsy, SSBdivSSBmsy)) %>%
+  mutate(ram_bmsy =
+           ifelse(is.na(TBdivTBmsy) & is.na(SSBdivSSBmsy), TBdivTBmgt, ram_bmsy)) %>%
+  mutate(ram_bmsy = 
+           ifelse(is.na(TBdivTBmsy) & is.na(SSBdivSSBmsy) & is.na(TBdivTBmgt), SSBdivSSBmgt, ram_bmsy)) %>% 
+  filter(!is.na(ram_bmsy)) %>% 
+  dplyr::filter(year > 1979) %>%
+  dplyr::select(stockid, stocklong, year, ram_bmsy)
+
+## check number of unique entries
+new_stockid <- unique(ram_bmsy$stockid) # 496 unique entries
+```
+
+
+### Investigate Differences
+There were 27 stocks included in the new data but not the old data.
+These include: 
+
+ [1] "ANCHIXa"              "BIGSKAPCOAST"        
+ [3] "BLSHARIO"             "BLSHARNATL"          
+ [5] "BLSHARSATL"           "CSLOBSTERPR"         
+ [7] "CSLOBSTERSTC"         "CSLOBSTERSTT_STJ"    
+ [9] "DVANGSASC"            "DVANGSAWC"           
+[11] "GJOBMHI"              "GSSMELTI-II-IIIa-IV" 
+[13] "GSSMELTVa-XIV"        "GSSMELTVb-VIa"       
+[15] "IPSAILIO"             "LINGVb"              
+[17] "NEPHFU25"             "NEPHFU2627"          
+[19] "OWSHARCWPAC"          "PERCHHG"             
+[21] "SCMPSCI6A"            "SFMAKONATL"          
+[23] "SFMAKOSATL"           "SLKSHARCWPAC"        
+[25] "SWORDSPAC"            "TURIIIa"             
+[27] "WITFLOUNIIIa-IV-VIId"
+
+
+There were 19 stocks present in the old data but not the new.
+These include:
+
+ [1] "ANCHOCWACIV-BEN"   "ANCHOCWAGAB-AGO"   "BHAKECWAAGO"      
+ [4] "BOARVI-VIII"       "BONGACWAGAB-COD"   "CHMACKCWAGAB-AGO" 
+ [7] "CHMACKCWAGNB-LBR"  "CODNEARNCW"        "HERRVIa"          
+[10] "LOBSTERGOM"        "MSARDCWACIV-BEN"   "PERCHQCI"         
+[13] "RSARDCWACIV-BEN"   "SARDINCWAGAB-AGO"  "SARDINCWAGNB-LBR" 
+[16] "SARDNWAZC"         "SCADSPPCWAGNB-LBR" "SOLECWAAGO"       
+[19] "SOLECWAGNB-GIN" 
+
+
+ - PERCHQCI: ID changed to PERCHHG (redefined)
+ - LOBSTERGOM: now LOBSTERGOMGB (merged)
+
+
+```{r}
+## find newly added stocks, when using timeseries_values_views
+newStocks <- setdiff(new_stockid, old_stockid) # v2023: there are 27 new stocks
+unusedStocks <- setdiff(old_stockid, new_stockid) # these are no longer included in the RAM data, will be deleted
+
+# v2021: See the mispelling for COD1F-XIV vs COD1f-XIV. This is ok. We will just use the new spelling and assign the fao-ohi regions again. 
+```
+
+
+Subset for just the additional stocks in RAM v4.61 data
+```{r}
+ram_bmsy_new <- ram_bmsy %>% 
+  filter(stockid %in% newStocks) 
+
+id_new <- ram_bmsy_new %>% 
+  select(stockid, stocklong) %>% 
+  distinct()
+```
+
+
+## Add Stock Info to Old RAM_fao_ohi_rgns
+
+Each stock needs the corresponding ohi and fao regions associated with its range. Make sure there are no duplicates here
+
+```{r}
+## Grab last year's fao-ohi-assessid data table
+## (we need to get the stock id from the old RAM data)
+RAM_fao_ohi_rgns <- read.csv("../v2022/int/RAM_fao_ohi_rgns_final.csv") 
+
+
+RAM_fao_ohi_rgns_fix <- RAM_fao_ohi_rgns %>%
+  distinct() %>% ## fixes any duplicates. Now lets check for mispellings or other errors 
+  group_by(rgn_id, fao_id, stockid) %>%
+  dplyr::mutate(dupe = n()>1) %>% # find the rest of the duplicates 
+  ungroup()
+  
+ #filter for duplicates
+dupes <- RAM_fao_ohi_rgns_fix %>%
+filter(dupe == "TRUE") # 0 good
+
+dupes$stockid #these are our problem duplicates: 0
+
+## fix the dupes 
+dupes_fix <- dupes %>%
+  filter(!is.na(RAM_area_m2))
+
+##filter out dupes from RAM_fao_ohi_rgns_fix and add fixed dupes back in
+#RAM_fao_ohi_rgns_fix_final 
+
+RAM_rgns_old <- RAM_fao_ohi_rgns_fix %>%
+  filter(dupe == "FALSE") %>%
+  rbind(dupes_fix) %>%
+  select(-dupe) ## now we have fixed the duplicate problem (if there was one...). 
+```
+
+
+## remove stocks that are no longer in the RAM data
+(but were in the previous version)
+
+```{r}
+filter(RAM_rgns_old, stockid %in% unusedStocks) # quick check
+
+RAM_rgns_old <- RAM_rgns_old %>%
+  filter(!(stockid %in% unusedStocks))
+```
+
+## Combine New and Old Stock Data
+
+Essentially adds new stocks to the bottom of the old stocks data table.  The regions of the new stocks are blank at this point. 
+```{r}
+## Make sure these new species aren't in the old data
+setdiff(id_new$stockid, RAM_rgns_old$stockid)
+
+
+RAM_rgns_new <- RAM_rgns_old %>% 
+  full_join(id_new, by = c("stockid","stocklong")) ## added the 27 new stocks.
+```
+
+## Fill Region IDs for New Stocks
+
+Here we need to figure out what ohi region id and FAO region id each of the new stocks fall in (there are 27 new stocks for v2023). 
+
+1. Filter for all of the new stocks (all those with NA rgn and fao ids)
+2. Join with the "stock" and "area" dataset, which contain more information on the distribution of each stock
+3. For those stocks that are not labelled as multinational, we will assume that they only fall in the FAO and ISO3Cs that are attached to those stocks. Then we will join with our OHI regions dataset by ISO3C to get the OHI region ids. 
+4. For those that are labelled as "multinational" we will have to figure the regions out through google and other means (see below and the code for a complete description)
+
+
+Investigate what FAO/OHI region each stock belongs to: 
+* Primarily used www.fishsource.org to find stock distribution information (just search the stocklong name and usually something will come up). Can just put these regions/countries down if the fish shows up. 
+* Another good source to use is https://ices-library.figshare.com/ which will often have the specific name of the fish and then list the regions (FAO/other areas) in the title.
+* If the fish or a close enough match is on fishsource take the fishing countries listed at the top for the OHI regions. Then, use the FAO areas or other regional division (and find the FAO equivalent) to use for the associated FAO codes. If not, use the FAO areas or other regional divisions for both OHI regions and FAO codes.
+* For cross referencing with ICES sub-region codes, use these maps: https://www.researchgate.net/figure/Stock-units-defined-by-ICES-for-white-anglerfish-southern-stock-in-Divisions-VIIIc-and_fig1_31198841 and http://gis.ices.dk/sf/
+* Referenced F_CODE/FAO_AREAS (filtered for MAJOR in F_LEVEL) in ohi_fao_rgns shapefile (fis/v2017/int) from mazu (can use other map visuals to identify stock extent). 
+* FAO major fishing areas (fao_id): https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg
+
+Some regions have more than 1 `fao_id` or `rgn_id` (e.g. Alaska skate Bering Sea and Aleutian Islands,	Kamchatka flounder Bering Sea and Aleutian Islands have `fao_id` 61 and 67).
+
+
+```{r}
+## v2023: We will manually add the FAO and OHI regions for all of the NA stocks here. 
+
+## join with stock and area
+# first we join our stocks that have NAs in FAO id and rgn id (there should be 27 in v2023) to the "stock" and "area" dataframes that were loaded from the RAM database
+
+RAM_nas <- RAM_rgns_new %>%
+  filter(is.na(fao_id)) %>% 
+  left_join(as.data.frame(stock)) %>%
+  left_join(area)
+
+
+## filter for not multinational - we will use what is notated
+# Now we will filter for those stocks that have country not labeled as "multinational".. we will assume that the FAO id and country names are the true ranges for these stocks. Then we will wrangle to have the appropriate OHI rgn_id
+
+region_data()
+
+RAM_na_non_multi <- RAM_nas %>%
+  dplyr::select(-rgn_id) %>%
+  filter(country != "multinational") %>%
+  mutate(fao_id = primary_FAOarea) %>%
+  left_join(rgns_eez, by = c("ISO3_code" = "eez_iso3"), relationship =
+  "many-to-many") %>%
+  dplyr::select(rgn_id, fao_id, RAM_area_m2, stockid, stocklong) %>%
+  mutate(fao_id = as.double(fao_id)) # great, this leaves 18 stocks that we need to fill in now! 
+  
+
+
+## filter for multinational and determine what FAO ids they deserve
+
+RAM_na_multi <- RAM_nas %>%
+  filter(country == "multinational")
+
+unique(RAM_na_multi$region)
+
+# we have five larger areas that require manual data entry
+# "European Union" "Indian Ocean"   "Atlantic Ocean" "Europe non EU" "Pacific Ocean" 
+
+
+####### Start with Europe
+
+#### We know from the RAM excel sheet "Stock Changes History" that these stocks used to be named something else. So we will look at last years "RAM_fao_ohi_rgns" to figure out the ohi region ids for these stocks. Not relevant for v2023.
+
+
+####  now lets google each stocklong individually to figure out what OHI regions they are in
+
+# v2023
+# Europe - European Union and Europe non EU
+# Map of ICES/NAFO fishing areas: https://www.researchgate.net/figure/Map-of-the-ICES-and-NAFO-fishing-areas_fig1_268343176 (referenced for related areas)
+# Zoomed in version of Western Europe: https://www.researchgate.net/figure/Stock-units-defined-by-ICES-for-white-anglerfish-southern-stock-in-Divisions-VIIIc-and_fig1_31198841 (this is listed above too)
+# Map of broader FAO fishing areas: https://www.fao.org/fishery/en/area/search (see link above too)
+
+# Anchovy Portugese Waters -East (ANCHIXa): closest I could find - https://www.fishsource.org/stock_page/2687
+# OHI regions (fishing countries): Portugal (183), Spain (182)
+# fao:27.9.a
+
+# Greater silver smelt ICES 1-2-3a-4 (GSSMELTI-II-IIIa-IV): https://www.fishsource.org/stock_page/1710; https://ices-library.figshare.com/articles/report/Greater_silver_smelt_Argentina_silus_in_subareas_1_2_and_4_and_in_Division_3_a_Northeast_Arctic_North_Sea_Skagerrak_and_Kattegat_/21828207?backTo=/collections/_/6398177
+# OHI regions (fishing countries): Norway (223)
+# fao:27.1;fao:27.2;fao:27.3.a;fao:27.4
+# Northeast Arctic, North Sea, Skagerrak and Kattegat
+# Other areas associated with this region: Russia (73), Finland (174), Sweden (222), United Kingdom (Great Britain specifically, but it's lumped together) (180), Denmark (175), Germany (176), the Netherlands (177), Belgium (59), France (179)
+
+# Greater silver smelt ICES 5a-14 (GSSMELTVa-XIV): https://www.fishsource.org/stock_page/1845 (doesn't mention Greenland but seems close enough); https://ices-library.figshare.com/articles/report/Greater_silver_smelt_Argentina_silus_in_Subarea_14_and_Division_5_a_East_Greenland_and_Iceland_grounds_/19447772?backTo=/collections/ICES_Advice_2022/5796935
+# OHI regions (fishing countries): Iceland (143)
+# fao:27.14;fao:27.5.a
+# East Greenland and Iceland grounds
+
+# Greater silver smelt ICES 5b-6a (GSSMELTVb-VIa): https://www.fishsource.org/stock_page/1709; https://ices-library.figshare.com/articles/report/Greater_silver_smelt_Argentina_silus_in_divisions_5_b_and_6_a_Faroes_grounds_and_west_of_Scotland_/19447778?backTo=/collections/ICES_Advice_2022/5796935
+# OHI regions (fishing countries): Faeroe Islands (141), the Netherlands (177)
+# fao:27.5.b;fao:27.6.a
+# Faroes grounds and west of Scotland
+# Other areas associated with this region: United Kingdom (Scotland specifically, but it's lumped together) (180)
+
+# Ling Faroe Grounds (LINGVb): https://www.fishsource.org/stock_page/1353
+# OHI regions (fishing countries): Faeroe Islands (141)
+# fao:27.5.b
+# Faroe Grounds
+
+# Norway lobster North Galicia (FU 25) (NEPHFU25): did not see good enough equivalent on fishsource; https://ices-library.figshare.com/articles/report/Norway_lobster_Nephrops_norvegicus_in_Division_8_c_Functional_Unit_25_southern_Bay_of_Biscay_and_northern_Galicia_/19453487?backTo=/collections/ICES_Advice_2022/5796935 
+# ices_fu_nep:25
+# southern Bay of Biscay and northern Galicia
+# OHI regions (fishing countries): Spain (182)
+
+# Norway lobster West Galicia and North Portugal (FU 26-27) (NEPHFU2627): did not see good enough equivalent on fishsource; https://ices-library.figshare.com/articles/report/Norway_lobster_Nephrops_norvegicus_in_Division_9_a_functional_units_26_27_Atlantic_Iberian_waters_East_western_Galicia_and_northern_Portugal_/19453496?backTo=/collections/ICES_Advice_2022/5796935
+# ices_fu_nep:26;ices_fu_nep:27
+# Atlantic Iberian waters East, western Galicia, and northern Portugal
+# OHI regions (fishing countries): Spain (182), Portugal (183)
+
+# Turbot Kattegat and Skagerrak (TURIIIa): https://www.fishsource.org/fishery_page/4954 (roughly covers Skagerrak); https://www.fishsource.org/stock_page/1364 (roughly covers Kattegat); https://ices-library.figshare.com/articles/report/Turbot_Scophthalmus_maximus_in_Division_3_a_Skagerrak_and_Kattegat_/21864318
+# OHI regions (fishing countries): Denmark (175), Poland (178), the Netherlands (177), United Kingdom (180)
+# fao:27.3.a
+# Skagerrak and Kattegat 
+# Other areas associated with this region: Sweden (222), Norway (223)
+
+# Witch flounder ICES 3a-4-7d (WITFLOUNIIIa-IV-VIId): did not see good enough equivalent on fishsource; https://ices-library.figshare.com/articles/report/Stock_Annex_Witch_Glyptocephalus_cynoglossus_in_Subarea_4_and_divisions_3_a_and_7_d_North_Sea_Skagerrak_and_Kattegat_eastern_English_Channel_/18623576
+# fao:27.3.a;fao:27.4;fao:27.7.d
+# North Sea, Skagerrak and Kattegat, eastern English Channel
+# OHI regions (fishing countries): Denmark (175), Sweden (222), Norway (223), Belgium (59), the Netherlands (177), Germany (176), United Kingdom (180), France (179)
+
+
+ram_fao_areaname_multinational_europe <- RAM_na_multi %>%
+  dplyr::filter(region %in% c("Europe non EU", "European Union")) %>%
+  distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %>% # these are all just general rules, taken from an emLAB project: https://github.com/emlab-ucsb/sustain-sci-subsidy-reform-paper/blob/master/data/lookup-tables/assign_fao_areas_to_ram_v4.491.Rmd
+  mutate(areaname_fao_area = case_when(#areaname == "Azores" ~ "27;34", # crosses both
+                                       #areaname == "NAFO 1F and ICES 14" ~ "21;27", # crosses both
+                                       #areaname == "ICES 5-12-14 and NAFO Subareas 1-2 (deep)" ~ "21;27",
+                                       #areaname == "ICES 5-12-14 and NAFO Subareas 1-2 (shallow)" ~ "21;27",
+                                       #areaname == "Azores Grounds" ~ "27;34",
+                                       #areaname == "Mid-Atlantic Ridge" ~ "27", # check on this one
+                                        areaname == "Portugese Waters -East" ~ "27",
+                                        areaname == "ICES 1-2-3a-4" ~ "27",
+                                        areaname == "ICES 5a-14" ~ "27",
+                                        areaname == "ICES 5b-6a" ~ "27",
+                                        areaname == "Faroe Grounds" ~ "27",
+                                        areaname == "North Galicia (FU 25)" ~ "27",
+                                        areaname == "West Galicia and North Portugal (FU 26-27)" ~ "27",
+                                        areaname == "Kattegat and Skagerrak" ~ "27",
+                                        areaname == "ICES 3a-4-7d" ~ "27",
+                                       TRUE ~ "27"
+                                       )) %>% # Otherwise we assume it's 27 %>%
+ mutate(ohi_rgn = case_when(
+   #stockid == "WHITVIIbce-k" ~ "179;180;181;227;228;262",
+   #stockid == "COD1F-XIV" ~ "145", 
+   #stockid == "EBASSVIIIab" ~ "179;59;177;182;180",
+   #stockid == "REDDEEPI-II" ~ "223;182;73", 
+   #stockid == "SARDVIIIabd" ~ "179;182;177;181;180;175;176;189", 
+   #stockid == "TURIV" ~ "180;177"
+   stockid == "ANCHIXa" ~ "182;183",
+   stockid == "GSSMELTI-II-IIIa-IV" ~ "223",
+   stockid == "GSSMELTVa-XIV" ~ "143", # check on this
+   stockid == "GSSMELTVb-VIa" ~ "141;177",
+   stockid == "LINGVb" ~ "141",
+   stockid == "NEPHFU25" ~ "182",
+   stockid == "NEPHFU2627" ~ "182;183",
+   stockid == "TURIIIa" ~ "175;178;177;180",
+   stockid == "WITFLOUNIIIa-IV-VIId" ~ "175;222;223;59;177;176;180;179"
+ )) %>%
+  separate_rows(c(ohi_rgn, areaname_fao_area), sep = ";", convert = TRUE) %>%
+  dplyr::select("rgn_id" = "ohi_rgn", "fao_id" = "areaname_fao_area", RAM_area_m2, stockid, stocklong)
+
+
+
+####### Now lets do Africa 
+
+# assign fao id and rgn_id based on context clues from the areaname
+
+
+# ram_fao_areaname_multinational_west_africa <- RAM_na_multi %>%
+#   dplyr::filter(region %in% c("West Africa")) %>%
+#   distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %>%
+#   mutate(areaname_fao_area = case_when(areaname == "Central West Africa Cote Divoire-Benin" ~ "34", # assuming coast along ivory coast and benin
+#                                        areaname == "Central West Africa Gabon-Angola" ~ "34;47", # assume coast from gabon to angola
+#                                        areaname == "Central West Africa Angola" ~ "47", # assume just angola
+#                                        areaname == "Central West Africa Gabon-Congo DR" ~ "34", # assume gabon and Dem congo
+#                                        areaname == "Central West Africa Guinea Bissau-Guinea" ~ "34",
+#                                        areaname == "Central West Africa Guinea Bissau-Liberia" ~ "34", 
+#                                        areaname == "North West Africa Zone C" ~ "34")) %>%
+#   # now assign ohi rgn_id based on the same logic as above...
+#   mutate(ohi_rgn = case_when(areaname == "Central West Africa Cote Divoire-Benin" ~ "195;106;98;99", # assuming coast along ivory coast and benin
+#                                        areaname == "Central West Africa Gabon-Angola" ~ "198;100;199;200", # assume coast from gabon to angola
+#                                        areaname == "Central West Africa Angola" ~ "200", # assume just angola
+#                                        areaname == "Central West Africa Gabon-Congo DR" ~ "198;100;199", # assume gabon and Dem congo
+#                                        areaname == "Central West Africa Guinea Bissau-Guinea" ~ "194;193",
+#                                        areaname == "Central West Africa Guinea Bissau-Liberia" ~ "193;194;96;97", 
+#                                        areaname == "North West Africa Zone C" ~ "62")) %>%
+#   dplyr::select(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) %>%
+#   separate_rows(ohi_rgn,  sep = ";", convert = TRUE) %>%
+#   separate_rows(areaname_fao_area, sep = ";", convert = TRUE) %>%
+#   dplyr::select("rgn_id" = "ohi_rgn", "fao_id" = "areaname_fao_area", RAM_area_m2, stockid, stocklong)
+
+
+
+####### Now Atlantic Ocean
+# Blue shark Northern Atlantic (BLSHARNATL): https://www.fishsource.org/stock_page/1022
+# OHI regions (fishing countries): Belize (164), Japan (210), Portugal (183), Spain (182)
+# fao:21;fao:27;fao:31;fao:34.1;fao:34.2;fao:34.3.1;fao:34.3.2;fao:34.3.3;fao:34.3.4;fao:34.3.5;fao:34.4.2
+
+# Shortfin mako Northern Atlantic (SFMAKONATL): https://www.fishsource.org/stock_page/1156 (covers both North and South)
+# OHI regions (fishing countries): United States (163)
+# fao:21;fao:27;fao:31;fao:34.1;fao:34.2;fao:34.3.1;fao:34.3.2;fao:34.3.3;fao:34.3.4;fao:34.3.5;fao:34.4.2
+
+# Blue shark South Atlantic (BLSHARSATL): https://www.fishsource.org/stock_page/1024
+# OHI regions (fishing countries): Spain (182), Portugal (183), Japan (210), Namibia (101)
+# fao:34.3.6;fao:34.4.1;fao:41;fao:47
+
+# Shortfin mako South Atlantic (SFMAKOSATL): https://www.fishsource.org/stock_page/1156 (covers both North and South)
+# OHI regions (fishing countries): United States (163)
+# fao:34.3.6;fao:34.4.1;fao:41;fao:47
+
+ram_fao_areaname_multinational_atlantic_ocean <- RAM_na_multi %>%
+  dplyr::filter(region %in% c("Atlantic Ocean")) %>%
+  distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %>%
+  mutate(areaname_fao_area = case_when(areaname == "Northern Atlantic" ~ "21;27;31;34",
+                                       areaname == "South Atlantic" ~ "34;41;47"
+                                       )) %>%
+  # now assign ohi rgn_id based on the same logic as above...
+  mutate(ohi_rgn = case_when(stockid == "BLSHARNATL" ~ "164;210;183;182",
+                             stockid == "SFMAKONATL" ~ "163",
+                             stockid == "BLSHARSATL" ~ "182;183;210;101",
+                             stockid == "SFMAKOSATL" ~ "163"
+                             )) %>%
+  dplyr::select(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) %>%
+  separate_rows(ohi_rgn,  sep = ";", convert = TRUE) %>%
+  separate_rows(areaname_fao_area, sep = ";", convert = TRUE) %>%
+  dplyr::select("rgn_id" = "ohi_rgn", "fao_id" = "areaname_fao_area", RAM_area_m2, stockid, stocklong)
+
+
+
+####### Now Pacific Ocean
+# https://www.iss-foundation.org/tuna-stocks-and-management/fisheries-management/regional-fisheries-management-organizations-rfmos/western-and-central-pacific-fisheries-commission-wcpfc/ (helpful for WCPFC)
+
+# Oceanic whitetip shark Central Western Pacific Ocean (OWSHARCWPAC): could not find on fishsource; using places bordering WCPFC zone as a proxy for fishing countries
+# OHI regions (fishing countries): Russia (73), Japan (210), North Korea (21), South Korea (20), Taiwan (14), China (209), Singapore (208), Vietnam (207), Cambodia (24), Thailand (25), Malaysia (206), Indonesia (216), Philippines (15), Papua New Guinea (17), Australia (16), New Zealand (162), Solomon Islands (7), American Samoa (151), Cook Islands (153), Micronesia (9), Fiji (18), French Polynesia (147), Northern Mariana Islands and Guam (13), Line Islands (Kiribati) (148), Phoenix Islands (Kiribati) (157), Gilbert Islands (Kiribati) (212), Marshall Islands (11), Nauru (10), New Caledonia (5), Niue (154), Palau (8), Samoa (152), Tokelau (156), Tonga (155), Tuvalu (19), Vanuatu (6), Wallis and Futuna (161), Brunei (247), Norfolk Island (3), Macquarie Island (4)
+# FAO 71
+
+# Silky shark Central Western Pacific Ocean (SLKSHARCWPAC): could only find NE Pacific on fishsource which I did not think was a close enough equivalent; using places bordering WCPFC zone as a proxy for fishing countries
+# OHI regions (fishing countries): Russia (73), Japan (210), North Korea (21), South Korea (20), Taiwan (14), China (209), Singapore (208), Vietnam (207), Cambodia (24), Thailand (25), Malaysia (206), Indonesia (216), Philippines (15), Papua New Guinea (17), Australia (16), New Zealand (162), Solomon Islands (7), American Samoa (151), Cook Islands (153), Micronesia (9), Fiji (18), French Polynesia (147), Northern Mariana Islands and Guam (13), Line Islands (Kiribati) (148), Phoenix Islands (Kiribati) (157), Gilbert Islands (Kiribati) (212), Marshall Islands (11), Nauru (10), New Caledonia (5), Niue (154), Palau (8), Samoa (152), Tokelau (156), Tonga (155), Tuvalu (19), Vanuatu (6), Wallis and Futuna (161), Brunei (247), Norfolk Island (3), Macquarie Island (4)
+# FAO 71
+
+# Swordfish South Pacific Ocean (SWORDSPAC): https://www.fishsource.org/stock_page/1051; https://www.fishsource.org/stock_page/1076 (separates out Southeast and Southwest - took information from both)
+# OHI regions (fishing countries): Chile (224), China (209), Ecuador (137), South Korea (20), Mexico (135), Panama (129), Peru (138), Puerto Rico and Virgin Islands of the United States (116), Spain (182), Vanuatu (6), Australia (16), Vietnam (207), Fiji (18), French Polynesia (147)
+# FAO 87, 81 (approximate of South Pacific Ocean for lack of better source)
+
+ram_fao_areaname_multinational_pacific_ocean <- RAM_na_multi %>%
+  dplyr::filter(region %in% c("Pacific Ocean")) %>%
+  distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %>%
+  mutate(areaname_fao_area = case_when(areaname == "Central Western Pacific Ocean" ~ "71",
+                                       areaname == "South Pacific Ocean" ~ "87;81"
+                                       )) %>%
+  # now assign ohi rgn_id based on the same logic as above...
+  mutate(ohi_rgn = case_when(stockid == "OWSHARCWPAC" ~ "73;210;21;20;14;209;208;207;24;25;206;216;15;17;16;162;7;151;153;9;18;147;13;148;157;212;11;10;5;154;8;152;156;155;19;6;161;247;3;4",
+                             stockid == "SLKSHARCWPAC" ~ "73;210;21;20;14;209;208;207;24;25;206;216;15;17;16;162;7;151;153;9;18;147;13;148;157;212;11;10;5;154;8;152;156;155;19;6;161;247;3;4",
+                             stockid == "SWORDSPAC" ~ "224;209;137;20;135;129;138;116;182;6;16;207;18;147"
+                             )) %>%
+  dplyr::select(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) %>%
+  separate_rows(ohi_rgn,  sep = ";", convert = TRUE) %>%
+  separate_rows(areaname_fao_area, sep = ";", convert = TRUE) %>%
+  dplyr::select("rgn_id" = "ohi_rgn", "fao_id" = "areaname_fao_area", RAM_area_m2, stockid, stocklong)
+
+
+
+####### Now Indian Ocean
+# http://geonetwork.d4science.org/geonetwork/srv/en/metadata.show?uuid=fao-rfb-map-iotc (helpful for IOTC)
+
+# Blue shark Indian Ocean (BLSHARIO): https://www.fishsource.org/stock_page/1031
+# OHI regions (fishing countries): Spain, Portugal
+# rfb:IOTC: FAO 57 (primary), 51
+# Other areas associated with this region: All places bordering Indian Ocean (FAO 57 and 51 based on fishsource and link above) - South Africa (102), Mozambique (41), Madagascar (42), Tanzania (202), Kenya (43), Somalia (44), Yemen (47), Oman (48), Iran (191), Pakistan (53), India (203), Sri Lanka (40), Bangladesh (204), Myanmar (205), Thailand (25), Indonesia (216), Australia (16), Sudan (49), Egypt (214), Saudi Arabia (50), Singapore (208), Bahrain (52), Comoro Islands (21), Djibouti (46), Eritrea (45), Iraq (192), Kuwait (51), Israel (79), Jordan (215), Maldives (39), Mauritius (37), Qatar (190), Seychelles (31), East Timor (231), Andaman and Nicobar (26), Mayotte (29), Christmas Island (2), Cocos Islands (1), Heard and McDonald Islands (94), Prince Edward Islands (90), British Indian Ocean Territory (38)
+
+
+# Indo-Pacific sailfish Indian Ocean (IPSAILIO): could only find Eastern Pacific which I did not think was a close enough equivalent
+# rfb:IOTC: FAO 57 (primary), 51
+# OHI regions (fishing countries): All places bordering Indian Ocean in FAO 57 and 51 as a proxy (based on link above which defines Indian Ocean as 57 and 51) - South Africa (102), Mozambique (41), Madagascar (42), Tanzania (202), Kenya (43), Somalia (44), Yemen (47), Oman (48), Iran (191), Pakistan (53), India (203), Sri Lanka (40), Bangladesh (204), Myanmar (205), Thailand (25), Indonesia (216), Australia (16), Sudan (49), Egypt (214), Saudi Arabia (50), Singapore (208), Bahrain (52), Comoro Islands (21), Djibouti (46), Eritrea (45), Iraq (192), Kuwait (51), Israel (79), Jordan (215), Maldives (39), Mauritius (37), Qatar (190), Seychelles (31), East Timor (231), Andaman and Nicobar (26), Mayotte (29), Christmas Island (2), Cocos Islands (1), Heard and McDonald Islands (94), Prince Edward Islands (90), British Indian Ocean Territory (38)
+
+ram_fao_areaname_multinational_indian_ocean <- RAM_na_multi %>%
+  dplyr::filter(region %in% c("Indian Ocean")) %>%
+  distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %>%
+  mutate(areaname_fao_area = case_when(areaname == "Indian Ocean" ~ "57;51"
+                                       )) %>%
+  # now assign ohi rgn_id based on the same logic as above...
+  mutate(ohi_rgn = case_when(stockid == "BLSHARIO" ~ "102;41;42;202;43;44;47;48;191;53;203;40;204;205;25;216;16;49;214;50;208;52;21;46;45;192;51;79;215;39;37;190;31;231;26;29;2;1;94;90;38",
+                             stockid == "IPSAILIO" ~ "102;41;42;202;43;44;47;48;191;53;203;40;204;205;25;216;16;49;214;50;208;52;21;46;45;192;51;79;215;39;37;190;31;231;26;29;2;1;94;90;38"
+                             )) %>%
+  dplyr::select(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) %>%
+  separate_rows(ohi_rgn,  sep = ";", convert = TRUE) %>%
+  separate_rows(areaname_fao_area, sep = ";", convert = TRUE) %>%
+  dplyr::select("rgn_id" = "ohi_rgn", "fao_id" = "areaname_fao_area", RAM_area_m2, stockid, stocklong)
+
+## Join them all together 
+
+RAM_na_all <- rbind(RAM_na_non_multi, ram_fao_areaname_multinational_europe, ram_fao_areaname_multinational_atlantic_ocean, ram_fao_areaname_multinational_pacific_ocean, ram_fao_areaname_multinational_indian_ocean) ## now all of the NA ones have rgn_id and fao_id! 
+
+summary(RAM_na_all)
+# v2023:
+ #     rgn_id        fao_id     
+ # Min.   :  1   Min.   :21.00  
+ # 1st Qu.: 38   1st Qu.:51.00  
+ # Median :102   Median :57.00  
+ # Mean   :110   Mean   :56.56  
+ # 3rd Qu.:183   3rd Qu.:71.00  
+ # Max.   :247   Max.   :87.00  
+ #                              
+ #  RAM_area_m2    stockid         
+ # Min.   : NA   Length:340        
+ # 1st Qu.: NA   Class :character  
+ # Median : NA   Mode  :character  
+ # Mean   :NaN                     
+ # 3rd Qu.: NA                     
+ # Max.   : NA                     
+ # NA's   :340                     
+ #  stocklong        
+ # Length:340        
+ # Class :character  
+ # Mode  :character
+```
+
+## Tidy Final Datatable
+
+
+### Fix Incorrect FAO-OHI Matches
+
+Each row must have both an FAO id and a rgn id. Fix duplicate/incorrect fao-ohi matches by using ohi_fao_rgns spatial file
+```{r}
+## Spatial file with fao and ohi regions, F_CODE is the FAO id
+fao_ohi <- st_read(dsn = file.path(dir_M, "git-annex/globalprep/fis/v2017/int"),
+                   layer = "ohi_fao_rgns")
+st_geometry(fao_ohi) <- NULL # removes geometry
+
+fao_ohi_id <- fao_ohi %>%
+  select(rgn_id, fao_id = F_CODE) %>% 
+  arrange(rgn_id) %>% 
+  mutate(fao_id = as.numeric(as.character(fao_id))) %>% 
+  mutate(rgn_id = as.numeric(as.character(rgn_id))) %>% 
+  distinct()
+
+## Filter for correct fao-ohi pairs in the RAM regions table 
+RAM_rgns_new_final <- fao_ohi_id %>% 
+  left_join(RAM_na_all, by = c("rgn_id", "fao_id")) %>% 
+  filter(!is.na(stockid)) %>% # keep matches only
+ arrange(stocklong, fao_id)
+```
+
+Compare with unfiltered RAM regions table to check on fao-ohi pairs that were dropped
+```{r}
+## Number of unique stocks after joining
+nrow(RAM_rgns_new_final) #112 #v2023: 182
+## Number of unique stocks before joining
+RAM_temp <- RAM_na_all %>% select(rgn_id, fao_id, stockid, stocklong) %>% distinct() %>% arrange(stocklong, fao_id)
+nrow(RAM_temp) #113 #v2023: 340
+
+## add identifier for the two RAM table versions
+RAM_temp$idtemp <- 1:nrow(RAM_temp)
+RAM_rgns_new_final$idtemp2 <- 1:nrow(RAM_rgns_new_final)
+
+## view the ohi-fao pairs that would be removed
+combine <- RAM_temp %>% 
+  full_join(RAM_rgns_new_final, by = c("rgn_id", "fao_id", "stockid", "stocklong")) %>% 
+  filter(is.na(idtemp2)) ## we lost 1 here... This is ok though # v2023: is now 158 rows but 11 unique stocks
+```
+
+Tidy up RAM data table.  After the final check (located below), I hand added some new regions for some of the stocks. 
+```{r}
+# v2023: none hand-added
+write.csv(RAM_rgns_new_final, "int/RAM_new_stocks.csv", row.names=FALSE)
+## check that there are still 9 unique stock ids
+length(unique(RAM_rgns_new_final$stockid)) # 26, should be 27 but we lost SFMAKOSATL since US is not within the FAO zones of South Atlantic
+```
+
+### Combine with full dataset
+
+Combine newly added stocks with ohi and fao region information to the old stock data table. Make sure there are no NAs!
+```{r, eval=FALSE}
+RAM_final <- bind_rows(read_csv(file.path("int/RAM_new_stocks.csv"))) %>% 
+  select(-idtemp2)
+
+RAM_fao_ohi_rgn_final <- RAM_rgns_old %>% 
+  full_join(RAM_final, by = c("rgn_id", "fao_id", "stockid", "stocklong")) %>%
+  select(-RAM_area_m2.y, RAM_area_m2 = RAM_area_m2.x) 
+ 
+
+write.csv(RAM_fao_ohi_rgn_final, "int/RAM_fao_ohi_rgns_final.csv", row.names=FALSE)
+```
+
