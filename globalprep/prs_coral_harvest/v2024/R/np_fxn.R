@@ -61,7 +61,7 @@ np_split_antilles <- function(m) {
       'Saba'           = value,
       'Sint Maarten'   = value,
       'Sint Eustatius' = value) %>%
-    select(-value, -country) %>%
+    dplyr::select(-value, -country) %>%
     gather(country, value, -commodity, -product, -year) %>%
     mutate(country = as.character(country))  # otherwise, m_ant$country is factor; avoids warning in bind_rows bel
   m1 <- m %>%
@@ -150,7 +150,7 @@ np_harvest_gapflag <- function(h) {
     ### 'tbd' is a placeholder, to be corrected depending on which pass of regression
     ###     gapfill is required to fill them.  If any remain as 'tbd' after pass 2, then they never got gap-filled.
     
-    select(-no_data, -year_last) %>%
+    dplyr::select(-c(no_data, year_last)) %>%
     ### clean up temp columns
     
     arrange(rgn_id, product, commodity, year)
@@ -194,7 +194,7 @@ np_lowdata_filter <- function(h, nonzero_h_yr_min = 4) {
     ### Require at least 'nonzero_harvest_years_min' years of data; filter out all
     ###   commodities by region with fewer than this.  This prevents penalizing countries that
     ###   start experimental production but then stop, for example.
-    select(-nonzero_n) %>%
+    dplyr::select(-nonzero_n) %>%
     ### clean up temp columns
     arrange(rgn_id, product, commodity, year) %>%
     ungroup()
@@ -260,7 +260,7 @@ np_regr_coef <- function(h, scope = 'rgn_id', vars = 'tdy') {
               rgn_id    = mutate(m, rgn_id = scope_id),
               georgn_id = mutate(m, georgn_id = scope_id),
               global    = m)
-  m <- m %>% select(-scope_id)
+  m <- m %>% dplyr::select(-scope_id)
   return(m)
 }
 
@@ -286,7 +286,7 @@ np_regr_fill <- function(h, years_back=50, min_paired_obs=4, scope = 'rgn_id', v
   h_clipped <- h %>%
     filter(year >= lower_bound_year) %>%
     mutate(
-      n_pairs = sum((!is.na(tonnes) & tonnes>0 & !is.na(usd) & usd>0))) %>%
+      n_pairs = sum((!is.na(tonnes) & tonnes > 0 & !is.na(usd) & usd>0))) %>%
     filter(n_pairs >= min_paired_obs)
   
   coefficients <- np_regr_coef(h_clipped, scope, vars)
@@ -319,7 +319,7 @@ np_regr_fill <- function(h, years_back=50, min_paired_obs=4, scope = 'rgn_id', v
       usd         = ifelse(is.na(usd) & year >= lower_bound_year, pmax(0, usd_mdl), usd)) %>%
     mutate(year_last = max(year, na.rm=T)) %>% # add year_last variable
     mutate(gapfill = ifelse(is.na(tonnes) & is.na(usd) & year == year_last, 'endfill', gapfill)) %>% ## fix bad classifications
-    select(-usd_ix0, -tonnes_ix0, -usd_coef, -tonnes_coef, -usd_mdl, -tonnes_mdl, -yr_tns_coef, -yr_usd_coef, year_last) %>%
+    dplyr::select(-usd_ix0, -tonnes_ix0, -usd_coef, -tonnes_coef, -usd_mdl, -tonnes_mdl, -yr_tns_coef, -yr_usd_coef, year_last) %>%
     ### removes internal function-specific variables
     arrange(rgn_id, product, commodity, year)
   
@@ -341,7 +341,7 @@ np_end_fill <- function(h) {
       tonnes      = ifelse((gapfill=='endfill' & year==year_last & year_prev==year-1), tonnes_prev, tonnes),
       usd         = ifelse((gapfill=='endfill' & year==year_last & year_prev==year-1), usd_prev, usd)) %>%
     ungroup() %>%
-    select(-tonnes_prev, -usd_prev, -year_prev, -year_last) %>%
+    dplyr::select(-tonnes_prev, -usd_prev, -year_prev, -year_last) %>%
     ### clean up regression model gap-fill variables and end-fill variables.
     arrange(rgn_id, product, commodity, year)
   
@@ -465,7 +465,7 @@ add_georegion_id <- function(k) {
   region_data()
   key <- rgns_eez %>% 
     rename(cntry_key = eez_iso3) %>% 
-    select(-rgn_name)
+    dplyr::select(-rgn_name)
   dups <- key$rgn_id[duplicated(key$rgn_id)]
   key[key$rgn_id %in% dups, ]
   
@@ -473,7 +473,7 @@ add_georegion_id <- function(k) {
     filter(!(cntry_key %in% c('Galapagos Islands', 'Alaska',
                               'Hawaii', 'Trindade', 'Easter Island',
                               'PRI', 'GLP', 'MNP')))  %>%
-    select(rgn_id, cntry_key)
+    dplyr::select(rgn_id, cntry_key)
   #PRI (Puerto Rico) and VIR (Virgin Islands) in the same r2 zone (just selected one), 
   #GLP (Guadalupe) and MTQ (Marinique) in the same r2 zone (just selected one),  
   #MNP (Northern Mariana Islands) and GUM (Guam)
@@ -488,7 +488,7 @@ add_georegion_id <- function(k) {
   k1 <- k %>%
     left_join(key, by = 'rgn_id') %>%
     left_join(georegion, by = 'cntry_key') %>%
-    select(-cntry_key)
+    dplyr::select(-cntry_key)
   ### cleaning out variables
   return(k1)
 }
