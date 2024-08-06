@@ -669,6 +669,9 @@ regions_stats_clean <- regions_stats %>%
   mutate(year = as.numeric(as.character(substring(year, 8, 11)))) %>% # replace year from "scores_yr" into "yr"
   mutate(pressure_score = format(pressure_score, scientific = FALSE)) # remove scientific notation formating
 
+# write out acid.csv, which is in the same format as previous years.  All future .csv write-outs are in different formats than previous years
+# write_csv(regions_stats_clean, "output/acid.csv")
+
 # bringing the names in to allow for greater readability
 regions_stats_join <- left_join(regions_stats_clean, rgn_data, by = "rgn_id") %>% 
   relocate(rgn_name, .after = rgn_id)
