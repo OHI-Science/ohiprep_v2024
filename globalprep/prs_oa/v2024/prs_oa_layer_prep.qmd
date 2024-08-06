@@ -19,7 +19,7 @@ output:
 editor_options: 
   markdown: 
     wrap: sentence
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 # Summary
@@ -37,7 +37,7 @@ Specifically, we want to evaluate aragonite saturation. This is because it is a 
 3)  $HCO_3^- ↔ CO_3^{2-} + H^+$
 4)  $CO_2(aq) + CO_3^{2-} + H_2O → 2HCO_3^-$
 
-For **supersaturated** (Ω \> 1) conditions, with an excess of \[ $CO_3^{2-}$ \]seawater, a crystal of $CaCO_3$ will tend to grow, and in **undersaturated** (Ω \< 1) conditions, \$CaCO_3\$ will dissolve. \[$CO_3^{2-}$\]saturation is a weak function of temperature and salinity but a strong function of water depth (pressure) meaning that deeper waters are typically more corrosive. How \[saturation level\] affects calcifying organisms is difficult to predict however, because different species exert varying degrees of biological control on the calcification process. **Therefore, it may be a better idea to look at the current level of aragonite.**
+For **supersaturated** (Ω \> 1) conditions, with an excess of \[ $CO_3^{2-}$ \]seawater, a crystal of $CaCO_3$ will tend to grow, and in **undersaturated** (Ω \< 1) conditions, $CaCO_3$ will dissolve. \[$CO_3^{2-}$\]saturation is a weak function of temperature and salinity but a strong function of water depth (pressure) meaning that deeper waters are typically more corrosive. How \[saturation level\] affects calcifying organisms is difficult to predict however, because different species exert varying degrees of biological control on the calcification process. **Therefore, it may be a better idea to look at the current level of aragonite.**
 
 [Ocean Acidification: Saturation State - Science On a Sphere](https://sos.noaa.gov/catalog/datasets/ocean-acidification-saturation-state/#:~:text=Aragonite%20saturation%20state%20is%20commonly,organisms%20with%20calcium%20carbonate%20structures)
 
@@ -119,11 +119,11 @@ Will be filled as the data is evaluated...
 -   Create annual mean rasters for the new data by stacking the monthly rasters by year and using `raster::calc` to calculate the mean for that year.
     -   Save within `/home/shares/ohi/git-annex/globalprep/prs_oa/v2024/int/oa_annual_mean`
 
-5.  Rescale from 0 to 1
+5.  Rescale each annual raster between 0 to 1 using the historical average data as a reference -- v2024 updated the function
 
 6.  Project, resample, and check the extent of the new data, historical ref data, and zones raster from OHI
 
-7.  Calculate Zonal Statistics 
+7.  Calculate Zonal Statistics using the "mean" between the zones raster and the rescaled annual rasters for each region.  Finish by saving the dataframe within `/home/lecuona/OHI_Intro/ohiprep_v2024/globalprep/prs_oa/v2024/output`.
 
 # Setup
 
@@ -159,7 +159,8 @@ librarian::shelf(
   ggplot2,
   reticulate, # for python coding
   ncmeta,
-  ncdf4
+  ncdf4,
+  plotly
 )
 
 # ---- sources! ----
@@ -184,6 +185,9 @@ oa_dir <- here(dir_M, "git-annex", "globalprep", "prs_oa", version_year)
 # output data dir for intermediate data products
 int_dir <- here(oa_dir, "int")
 # dir.create(int_dir) # to create the path on Mazu if it has not already been done
+
+# final output dir
+output_dir <- here("globalprep","prs_oa", version_year, "output")
 
 # set colors
 cols = rev(colorRampPalette(brewer.pal(9, 'Spectral'))(255)) # rainbow color scheme
@@ -564,7 +568,7 @@ Now, let's reproject the rescaled rasters to `zones`, for OHI consistency
 # tic()
 # oa_rescaled_moll <- terra::project(oa_rescaled, zones) # using terra::project, which inherently resamples using bilinear interpolation
 # toc() 
-annual_avg_rescaled_moll_dir <- here::here(oa_dir, version_year, "int","annual_avg_rescaled_moll") 
+annual_avg_rescaled_moll_dir <- here::here(oa_dir, "int","annual_avg_rescaled_moll") 
 # dir.create(annual_avg_rescaled_moll_dir) # create Mazu directory for rescaled rasters if not already created
 
 # make a list of the already saved and rescaled annual rasters
@@ -591,121 +595,114 @@ reprojecting_func <- function(file){
   # reprojecting to the OHI zones file to ensure they have the same extent and proj
   r_moll <- terra::project(r, crs(zones), threads = TRUE)
   
-  # resample to ensure they have the same resolution
+  # resample to ensure they have the same resolution and write out the file to Mazu
   r_moll_resample <- terra::resample(x = r_moll, y = zones, method = "bilinear", filename = paste0(annual_avg_rescaled_moll_dir, '/oa_rescaled_moll_', yr, ".tif"), overwrite = TRUE)
   
-  # ## write raster to int folder in prs_oa
-  # writeRaster(r_moll_resample, 
-  #             filename = paste0(annual_avg_rescaled_moll_dir, '/oa_rescaled_moll_', yr, ".tif"),
-  #             overwrite = TRUE)
 }
 
 tic()
 lapply(oa_rescaled_annual_files, reprojecting_func)
-toc()
-
-# Error: [resample] cannot write values (err: 3)
-# In addition: There were 50 or more warnings (use warnings() to see the first 50)
-
-# Error in gzfile(file, mode) : cannot open the connection
-# In addition: Warning message:
-# In gzfile(file, mode) :
-#   cannot open compressed file '/tmp/RtmpxXQjrG/rstudio-available-packages-ff1a07e4cba38/time.rds', probable reason 'No such file or directory'
+toc() # v2024: 1047.173 sec elapsed
 ```
 
+Now, visualize the reprojected rasters to ensure it looks correct.
 
 ```{r}
-tic()
-nc_raster_moll <- terra::project(oa_multi_raster, mollCRS) # using terra::project, which inherently resamples using bilinear interpolation
-toc() # v2024: 98.562 sec elapsed
+# plot the rescaled rasters to ensure it looks correct.  
+reproj_annual_rasts <- list.files(path = here::here(annual_avg_rescaled_moll_dir), pattern = '.tif$',
+                 full.names = TRUE) 
+oa_reprojected <- terra::rast(reproj_annual_rasts) # make into a multilayer spatraster so that all annual rasters can be seen
+plot(oa_reprojected) # v2024: this looks great!
 
-plot(nc_raster_moll)
+ext(oa_reprojected) == ext(zones) # v2024: TRUE
+res(oa_reprojected) == res(zones) # v2024: TRUE
+crs(oa_reprojected) == crs(zones) # v2024: TRUE
 
-# ---- reproject the historical raster -----
-# needs to be reprojected
-crs(oa_hist_multilayer_nc) # v2024: GEOGCRS[\"WGS 84 (CRS84)\",\n
-
-oa_hist_moll_nc <- project(oa_hist_multilayer_nc, ocean) # reproject to Mollweide
-
-plot(oa_hist_moll_nc) # this is monthly data; we need to stack the raster layers by year and calculate the overall mean across all years for a historical average reference
-```
-
-As seen above, after projecting to Mollweide, the rasters have purple rectangles in areas where there should not be values. To fix this and avoid issues in the future, it may be good to use the `ocean.tif` read as an object "ocean" within the setup chunk and make the resolution equal to our data's resolution. We can then mask the multi-layer SpatRaster of our data to the resampled `ocean`, ensuring that the CRS, extent, and resolution is all the same between the two.
-
-```{r}
-# mask to ocean extent
-tic()
-ocean_mask_test <- terra::mask(x = nc_moll_ocean, mask = ocean_res_to_nc)
-toc()
-
-plot(ocean_mask_test)
-
-# ---- mask to `rgns_3nm_offshore_mol.tif`----
-# read it in
-rgns_3nm_offshore <- terra::rast(here(dir_M, "git-annex","globalprep","spatial","v2018","rgns_3nm_offshore_mol.tif"))
-
-crs(rgns_3nm_offshore)
-
-# resample to same resolution as nc_moll_ocean
-resamp_3nm_offshore <- terra::resample(x = rgns_3nm_offshore, y = nc_moll_ocean)
-
-# mask nc_moll_ocean to the eezs by region
-tic()
-oa_global_eez_multi <- terra::mask(x = nc_moll_ocean, mask = resamp_3nm_offshore)
-toc()
-
-plot(oa_global_eez_multi$omega_ar_1)
+# great! Now we can move on to zonal stats.
 ```
 
 ## Calculate Zonal Stats
 
 ```{r}
-# project and rescale here!!
-# come back and do each individual annual raster and parallelize!!
 # remember: `zones` from setup chunk
-# from `/home/shares/ohi/git-annex/globalprep/spatial/v2017`
+# zones is from `/home/shares/ohi/git-annex/globalprep/spatial/v2017`
 # regions_eez_with_fao_ant.tif: This includes all the ocean regions (eez/fao/antarctica), but the raster cell values correspond to the rgn_ant_id in regions_2017_update.  This file is most often used to extract pressure values for each region.
 
-crs(zones) # "PROJCRS[\"Mollweide\",\n  good, matches our rescaled rasters!
-res(zones) # 934.4789 934.4789
-ext(zones) == ext(oa_rescaled) # FALSE, does not match our rescaled rasters
-
-# resample the data to make the extents equal so zonal statistics can be calculated
-tic() # may need to add parallelization this takes a while
-oa_resampled <- terra::resample(x = oa_rescaled, y = zones) # rename object
-toc()
-
-# check that the extents are the same now
-ext(zones_resampled) == ext(oa_rescaled) # TRUE, matches our rescaled multilayer raster!
+names(zones)
 
 # use zonal statistics to calculate the average score of all the cells within each region
 tic()
-regions_stats <- terra::zonal(oa_resampled, zones, fun = "mean", na.rm = TRUE, progress = "text") %>% 
-  data.frame() 
-toc() # 
+regions_stats <- terra::zonal(oa_reprojected, zones, fun = "mean", na.rm = TRUE, progress = "text") %>%
+  data.frame() %>%
+  setNames(c("rgn_id", "scores_2010","scores_2011","scores_2012","scores_2013","scores_2014","scores_2015","scores_2016","scores_2017","scores_2018","scores_2019","scores_2020","scores_2021","scores_2022"))
+toc() # v2024: 361.876 sec elapsed
 
-# all OHI regions to compare to our zonal statistics and see what is missing
+# bring in all OHI regions and their names to compare to our zonal statistics and see what is missing
 rgn_data <- read_sf(here(dir_M, "git-annex", "globalprep", "spatial", "v2017"), "regions_2017_update") %>%
   st_set_geometry(NULL) %>%
   dplyr::filter(rgn_type == "eez") %>%
   dplyr::select(rgn_id = rgn_ant_id, rgn_name)
 
-# use `setdiff()` to see if any regions are missing
-setdiff(regions_stats$zone, rgn_data$rgn_id) # v2024: NULL -- great!!
-setdiff(rgn_data$rgn_id, regions_stats$zone) # CHECK BACK ON THIS!!
+# use `setdiff()` between the original zonal stats and the OHI regions to see if any regions are missing
+setdiff(regions_stats$rgn_id, rgn_data$rgn_id) # v2024: only the high seas regions that are not within the 250 OHI regions: 260 261 262 263 264 266 267 269 270 272 273 274 275 276 277
+setdiff(rgn_data$rgn_id, regions_stats$rgn_id) # v2024: integer(0)
 
+# clean up the zonal statistics resulting dataframe
 regions_stats_clean <- regions_stats %>%
-  rename(rgn_id = zone) %>%
-  filter(rgn_id <= 250) %>%
-  gather("year", "pressure_score", -1) %>%
-  mutate(year = as.numeric(as.character(substring(year, 7, 8)))) %>%
-  mutate(year = 1993 + year - 1) # convert from numbers to actual years
+  filter(rgn_id <= 250) %>% # to filter out zonal artifacts
+  gather("year", "pressure_score", -1) %>% # convert into tidier format
+  mutate(year = as.numeric(as.character(substring(year, 8, 11)))) %>% # replace year from "scores_yr" into "yr"
+  mutate(pressure_score = format(pressure_score, scientific = FALSE)) # remove scientific notation formating
+
+# bringing the names in to allow for greater readability
+regions_stats_join <- left_join(regions_stats_clean, rgn_data, by = "rgn_id") %>% 
+  relocate(rgn_name, .after = rgn_id)
 ```
 
-# Final Pressure Layer
+
+# Final Pressure Scores
+
+Visualize the final scores!
+
+```{r}
+pressure_oa_plot <- regions_stats_join %>%
+  plot_ly(x = ~year, y = ~pressure_score, color = ~rgn_name, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "Ocean Acidification Pressure Scores by Region",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Pressure Score"))
+pressure_oa_plot
+
+# save plot
+# htmlwidgets::saveWidget(pressure_oa_plot, file = "output/prs_oa_all_years_plot.html")
+```
+
+Save output files in `output_dir`, refer back to the setup chunk.
 
 ```{r plot_final}
+# ----- save all data (commented out in case someone runs the whole script) ---------
+# write_csv(regions_stats_join, "prs_oa_all_yrs.csv")
 
+# group the data by year
+yearly_data <- regions_stats_join %>%
+  group_by(year) %>% # group by all years, in this case it should be 2010 - 2022
+  group_split() # splits into a list of tibbles by the previous grouping.  It may be deprecated in the future... check documentation
+
+# get a list of unique years
+years <- regions_stats_join %>%
+  pull(year) %>% # specifying the year column, similar to using the $
+  unique() %>% # all unique values in that column
+  sort() # by default will sort in ascending order, double check "years" to make sure.
+
+# create a function to write CSV files in the output folder
+write_csv_by_year <- function(data, year) {
+  filename <- file.path("output", paste0("prs_oa_", year, ".csv"))
+  write.csv(data, file = filename, row.names = FALSE)
+}
+
+# ----- save yearly data (commented out in case someone runs the whole script) ---------
+## use map2 (which allows two vectors of the same length) to iterate over the split data and years to write individual csvs for each year
+# map2(yearly_data, years, write_csv_by_year) 
 ```
 
 
