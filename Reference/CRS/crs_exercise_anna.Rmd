@@ -24,12 +24,12 @@ plot(log(fish+1))
 How many fish were captured?
 ```{r}
 global(fish, "sum", na.rm = TRUE)
-# 86.3 million
+# 86.3 million tonnes
 ```
 Check against Sea Around Us to make sure this seems generally reasonable.
 
--   seems quite low <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10>
-
+-   seems a little low <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10> but generally makes sense (close enough)
+-   around 100 million <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10>
 
 What is the area of each cell?
 ```{r}
@@ -38,7 +38,13 @@ plot(cell_area, box = TRUE)
 ```
 Describe what the plotted image is saying?
 
+- cell size is much smaller at the poles, increases as you head in towards the equator
+
 Given this, what is kind of deceptive about these plots?
+
+-   if density of fish landings in tonnes, pole values would appear higher than they are -- apparent tonnes per cell would be higher 
+-   if count, same thing (seems higher than in reality)
+
 ```{r}
 plot(fish)
 # lets log so we can visualize this a little better
@@ -46,8 +52,10 @@ plot(log(fish+1))
 
 ```
 
--   the cells in the northern and southern extremes have a much gerater area than those concentrated in the center
+-   the cells in the northern and southern extremes have a much smaller area than those concentrated in the center
 -   this may hide higher commercial fishing values in the center band, as those pixels will appear smaller when plotted
+-   value associated w the cell is changing when you convert -- resampling by diff method (nearest neighbor, linear interpolation, bilinear)
+-   poles may appear to have higher values than they actually do -- same value over smaller area = higher density value
 -   more coarse resolution at the poles can lead to higher catch shown over a greater area than in reality
 -   when we sum values across cells, the area of that cell is relevant when we do a global summation:
     -   From the documentation on `cellSize()`
@@ -86,6 +94,8 @@ plot(cell_area_moll, main = "Mollweide projection cell size")
 plot(cell_area, main = "Original projection cell size")
 ```
 
+-   389 million tonnes is crazy
+
 ```{r}
 (cell_area_moll$area)
 # min 0
@@ -101,6 +111,45 @@ Compare to the original tonnes? What is happening? How can you improve this?
 -   Mollweide tons: 389271065
 -   the cell size area is now relatively consistent across the globe -- old cell sizes have stretched etc., to fit a standardized cell size (I tried to extend the margins to see the full scalebar label values but struggled)
 -     perform global calculations before reprojecting
+
+
+
+-   could take raster of cell size, multiply by original (if density) raster, then sum values 
+-   ^ divide if count
+
+-   tonnes / area = density, then project
+-   take new cell size, multiply by density raster
+-   sum at end to check again -- might need to reduce resolution, summary before projecting data
+
+
+```{r}
+# get density (tonnes/area)
+fish_density <- fish / cell_area
+
+plot(log(fish_density))
+
+# reproject to Mollweide
+fish_density_moll <- terra::project(fish_density, crs(moll))
+fish_density_moll
+
+plot(log(fish_density_moll))
+
+# get area of cells
+new_cell_size <- cellSize(fish_density_moll)
+plot(new_cell_size)
+
+# multiply density by area to get count (tonnes)
+new_tonnes <- fish_density_moll * new_cell_size
+plot(log(new_tonnes + 1))
+
+# sum to check
+global(new_tonnes, "sum", na.rm = TRUE)
+# 85 million!
+```
+
+-   close enough :)
+-   hopefully you don't care about Fiji data too much (gets distorted with Mollweide projection)
+
 
 ```{r}
 View(fish)
@@ -148,6 +197,7 @@ plot(log(fish_moll_rob + 1))
 fish_moll_rob_latlon <- project(fish_moll_rob, fish)
 
 plot(log(fish_moll_rob_latlon + 1))
+plot(log(fish + 1))
 
 # check to see if it exactly matches the start
 check <- fish_moll_rob_latlon - fish
@@ -161,3 +211,21 @@ What is this telling us?
 
 
 -   the values have changed notably between projections
+
+-   some are highly inflated (large positive numbers), other deflated (large negative in new projection)
+
+-   adding error when we flip between resolutions
+
+-   they're all just approximations (by nature)
+
+
+```{r}
+fish_moll_rob
+
+fish_moll_rob_latlon <- project(fish_moll_rob, fish) # match template (convert crs and resolution)
+fish_moll_rob_latlon
+
+fish_moll_rob_latlon_v2 <- project(fish_moll_rob, crs(fish)) # match crs (just convert crs)
+fish_moll_rob_latlon_v2
+```
+
