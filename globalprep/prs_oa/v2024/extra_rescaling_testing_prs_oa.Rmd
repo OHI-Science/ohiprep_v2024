@@ -1,0 +1,326 @@
+---
+title: 'OHI 2024: Ocean Acidification Data Prep Rescaling Testing'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+title: "OA extra rescaling exploration"
+jupyter: /home/lecuona/.virtualenvs/r-reticulate/bin/python
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 3
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../src/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+editor_options: 
+  markdown: 
+    wrap: sentence
+  chunk_output_type: console
+---
+
+# Setup
+
+```{r setup, message = FALSE, warning = FALSE, verbose = FALSE}
+
+#set options for all chunks in code
+#knitr::opts_chunk$set(warning=FALSE, message=FALSE,fig.width=6, fig.height=6)
+
+# load packages
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  here,
+  CopernicusMarine,
+  janitor,
+  raster,
+  terra,
+  maps,
+  httr,
+  jsonlite,
+  purrr,
+  tictoc,
+  sf, 
+  googleVis,
+  RColorBrewer,
+  foreach,
+  doParallel, # for using multiple cores, if needed
+  tidyverse, 
+  ohicore,
+  reticulate,
+  ggplot2,
+  reticulate, # for python coding
+  ncmeta,
+  ncdf4
+)
+
+# ---- sources! ----
+source(here("workflow", "R", "common.R")) # file creates objects to process data
+
+# ---- set year and file path info ----
+current_year <- 2024 # Update this in the future!!
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+
+# ---- data directories ----
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# CMS (Copernicus Marine Service) raw data directory
+cms_dir <- here(raw_data_dir, "CMS", data_dir_version_year)
+
+# prs_oa dir
+oa_dir <- here(dir_M, "git-annex", "globalprep", "prs_oa", version_year)
+
+# output data dir for intermediate data products
+int_dir <- here(oa_dir, "int")
+# dir.create(int_dir) # to create the path on Mazu if it has not already been done
+
+# set colors
+cols = rev(colorRampPalette(brewer.pal(9, 'Spectral'))(255)) # rainbow color scheme
+
+# Read in eez raster with cells at 1km -- used for resampling and zonal statistics (held on an NCEAS server)
+zones <- terra::rast(here::here(dir_M, "git-annex", "globalprep","spatial","v2017","regions_eez_with_fao_ant.tif"))
+```
+
+### Testing rescaling
+
+```{r}
+current <- c(0, 0.1, 0.5, 0.75, 0.95, 0.99, 1, 1.1, 1.5, 1.75, 2, 2.25, 2.50,
+2.75, 3.0, 3.5)
+hist <- c(0.5, 0.75, 1, 1.5, 2, 2.5, 3)
+oa_data <- expand.grid(current=current, hist=hist)
+oa_data <- oa_data %>%
+mutate(diff = (hist-current)/(hist-1)) %>%
+mutate(rescale_low_historic = ifelse(current <= 1, 1, diff))
+
+# test where the data is falling when doing conditionals
+hist_rules <- ifel(historical_avg>1 & historical_avg<3, 1, NA)
+plot(hist_rules)
+
+oa_annual_test_stack <- rast(oa_annual_files)
+global(oa_annual_test_stack, fun="isNA", na.rm=FALSE)
+#                  isNA
+# oa_annual_2010 425310
+# oa_annual_2011 424739
+# oa_annual_2012 426297
+# oa_annual_2013 428050
+# oa_annual_2014 427254
+# oa_annual_2015 425073
+# oa_annual_2016 424615
+# oa_annual_2017 424583
+# oa_annual_2018 424414
+# oa_annual_2019 423821
+# oa_annual_2020 424888
+# oa_annual_2021 426376
+# oa_annual_2022 426376
+
+annual_rules <- ifel(oa_annual_test_stack>1 | oa_annual_test_stack<0, 1, NA)
+plot(annual_rules)
+
+annual_rules_neg <- ifel(oa_annual_test_stack<0, 1, NA)
+plot(annual_rules_neg) # none
+global(annual_rules_neg, fun = "sum", na.rm = TRUE) # NaN, so none
+
+annual_rules_over1 <- ifel(oa_annual_test_stack>1, 1, NA)
+plot(annual_rules_over1)
+annual_rules_over1_sum <- global(annual_rules_over1, fun = "sum", na.rm = TRUE) 
+#                   sum
+# oa_annual_2010 593872
+# oa_annual_2011 594459
+# oa_annual_2012 593699
+# oa_annual_2013 590495
+# oa_annual_2014 592013
+# oa_annual_2015 593592
+# oa_annual_2016 593607
+# oa_annual_2017 593438
+# oa_annual_2018 594143
+# oa_annual_2019 595117
+# oa_annual_2020 593792
+# oa_annual_2021 591525
+# oa_annual_2022 591175
+
+# vs the total number of values
+all_annual_values <- ifel(oa_annual_test_stack>1, 1, 1)
+all_annual_values_sum <- global(all_annual_values, fun = "sum", na.rm = TRUE) 
+#                   sum
+# oa_annual_2010 601410
+# oa_annual_2011 601981
+# oa_annual_2012 600423
+# oa_annual_2013 598670
+# oa_annual_2014 599466
+# oa_annual_2015 601647
+# oa_annual_2016 602105
+# oa_annual_2017 602137
+# oa_annual_2018 602306
+# oa_annual_2019 602899
+# oa_annual_2020 601832
+# oa_annual_2021 600344
+# oa_annual_2022 600344
+
+# how many values in the annual rasters are not over 1
+setdiff(annual_rules_over1_sum, all_annual_values_sum)
+diff_test <- all_annual_values_sum - annual_rules_over1_sum
+#                 sum
+# oa_annual_2010 7538
+# oa_annual_2011 7522
+# oa_annual_2012 6724
+# oa_annual_2013 8175
+# oa_annual_2014 7453
+# oa_annual_2015 8055
+# oa_annual_2016 8498
+# oa_annual_2017 8699
+# oa_annual_2018 8163
+# oa_annual_2019 7782
+# oa_annual_2020 8040
+# oa_annual_2021 8819
+# oa_annual_2022 9169
+```
+
+#### Anna's testing:
+
+```{r, }
+# Function to generate bimodal distribution
+generate_bimodal <- function(n) {
+  # Generate two normal distributions
+  dist1 <- rnorm(n/2, mean = 1.5, sd = 0.5)
+  dist2 <- rnorm(n/2, mean = 3.5, sd = 0.5)
+  
+  # Combine the distributions
+  mixture <- c(dist1, dist2)
+  
+  # Clip values to range 0-5
+  pmax(pmin(mixture, 5), 0)
+}
+
+# Generate two sets of bimodal distributions
+set.seed(123)  # for reproducibility
+hist <- (generate_bimodal(1000))
+current <- generate_bimodal(1000)
+
+# Visualize the distributions
+par(mfrow = c(1, 2))
+hist(hist, main = "Distribution of Hist(orical) values", xlab = "Value", breaks = 30)
+hist(current, main = "Distribution of Current values", xlab = "Value", breaks = 30)
+
+
+
+hist_df <- as.data.frame(x = hist)
+current_df <- as.data.frame(x = current)
+
+vals_df <- cbind(hist_df, current_df)
+
+diff_df <- vals_df %>% 
+  mutate(diff = (hist - current)/(hist - 1))
+
+ggplot(diff_df, aes(x = diff)) + 
+  geom_histogram(binwidth = 0.5,
+                 color = "red") +
+  labs(title = "Distribution of 'diff' values",
+       subtitle = "across all locations") +
+  theme_bw()
+
+diff_filter <- diff_df %>% filter(hist > 1 & hist <= 3)
+
+ggplot(diff_filter, aes(x = diff)) + 
+  geom_histogram(binwidth = 0.5,
+                 color = "red") +
+  labs(title = "Distribution of 'diff' values",
+       subtitle = "where historical values > 1 & <= 3") +
+  theme_bw()
+
+
+current_reclass <- diff_df %>% 
+  mutate(current_reclass_vals = case_when(
+    current <= 1 ~ 1,
+    current > 3 ~ 0,
+    current > 1 & current <= 3 ~ (1 - ((current - 1)/(3 - 1))),
+    .default = current
+  ))
+
+ggplot(current_reclass, aes(x = current_reclass_vals)) + 
+  geom_histogram(color = "blue", fill = "grey") +
+  theme_bw() +
+  labs(title = "Distribution of values after adjusting current values",
+       subtitle = "current <=1 ~1, current > 3 ~ 0, current > 1 & current <= 3 ~ (1 - ((current - 1)/(3 - 1)))",
+       x = "reclassified current values")
+
+pressure_df <- current_reclass %>% 
+  mutate(final_press_vals = case_when(
+    hist > 1 & hist <= 3 ~ diff,
+    .default = current_reclass_vals
+  ))
+
+ggplot(pressure_df, aes(x = final_press_vals)) + 
+  geom_histogram(binwidth = 0.5,
+    color = "purple", fill = "grey") +
+  theme_bw() +
+  labs(title = "Distribution of values after using 'diff' values",
+  subtitle = "for locations where hist > 1 & hist <= 3",
+  x = "final 'pressure' values...")
+```
+
+
+## Interpolate if needed?
+
+Since there are oceanic cells with no information in the raw data, we need to fill in these gaps. We do this by interpolating across the globe using the data we have with an Inverse Distance Weighting (IDW) function. Previously this was done using `arcpy` from ArcGIS.
+
+```{r}
+# how many NAs in each 
+global(oa_rescaled, fun="isNA", na.rm=FALSE)
+
+#
+
+# how many values in the annual rasters are not over 1
+setdiff(annual_rules_over1_sum, all_annual_values_sum)
+diff_test <- all_annual_values_sum - annual_rules_over1_sum
+#                 sum
+# oa_annual_2010 7538
+# oa_annual_2011 7522
+# oa_annual_2012 6724
+# oa_annual_2013 8175
+# oa_annual_2014 7453
+# oa_annual_2015 8055
+# oa_annual_2016 8498
+# oa_annual_2017 8699
+# oa_annual_2018 8163
+# oa_annual_2019 7782
+# oa_annual_2020 8040
+# oa_annual_2021 8819
+# oa_annual_2022 9169
+```
+
+# Issues with reprojecting before raster calculations -- was fixed by projecting the data later
+
+After projecting to Mollweide, the rasters have purple rectangles in areas where there should not be values. To fix this and avoid issues in the future, it may be good to use the `ocean.tif` read as an object "ocean" within the setup chunk and make the resolution equal to our data's resolution. We can then mask the multi-layer SpatRaster of our data to the resampled `ocean`, ensuring that the CRS, extent, and resolution is all the same between the two.
+
+```{r}
+# mask to ocean extent
+tic()
+ocean_mask_test <- terra::mask(x = nc_moll_ocean, mask = ocean_res_to_nc)
+toc()
+
+plot(ocean_mask_test)
+
+# ---- mask to `rgns_3nm_offshore_mol.tif`----
+# read it in
+rgns_3nm_offshore <- terra::rast(here(dir_M, "git-annex","globalprep","spatial","v2018","rgns_3nm_offshore_mol.tif"))
+
+crs(rgns_3nm_offshore)
+
+# resample to same resolution as nc_moll_ocean
+resamp_3nm_offshore <- terra::resample(x = rgns_3nm_offshore, y = nc_moll_ocean)
+
+# mask nc_moll_ocean to the eezs by region
+tic()
+oa_global_eez_multi <- terra::mask(x = nc_moll_ocean, mask = resamp_3nm_offshore)
+toc()
+
+plot(oa_global_eez_multi$omega_ar_1)
+```
