@@ -238,6 +238,7 @@ h <- h_usd %>%
 h <- h %>% np_harvest_preclip()
 ```
 
+
 # Gapfilling 
 
 Summary of gapfilling that is performed:
@@ -300,9 +301,9 @@ h_comm <- h
 ## Output gapfilling report to .csv files.
 ## Very few usd gapfilling, and none in recent years (data used to weight contributions), so will ignore this: gapfill=="r2_u_gr"
 h_gap <- h %>%
-  mutate(gapfill = ifelse(gapfill == "r2_u_gr", "none", gapfill)) %>%   # focusing only on tonnes gapfilling
+  dplyr::mutate(gapfill = ifelse(gapfill == "r2_u_gr", "none", gapfill)) %>%   # focusing only on tonnes gapfilling
   dplyr::select(rgn_id, commodity, product, year, gapfill) %>%
-  filter(product == "corals")
+  dplyr::filter(product == "corals")
 
 write.csv(h_gap, file.path(here(), paste0('globalprep/prs_coral_harvest/v', scen_year, '/output/prs_coral_gf.csv')), row.names = FALSE, na = '')
 ```
@@ -314,8 +315,8 @@ write.csv(h_gap, file.path(here(), paste0('globalprep/prs_coral_harvest/v', scen
 Summarize each product per country per year, e.g., all corals in Albania in 2011. And, do some error checking.
 ```{r, eval = FALSE}
 h_prod <- h_comm %>%
-  filter(product == "corals") %>%
-  group_by(rgn_name, rgn_id, product, year) %>%
+  dplyr::filter(product == "corals") %>%
+  dplyr::group_by(rgn_name, rgn_id, product, year) %>%
   summarize(tonnes = sum(tonnes, na.rm = TRUE), 
             usd = sum(usd, na.rm = TRUE))
           
@@ -330,18 +331,18 @@ Look at wide format with all commmodities and product subtotal (where commodity 
 ```{r, eval = FALSE}
 h_x_tonnes <- h_comm %>% 
   bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
-  select(rgn_name, rgn_id, commodity, product, year, tonnes) %>%
-  arrange(rgn_name, product, commodity, year) %>%
+  dplyr::select(rgn_name, rgn_id, commodity, product, year, tonnes) %>%
+  dplyr::arrange(rgn_name, product, commodity, year) %>%
   pivot_wider(names_from = year, values_from = tonnes)
 
 h_x_usd <- h_comm %>% 
   bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
-  select(rgn_name, rgn_id, commodity, product, year, usd) %>%
-  arrange(rgn_name, product, commodity, year) %>%
+  dplyr::select(rgn_name, rgn_id, commodity, product, year, usd) %>%
+  dplyr::arrange(rgn_name, product, commodity, year) %>%
   pivot_wider(names_from = year, values_from = usd)
 
 ## Check a random country and commodity
-australia <- h_x_usd %>% filter(product == "corals", rgn_name == "Australia") 
+australia <- h_x_usd %>% dplyr::filter(product == "corals", rgn_name == "Australia") 
 australia ## perfect
 
 ## Can open up in Excel to compare subtotals per country-product-year
@@ -358,18 +359,18 @@ Determine rolling averages for tonnes and USD in order to determine peak values.
 year_max <- max(h_prod$year)
 
 roll_prod <- h_prod %>%
-  arrange(rgn_id, product, year) %>%
-  group_by(rgn_id, product) %>%
-  mutate(
+  dplyr::arrange(rgn_id, product, year) %>%
+  dplyr::group_by(rgn_id, product) %>%
+  dplyr::mutate(
       tonnes_rollmean = rollapply(tonnes, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE),
       usd_rollmean    = rollapply(   usd, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE)) %>%
-  rename(
+  dplyr::rename(
       tonnes_orig = tonnes, # prevent overwriting of reported and gapfilled values
       usd_orig    = usd) %>% # prevent overwriting of reported and gapfilled values
-  mutate(
+  dplyr::mutate(
       tonnes = ifelse(!is.na(tonnes_rollmean), tonnes_rollmean, tonnes_orig),
       usd    = ifelse(!is.na(usd_rollmean),    usd_rollmean,    usd_orig)) %>%
-  select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
+  dplyr::select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
 
 write.csv(roll_prod, paste0("globalprep/prs_coral_harvest/v", scen_year, "/int/tonnes_coral_harvest.csv"), row.names = FALSE)
 ```
