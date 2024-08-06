@@ -87,7 +87,7 @@ library(ohicore)
 
 ## Spatial libraries
 library(raster)
-library(rgdal)
+# library(rgdal)
 library(sp)
 library(sf)
 library(fasterize)
@@ -165,7 +165,7 @@ Gridded world population densities from CIESE and CIAT are projected into the Wo
 cl <- makeCluster(5) # 5 clusters for 5 files being targeted
 registerDoParallel(cl)
 foreach(i = raw, .packages = c("raster", "rgdal", "stringr")) %dopar% {
-#  i = raw[1] # send this down alone and check to see which file it calls; see if there are any errors in file naming
+ i = raw[1] # send this down alone and check to see which file it calls; see if there are any errors in file naming
   yr <- as.numeric(as.character(str_sub(i, -17, -14))) # counts backwards by character in file name to grab the year digits
   raster::raster(i) %>% # read in file path to raster
     raster::projectRaster(crs = crs(ocean), res = res(ocean), over = TRUE, method = "ngb", # convert large grids to small grids using nearest neighbor method
@@ -254,10 +254,11 @@ Density data are converted to population by multiplying density times the area o
 den_raster <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2020/int"), pattern = "density_\\d{4}_mol.tif$", full = TRUE)
 den_raster # check to make sure this looks correct; should only have human_density tif files for each interpolated year
 
+########################## It appears that the issue is arising here. The manual conversion from density to count is flawed in some way in relation to the spatial extent. My plan is to not rescale the human count data but convert the 
 cl <- makeCluster(5)
 registerDoParallel(cl)
 
-foreach(i = den_raster, .packages = c("raster", "rgdal", "stringr")) %dopar% {
+foreach(i = den_raster, .packages = c("raster", "stringr")) %dopar% {
   # i = den_raster[1] - does i generate the 2000 raster?
   nm <- basename(i)
   yr <- stringr::str_sub(nm, -12, -9) # pulls out the year from the file name
@@ -279,7 +280,7 @@ closeAllConnections()
 # No longer using shape files, raster only
 
 # Raster
-eez_25mi_inland <- raster(file.path(dir_M, "git-annex/globalprep/spatial/v2019/ocean_plus25mile_inland.tif")) # last updated v2019
+eez_25mi_inland <- raster::raster(file.path(dir_M, "git-annex/globalprep/spatial/v2019/ocean_plus25mile_inland.tif")) # last updated v2019
 
 ## Make sure that the layers make sense!
 plot(eez_25mi_inland) # will appear to only feature the Antarctic ocean; can check that gray area actually has data. Because we don't include this region in the OHI, the raster has CCAMLR IDs for points in this region, which appear to have high region ID values.
@@ -294,22 +295,66 @@ plot(regions[1], color = NA, add = TRUE)
 
 ```
 
+## Reference Chunk for working with uncooperative rasters 
+
+```{r}
+# rgn_rast = terra::rast(rgn_rast_list[1]) ## Create SpatRaster object 
+rgn_rast  = eez_25mi_inland ## Add zero 
+df = freq(rgn_rast) ## Turns frequency table into a dataframe (should have 3 columns: layer, value, count) 
+rgn_rast2 <- raster(file.path(dir_M, "git-annex/globalprep/spatial/v2019/ocean_plus25mile_inland.tif"))##Create RasterLayer object 
+
+df2 = as.data.frame(rgn_rast2@data@attributes) ## Creates dataframe from attributes (Should have 3 columns: ID, OBJECTID, count) 
+df$difference = df$value - df2$ID ## Creating new column in 'df' that is the difference between 'value' and 'ID'  
+unique(df$difference) ## Should return one value: 0 
+```
+
 
 ## Append or Extract by OHI Regions
 
 Stack rasters of population counts for each year, sum within regions (using eez_25mi_inland) for each year, and save this as `coastal_pop_zonal_sums.csv` in the intermediate folder. Gather this into long format dataframe, and save as `output/mar_pop_25mi.csv`.
 
 ```{r extract population data from all population layers, eval=FALSE}
+cp_fp <- file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/coastal_pop/WGS_1984_OHI_Coastal_Population_Estimates_TableToExcel.xlsx")
+coastal_pop1 <- readxl::read_xlsx(cp_fp)
 
 pop_rasters <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2020/int"), pattern = "count_\\d{4}_mol.tif$", full = TRUE) # should list all the human_count files in folder
 
 pop_stack <- raster::stack(pop_rasters) # stack human_count rasters 2000-2020
 
+####### TESTING ######### ---- 
+# pop_raster_test <- file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/int/gpw_v4_population_count_rev11_2020_30_sec.tif")
+# 
+# pop_rast <- raster(pop_raster_test)
+# 
+# crs(pop_rast) <- crs(eez_25mi_inland)
+# 
+# extent(pop_rast) <- extent(eez_25mi_inland)
+# 
+# pop_rast <- raster::resample(pop_rast, eez_25mi_inland, method = "bilinear")
+# 
+# coastal_pop <- raster::zonal(pop_rast, eez_25mi_inland, fun="sum", progress="text") # sum within zones (regions as specified by eez_25mi_inland)
+# 
+# coastal_pop <- as.data.frame(coastal_pop)
+
+######### END TEST ############# ----
+
+## The actual issue appears to be arising from the conversion of density data to count data and then doing the zonal statistics. I suppose the actual best way to do it would be to calculate zonal statistics with the density data and then convert to counts using the method described in the above chunk: [see link](https://community.esri.com/t5/arcgis-spatial-analyst-questions/resampling-a-raster-better-method-needed-than/td-p/492597) ## 
+
 coastal_pop <- raster::zonal(pop_stack, eez_25mi_inland, fun="sum", progress="text") # sum within zones (regions as specified by eez_25mi_inland)
 
 coastal_pop <- as.data.frame(coastal_pop)
 
-write_csv(coastal_pop, file.path(here("globalprep/mar_prs_population/v2020/int/coastal_pop_zonal_sums.csv"))) # do we need to save this as intermediate data?
+# coastal_pop_long <- coastal_pop %>% 
+#   pivot_longer(cols = c(-zone), names_to = "year", values_to = "population")
+# 
+# coastal_pop_check <- coastal_pop_long %>% 
+#   mutate(pop2 = population*(0.000001)) %>% 
+#   select(-population)
+# 
+# coastal_pop_wide <- coastal_pop_check %>% 
+#   pivot_wider(id_cols = zone, names_from = year, values_from = pop2)
+# ?pivot_wider
+# write_csv(coastal_pop, file.path(here("globalprep/mar_prs_population/v2020/int/coastal_pop_zonal_sums.csv"))) # do we need to save this as intermediate data?
 
 ## Organize data to have a population sum for each region and each year
 coastal_pop2 <- data.frame(coastal_pop) %>%

@@ -1,7 +1,7 @@
 ---
 title: 'OHI 2024: Ocean Acidification Data Prep Rescaling Testing'
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
-title: "My Quarto Document"
+title: "OA extra rescaling exploration"
 jupyter: /home/lecuona/.virtualenvs/r-reticulate/bin/python
 output: 
   html_document:
@@ -294,4 +294,33 @@ diff_test <- all_annual_values_sum - annual_rules_over1_sum
 # oa_annual_2020 8040
 # oa_annual_2021 8819
 # oa_annual_2022 9169
+```
+
+# Issues with reprojecting before raster calculations -- was fixed by projecting the data later
+
+After projecting to Mollweide, the rasters have purple rectangles in areas where there should not be values. To fix this and avoid issues in the future, it may be good to use the `ocean.tif` read as an object "ocean" within the setup chunk and make the resolution equal to our data's resolution. We can then mask the multi-layer SpatRaster of our data to the resampled `ocean`, ensuring that the CRS, extent, and resolution is all the same between the two.
+
+```{r}
+# mask to ocean extent
+tic()
+ocean_mask_test <- terra::mask(x = nc_moll_ocean, mask = ocean_res_to_nc)
+toc()
+
+plot(ocean_mask_test)
+
+# ---- mask to `rgns_3nm_offshore_mol.tif`----
+# read it in
+rgns_3nm_offshore <- terra::rast(here(dir_M, "git-annex","globalprep","spatial","v2018","rgns_3nm_offshore_mol.tif"))
+
+crs(rgns_3nm_offshore)
+
+# resample to same resolution as nc_moll_ocean
+resamp_3nm_offshore <- terra::resample(x = rgns_3nm_offshore, y = nc_moll_ocean)
+
+# mask nc_moll_ocean to the eezs by region
+tic()
+oa_global_eez_multi <- terra::mask(x = nc_moll_ocean, mask = resamp_3nm_offshore)
+toc()
+
+plot(oa_global_eez_multi$omega_ar_1)
 ```
