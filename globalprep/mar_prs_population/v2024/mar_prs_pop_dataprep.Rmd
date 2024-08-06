@@ -202,7 +202,7 @@ GWPv4 data is for years 2005, 2010, 2015, and 2020. Data for missing years must 
 ## Define and apply function to calculate yearly change in population density 
 
 ## These are the files that were created and written out above. Dont exactly need them since we are working with just counts at this point 
-files <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/int"), pattern = "human_density_\\d{4}_mol.tif$", full = TRUE)
+files <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/int"), pattern = "human_count_\\d{4}_mol.tif$", full = TRUE)
 
 ## Create function for average yearly change
 yearly_diff <- function(year_min, year_max, density_files = files){
@@ -727,6 +727,10 @@ names(ocean_fact_reproj)
 names(ocean_fact_reproj) = c("zone") 
 # [1] "zone"
 
+terra::set.names(ocean_fact_reproj, "zone")
+
+# zonal_rast <- terra::writeRaster(ocean_fact_reproj, filename = file.path(dir_M, "git-annex/globalprep/spatial/v2024/eez_25mi_inland_wgs1984.tif"), overwrite = TRUE, datatype='INT4U')
+
 names(count_rast) 
 # [1] "gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2020_30_sec"
 names(count_rast) = c("population_count") 
@@ -756,38 +760,207 @@ zonal_nas2 <- zonal_filter2 %>%
 ```{r}
 ## Pulling from "files"
 
-raster_2000 <- terra::rast(files[1])
+raster_2000 <- terra::rast(files[grep(sprintf("count_%s_mol", 2000), files)])
 
-change_1 <- terra::rast(files[30])
+yr=2000
+
+names(raster_2000) = c("pop_2000")
+
+# terra::writeRaster(raster_2000, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+change_1 <- terra::rast(files[grep(sprintf("change_%s_to_%s", 2000, 2005), files)])
 
 i=1
 yr = 2000+i
 raster_2001 <- raster_2000 + (i * change_1)
 
-terra::writeRaster(raster_2001, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+names(raster_2001) = c("pop_2001")
+
+terra::writeRaster(raster_2001, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
 
 i=2
 yr=2000+i
 raster_2002 <- raster_2000 + (i*change_1)
 
-terra::writeRaster(raster_2002, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+names(raster_2002) = c("pop_2002")
+
+terra::writeRaster(raster_2002, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
 
 i=3
 yr=2000+i
 
 raster_2003 <- raster_2000 + (i*change_1)
 
-terra::writeRaster(raster_2003, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+names(raster_2003) = c("pop_2003")
+
+terra::writeRaster(raster_2003, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
 
 i=4
 yr=2000+i
 
 raster_2004 <- raster_2000 + (i*change_1)
 
-terra::writeRaster(raster_2004, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+names(raster_2004) = c("pop_2004")
 
-raster_2005 <- files[grep(sprintf("count_%s_mol", 2005), files)]
+terra::writeRaster(raster_2004, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
 
+raster_2005 <- terra::rast(files[grep(sprintf("count_%s_mol", 2005), files)])
+
+change_2 <- terra::rast(files[grep(sprintf("change_%s_to_%s", 2005, 2010), files)])
+
+i=1
+yr=2005+i
+
+raster_2006 <- raster_2005 + (i*change_2)
+
+names(raster_2006) = c("pop_2006")
+
+terra::writeRaster(raster_2006, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+i=2
+yr=2005+i
+
+raster_2007 <- raster_2005 + (i*change_2)
+
+names(raster_2007) = c("pop_2007")
+
+terra::writeRaster(raster_2007, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+i=3
+yr=2005+i
+
+raster_2008 <- raster_2005 + (i*change_2)
+
+names(raster_2008) = c("pop_2008")
+
+terra::writeRaster(raster_2008, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+i=4
+yr=2005+i
+
+raster_2009 <- raster_2005 + (i*change_2)
+
+names(raster_2009) = c("pop_2009")
+
+terra::writeRaster(raster_2009, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+raster_2010 <- terra::rast(files[grep(sprintf("count_%s_mol", 2010), files)])
+
+change_3 <- terra::rast(files[grep(sprintf("change_%s_to_%s", 2010, 2015), files)])
+
+i=1
+yr=2010+i
+
+raster_2011 <- raster_2010 + (i*change_3)
+
+names(raster_2011) = c("pop_2011")
+
+terra::writeRaster(raster_2011, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+i=2
+yr=2010+i
+
+raster_2012 <- raster_2010 + (i*change_3)
+
+names(raster_2012) = c("pop_2012")
+
+terra::writeRaster(raster_2012, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+i=3
+yr=2010+i
+
+raster_2013 <- raster_2010 + (i*change_3)
+
+names(raster_2013) = c("pop_2013")
+
+terra::writeRaster(raster_2013, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+i=4
+yr=2010+i
+
+raster_2014 <- raster_2010 + (i*change_3)
+
+names(raster_2014) = c("pop_2014")
+
+terra::writeRaster(raster_2014, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+raster_2015 <- terra::rast(files[grep(sprintf("count_%s_mol", 2015), files)])
+
+change_4 <- terra::rast(files[grep(sprintf("change_%s_to_%s", 2015, 2020), files)])
+
+i=1
+yr=2015+i
+
+raster_2016 <- raster_2015 + (i*change_4)
+
+names(raster_2016) = c("pop_2016")
+
+terra::writeRaster(raster_2016, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+i=2
+yr=2015+i
+
+raster_2017 <- raster_2015 + (i*change_4)
+
+names(raster_2017) = c("pop_2017")
+
+terra::writeRaster(raster_2017, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+i=3
+yr=2015+i
+
+raster_2018 <- raster_2015 + (i*change_4)
+
+names(raster_2018) = c("pop_2018")
+
+terra::writeRaster(raster_2018, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+i=4
+yr=2015+i
+
+raster_2019 <- raster_2015 + (i*change_4)
+
+names(raster_2019) = c("pop_2019")
+
+terra::writeRaster(raster_2019, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+
+raster_2020 <- terra::rast(files[grep(sprintf("count_%s_mol", 2020), files)])
+
+global(raster_2000, "sum", na.rm=TRUE)
+
+global(raster_2019, "sum", na.rm=TRUE)
+
+global(raster_2020, "sum", na.rm=TRUE)
+
+files <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/int"), pattern = "human_count_\\d{4}_mol.tif$", full = TRUE)
+
+files
+
+zonal_rast_read <- terra::rast(file.path(dir_M, "git-annex/globalprep/spatial/v2024/eez_25mi_inland_wgs1984.tif"))
+
+terra::datatype(zone_raster) # [1] "INT4U"
+
+names(zone_raster) = c("zone")# [1] "ocean_plus25mile_inland"
+
+# Need to figure out how to rename the layer to "zone" before writing out 
+
+
+files_test <- terra::rast(files[1:2])
+zonal_stats <- terra::zonal(count_rast, ocean_fact_reproj, "sum", na.rm=TRUE)
+
+
+zonal_2layer_test <- terra::zonal(files_test, ocean_fact_reproj, "sum", na.rm=TRUE) # IT WORKED!! 
+
+
+single_layer <- files_test[[1]]
+zonal_2layer_test <- terra::zonal(single_layer, ocean_fact_reproj, fun="sum", na.rm=TRUE)
+
+
+for(j in c(2000, 2005, 2010, 2015)){
+  for(i in 1:4){
+    cat("The Year is:", i+j, "\n")
+  }
+}
 ```
 
 

@@ -39,7 +39,7 @@ library(ggplot2)
 source(here('workflow/R/common.R'))
 
 goal     <- 'spp'
-scenario <- 'v2022'
+scenario <- 'v2024'
 
 dir_goal <- here('globalprep', goal, scenario)
 
@@ -611,6 +611,138 @@ if(!file.exists(spp_current_file) | reload) {
 ``` {r prov_footer, results = 'asis'}
 
 prov_wrapup(commit_outputs = FALSE)
+
+```
+
+## Troubleshooting:
+
+```{r}
+# > population_raster <- terra::rast(raw[5])
+# > plot(ocean_raster)
+# > ocean_raster
+# class       : SpatRaster 
+# dimensions  : 19305, 38610, 1  (nrow, ncol, nlyr)
+# resolution  : 934.4789, 934.4789  (x, y)
+# extent      : -18040095, 18040134, -9020047, 9020067  (xmin, xmax, ymin, ymax)
+# coord. ref. : Mollweide 
+# source      : ocean_plus25mile_inland.tif 
+# name        : ocean_plus25mile_inland 
+# min value   :                       1 
+# max value   :                  288300 
+# > plot(population_raster)
+# > population_raster
+# class       : SpatRaster 
+# dimensions  : 21600, 43200, 1  (nrow, ncol, nlyr)
+# resolution  : 0.008333333, 0.008333333  (x, y)
+# extent      : -180, 180, -90, 90  (xmin, xmax, ymin, ymax)
+# coord. ref. : lon/lat WGS 84 (EPSG:4326) 
+# source      : gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2020_30_sec.tif 
+# name        : gpw_v4_population_count_adjust~untry_totals_rev11_2020_30_sec 
+# > ocean_int <- as.integer(ocean_raster)
+# Error: Not compatible with requested type: [type=list; target=logical].
+# > ocean_int <- terra::as.int(ocean_raster)
+# > plot(ocean_int)
+# > ocean_int_reproject <- terra::project(x = ocean_int, y = population_raster, method = "near")
+# > plot(ocean_int_reproject)               
+# > ocean_int_reproject
+# class       : SpatRaster 
+# dimensions  : 21600, 43200, 1  (nrow, ncol, nlyr)
+# resolution  : 0.008333333, 0.008333333  (x, y)
+# extent      : -180, 180, -90, 90  (xmin, xmax, ymin, ymax)
+# coord. ref. : lon/lat WGS 84 (EPSG:4326) 
+# source      : spat_a66935c0f0b1d_681619.tif 
+# varname     : gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2020_30_sec 
+# name        : ocean_plus25mile_inland 
+# min value   :                       1 
+# max value   :                  288300 
+# > zonal_stats <- terra::zonal(ocean_int_reproject, population_raster, fun = "sum")
+# > View(zonal_stats)
+# > range(zonal_stats$ocean_plus25mile_inland)
+# [1] NaN NaN
+# > max(zonal_stats$ocean_plus25mile_inland)
+# [1] NaN
+# > min(zonal_stats$ocean_plus25mile_inland)
+# [1] NaN
+# > zonal_stats2 <- zonal_stats %>% 
+# + dplyr::rename(zone = ocean_plus25mi_inland)
+# Error in `dplyr::rename()`:
+# ! Can't rename columns that don't exist.
+# ✖ Column `ocean_plus25mi_inland` doesn't exist.
+# Run `rlang::last_trace()` to see where the error occurred.
+# > dplyr::rename(zone = ocean_plus25mile_inland)
+# Error: object 'ocean_plus25mile_inland' not found
+# > zonal_stats2 <- zonal_stats %>% dplyr::rename(zone = ocean_plus25mile_inland)
+# > View(zonal_stats2)
+# > zonal_stats3 <- zonal_stats2 %>% dplyr::filter(!zone == NaN)
+# > zonal_stats3 <- zonal_stats2 %>% dplyr::filter(zone != NaN)
+# > zonal_stats3 <- zonal_stats2 %>% dplyr::filter(zone %in% (218))
+# > zonal_stats3 <- zonal_stats2 %>% dplyr::filter(!zone %in% (NaN))
+# > zonal_stats4 <- zonal_stats3 %>% mutate(zone = as.character(zone)) %>% group_by(zone) %>% dplyr::summarise(population_sum = sum(gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev, na.rm = TRUE))
+# Error in `dplyr::summarise()`:
+# ℹ In argument: `population_sum = sum(...)`.
+# ℹ In group 1: `zone = "1"`.
+# Caused by error:
+# ! object 'gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev' not found
+# Run `rlang::last_trace()` to see where the error occurred.
+# > zonal_stats2 <- zonal_stats %>% dplyr::rename(zone = ocean_plus25mile_inland,)
+# > zonal_stats2 <- zonal_stats %>% dplyr::rename(zone = ocean_plus25mile_inland, pop = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2020_30_sec)
+# > zonal_stats3 <- zonal_stats2 %>% dplyr::filter(!zone %in% (NaN))
+# > View(zonal_stats3)
+# > zonal_stats4 <- zonal_stats3 %>% mutate(zone = as.character(zone)) %>% group_by(zone) %>% dplyr::summarise(population_sum = sum(pop, na.rm = TRUE))
+# > View(zonal_stats4)
+# > zonal_stats5 <- zonal_stats4 %>% mutate(zone = as.numeric(zone) %>% dplyr::filter(zone <= 250)
+# + + 1
+# Error: unexpected numeric constant in:
+# "
+# 1"
+# > zonal_stats5 <- zonal_stats4 %>% mutate(zone = as.numeric(zone)) %>% dplyr::filter(zone <= 250)
+# > View(zonal_stats5)
+# > ocean_fact <- terra::as.factor(ocean_raster)
+# > plot(ocean_fact)                        
+# > ocean_fact_reproject <- terra::project(x = ocean_fact, y = population_raster, method = "near")
+# > plot(ocean_fact_reproject)              
+# Connected to your session in progress, last started 2024-Jul-31 15:39:18 UTC (5 hours ago)
+# > zonal_stats <- terra::zonal(ocean_int_reproject, population_raster, fun = "sum")
+# > View(zonal_stats)
+# > zonal_stats2 <- zonal_stats %>% dplyr::rename(zone = ocean_plus25mile_inland,)
+# > zonal_stats2 <- zonal_stats %>% dplyr::rename(zone = ocean_plus25mile_inland, pop = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2020_30_sec)
+# > View(zonal_stats2)
+# > zonal_stats3 <- zonal_stats2 %>% dplyr::filter(!zone %in% (NaN))
+# > zonal_stats4 <- zonal_stats3 %>% mutate(zone = as.character(zone)) %>% group_by(zone) %>% dplyr::summarise(population_sum = sum(pop, na.rm = TRUE))
+# > View(zonal_stats4)
+# > zonal_stats5 <- zonal_stats4 %>% mutate(zone = as.numeric(zone)) %>% dplyr::filter(zone <= 250)
+# > View(zonal_stats5)
+# > ocean_values = freq(ocean_raster)
+# > View(ocean_values)
+# > ocean_raster = ocean_raster+0
+#                                           
+# > terra::zonal
+# standardGeneric for "zonal" defined from package "terra"
+# 
+# function (x, z, ...) 
+# standardGeneric("zonal")
+# <bytecode: 0x558ac7515010>
+# <environment: 0x558ac749c480>
+# Methods may be defined for arguments: x, z
+# Use  showMethods(zonal)  for currently available ones.
+# > ?terra::zonal
+# > ocean_poly = terra::as.polygons(ocean_raster)
+
+plot(ocean_poly)
+
+ocean_values = freq(ocean_raster) # Three columns: layer, value, count. Value is correct 
+
+(ocean_raster)
+
+(ocean_poly)
+
+ocean_poly_reproject <- terra::project(x = ocean_poly, y = population_raster, partial=TRUE)
+
+plot(ocean_poly_reproject)
+
+(ocean_poly_reproject)
+
+poly_stats <- terra::zonal(x = population_raster, z = ocean_poly_reproject, fun = "sum", touches=TRUE)
 
 ```
 
