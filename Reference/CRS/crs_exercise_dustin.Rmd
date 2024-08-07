@@ -1,0 +1,99 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-01"
+---
+
+```{r setup, include=FALSE}
+
+library(terra)
+library(here)
+
+```
+
+Data describing commercial landings (tonnes) in 2017.
+```{r}
+fish <- rast(here("Reference/CRS/commercial_landings_2017.tif"))
+
+## Take a look
+plot(fish)
+# lets log so we can visualize this a little better
+plot(log(fish+1))
+```
+
+How many fish were captured?
+```{r}
+global(fish, "sum", na.rm=TRUE)
+
+```
+Check against Sea Around Us to make sure this seems generally reasonable.
+
+**This makes sense. SeaAroundUs says about 87 million**
+
+What is the area of each cell?
+```{r}
+cell_area <- cellSize(fish)
+plot(cell_area)
+```
+Describe what the plotted image is saying?
+
+**The plotted image is describing the area of each cell across different lattitudes. For example the area of each cell (Cellsize) is smaller near the poles, and increases as one moves towards the tropics/equator.**
+
+Given this, what is kind of deceptive about these plots?
+```{r}
+plot(fish)
+# lets log so we can visualize this a little better
+plot(log(fish+1))
+
+```
+
+**It depends. If the plot were of density of fish landings in tonnes (i.e. tonnes/km^2), then the cells that represent smaller areas (near the poles) would have values that are skewed higher (appear higher) than they are. Because the actual density value would not change but because the cell size is smaller then the apparent "tonnes per cell" would be higher.**
+
+
+Let's convert these data to another coordinate reference system:
+```{r}
+moll <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+fish_moll <- terra::project(fish, crs(moll))
+
+# take a look
+plot(fish_moll)
+plot(log(fish_moll + 1))
+
+## Count the total tonnes
+global(fish_moll, "sum", na.rm=TRUE)
+
+
+```
+
+Compare to the original tonnes? What is happening? How can you improve this?
+
+**389 million versus 86 million. Since the second is higher and has equal area, it appears that the fish landings data is in density rather than count. If it were in density and you had an unequal areas CRS, you could create a raster of the cell sizes, and multiply that by the original (density) raster to obtain counts per cell, then sum those up. But since you have continuous data its kind of shaky to convert CRS because you would need a resampling technique that would minimize the change in value to each cell.** 
+
+See what happens when we make multiple CRS conversions:
+
+```{r}
+#Robinson projection
+rob <- "+proj=robin +datum=WGS84 +units=m +no_defs"
+
+fish_moll_rob <-terra::project(fish_moll, crs(rob))
+plot(log(fish_moll_rob + 1))
+
+# now back to lat long:
+fish_moll_rob_latlon <- project(fish_moll_rob, fish)
+
+plot(log(fish_moll_rob_latlon + 1))
+
+# check to see if it exactly matches the start
+
+check <- fish_moll_rob_latlon - fish
+plot(log(check+1))
+check
+
+
+```
+
+What is this telling us?
+
+**This is telling us that some values are highly inflated from the CRS switch and some are highly deflated. So the values that are deflated are appearing as large negative numbers because the original raster has higher values than the new raster. And the opposite is true for the values that are inflated. They are appearing as large positive numbers because the original raster has much smaller values than the new raster.** 
+
+
