@@ -92,16 +92,19 @@ files <- list.files(dir_fao_data, pattern = glob2rx('*.csv'), full.names = TRUE)
 ## To compare to old data:
 # dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2020')
 # files <- list.files(dir_fao_data, pattern=glob2rx('*.csv'), full.names=T)
+# dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2020')
+# files <- list.files(dir_fao_data, pattern=glob2rx('*.csv'), full.names=T)
 
 
 ## loop
 tic()
 for (f in files){  
-  f = files[2] # uncomment to run line-by-line to test each file
+  #f = files[2] # uncomment to run line-by-line to test each file
   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
   
   
-  #d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
+  d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
+  #d_test <- readr::read_csv(f)
   # checks names syntactically, strips leading and trailing whitespace, prevents conversion of characters to factors 
   
   ## Specifies that units are tonnes if we are reading in the Commodities Quantity data csv, and usd if we are reading in the Commodities Value data csv
@@ -216,6 +219,22 @@ toc()
 # v2024: 98.956 sec elapsed
 ```
 
+
+### Testing issue with gapfilling:
+```{r}
+# ==== Data investigation ====
+# there appear to be no NAs in the "value" dataset -- this is causing issues
+# during gapfilling, as the np_regr_coef() function uses 
+# np_regr_fill(), which gapfills NAs (and expects there to be NAs)
+#test_na[,1]
+test_na <- d %>% filter(is.na(`[2019]`))
+
+aggregate_group_name <- paste0("FAO. ", scen_year, ". FishStat: Global Aquatic Trade - All partners aggregated")
+
+test_na %>% filter(str_detect(`Reporting country (Name)`, aggregate_group_name))
+```
+
+
 # Data Wrangle
 
 Read in the tonnes and usd data that was completed in the Natural Products ornamentals dataprep (and above). Combining the quantity and value data and a bit of cleaning to remove data prior to first reporting year for coral commodities and regions. 
@@ -282,7 +301,9 @@ h <- h %>% np_lowdata_filter()
 h <- h %>%
   add_georegion_id()
 
+# testing this line
 h <- h %>% np_regr_fill(years_back = 10, vars = 'td', scope = 'rgn_id')
+
 h <- h %>% np_regr_fill(vars = 'tdy', scope = 'georgn_id')
 h <- h %>% np_regr_fill(vars = 'tdy', scope = 'global')
 ## np_regr_fill() is a generalized regression gapfill function. Parameters (with defaults):
@@ -344,6 +365,8 @@ h_x_usd <- h_comm %>%
 ## Check a random country and commodity
 australia <- h_x_usd %>% dplyr::filter(product == "corals", rgn_name == "Australia") 
 australia ## perfect
+
+
 
 ## Can open up in Excel to compare subtotals per country-product-year
 write.csv(h_x_tonnes, paste0('globalprep/prs_coral_harvest/v', scen_year, '/int/coral_harvest_tonnes_wide.csv'), row.names = FALSE, na = 'NA')

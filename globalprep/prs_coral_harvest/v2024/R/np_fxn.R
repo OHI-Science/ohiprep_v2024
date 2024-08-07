@@ -190,7 +190,7 @@ np_lowdata_filter <- function(h, nonzero_h_yr_min = 4) {
     group_by(rgn_id, commodity) %>%
     mutate(
       nonzero_n = sum(tonnes > 0 | usd > 0, na.rm=TRUE)) %>%
-    filter(nonzero_n >= nonzero_h_yr_min) %>%
+    dplyr::filter(nonzero_n >= nonzero_h_yr_min) %>%
     ### Require at least 'nonzero_harvest_years_min' years of data; filter out all
     ###   commodities by region with fewer than this.  This prevents penalizing countries that
     ###   start experimental production but then stop, for example.
@@ -211,7 +211,7 @@ np_regr_coef <- function(h, scope = 'rgn_id', vars = 'tdy') {
   ###     passed to group_by() and the full_join() to set the scope of regression.
   ### * vars = 'td' for  (tonnes ~ dollars) (and vice versa), and 
   ###          'tdy' for (tonnes ~ dollars + years)
-  
+  browser()
   h <- switch(scope,
               rgn_id    = group_by(h, rgn_id,    commodity),
               georgn_id = group_by(h, georgn_id, commodity),
@@ -222,22 +222,23 @@ np_regr_coef <- function(h, scope = 'rgn_id', vars = 'tdy') {
                   td        = c('tonnes ~ usd',        'usd ~ tonnes'))
   
   m_tonnes <- h  %>%
-    mutate(tonnes_nas = sum(is.na(tonnes))) %>%  
-    filter(tonnes_nas > 0 & !is.na(usd) & !is.na(tonnes)) %>%
+    dplyr::mutate(tonnes_nas = sum(is.na(tonnes))) %>%  
+    dplyr::filter(tonnes_nas > 0 & !is.na(usd) & !is.na(tonnes)) %>%
     do(mdl = lm(as.formula(model[1]), data=.)) %>%
-    summarize(
+    dplyr::summarize(
       scope_id    = switch(scope, rgn_id = rgn_id, georgn_id = georgn_id, global = NA),
       commodity   = as.character(commodity), 
       usd_ix0     = coef(mdl)['(Intercept)'],
       usd_coef    = coef(mdl)['usd'],
       yr_tns_coef = ifelse(vars=='tdy', coef(mdl)['year'], 0)) %>%
-    ungroup()
+    dplyr::ungroup()
   
+  # if appropriate, add conditional about gapfilling if sum(nas) > 0
   m_usd <- h %>%
     mutate(usd_nas = sum(is.na(usd))) %>%
     filter(usd_nas > 0 & !is.na(usd) & !is.na(tonnes)) %>%
     do(mdl = lm(model[2], data=.)) %>%
-    summarize(
+    dplyr::summarize(
       scope_id    = switch(scope, rgn_id = rgn_id, georgn_id = georgn_id, global = NA),
       commodity   = as.character(commodity), 
       tonnes_ix0  = coef(mdl)['(Intercept)'],
@@ -286,7 +287,7 @@ np_regr_fill <- function(h, years_back=50, min_paired_obs=4, scope = 'rgn_id', v
   h_clipped <- h %>%
     filter(year >= lower_bound_year) %>%
     mutate(
-      n_pairs = sum((!is.na(tonnes) & tonnes > 0 & !is.na(usd) & usd>0))) %>%
+      n_pairs = sum((!is.na(tonnes) & tonnes > 0 & !is.na(usd) & usd > 0))) %>%
     filter(n_pairs >= min_paired_obs)
   
   coefficients <- np_regr_coef(h_clipped, scope, vars)
