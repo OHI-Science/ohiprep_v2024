@@ -95,6 +95,7 @@ data_dir_year <- paste0("d", scen_year)
 prev_scen_year <- as.character(as.numeric(scen_year) - 1)
 common_year <- as.character(as.numeric(scen_year) - 4) # this depends on what the latest data year is; there's often a 3 year lag so the common year between the current and previous version year would be 4 years prior to the current version year; this time there is a 2 year lag but the common year is still 4 years prior at the moment
 current_prs_folder <- here::here("globalprep", "prs_coral_harvest", v_scen_year)
+current_int_folder <- here::here(current_prs_folder, "int")
 
 # ==== Load FAO-specific user-defined functions ====
 source(here::here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
@@ -285,15 +286,15 @@ quant_raw_tidy <- quant_raw_clean %>%
 Read in the tonnes and usd data that was completed in the Natural Products ornamentals dataprep (and above). Combining the quantity and value data and a bit of cleaning to remove data prior to first reporting year for coral commodities and regions. 
 ```{r, eval = FALSE}
 ## Read in quant dataset from intermediate folder
-h_tonnes <- read.csv(here::here(current_prs_folder, "int", "tonnes.csv"))
+h_tonnes <- read.csv(here::here(current_int_folder, "tonnes.csv"))
 
 ## Read in value dataset from intermediate folder
-h_usd <- read.csv(here::here(current_prs_folder, "int", "usd.csv"))
+h_usd <- read.csv(here::here(current_prs_folder, "usd.csv"))
 
 ## concatenates h_tonnes and h_usd data
 ## h includes rgn_name, rgn_id, commodity, product, year, tonnes, usd.
 h <- h_usd %>%
-    full_join(h_tonnes, by = c('rgn_name', 'rgn_id', 'commodity', 'product', 'year')) %>%
+    full_join(h_tonnes, by = c("rgn_name", "rgn_id", "commodity", "product", "year")) %>%
     mutate(commodity = as.character(commodity)) %>%
     arrange(rgn_id, product, commodity, year) # %>%
   # dplyr::filter(product == "corals") ##filter for our commodities of interest
@@ -454,8 +455,8 @@ australia ## perfect
 
 
 ## Can open up in Excel to compare subtotals per country-product-year
-readr::write_csv(h_x_tonnes, here::here(current_prs_folder, "int", "coral_harvest_tonnes_wide.csv"), na = "NA")
-readr::write_csv(h_x_usd, here::here(current_prs_folder, "int", "coral_harvest_usd_wide.csv"), na = "NA")
+readr::write_csv(h_x_tonnes, here::here(current_prs_folder, "coral_harvest_tonnes_wide.csv"), na = "NA")
+readr::write_csv(h_x_usd, here::here(current_prs_folder, "coral_harvest_usd_wide.csv"), na = "NA")
 ```
 
 
@@ -482,7 +483,7 @@ roll_prod <- h_prod %>%
     usd = ifelse(!is.na(usd_rollmean), usd_rollmean, usd_orig)) %>%
   dplyr::select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
 
-readr::write_csv(roll_prod, here::here(current_prs_folder, "int", "tonnes_coral_harvest.csv"))
+readr::write_csv(roll_prod, here::here(current_prs_folder, "tonnes_coral_harvest.csv"))
 ```
 
 ## Calculate pressure score
@@ -490,11 +491,13 @@ readr::write_csv(roll_prod, here::here(current_prs_folder, "int", "tonnes_coral_
  - Anything above the 95th quantile recieves a pressure score of 1, otherwise what it was before. 
  - Multiply the pressure score by the health score to get the final pressure score.
 ```{r, eval = FALSE}
-## read in production harvest data 
-roll_prod <- read_csv(paste0("globalprep/prs_coral_harvest/v", scen_year, "/int/tonnes_coral_harvest.csv"))
+# read in production harvest data 
+roll_prod <- readr::read_csv(here::here(current_prs_folder, "tonnes_coral_harvest.csv"))
 
-## read in coral extent 
-coral_ext <- read_csv(paste0("globalprep/hab_coral/v", (as.numeric(scen_year) - 2), "/data/habitat_extent_coral_updated.csv")) %>% # UPDATE TO MOST RECENT VERSION
+# read in coral extent 
+coral_ext <- readr::read_csv(here::here("globalprep", "hab_coral",
+                                        paste0("v", (as.numeric(scen_year) - 2)), # error in v2024: most recent update to this folder is 2021... 
+                                        "data", "habitat_extent_coral_updated.csv")) %>% # UPDATE TO MOST RECENT VERSION
   dplyr::select(-habitat, -year) %>%
   filter(km2 != 0)
 
