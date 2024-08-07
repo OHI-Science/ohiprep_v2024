@@ -475,7 +475,7 @@ coastal_pop <- raster::zonal(world_count, eez_25mi_inland, fun="sum", progress =
 
 coastal_pop <- as.data.frame(coastal_pop)
 
-write_csv(coastal_pop, file.path(here("globalprep/mar_prs_population/v2024/int/coastal_pop_zonal_sums.csv"))) # do we need to save this as intermediate data?
+# write_csv(coastal_pop, file.path(here("globalprep/mar_prs_population/v2024/int/coastal_pop_zonal_sums.csv"))) # do we need to save this as intermediate data?
 
 ## Organize data to have a population sum for each region and each year
 coastal_pop2 <- data.frame(coastal_pop) %>%
@@ -954,6 +954,30 @@ pop_all_years <- terra::rast(files) # Use terra::rast() on list files to make a 
 
 coastal_pop <- terra::zonal(pop_all_years, ocean_fact_reproj, "sum", na.rm=TRUE) 
 
+coastal_pop2 <- coastal_pop %>% 
+  dplyr::rename(pop_2000 = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2000_30_sec,
+                pop_2005 = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2005_30_sec,
+                pop_2010 = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2010_30_sec,
+                pop_2015 = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2015_30_sec,
+                pop_2020 = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2020_30_sec)
+
+write_csv(coastal_pop2, file.path(here("globalprep/mar_prs_population/v2024/int/coastal_pop_zonal_sums_new.csv")))
+
+coastal_pop3 <- coastal_pop2 %>% 
+  pivot_longer(cols = -c(zone), names_to = "year", values_to = "popsum") %>% 
+  mutate(year = str_remove_all(year, "pop_"),
+         year = as.numeric(year)) %>% 
+  dplyr::rename(rgn_id = zone) %>%
+  dplyr::mutate(rgn_id = as.numeric(rgn_id)) %>% 
+  dplyr::filter(rgn_id <= 250) 
+
+coastal_pop_nona <- coastal_pop3 %>% 
+  dplyr::mutate(popsum = case_when(
+    popsum == "NaN" ~ 0,
+    .default=popsum 
+  ))
+
+write_csv(coastal_pop_nona, file.path(here("globalprep/mar_prs_population/v2024/output/mar_pop_25mi_new.csv")))
 
 single_layer <- files_test[[1]]
 zonal_2layer_test <- terra::zonal(single_layer, ocean_fact_reproj, fun="sum", na.rm=TRUE)
