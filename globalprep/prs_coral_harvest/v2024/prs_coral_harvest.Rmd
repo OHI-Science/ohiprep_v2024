@@ -496,14 +496,20 @@ roll_prod <- readr::read_csv(here::here(current_prs_folder, "tonnes_coral_harves
 
 # read in coral extent 
 coral_ext <- readr::read_csv(here::here("globalprep", "hab_coral",
-                                        paste0("v", (as.numeric(scen_year) - 2)), # error in v2024: most recent update to this folder is 2021... 
+                                       # paste0("v", (as.numeric(scen_year) - 2)), # error in v2024: most recent update to this folder is 2021... 
+                                       "v2021", # temporary hard-coded fix
                                         "data", "habitat_extent_coral_updated.csv")) %>% # UPDATE TO MOST RECENT VERSION
-  dplyr::select(-habitat, -year) %>%
+  dplyr::select(-c(habitat, year)) %>%
   filter(km2 != 0)
 
 ## read in coral health data 
-coral_health <- read_csv(paste0("globalprep/hab_coral/v", (as.numeric(scen_year) - 2), "/data/habitat_health_coral_updated.csv")) %>% # UPDATE TO MOST RECENT VERSION
-  dplyr::select(-habitat, -year)
+# coral_health <- readr::read_csv(paste0("globalprep/hab_coral/v", (as.numeric(scen_year) - 2), "/data/habitat_health_coral_updated.csv")) %>% # UPDATE TO MOST RECENT VERSION
+#   dplyr::select(-habitat, -year)
+coral_health <- readr::read_csv(here::here("globalprep", "hab_coral",
+                                       # paste0("v", (as.numeric(scen_year) - 2)), # error in v2024: most recent update to this folder is 2021... 
+                                       "v2021", # temporary hard-coded fix
+                                        "data", "habitat_health_coral_updated.csv")) %>% # UPDATE TO MOST RECENT VERSION
+  dplyr::select(-c(habitat, year))
 
 # join together with the coral harvest data 
 coral_harvest <- roll_prod %>%
@@ -513,13 +519,14 @@ coral_harvest <- roll_prod %>%
 coral_harvest <- coral_harvest %>%
   mutate(intensity = tonnes/km2)
 
-ref = quantile(coral_harvest$intensity, probs = 0.95, na.rm = TRUE) ## find the 95th quantile for a reference point
+ref <- quantile(coral_harvest$intensity, probs = 0.95, na.rm = TRUE) # find the 95th quantile for a reference point
 
 coral_harvest <- coral_harvest %>%
   mutate(pressure_no_health = ifelse(intensity > ref, 1, intensity/ref)) %>%
-  mutate(pressure_health = pressure_no_health*health) %>% ## calculate the pressure score
+  mutate(pressure_health = pressure_no_health * health) %>% # calculate the pressure score
   filter(!is.na(pressure_health)) %>%
-  dplyr::select(rgn_id, year, pressure_score = pressure_health)
+  dplyr::select(rgn_id, year, pressure_score = pressure_health) # adds "product" because it's still one of the grouping variable
+# come back to this 
 
 # test <- coral_harvest %>%
 #   filter(is.na(km2))
@@ -529,7 +536,8 @@ coral_harvest <- coral_harvest %>%
 
 ## Save data layer
 ```{r, eval = FALSE}
-write.csv(coral_harvest, paste0("globalprep/prs_coral_harvest/v", scen_year, "/output/prs_coral_harvest.csv"), row.names = FALSE)
+#write.csv(coral_harvest, paste0("globalprep/prs_coral_harvest/v", scen_year, "/output/prs_coral_harvest.csv"), row.names = FALSE)
+readr::write_csv(coral_harvest, here::here(current_prs_folder, "output", "prs_coral_harvest.csv"))
 ```
 
 
