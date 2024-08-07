@@ -70,18 +70,23 @@ Flag codes:
 ```{r setup, warning=FALSE, message=FALSE}
 knitr::opts_chunk$set(eval = FALSE)
 
-# ==== Read in packages ====
-
-library(ohicore)  #devtools::install_github('ohi-science/ohicore@dev')
-library(dplyr)
-library(stringr)
-library(tidyr)
-library(zoo)  
-library(ggplot2)
-library(here)
-library(tidyverse)
-library(plotly)
-library(tictoc)
+# ==== Load packages ====
+if (!require(librarian)) {
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  ohicore, #devtools::install_github('ohi-science/ohicore@dev')
+  dplyr,
+  stringr,
+  tidyr,
+  here,
+  tidyverse,
+  zoo,
+  ggplot2,
+  plotly,
+  tictoc
+)
 
 # ==== Set file paths ====
 scen_year <- "2024"
@@ -89,11 +94,12 @@ v_scen_year <- paste0("v", scen_year)
 data_dir_year <- paste0("d", scen_year)
 prev_scen_year <- as.character(as.numeric(scen_year) - 1)
 common_year <- as.character(as.numeric(scen_year) - 4) # this depends on what the latest data year is; there's often a 3 year lag so the common year between the current and previous version year would be 4 years prior to the current version year; this time there is a 2 year lag but the common year is still 4 years prior at the moment
+current_prs_folder <- here::here("globalprep", "prs_coral_harvest", v_scen_year)
 
 # ==== Load FAO-specific user-defined functions ====
 source(here::here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
 source(here::here("workflow", "R", "common.R")) # directory locations
-source(here::here("globalprep", "prs_coral_harvest", v_scen_year, "R", "np_fxn.R"))
+source(here::here(current_prs_folder, "R", "np_fxn.R"))
 ```
 
 # Import Raw Data: FAO Commodities
@@ -112,93 +118,84 @@ files <- list.files(dir_fao_data, pattern = glob2rx('*.csv'), full.names = TRUE)
 ## To compare to old data:
 # dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2020')
 # files <- list.files(dir_fao_data, pattern=glob2rx('*.csv'), full.names=T)
-old_dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2023')
-old_files <- list.files(old_dir_fao_data, pattern=glob2rx('*.csv'), full.names=T)
-test_old_quant <- read.csv(old_files[1], check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE)
+## To compare to 2023
+#old_dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2023')
+#old_files <- list.files(old_dir_fao_data, pattern=glob2rx('*.csv'), full.names=T)
+#test_old_quant <- read.csv(old_files[1], check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE)
 
-## loop
+# ========== Data processing loop ===================
 tic()
-for (f in files){  
+for (f in files) {  
   #f = files[2] # uncomment to run line-by-line to test each file
+  # Print name of file in current iteration
   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
   
-  
+  # ---- Read in data ----
+  #d_test <- readr::read_csv(f) %>% janitor::clean_names() # testing out tibble option for reading in data
   d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
-  #d_test <- readr::read_csv(f)
   # checks names syntactically, strips leading and trailing whitespace, prevents conversion of characters to factors 
   
+  # ---- Specify units ----
   ## Specifies that units are tonnes if we are reading in the Commodities Quantity data csv, and usd if we are reading in the Commodities Value data csv
   units <- c('tonnes','usd')[str_detect(f, c('quant','value'))] # detect unit name using lowercase American English
 
+  # ---- Clean and tidy data ----
   ## gather into long format and clean up FAO-specific data foibles
-  ## warning: attributes are not identical across measure variables; they will be dropped: this is fine
+  ## warning: attributes are not identical across measure variables; they will be dropped: this is fine (didn't get this warning in 2024)
   m <- d %>% 
-    #dplyr::select(-contains("S")) %>% 
-    dplyr::select(-"Unit (Name)") %>%
-    rename(country   = `Reporting country (Name)`,
-           commodity = `Commodity (Name)`,
-           trade     = `Trade flow (Name)`) %>%
-    rename_with(~ gsub("\\[", "", .)) %>%
-    rename_with(~ gsub("\\]", "", .)) %>%
-    pivot_longer(cols = -c(country, commodity, trade, Unit),
+    janitor::clean_names() %>% 
+    dplyr::select(-c(unit_name)) %>% # "Tonnes – net product weight" == TPW
+    rename(country = reporting_country_name,
+           commodity = commodity_name,
+           trade = trade_flow_name) %>%
+    rename_with(~ gsub("x", "", .)) %>% # tidy up year column names (clean_names() added "x"s)
+    pivot_longer(cols = -c(country, commodity, trade, unit),
                    names_to = "year", values_to = "value") 
   
-  ## Include only the "Exports" data:
-  ## 2022 - changed from "Export" to "Exports"
+  # ---- Filter to only include "Exports" data
   m <- m %>%
     filter(trade == "Exports")
 
+  # ---- Run fao data cleaning function ----
+  # cleans up flags, swaps out FAO-specific codes for analysis
   m <- m %>%
     fao_clean_data_new() %>%  # swaps out FAO-specific codes. NOTE: optional parameter 'sub_N' can be passed to control how an 'N' code is interpreted.
-    dplyr::select(-c(trade, Unit)) %>% # eliminate 'trade' column
+    dplyr::select(-c(trade, unit)) %>% # eliminate 'trade' and 'unit' columns
     arrange(country, commodity, is.na(value), year)
 
+  # 2024 note -- warning message: NAs introduced by coercion (in value = as.numeric(as.character(value)) from line 65 in fao_fxn.R)
   
-  ## Products join: attach product categories from com2prod, and
-  ##   filter out all entries that do not match a product category.
-  ## Note: commodity_lookup is user-defined function to compare 
-  ##   commodities in data vs commodities in lookup table
+  # ---- Products join ----
+  ## attach product categories from com2prod, and filter out all entries that 
+  ## do not match a product category.
+  ## Note: commodity_lookup is user-defined function to compare commodities in
+  ## data vs commodities in lookup table
   
-  ## load lookup for converting commodities to products
-  com2prod <- read.csv(here(paste0('globalprep/prs_coral_harvest/v', scen_year, '/raw/commodities2products_weighting.csv')), na.strings = '')
-  
-  ## Check the current commodity-to-product lookup table.  If necessary, make changes to     "raw/commodities2products_weighting.csv"
-  # v2024: added shells, Powder and waste of shells; corals,Miscellaneous corals and shells
-  # For prs_coral_harvest, The main product we're concerned about is "corals". The other natural product commodities are more important for the np goal and should be inspected more carefully for updating the lookup table for that goal
+  # Load lookup for converting commodities to products
+  com2prod <- read.csv(here::here(current_prs_folder, "raw", "commodities2products_weighting.csv"), na.strings = '')
+  #com2prod_test <- read_csv(here::here(current_prs_folder, "raw", "commodities2products_weighting.csv"), na = '')
+  ## Check the current commodity-to-product lookup table.  If necessary, make changes to "raw/commodities2products_weighting.csv"
+  ## For prs_coral_harvest, The main product we're concerned about is "corals". The other natural product commodities are more important for the np goal and should be inspected more carefully for updating the lookup table for that goal
   np_commodity_lookup(m, com2prod) 
+  ## v2024: added shells,Powder and waste of shells; corals,Miscellaneous corals and shells
     
+  # Perform inner join
   ## inner_join will attach product names to matching commodities according to
-  ##    lookup table 'com2prod', and eliminate all commodities that do not appear in the lookup table.
+  ## lookup table 'com2prod', and eliminate all commodities that do not appear in the lookup table.
   m <- m %>%
       inner_join(com2prod, by = 'commodity')
     
     
+  # ---- Run name_2_rgn ----
+  # Prep:
   ## Special case: user-defined function deals with 
   ##   breaking up Antilles into separate reported rgns
-  m <- split_regions(m) # used to use np_split_antilles(); this incorporates more than just antilles
-    
-  ## Some changes to region names that aren't working in name_2_rgn()
-  # m <- m %>%
-  #   mutate(country = ifelse(country == "Côte d'Ivoire", "Ivory Coast", country)) %>%
-  #   mutate(country = ifelse(country == "C<f4>te d'Ivoire	", "Ivory Coast", country)) %>%
-  #   mutate(country = ifelse(country == "C\xf4te d'Ivoire", "Ivory Coast", country)) %>%
-  #   mutate(country = ifelse(country == "Cura<e7>ao","Curacao", country)) %>%
-  #   mutate(country = ifelse(country == "Curaçao","Curacao", country)) %>%
-  #   mutate(country = ifelse(country == "Cura\xe7ao","Curacao", country)) %>%
-  #   mutate(country = ifelse(country == "R\xe9union", "Reunion", country)) %>% 
-  #   mutate(country = ifelse(country == "Réunion", "Reunion", country)) %>% 
-  #   mutate(country = ifelse(country == "R<e9>union", "Reunion", country)) %>%
-  #   mutate(country = ifelse(country == "Micronesia (Fed. States)", "Micronesia", country)) %>%
-  #   mutate(country = ifelse(country == "Saint Helena/Asc./Trist.", "Saint Helena", country)) %>%
-  #   mutate(country = ifelse(country == "Türkiye", "Turkey", country)) %>%
-  #   mutate(country = ifelse(country == "Venezuela (Boliv Rep of)", "Venezuela", country)) %>%
-  #   mutate(country = ifelse(country == "Netherlands (Kingdom of the)", "Netherlands", country)) %>%
-  #   filter(country != "Azerbaijan") # landlocked, but not being removed by name_2_rgn?
-  # the above shouldn't be needed anymore in v2023 onwards due to updates to name_2_rgn
-    
+  m <- ohicore::split_regions(m) # used to use np_split_antilles(); this incorporates more than just antilles
+  
+  # Run name_2_rgn to filter to OHI regions, assign rgn_ids, standardize rgn_names
   m_rgn <- ohicore::name_2_rgn(df_in = m,
-                               fld_name='country', 
-                               flds_unique=c('commodity', 'product', 'year'))
+                               fld_name = "country", 
+                               flds_unique = c("commodity", "product", "year"))
   
 # v2023 removed countries:
 #   These data were removed for not having any match in the lookup tables:
@@ -210,33 +207,35 @@ for (f in files){
 # [5] "Martinique"            "Montenegro"            "Russian Federation"    "Serbia and Montenegro"
 # [9] "Sudan"                 "Sudan (former)"        "Un. Sov. Soc. Rep."     - these are all fixed in the group by and summarise below  
   
-  # v2024: removed yugoslavia sfr in both quality and value
-  # ascension saint helena and tristan da cunha in value
+  # v2024: removed yugoslavia sfr in both quantity and value
+  # ascension saint helena and tristan da cunha in quantity and value
   
-  # had the same duplicates as v2023; all are fixed in the group by and summarize (aggregating groups by ohi rgn_id among other variables, which sums the "duplicates" above into appropriate rgn_id groups)
+  # v2024: had the same duplicates as v2023; all are fixed in the group by and summarize (aggregating groups by ohi rgn_id among other variables, which sums the "duplicates" above into appropriate rgn_id groups)
   
-  ## combine composite regions
+  # ---- Aggregate: combine composite regions ----
   ## When summarizing the dataset, this function provides a modified way to sum the value column while maintaining NA values when both variables are NA (rather than turning to zero values). The function will sum non-NA values normally.
   sum_function <- function(x) {
     if (sum(is.na(x)) == length(x)) 
       return(NA)
     return(sum(x, na.rm = T))}
   
+  # Apply sum function
   m_rgn <- m_rgn %>%
     dplyr::group_by(rgn_id, rgn_name, commodity, product, year) %>%
-    dplyr::summarize(value = sum_function(value)) %>%
+    dplyr::summarize(value = sum_function(value)) %>% # alternate: .groups = "drop (currently experimental)
     dplyr::ungroup()
 
-  ## units: rename value field to units based on filename
+  # ---- Write out to int folder ----
+  # prep units: rename value field to units based on filename
   names(m_rgn)[names(m_rgn) == 'value'] <- units  
   
-  ## output to .csv - should create two csvs (tonnes.csv and usd.csv)
+  # output to .csv - should create two csv files (tonnes.csv and usd.csv)
   harvest_out <- sprintf(here(paste0('globalprep/prs_coral_harvest/v', scen_year, '/int/%s.csv')), units)
   write.csv(m_rgn, harvest_out, row.names = FALSE, na = '')
 }
 toc()
 # v2023: 152.934 sec elapsed
-# v2024: 98.956 sec elapsed
+# v2024: 97.65 sec elapsed
 ```
 
 
