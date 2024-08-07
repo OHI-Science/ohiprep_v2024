@@ -51,12 +51,12 @@ fao_clean_data_new <- function(m, sub_N = 0.1) {
       #value = str_replace(value, fixed(' N'), sub_N),
       value = case_when(str_detect(value,"0  N") ~ as.character(sub_N),
                         str_detect(value, " N") ~ str_remove(value, " N"),
-                        TRUE ~value),
+                        TRUE ~ value),
       ### FAO denotes something as 'N' when it is > 0 but < 1/2 of a unit. 
       ### Replace with lowdata_value.
       value = str_replace(value, fixed(  '-'), '0'),  
       ### FAO's code for true 0
-      value = ifelse(value =='', NA, value)) %>%
+      value = ifelse(value == '', NA, value)) %>%
     mutate(
       value = as.numeric(as.character(value)),
       year  = as.integer(as.character(year)))       # search in R_inferno.pdf for "shame on you"

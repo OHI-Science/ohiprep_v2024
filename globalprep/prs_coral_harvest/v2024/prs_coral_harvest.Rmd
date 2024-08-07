@@ -23,13 +23,24 @@ editor_options:
 # Summary
 This analysis converts FAO commodities data into data layers used to calculate OHI 2023 global coral harvest pressure.
 
-# Updates from previous assessment
+
+## 2024 Updates from previous assessment
+- New year of FAO data (1976-2022; new year 2022)
+- Added code to remove flag column (was done inherently or upstream before)
+- Built on programmatic year usage
+- More updates to name_2_rgn
+- Restructured file paths for cross-platform capability, primarily using `{here}` package
+- Updated `raw/commodities2products.csv` to include new coral category
+- Updated script to work with 
+
+# 2023 Updates from previous assessment
 - New 2 years of FAO data (1976-2021; new years 2020 and 2021)
 - Added/edited code for the Datacheck section
 - Added a tic/toc for timing purposes
 - Added more programmatic year usage
 - Swapped np_split_antilles for split_regions (more generalized usage)
 - Updates to name_2_rgn reduce the code length of the Rmd
+- Cleaned up code and comments
 
 ***
 
@@ -44,17 +55,23 @@ FAO raw commodities metadata found [here](https://www.fao.org/fishery/en/collect
 
 **Downloaded**: August 5, 2024
 
-**Description**:  Quantity (tonnes) and value (USD) of raw commodities (Exports only) for each country, taxa, year. The FAO data is subset to include commodities in these categories: shells, corals, ornamental fish, fish oil, seaweed and plants, sponges (see: raw/commodities2products.csv for details).
+**Description**:  Quantity (tonnes) and value (USD) of raw commodities (Exports only) for each country, taxa, year. The FAO data is subset to include commodities in these categories: shells, corals, ornamental fish, fish oil, seaweed and plants, sponges (see: `raw/commodities2products.csv` for details).
 
 **Time range**: 1976-2022
+
+
+Flag codes:
+
+
 
 ***
   
 # Methods
 ```{r setup, warning=FALSE, message=FALSE}
-knitr::opts_chunk$set(eval=FALSE)
+knitr::opts_chunk$set(eval = FALSE)
 
-## load libraries, set directories
+# ==== Read in packages ====
+
 library(ohicore)  #devtools::install_github('ohi-science/ohicore@dev')
 library(dplyr)
 library(stringr)
@@ -66,14 +83,17 @@ library(tidyverse)
 library(plotly)
 library(tictoc)
 
+# ==== Set file paths ====
 scen_year <- "2024"
+v_scen_year <- paste0("v", scen_year)
+data_dir_year <- paste0("d", scen_year)
 prev_scen_year <- as.character(as.numeric(scen_year) - 1)
 common_year <- as.character(as.numeric(scen_year) - 4) # this depends on what the latest data year is; there's often a 3 year lag so the common year between the current and previous version year would be 4 years prior to the current version year; this time there is a 2 year lag but the common year is still 4 years prior at the moment
 
-## Load FAO-specific user-defined functions
-source(here('workflow/R/fao_fxn.R')) # function for cleaning FAO files
-source(here('workflow/R/common.R')) # directory locations
-source(here(paste0('globalprep/prs_coral_harvest/v', scen_year, '/R/np_fxn.R')))
+# ==== Load FAO-specific user-defined functions ====
+source(here::here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
+source(here::here("workflow", "R", "common.R")) # directory locations
+source(here::here("globalprep", "prs_coral_harvest", v_scen_year, "R", "np_fxn.R"))
 ```
 
 # Import Raw Data: FAO Commodities
@@ -83,18 +103,18 @@ Simultaneously read and process FAO commodities value and quantity data.
 ## NOTE: This can be run as a loop, but the "value" and "quant" datasets need to be run individually to make sure
 ##  there are no problems (after this check, they can be looped for efficiency)
 
-## describe where the raw data are located:
-dir_fao_data <- file.path(dir_M, paste0('git-annex/globalprep/_raw_data/FAO_commodities/d', scen_year))
+# describe where the raw data are located:
+dir_fao_data <- here::here(dir_M, "git-annex", "globalprep", "_raw_data", "FAO_commodities", data_dir_year)
 
-## list files included in d2024 folder (value and quant datasets)
+# list files included in d2024 folder (value and quant datasets)
 files <- list.files(dir_fao_data, pattern = glob2rx('*.csv'), full.names = TRUE)
 
 ## To compare to old data:
 # dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2020')
 # files <- list.files(dir_fao_data, pattern=glob2rx('*.csv'), full.names=T)
-# dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2020')
-# files <- list.files(dir_fao_data, pattern=glob2rx('*.csv'), full.names=T)
-
+old_dir_fao_data <- file.path(dir_M, 'git-annex/globalprep/_raw_data/FAO_commodities/d2023')
+old_files <- list.files(old_dir_fao_data, pattern=glob2rx('*.csv'), full.names=T)
+test_old_quant <- read.csv(old_files[1], check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE)
 
 ## loop
 tic()
@@ -113,7 +133,7 @@ for (f in files){
   ## gather into long format and clean up FAO-specific data foibles
   ## warning: attributes are not identical across measure variables; they will be dropped: this is fine
   m <- d %>% 
-    dplyr::select(-contains("S")) %>% 
+    #dplyr::select(-contains("S")) %>% 
     dplyr::select(-"Unit (Name)") %>%
     rename(country   = `Reporting country (Name)`,
            commodity = `Commodity (Name)`,
@@ -227,11 +247,37 @@ toc()
 # during gapfilling, as the np_regr_coef() function uses 
 # np_regr_fill(), which gapfills NAs (and expects there to be NAs)
 #test_na[,1]
-test_na <- d %>% filter(is.na(`[2019]`))
 
-aggregate_group_name <- paste0("FAO. ", scen_year, ". FishStat: Global Aquatic Trade - All partners aggregated")
 
-test_na %>% filter(str_detect(`Reporting country (Name)`, aggregate_group_name))
+quant_file <- files[1]
+# value_file <- files[2]
+# 
+quant_raw <- read.csv(quant_file, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE)
+quant_raw_new <- read_csv(quant_file)
+
+units <- c('tonnes','usd')[str_detect(quant_file, c('quant','value'))] # detect unit name using lowercase American English
+
+quant_raw_clean <- quant_raw_new %>% janitor::clean_names()
+
+quant_raw_tidy <- quant_raw_clean %>% 
+  dplyr::select(-c(unit_name)) %>% 
+  dplyr::rename(country = reporting_country_name,
+         commodity = commodity_name,
+         trade = trade_flow_name) %>%
+  dplyr::rename_with(~ gsub("x", "", .)) %>% # tidy year columns
+  dplyr::mutate_if(is.numeric, as.character) %>% # setting datatypes for pivoting (we want to include Flag columns for use in processing)
+  tidyr::pivot_longer(cols = -c(country, commodity, trade, unit),
+                   names_to = "year", values_to = "value") 
+  
+
+# 
+# quant_filter <- quant_raw %>% dplyr::select(-"Unit (Name)")
+# 
+# test_na <- d %>% filter(is.na(`[2019]`))
+# 
+# aggregate_group_name <- paste0("FAO. ", scen_year, ". FishStat: Global Aquatic Trade - All partners aggregated")
+# 
+# test_na %>% filter(str_detect(`Reporting country (Name)`, aggregate_group_name))
 ```
 
 
