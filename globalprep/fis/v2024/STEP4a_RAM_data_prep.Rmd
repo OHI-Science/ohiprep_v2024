@@ -1,5 +1,5 @@
 ---
-title: "OHI 2023: Food Provision/Fisheries, Preparing RAM B/Bmsy data"
+title: "OHI 2024: Food Provision/Fisheries, Preparing RAM B/Bmsy data"
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
@@ -29,7 +29,7 @@ This script prepares the RAM B/Bmsy data:
 
 ## Updates from previous assessment
 
-- Updated RAM data for v2023
+- Updated RAM data for v2024
 
 
 ***
@@ -37,12 +37,12 @@ This script prepares the RAM B/Bmsy data:
 # Data
 ## B/Bmsy values from stock assessments 
 
-Reference: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.61
+Reference: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.65
 
-* Downloaded: 07/06/2023
+* Downloaded: 08/07/2024
 * Description: B/Bmsy value by stock and year (other data, which we do not use, are also available in the database)
 * Native data resolution: stock (fish stock, species and region specific)
-* Time range: 1800 - 2022 (we only use the year which matches our fisheries catch data (2019 for v2023))
+* Time range: 1800 - 2023 (we only use the year which matches our fisheries catch data (2019 for v2024))*
 * Format: R data files (.rds)
 * DOI: http://doi.org/10.5281/zenodo.4824192
 
@@ -74,9 +74,21 @@ library(here)
 library(zoo)
 library(patchwork)
 
-## highlight out when knitting
-setwd(here::here("globalprep/fis/v2023"))
-source('../../../workflow/R/common.R')
+# ---- sources! ----
+source(here("workflow", "R", "common.R")) # file creates objects to process data
+
+# ---- set year and file path info ----
+current_year <- 2024 # Update this in the future!!
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+
+# ---- data directories ----
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# CMS (Copernicus Marine Service) raw data directory
+RAM_dir <- here(raw_data_dir, "RAM", data_dir_version_year)
 ```
 
 ## Obtain RAM B/Bmsy data
@@ -85,46 +97,74 @@ The data is stored as a relational database in an R object. Check that the names
 
 The following tables are included (for full list, see loadDBdata.r in mazu):  
 
-1. timeseries  
+1. timeseries # checked v2024
 The time series data is a data frame containing all assessments conducted per stock with the following headers/columns:  
 (1) assessid (2) stockid (3) stocklong (4) tsid (5) tsyear (6) tsvalue
 
-2. bioparams  
+2. bioparams  # checked v2024
 The time series data is a data frame with parameter values for all stocks and assessments. It has the following headers/columns:  
 (1) assessid (2) stockid (3) stocklong (4) bioid (5) biovalue (6) bioyear (7) bionotes  
 
-3.  timeseries_values_views  
-This stores the timeseries values, using the most recent assessment available, with timeseries type. The dataframe contains the following headers/columns: stockid, stocklong, year, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpref, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+3.  timeseries_values_views # checked v2024
+This stores the timeseries values, using the most recent assessment available, with timeseries type. The dataframe contains the following headers/columns: stockid, stocklong, year, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpref, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmgt, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
 
-4. timeseries_units_views  
-This stores the timeseries units (or time series source for touse time series), with timeseries type. The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmgtpref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows
+4. timeseries_units_views  # checked v2024
+This stores the timeseries units (or time series source for touse time series), with timeseries type. The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows
 
-5. timeseries_id_views  
-This stores the timeseries ids with timeseries id along the columns. The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpref, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+5. timeseries_id_views # checked v2024
+This stores the timeseries ids with timeseries id along the columns. The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpref, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmgt, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
 
-6. bioparams_values_views  
+6. bioparams_values_views  # checked v2024
 This stores the bioparams values, with bioparam type along the columns
-(TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+(stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
 
-7. bioparams_units_views  
-This stores the bioparams units, with bioparam type along the columns (TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+7. bioparams_units_views  # checked v2024
+This stores the bioparams units, with bioparam type along the columns (stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
 
-8. bioparams_ids_views  
+8. bioparams_ids_views  # checked v2024
 This stores the bioparams ids, with bioparam id along the columns
 (TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
 
-9. metadata  
+9. metadata  # checked v2024
 This stores assorted metadata associated with the stock, with datatypes along the columns
 (assessid, stockid, stocklong, assessyear, scientificname, commonname, areaname, managementauthority, assessorfull, region, FisheryType, taxGroup, primary_FAOarea, primary_country) and stock by row.
 
-10. tsmetrics
+10. tsmetrics # checked v2024
 Contains metadata, with columns tscategory, tsshort, tslong, tsunitsshort, tsunitslong, tsunique.
+
+11. timeseries_assessments_views # checked v2024
+The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+
+12. timeseries_years_views # checked v2024
+The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+
+13. timeseries_notes_views # checked v2024
+The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+
+14. timeseries_sources_views # checked v2024
+The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+
+15. bioparams_assessments_views  # checked v2024
+This stores the columns
+(stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+
+15. bioparams_years_views  # checked v2024
+This stores the columns
+(stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+
+15. bioparams_notes_views  # checked v2024
+This stores the columns
+(stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+
+15. bioparams_sources_views  # checked v2024
+This stores the columns
+(stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
 
 
 For this data prep we primarily use and consult `timeseries_values_views`, `tsmetrics`, and `metadata`
 ```{r load_data, eval = FALSE}
 # Manually download a new database from http://ramlegacy.org/ if applicable
-load(file.path(dir_M, "git-annex/globalprep/_raw_data/RAM/d2023/RAMLDB v4.61/R Data/DBdata[asmt][v4.61].RData"))
+load(here::here(RAM_dir, "RAMLDB v4.65/R Data/DBdata[asmt][v4.65].RData")) # update if downloading a new database
 
 ram_bmsy_new <- timeseries_values_views %>%
   dplyr::select(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SSBdivSSBmgt) %>%
@@ -138,7 +178,6 @@ ram_bmsy_new <- timeseries_values_views %>%
   filter(!is.na(ram_bmsy)) %>%
   dplyr::select(stockid, stocklong, year, ram_bmsy)
 
-
 test <- ram_bmsy_new %>%
   filter(year >=2001, year <=2019) %>%
   group_by(stockid) %>%
@@ -146,9 +185,16 @@ test <- ram_bmsy_new %>%
   ungroup() %>%
   distinct(stockid, max_year) %>%
   group_by(max_year) %>%
-  summarise(n())
+  summarise(n()) %>% 
+  rename(num_max_yrs = c("n()"))
 
+# histogram of all years and how many stocks have their latest year of data in that year
+hist(test$num_max_yrs,breaks=18)
 hist(test$max_year,breaks=18)
+
+sum(test$num_max_yrs) # 474 total stocks
+
+plot(test) # 203 stocks have data until 2019, but that is out of 474 stocks (lots need to be gapfilled)
 ```
 
 ## Gapfill RAM data when there are missing years
