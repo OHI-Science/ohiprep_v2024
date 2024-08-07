@@ -211,7 +211,7 @@ np_regr_coef <- function(h, scope = 'rgn_id', vars = 'tdy') {
   ###     passed to group_by() and the full_join() to set the scope of regression.
   ### * vars = 'td' for  (tonnes ~ dollars) (and vice versa), and 
   ###          'tdy' for (tonnes ~ dollars + years)
-  browser()
+  #browser()
   h <- switch(scope,
               rgn_id    = group_by(h, rgn_id,    commodity),
               georgn_id = group_by(h, georgn_id, commodity),

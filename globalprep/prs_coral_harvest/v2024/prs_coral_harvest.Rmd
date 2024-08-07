@@ -285,15 +285,15 @@ quant_raw_tidy <- quant_raw_clean %>%
 Read in the tonnes and usd data that was completed in the Natural Products ornamentals dataprep (and above). Combining the quantity and value data and a bit of cleaning to remove data prior to first reporting year for coral commodities and regions. 
 ```{r, eval = FALSE}
 ## Read in quant dataset from intermediate folder
-h_tonnes <- read.csv(here(paste0('globalprep/prs_coral_harvest/v', scen_year, '/int/tonnes.csv')))
+h_tonnes <- read.csv(here::here(current_prs_folder, "int", "tonnes.csv"))
 
 ## Read in value dataset from intermediate folder
-h_usd <- read.csv(here(paste0('globalprep/prs_coral_harvest/v', scen_year, '/int/usd.csv')))
+h_usd <- read.csv(here::here(current_prs_folder, "int", "usd.csv"))
 
 ## concatenates h_tonnes and h_usd data
 ## h includes rgn_name, rgn_id, commodity, product, year, tonnes, usd.
 h <- h_usd %>%
-    full_join(h_tonnes, by=c('rgn_name', 'rgn_id', 'commodity', 'product', 'year')) %>%
+    full_join(h_tonnes, by = c('rgn_name', 'rgn_id', 'commodity', 'product', 'year')) %>%
     mutate(commodity = as.character(commodity)) %>%
     arrange(rgn_id, product, commodity, year) # %>%
   # dplyr::filter(product == "corals") ##filter for our commodities of interest
@@ -301,6 +301,46 @@ h <- h_usd %>%
 ## clips out years prior to first reporting year, for each commodity per region
 h <- h %>% np_harvest_preclip()
 ```
+
+
+```{r}
+# test plot
+library(RColorBrewer)
+
+h_agg_plot_df <- h %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(rgn_id, rgn_name, product, year) %>% 
+  summarize(total_usd = sum(usd, na.rm = TRUE),
+            total_tonnes = sum(tonnes, na.rm = TRUE),
+            .groups = "drop")
+
+h_product_agg_df <- h %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(product, year) %>% 
+  summarize(total_usd = sum(usd, na.rm = TRUE),
+            total_tonnes = sum(tonnes, na.rm = TRUE),
+            .groups = "drop")
+
+corals_quant_agg <- h_agg_plot_df %>% 
+  filter(product == "corals")
+
+quantity_rgn_plot <- ggplot(data = h_agg_plot_df, aes(x = year, color = rgn_name)) +
+  geom_line(aes(y = total_tonnes, color = rgn_name)) +
+  facet_wrap(~product) + 
+  theme_bw() +
+  labs(title = "Aquatic Trade Quantity per Product Category Per Region over Time",
+       y = "Tonnes")
+
+coral_agg_plot <- ggplot(data = corals_quant_agg, aes(x = year)) +
+  geom_line(aes(y = total_tonnes, color = rgn_name)) +
+  theme_bw() +
+  labs(title = "Aquatic Trade Quantity of Corals over Time",
+       y = "Tonnes")
+
+plotly::ggplotly(coral_agg_plot)
+
+```
+
 
 
 # Gapfilling 
@@ -371,7 +411,7 @@ h_gap <- h %>%
   dplyr::select(rgn_id, commodity, product, year, gapfill) %>%
   dplyr::filter(product == "corals")
 
-write.csv(h_gap, file.path(here(), paste0('globalprep/prs_coral_harvest/v', scen_year, '/output/prs_coral_gf.csv')), row.names = FALSE, na = '')
+write.csv(h_gap, here(current_prs_folder, "output", "prs_coral_gf.csv"), row.names = FALSE, na = '')
 ```
 
 # Final Data Wranglng
@@ -392,17 +432,17 @@ stopifnot(sum(duplicated(h_prod[ , c('rgn_id', 'product', 'year')])) == 0)
 
 ## Quick Data Check
 
-Look at wide format with all commmodities and product subtotal (where commodity column value is "Z_TOTAL"), compared with the input data prior to summing.
+Look at wide format with all commodities and product subtotal (where commodity column value is "Z_TOTAL"), compared with the input data prior to summing.
 
 ```{r, eval = FALSE}
 h_x_tonnes <- h_comm %>% 
-  bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
+  bind_rows(mutate(h_prod, commodity = 'Z_TOTAL')) %>%
   dplyr::select(rgn_name, rgn_id, commodity, product, year, tonnes) %>%
   dplyr::arrange(rgn_name, product, commodity, year) %>%
   pivot_wider(names_from = year, values_from = tonnes)
 
 h_x_usd <- h_comm %>% 
-  bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
+  bind_rows(mutate(h_prod, commodity = 'Z_TOTAL')) %>%
   dplyr::select(rgn_name, rgn_id, commodity, product, year, usd) %>%
   dplyr::arrange(rgn_name, product, commodity, year) %>%
   pivot_wider(names_from = year, values_from = usd)
@@ -414,8 +454,8 @@ australia ## perfect
 
 
 ## Can open up in Excel to compare subtotals per country-product-year
-write.csv(h_x_tonnes, paste0('globalprep/prs_coral_harvest/v', scen_year, '/int/coral_harvest_tonnes_wide.csv'), row.names = FALSE, na = 'NA')
-write.csv(h_x_usd,    paste0('globalprep/prs_coral_harvest/v', scen_year, '/int/coral_harvest_usd_wide.csv'),    row.names = FALSE, na = 'NA')
+readr::write_csv(h_x_tonnes, here::here(current_prs_folder, "int", "coral_harvest_tonnes_wide.csv"), na = "NA")
+readr::write_csv(h_x_usd, here::here(current_prs_folder, "int", "coral_harvest_usd_wide.csv"), na = "NA")
 ```
 
 
@@ -426,21 +466,23 @@ Determine rolling averages for tonnes and USD in order to determine peak values.
 # Find max year in the summarized data table
 year_max <- max(h_prod$year)
 
+# Determine rolling averages for tonnes and USD
 roll_prod <- h_prod %>%
   dplyr::arrange(rgn_id, product, year) %>%
-  dplyr::group_by(rgn_id, product) %>%
+  dplyr::group_by(rgn_id, product) %>% # group by region and product
+  # determine rolling averages for tonnes and USD
   dplyr::mutate(
-      tonnes_rollmean = rollapply(tonnes, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE),
-      usd_rollmean    = rollapply(   usd, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE)) %>%
+    tonnes_rollmean = rollapply(tonnes, width = 4, FUN = mean, align = "right", partial = TRUE, na.rm = FALSE),
+    usd_rollmean = rollapply(usd, width = 4, FUN = mean, align = "right", partial = TRUE, na.rm = FALSE)) %>%
   dplyr::rename(
-      tonnes_orig = tonnes, # prevent overwriting of reported and gapfilled values
-      usd_orig    = usd) %>% # prevent overwriting of reported and gapfilled values
+    tonnes_orig = tonnes, # prevent overwriting of reported and gapfilled values
+    usd_orig = usd) %>% # prevent overwriting of reported and gapfilled values
   dplyr::mutate(
-      tonnes = ifelse(!is.na(tonnes_rollmean), tonnes_rollmean, tonnes_orig),
-      usd    = ifelse(!is.na(usd_rollmean),    usd_rollmean,    usd_orig)) %>%
+    tonnes = ifelse(!is.na(tonnes_rollmean), tonnes_rollmean, tonnes_orig),
+    usd = ifelse(!is.na(usd_rollmean), usd_rollmean, usd_orig)) %>%
   dplyr::select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
 
-write.csv(roll_prod, paste0("globalprep/prs_coral_harvest/v", scen_year, "/int/tonnes_coral_harvest.csv"), row.names = FALSE)
+readr::write_csv(roll_prod, here::here(current_prs_folder, "int", "tonnes_coral_harvest.csv"))
 ```
 
 ## Calculate pressure score
