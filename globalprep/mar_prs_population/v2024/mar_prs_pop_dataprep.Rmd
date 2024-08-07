@@ -945,11 +945,14 @@ names(zone_raster) = c("zone")# [1] "ocean_plus25mile_inland"
 # Need to figure out how to rename the layer to "zone" before writing out 
 
 
-files_test <- terra::rast(files[1:2])
-zonal_stats <- terra::zonal(count_rast, ocean_fact_reproj, "sum", na.rm=TRUE)
+pop_all_years <- terra::rast(files) # Use terra::rast() on list files to make a spatraster with as many layers as there are files 
 
+# Check it out 
+(pop_all_years) # Has 21 layers, one for each of our raster files 
 
-zonal_2layer_test <- terra::zonal(files_test, ocean_fact_reproj, "sum", na.rm=TRUE) # IT WORKED!! 
+# zonal_stats <- terra::zonal(count_rast, ocean_fact_reproj, "sum", na.rm=TRUE)
+
+coastal_pop <- terra::zonal(pop_all_years, ocean_fact_reproj, "sum", na.rm=TRUE) 
 
 
 single_layer <- files_test[[1]]
