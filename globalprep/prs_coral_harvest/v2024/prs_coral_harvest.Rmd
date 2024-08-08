@@ -31,7 +31,8 @@ This analysis converts FAO commodities data into data layers used to calculate O
 - More updates to name_2_rgn
 - Restructured file paths for cross-platform capability, primarily using `{here}` package
 - Updated `raw/commodities2products.csv` to include new coral category
-- Updated script to work with 
+- Updated script to work with `janitor::clean_names()` instead of raw column names
+- Updated `read.csv()` and `write.csv()` to `read_csv()` and `write_csv()` when appropriate
 
 # 2023 Updates from previous assessment
 - New 2 years of FAO data (1976-2021; new years 2020 and 2021)
@@ -62,8 +63,32 @@ FAO raw commodities metadata found [here](https://www.fao.org/fishery/en/collect
 
 Flag codes:
 
+E: Estimate
+N: Not significant (below 0.5)
+X: Value from international organization
 
 
+**Summary of data layer from methodology**:
+`hd_coral`
+
+*Pressure*
+
+**Category**: ecological
+
+**Subcategory**: habitat destruction
+
+>The total tonnes of coral harvest were determined for each region using export 
+data from the FAO Global Commodities database. The tonnes of ornamental fishing 
+was divided by the area of coral, taken from the hab_coral layer, to get the 
+intensity of coral harvest per region. Following this, we set the reference 
+value as the 95th quantile of coral harvest intensity. We then divided the 
+intensity by the reference intensity. Anything that scored above 1 received a[n] 
+intensity pressure score of 1. To incorporate the health of the coral, we then 
+multiplied the intensity pressure score by the health of the coral, to get the 
+final pressure score.
+
+
+I think instead of ornamental fishing, it's tons of corals commodities 
 ***
   
 # Methods
@@ -85,7 +110,8 @@ librarian::shelf(
   zoo,
   ggplot2,
   plotly,
-  tictoc
+  tictoc,
+  RColorBrewer
 )
 
 # ==== Set file paths ====
@@ -94,6 +120,7 @@ v_scen_year <- paste0("v", scen_year)
 data_dir_year <- paste0("d", scen_year)
 prev_scen_year <- as.character(as.numeric(scen_year) - 1)
 common_year <- as.character(as.numeric(scen_year) - 4) # this depends on what the latest data year is; there's often a 3 year lag so the common year between the current and previous version year would be 4 years prior to the current version year; this time there is a 2 year lag but the common year is still 4 years prior at the moment
+# define common directories to shorten file paths in the script
 current_prs_folder <- here::here("globalprep", "prs_coral_harvest", v_scen_year)
 current_int_folder <- here::here(current_prs_folder, "int")
 
@@ -132,8 +159,8 @@ for (f in files) {
   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
   
   # ---- Read in data ----
-  #d_test <- readr::read_csv(f) %>% janitor::clean_names() # testing out tibble option for reading in data
-  d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
+  d <- readr::read_csv(f) # testing out tibble option for reading in data
+  #d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
   # checks names syntactically, strips leading and trailing whitespace, prevents conversion of characters to factors 
   
   # ---- Specify units ----
@@ -173,8 +200,8 @@ for (f in files) {
   ## data vs commodities in lookup table
   
   # Load lookup for converting commodities to products
-  com2prod <- read.csv(here::here(current_prs_folder, "raw", "commodities2products_weighting.csv"), na.strings = '')
-  #com2prod_test <- read_csv(here::here(current_prs_folder, "raw", "commodities2products_weighting.csv"), na = '')
+  #com2prod <- read.csv(here::here(current_prs_folder, "raw", "commodities2products_weighting.csv"), na.strings = '')
+  com2prod <- readr::read_csv(here::here(current_prs_folder, "raw", "commodities2products_weighting.csv"), na = '')
   ## Check the current commodity-to-product lookup table.  If necessary, make changes to "raw/commodities2products_weighting.csv"
   ## For prs_coral_harvest, The main product we're concerned about is "corals". The other natural product commodities are more important for the np goal and should be inspected more carefully for updating the lookup table for that goal
   np_commodity_lookup(m, com2prod) 
@@ -232,7 +259,8 @@ for (f in files) {
   
   # output to .csv - should create two csv files (tonnes.csv and usd.csv)
   harvest_out <- sprintf(here(paste0('globalprep/prs_coral_harvest/v', scen_year, '/int/%s.csv')), units)
-  write.csv(m_rgn, harvest_out, row.names = FALSE, na = '')
+  readr::write_csv(m_rgn, harvest_out, na = '')
+  #write.csv(m_rgn, harvest_out, row.names = FALSE, na = '')
 }
 toc()
 # v2023: 152.934 sec elapsed
@@ -251,7 +279,8 @@ toc()
 
 quant_file <- files[1]
 # value_file <- files[2]
-# 
+
+# these methods yield identical datasets
 quant_raw <- read.csv(quant_file, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE)
 quant_raw_new <- read_csv(quant_file)
 
@@ -268,16 +297,7 @@ quant_raw_tidy <- quant_raw_clean %>%
   dplyr::mutate_if(is.numeric, as.character) %>% # setting datatypes for pivoting (we want to include Flag columns for use in processing)
   tidyr::pivot_longer(cols = -c(country, commodity, trade, unit),
                    names_to = "year", values_to = "value") 
-  
 
-# 
-# quant_filter <- quant_raw %>% dplyr::select(-"Unit (Name)")
-# 
-# test_na <- d %>% filter(is.na(`[2019]`))
-# 
-# aggregate_group_name <- paste0("FAO. ", scen_year, ". FishStat: Global Aquatic Trade - All partners aggregated")
-# 
-# test_na %>% filter(str_detect(`Reporting country (Name)`, aggregate_group_name))
 ```
 
 
@@ -455,8 +475,8 @@ australia ## perfect
 
 
 ## Can open up in Excel to compare subtotals per country-product-year
-readr::write_csv(h_x_tonnes, here::here(current_prs_folder, "coral_harvest_tonnes_wide.csv"), na = "NA")
-readr::write_csv(h_x_usd, here::here(current_prs_folder, "coral_harvest_usd_wide.csv"), na = "NA")
+readr::write_csv(h_x_tonnes, here::here(current_int_folder, "coral_harvest_tonnes_wide.csv"), na = "NA")
+readr::write_csv(h_x_usd, here::here(current_int_folder, "coral_harvest_usd_wide.csv"), na = "NA")
 ```
 
 
@@ -483,7 +503,7 @@ roll_prod <- h_prod %>%
     usd = ifelse(!is.na(usd_rollmean), usd_rollmean, usd_orig)) %>%
   dplyr::select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
 
-readr::write_csv(roll_prod, here::here(current_prs_folder, "tonnes_coral_harvest.csv"))
+readr::write_csv(roll_prod, here::here(current_int_folder, "tonnes_coral_harvest.csv"))
 ```
 
 ## Calculate pressure score
@@ -492,7 +512,7 @@ readr::write_csv(roll_prod, here::here(current_prs_folder, "tonnes_coral_harvest
  - Multiply the pressure score by the health score to get the final pressure score.
 ```{r, eval = FALSE}
 # read in production harvest data 
-roll_prod <- readr::read_csv(here::here(current_prs_folder, "tonnes_coral_harvest.csv"))
+roll_prod <- readr::read_csv(here::here(current_int_folder, "tonnes_coral_harvest.csv"))
 
 # read in coral extent 
 coral_ext <- readr::read_csv(here::here("globalprep", "hab_coral",
@@ -521,12 +541,18 @@ coral_harvest <- coral_harvest %>%
 
 ref <- quantile(coral_harvest$intensity, probs = 0.95, na.rm = TRUE) # find the 95th quantile for a reference point
 
+# check grouping status
+#is.grouped_df(coral_harvest)
+
 coral_harvest <- coral_harvest %>%
   mutate(pressure_no_health = ifelse(intensity > ref, 1, intensity/ref)) %>%
   mutate(pressure_health = pressure_no_health * health) %>% # calculate the pressure score
   filter(!is.na(pressure_health)) %>%
-  dplyr::select(rgn_id, year, pressure_score = pressure_health) # adds "product" because it's still one of the grouping variable
+  dplyr::ungroup() %>% # if we don't ungroup, the select statement adds "product" because it's still one of the grouping variables
+  dplyr::select(rgn_id, year, pressure_score = pressure_health) 
 # come back to this 
+
+
 
 # test <- coral_harvest %>%
 #   filter(is.na(km2))
@@ -545,10 +571,12 @@ Datacheck
 
 ```{r}
 # get current version and previous version data and then combine for comparison
-current_version_coral <- read_csv(paste0("globalprep/prs_coral_harvest/v", scen_year, "/output/prs_coral_harvest.csv")) %>%
+current_version_coral <- readr::read_csv(here::here(current_prs_folder, "output", "prs_coral_harvest.csv")) %>%
   rename("new_prs" = "pressure_score")
 
-previous_version_coral <- read_csv(paste0("globalprep/prs_coral_harvest/v", prev_scen_year, "/output/prs_coral_harvest.csv")) %>%
+previous_version_coral <- readr::read_csv(here::here("globalprep", "prs_coral_harvest",
+                                              paste0("v", prev_scen_year),
+                                              "output", "prs_coral_harvest.csv")) %>%
   rename("old_prs" = "pressure_score") 
 
 combined_coral <- previous_version_coral %>%
@@ -578,7 +606,7 @@ current_version_coral_latest_yr <- current_version_coral %>%
 
 combined_latest_yr <- previous_version_coral_latest_yr %>%
   left_join(current_version_coral_latest_yr, by = "rgn_id") %>%
-  select(-year.x, -year.y)
+  dplyr::select(-year.x, -year.y)
 
 plot(combined_latest_yr$old_prs, combined_latest_yr$new_prs,
      xlab = paste0("Old Pressure Data Year ", common_year, " v", prev_scen_year),
@@ -609,7 +637,7 @@ plot(combined_coral_common_yr$old_prs, combined_coral_common_yr$new_prs,
 abline(0,1, col = "red")
 
 # glance at rolling production for one region
-roll_prod <- read_csv(paste0("globalprep/prs_coral_harvest/v", scen_year, "/int/tonnes_coral_harvest.csv")) %>%
+roll_prod <- readr::read_csv(here::here(current_int_folder, "tonnes_coral_harvest.csv")) %>%
   filter(rgn_id == 207)
 ```
 
