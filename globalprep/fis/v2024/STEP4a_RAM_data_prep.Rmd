@@ -211,15 +211,15 @@ For each stock:
 ## based on this it seems reasonable to gap-fill missing values
 
 ram_gf_check <- ram_bmsy_new %>%
-   filter(year >= 2001) %>%
+  filter(year >= 2001) %>%
   spread(year, ram_bmsy) 
 
 # identify stocks for gapfilling (those with 5 or more years of data since 2005).
 # NOTE: we potentially gapfill to 2001, but we want stocks with adequate *recent* data 
 ram_bmsy_gf <- ram_bmsy_new %>%
-  filter(year >= 2001 & year <= 2019) %>%   # 2019 corresponds to the final year of SAUP catch data
+  filter(year >= 2001 & year <= 2019) %>%   # v2024: 2019 corresponds to the final year of SAUP catch data
   group_by(stockid) %>%
-    mutate(max_year = max(year)) %>%
+  mutate(max_year = max(year)) %>%
   mutate(years_data_2005_now = length(ram_bmsy[year >= 2005])) %>%
   mutate(years_data_2001_now = length(ram_bmsy[year >= 2001])) %>%
   ungroup() %>%
@@ -227,17 +227,18 @@ ram_bmsy_gf <- ram_bmsy_new %>%
   group_by(stockid) %>%
   mutate(diff_years = year - lag(year)) %>%
   mutate(diff_years = ifelse(is.na(diff_years), 0, diff_years))
- # filter(years_data_2005_now >= 5)
+# filter(years_data_2005_now >= 5)
 
+# stocks with gaps in between years
 in_between_stocks <- ram_bmsy_gf %>%
   filter(diff_years >1)
 
-in_between_stocks_id <- unique(in_between_stocks$stockid)
+# which stocks have gaps in between years
+in_between_stocks_id <- unique(in_between_stocks$stockid) # v2024: [1] "SDOGATLC" "WPOLLWBS"
 
-
+# remove diff_years for gapfilling
 ram_bmsy_gf_2 <- ram_bmsy_gf %>%
   dplyr::select(-diff_years)
-
 
 
 ## Get rows for stocks/years with no B/Bmsy (identified as NA B/Bmsy value for now)
@@ -247,18 +248,18 @@ ram_bmsy_gf_3 <- ram_bmsy_gf_2 %>%
   mutate(year = as.numeric(year)) %>%
   dplyr::select(-years_data_2005_now, -years_data_2001_now)
 
-
+# remove stocks with in between years
 ram_bmsy_gf_4 <- ram_bmsy_gf_3 %>%
   filter(!(stockid %in% c(in_between_stocks_id)))
 
-
+# for those that don't have gaps in between years, gapfill by drawing the recent values up or down
 ram_bmsy_gf_updown <- ram_bmsy_gf_4 %>%
   mutate(ram_bmsy_gf = ram_bmsy) %>%
   group_by(stockid) %>%
   fill(ram_bmsy_gf, .direction = "downup") %>%
   mutate(gapfilled = ifelse(!is.na(ram_bmsy), "none", "down/upfilling")) 
 
-
+# df of stocks that have gaps in between years
 ram_bmsy_gf_in_between <- ram_bmsy_gf_3 %>%
   filter(stockid %in% c(in_between_stocks_id)) %>%
   group_by(stockid) %>%
@@ -266,35 +267,37 @@ ram_bmsy_gf_in_between <- ram_bmsy_gf_3 %>%
 
   
 ## split and do this 3 times for each stock in a for loop 
-stocks <- unique(ram_bmsy_gf_in_between$stockid)
+stocks <- unique(ram_bmsy_gf_in_between$stockid) # v2024: [1] "SDOGATLC" "WPOLLWBS" 
 
 ram_bmsy_gf_interpolate <- data.frame(stockid = NA, stocklong = NA, max_year = NA, year = NA, ram_bmsy = NA, ram_bmsy_gf = NA, gapfilled = NA)
 
 for(stock in stocks){
   
- # stock = stocks[1]
+  # stock = stocks[1]
   
   filter_stock <- ram_bmsy_gf_in_between %>%
     filter(stockid == stock)
   
   interpolate <- tibble(filter_stock, ram_bmsy_gf = na.approx(filter_stock$ram_bmsy, rule = 2), gapfilled = "linear interpolation")
-
+  
   ram_bmsy_gf_interpolate <- rbind(ram_bmsy_gf_interpolate, interpolate)
-    
+  
 }
 
 ## now fix the gapfilled column for the linear interpolation observations.. some of them need to be flagged as "upfilled" 
-ram_bmsy_gf_interpolate <- ram_bmsy_gf_interpolate %>%
+ram_bmsy_gf_interpolate_2 <- ram_bmsy_gf_interpolate %>%
   filter(!is.na(stockid)) %>%
   mutate(gapfilled = case_when(
-    stockid == "WPOLLNAVAR" & year %in% c(2014:2019) ~ "down/upfilling",
-    stockid == "WPOLLWBS" & year %in% c(2015:2019) ~ "down/upfilling",
+    stockid == "SDOGATLC" & year %in% c(2019) ~ "down/upfilling",
     TRUE ~ gapfilled
   )) %>%
   mutate(gapfilled = ifelse(!is.na(ram_bmsy), "none", gapfilled))
 
+# bind the different dataframes from diff gapfilling methods
+ram_bmsy_gf_final <- rbind(ram_bmsy_gf_interpolate_2, ram_bmsy_gf_updown)
 
-ram_bmsy_gf_final <- rbind(ram_bmsy_gf_interpolate, ram_bmsy_gf_updown)
+# check that everything has been taken care of
+unique(is.na(ram_bmsy_gf_final$ram_bmsy_gf)) # v2024: FALSE
 
 
 ## see unique values of stocks
@@ -304,15 +307,15 @@ tmp <- ram_bmsy_gf_final %>%
 
 
 ## check out gapfilling stats
-table(tmp$gapfilled) # only 3 stocks use linear interpolation for some years. 429 stocks are not gapfilled at all! 
+table(tmp$gapfilled) # only 2 stocks use linear interpolation for some years. 231 are down/upfilled. 431 stocks are not gapfilled at all! 
 
 sum(table(tmp$gapfilled))  
-# 769 stocks have at least one year of bbmsy values after 2010
+# 664 stocks have at least one year of bbmsy values after 2010
 
 
 summary(ram_bmsy_gf_final)# should be no NAs
 sum(ram_bmsy_gf_final$ram_bmsy_gf < 0 )  # should be 0 
-min(ram_bmsy_gf_final$ram_bmsy_gf, na.rm = TRUE) #0.000001475954
+min(ram_bmsy_gf_final$ram_bmsy_gf, na.rm = TRUE) # v2024: 0.002531646
 
 ## gapfilling record keeping
 ram_bmsy_gf_final_fin <- ram_bmsy_gf_final %>%
@@ -320,10 +323,18 @@ ram_bmsy_gf_final_fin <- ram_bmsy_gf_final %>%
   mutate(gapfilled = ifelse(method == "none", "0", "1")) %>%
   dplyr::select(stockid, year, ram_bmsy = ram_bmsy_gf, gapfilled, method) 
 
-write.csv(ram_bmsy_gf_final_fin, "int/ram_stock_bmsy_gf.csv", row.names=FALSE)
+# v2023
+# write.csv(ram_bmsy_gf_final_fin, "int/ram_stock_bmsy_gf.csv", row.names=FALSE)
+
+# v2024
+## directory for intermediate outputs
+int_dir <- here::here("globalprep","fis", version_year, "int")
+
+write_csv(ram_bmsy_gf_final_fin, here(int_dir, "ram_stock_bmsy_gf.csv"))
 ```
 
 Get a general idea of how well the model predicts missing data based on observed and model predicted values.  This model appears to do fairly well. 
+
 ```{r gf error est, eval=FALSE}
 mod <- lm(ram_bmsy ~ ram_bmsy_gf, data=ram_bmsy_gf_final)
 summary(mod)
@@ -373,6 +384,29 @@ summary(mod)
 #   (1001 observations deleted due to missingness)
 # Multiple R-squared:      1,	Adjusted R-squared:      1 
 # F-statistic: 5.462e+35 on 1 and 7566 DF,  p-value: < 2.2e-16
+# 
+# Warning message:
+# In summary.lm(mod) : essentially perfect fit: summary may be unreliable
+
+# v2024
+# Call:
+# lm(formula = ram_bmsy ~ ram_bmsy_gf, data = ram_bmsy_gf_final)
+# 
+# Residuals:
+#        Min         1Q     Median         3Q        Max 
+# -8.881e-16 -1.710e-17 -4.000e-19  1.570e-17  5.538e-15 
+# 
+# Coefficients:
+#               Estimate Std. Error    t value Pr(>|t|)    
+# (Intercept) -3.331e-16  1.475e-18 -2.258e+02   <2e-16 ***
+# ram_bmsy_gf  1.000e+00  8.618e-19  1.160e+18   <2e-16 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 8.141e-17 on 7277 degrees of freedom
+#   (910 observations deleted due to missingness)
+# Multiple R-squared:      1,	Adjusted R-squared:      1 
+# F-statistic: 1.346e+36 on 1 and 7277 DF,  p-value: < 2.2e-16
 # 
 # Warning message:
 # In summary.lm(mod) : essentially perfect fit: summary may be unreliable

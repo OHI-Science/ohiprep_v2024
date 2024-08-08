@@ -24,11 +24,11 @@ knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
 
 # Summary
 
-Generates a dataset describing the OHI and FAO major fishing regions that correspond to each stock's range.  This combines last year's dataset of stock-spatial information from RAM v4.491 database and Christopher M. Free's spatial work at Rutgers as well as newly added stocks from RAM v4.495 with manually assigned ohi and fao region ids. Dataset only contains stocks with B/Bmsy data.
+Generates a dataset describing the OHI and FAO major fishing regions that correspond to each stock's range.  This combines last year's dataset of stock-spatial information from RAM v4.61 database and Christopher M. Free's spatial work at Rutgers as well as newly added stocks from RAM v4.65 with manually assigned ohi and fao region ids. Dataset only contains stocks with B/Bmsy data.
 
 ## Updates from previous assessment
 
-- The RAM data changed for v2023 so we re-ran this
+- The RAM data changed for v2024 so we re-ran this
 
 ## Setup
 
@@ -41,9 +41,8 @@ library(sf)
 library(ggplot2)
 library(stringr)
 library(here) 
-setwd(here::here("globalprep","fis","v2023"))
 
-source('../../../workflow/R/common.R')
+source(here("workflow", "R", "common.R"))
 ```
 
 ## Identify Newly Added Stocks
@@ -51,9 +50,10 @@ source('../../../workflow/R/common.R')
 Compare stocks found in previous version of RAM data to new data to see what additional stocks have been added.
 
 Old Stocks: Used `timeseries` table, because in RAM v3.80, this table only contained single assessment for each unique stock. Now we use `timeseries_values_view, since v4.44 (assessment year 2019). 
+
 ```{r}
 ## old stocks
-load(file.path(dir_M, "git-annex/globalprep/_raw_data/RAM/d2021/RAMLDB v4.495/R Data/DBdata[asmt][v4.495].RData"))
+load(here::here(dir_M, "git-annex", "globalprep","_raw_data","RAM","d2023","RAMLDB v4.61","R Data","DBdata[asmt][v4.61].RData"))
 
 ram_bmsy_old <- timeseries_values_views %>%
 dplyr::select(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SSBdivSSBmgt) %>%
@@ -68,13 +68,15 @@ dplyr::select(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SS
   dplyr::select(stockid, stocklong, year, ram_bmsy)
 
 ## check number of unique entries
-old_stockid <- unique(ram_bmsy_old$stockid) # 488 unique entries
+old_stockid <- unique(ram_bmsy_old$stockid) 
+old_stockid_leng <- length(unique(ram_bmsy_old$stockid)) # v2024: 496 unique entries
 ```
 
 New Stocks: Used `timeseries_values_views` table, because in RAM v4.44, this is the table that contains the most recent assessment for each unique stock. The `timeseries` table has all assessments conducted so there are multiple `assessid` per unique `stockid`.
+
 ```{r}
 ## new stocks
-load(file.path(dir_M, "git-annex/globalprep/_raw_data/RAM/d2023/RAMLDB v4.61/R Data/DBdata[asmt][v4.61].RData"))
+load(here::here(dir_M, "git-annex", "globalprep","_raw_data","RAM","d2024","RAMLDB v4.65","R Data","DBdata[asmt][v4.65].RData"))
 
 ram_bmsy <- timeseries_values_views %>%
 dplyr::select(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SSBdivSSBmgt) %>%
@@ -89,56 +91,50 @@ dplyr::select(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SS
   dplyr::select(stockid, stocklong, year, ram_bmsy)
 
 ## check number of unique entries
-new_stockid <- unique(ram_bmsy$stockid) # 496 unique entries
+new_stockid <- unique(ram_bmsy$stockid)
+new_stockid_leng <- length(unique(ram_bmsy$stockid)) # v2024: 474 unique entries
 ```
 
 
 ### Investigate Differences
-There were 27 stocks included in the new data but not the old data.
+There were 4 stocks included in the new data but not the old data.
 These include: 
 
- [1] "ANCHIXa"              "BIGSKAPCOAST"        
- [3] "BLSHARIO"             "BLSHARNATL"          
- [5] "BLSHARSATL"           "CSLOBSTERPR"         
- [7] "CSLOBSTERSTC"         "CSLOBSTERSTT_STJ"    
- [9] "DVANGSASC"            "DVANGSAWC"           
-[11] "GJOBMHI"              "GSSMELTI-II-IIIa-IV" 
-[13] "GSSMELTVa-XIV"        "GSSMELTVb-VIa"       
-[15] "IPSAILIO"             "LINGVb"              
-[17] "NEPHFU25"             "NEPHFU2627"          
-[19] "OWSHARCWPAC"          "PERCHHG"             
-[21] "SCMPSCI6A"            "SFMAKONATL"          
-[23] "SFMAKOSATL"           "SLKSHARCWPAC"        
-[25] "SWORDSPAC"            "TURIIIa"             
-[27] "WITFLOUNIIIa-IV-VIId"
+[1] "CHTRACCH"        "RMULLMEDGSA7"    "SARDMEDGSA17-18" "SPRBLKGSA29" 
 
 
-There were 19 stocks present in the old data but not the new.
+There were 26 stocks present in the old data but not the new.
 These include:
 
- [1] "ANCHOCWACIV-BEN"   "ANCHOCWAGAB-AGO"   "BHAKECWAAGO"      
- [4] "BOARVI-VIII"       "BONGACWAGAB-COD"   "CHMACKCWAGAB-AGO" 
- [7] "CHMACKCWAGNB-LBR"  "CODNEARNCW"        "HERRVIa"          
-[10] "LOBSTERGOM"        "MSARDCWACIV-BEN"   "PERCHQCI"         
-[13] "RSARDCWACIV-BEN"   "SARDINCWAGAB-AGO"  "SARDINCWAGNB-LBR" 
-[16] "SARDNWAZC"         "SCADSPPCWAGNB-LBR" "SOLECWAAGO"       
-[19] "SOLECWAGNB-GIN" 
+ [1] "BLINGVb-VI-VII"               "COD3Ps"                      
+ [3] "CODFAPL"                      "CODIS"                       
+ [5] "CODVIIek"                     "HADFAPL"                     
+ [7] "HADNS-IIIa-VIa"               "HADROCK"                     
+ [9] "HAKENRTN"                     "HERRNIRS"                    
+[11] "HERRVIaVIIbc"                 "HMACKIIa-IVa-Vb-VIa-VII-VIII"
+[13] "HMACKIXa"                     "MACKNEICES"                  
+[15] "NEPHFU14"                     "NEPHFU17"                    
+[17] "NEPHFU7"                      "PLAICECHW"                   
+[19] "POLLFAPL"                     "REDDEEPI-II"                 
+[21] "SARDVIIIabd"                  "SOLEIS"                      
+[23] "SPURDNEATL"                   "WHITNS-VIId"                 
+[25] "WHITVIa"                      "WHITVIIa"  
 
-
+v2023:
  - PERCHQCI: ID changed to PERCHHG (redefined)
  - LOBSTERGOM: now LOBSTERGOMGB (merged)
 
-
 ```{r}
 ## find newly added stocks, when using timeseries_values_views
-newStocks <- setdiff(new_stockid, old_stockid) # v2023: there are 27 new stocks
+newStocks <- setdiff(new_stockid, old_stockid) # v2024: there are 4 new stocks
 unusedStocks <- setdiff(old_stockid, new_stockid) # these are no longer included in the RAM data, will be deleted
 
 # v2021: See the mispelling for COD1F-XIV vs COD1f-XIV. This is ok. We will just use the new spelling and assign the fao-ohi regions again. 
 ```
 
 
-Subset for just the additional stocks in RAM v4.61 data
+Subset for just the additional stocks in RAM v4.65 data
+
 ```{r}
 ram_bmsy_new <- ram_bmsy %>% 
   filter(stockid %in% newStocks) 
@@ -156,7 +152,7 @@ Each stock needs the corresponding ohi and fao regions associated with its range
 ```{r}
 ## Grab last year's fao-ohi-assessid data table
 ## (we need to get the stock id from the old RAM data)
-RAM_fao_ohi_rgns <- read.csv("../v2022/int/RAM_fao_ohi_rgns_final.csv") 
+RAM_fao_ohi_rgns <- read.csv(here("globalprep","fis", "v2023","int","RAM_fao_ohi_rgns_final.csv"))
 
 
 RAM_fao_ohi_rgns_fix <- RAM_fao_ohi_rgns %>%
@@ -165,11 +161,11 @@ RAM_fao_ohi_rgns_fix <- RAM_fao_ohi_rgns %>%
   dplyr::mutate(dupe = n()>1) %>% # find the rest of the duplicates 
   ungroup()
   
- #filter for duplicates
+#filter for duplicates
 dupes <- RAM_fao_ohi_rgns_fix %>%
-filter(dupe == "TRUE") # 0 good
+  filter(dupe == "TRUE") # v2024: 0 good
 
-dupes$stockid #these are our problem duplicates: 0
+dupes$stockid # these are our problem duplicates: 0
 
 ## fix the dupes 
 dupes_fix <- dupes %>%
@@ -185,14 +181,15 @@ RAM_rgns_old <- RAM_fao_ohi_rgns_fix %>%
 ```
 
 
-## remove stocks that are no longer in the RAM data
+## Remove stocks that are no longer in the RAM data
 (but were in the previous version)
 
 ```{r}
-filter(RAM_rgns_old, stockid %in% unusedStocks) # quick check
+filter(RAM_rgns_old, stockid %in% unusedStocks) # quick check to see which stocks are not being used
 
-RAM_rgns_old <- RAM_rgns_old %>%
-  filter(!(stockid %in% unusedStocks))
+# filter out any stocks that are unused
+RAM_rgns_old_filt <- RAM_rgns_old %>%
+  filter(!(stockid %in% unusedStocks)) # v2024: changed so it does not overwrite RAM_rgns_old
 ```
 
 ## Combine New and Old Stock Data
@@ -200,16 +197,19 @@ RAM_rgns_old <- RAM_rgns_old %>%
 Essentially adds new stocks to the bottom of the old stocks data table.  The regions of the new stocks are blank at this point. 
 ```{r}
 ## Make sure these new species aren't in the old data
-setdiff(id_new$stockid, RAM_rgns_old$stockid)
+setdiff(id_new$stockid, RAM_rgns_old_filt$stockid) # v2024: they are not, good!
+# [1] "CHTRACCH"       
+# [2] "RMULLMEDGSA7"   
+# [3] "SARDMEDGSA17-18"
+# [4] "SPRBLKGSA29" 
 
-
-RAM_rgns_new <- RAM_rgns_old %>% 
-  full_join(id_new, by = c("stockid","stocklong")) ## added the 27 new stocks.
+RAM_rgns_new <- RAM_rgns_old_filt %>% 
+  full_join(id_new, by = c("stockid","stocklong")) ## added the 4 new stocks, still don't have rgn_ids etc
 ```
 
 ## Fill Region IDs for New Stocks
 
-Here we need to figure out what ohi region id and FAO region id each of the new stocks fall in (there are 27 new stocks for v2023). 
+Here we need to figure out what ohi region id and FAO region id each of the new stocks fall in (there are 4 new stocks for v2024). 
 
 1. Filter for all of the new stocks (all those with NA rgn and fao ids)
 2. Join with the "stock" and "area" dataset, which contain more information on the distribution of each stock
@@ -227,12 +227,11 @@ Investigate what FAO/OHI region each stock belongs to:
 
 Some regions have more than 1 `fao_id` or `rgn_id` (e.g. Alaska skate Bering Sea and Aleutian Islands,	Kamchatka flounder Bering Sea and Aleutian Islands have `fao_id` 61 and 67).
 
-
 ```{r}
-## v2023: We will manually add the FAO and OHI regions for all of the NA stocks here. 
+## v2024: We will manually add the FAO and OHI regions for all of the NA stocks here, as all 4 are multinational
 
 ## join with stock and area
-# first we join our stocks that have NAs in FAO id and rgn id (there should be 27 in v2023) to the "stock" and "area" dataframes that were loaded from the RAM database
+# first we join our stocks that have NAs in FAO id and rgn id (there should be 4 in v2024) to the "stock" and "area" dataframes that were loaded from the RAM database
 
 RAM_nas <- RAM_rgns_new %>%
   filter(is.na(fao_id)) %>% 
@@ -252,9 +251,8 @@ RAM_na_non_multi <- RAM_nas %>%
   left_join(rgns_eez, by = c("ISO3_code" = "eez_iso3"), relationship =
   "many-to-many") %>%
   dplyr::select(rgn_id, fao_id, RAM_area_m2, stockid, stocklong) %>%
-  mutate(fao_id = as.double(fao_id)) # great, this leaves 18 stocks that we need to fill in now! 
+  mutate(fao_id = as.double(fao_id)) # v2024: none are multinational, so we will need to manually research all 4 stocks! 
   
-
 
 ## filter for multinational and determine what FAO ids they deserve
 
@@ -263,16 +261,40 @@ RAM_na_multi <- RAM_nas %>%
 
 unique(RAM_na_multi$region)
 
-# we have five larger areas that require manual data entry
-# "European Union" "Indian Ocean"   "Atlantic Ocean" "Europe non EU" "Pacific Ocean" 
+# v2024: we have two larger areas that require manual data entry
+# [1] "South America"          
+# [2] "Mediterranean-Black Sea"
 
+# ----- Start with South America -----
 
-####### Start with Europe
-
-#### We know from the RAM excel sheet "Stock Changes History" that these stocks used to be named something else. So we will look at last years "RAM_fao_ohi_rgns" to figure out the ohi region ids for these stocks. Not relevant for v2023.
+#### We know from the RAM excel sheet "Stock Changes History" that these stocks used to be named something else. So we will look at last years "RAM_fao_ohi_rgns" to figure out the ohi region ids for these stocks. Not relevant for v2024.
 
 
 ####  now lets google each stocklong individually to figure out what OHI regions they are in
+
+# v2024: 
+# [1] "CHTRACCH"; Chilean jack mackerel Chilean EEZ and offshore
+# [2] "RMULLMEDGSA7"; Red mullet Gulf of Lions
+# [3] "SARDMEDGSA17-18";  Sardine Adriatic Sea (GSA 17,18)
+# [4] "SPRBLKGSA29"; Sprat Black Sea
+
+# [1] 
+
+# [2]
+
+# [3]  
+# stocklong: Sardine Adriatic Sea (GSA 17,18)
+# https://www.fishsource.org/stock_page/779
+# OHI regions: Albania (82), Montenegro (186),  Croatia (187), Italy (184), Slovenia (188)
+# fao_id: 37 
+# See: `https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg` 
+
+# [4]
+# stocklong: Sprat Black Sea
+# https://www.fishsource.org/stock_page/2323 
+# OHI regions: Turkey (76), Bulgaria (71), Romania (72)
+# fao_id: 37
+# See: `https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg` 
 
 # v2023
 # Europe - European Union and Europe non EU
