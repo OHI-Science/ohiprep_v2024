@@ -426,6 +426,7 @@ coastal_pop_nona <- coastal_pop3 %>%
 write_csv(coastal_pop_nona, file.path(here("globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv")))
 ```
 
+************* ENDED HERE ************
 ## Calculate Area of 25mi Inland Buffers
 
 ```{r calculate area and mar. pressure, eval=FALSE}
@@ -440,7 +441,7 @@ area <- read_csv(here("globalprep/spatial/v2019/output/area_km2_25mi_inland.csv"
 ```{r calculate mar. population pressure, eval=FALSE}
 
 ## Rescale organized coastal population data
-pop_rescaled <- coastal_pop2 %>%
+pop_rescaled <- coastal_pop_nona %>%
   left_join(area, by="rgn_id") %>%
   mutate(density = popsum/area_km2) %>%
   mutate(ln_density = log(density + 1)) %>%
@@ -586,7 +587,7 @@ prev_scen_yr <- paste0("v", as.numeric(substr(scenario_yr, 2, 5)) -1)
 old <-  read_csv(here('globalprep/mar_prs_population/v2019/output/mar_pop_25mi.csv')) %>% 
   dplyr::select(rgn_id, year, popsum_old=popsum)
 
-tmp <- coastal_pop2 %>%
+tmp <- coastal_pop_nona %>%
   dplyr::left_join(old, by=c("rgn_id", "year"))
 
 years_compare_plot <- ggplot(tmp) +
