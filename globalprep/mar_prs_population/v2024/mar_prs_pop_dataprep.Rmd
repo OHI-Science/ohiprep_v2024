@@ -426,7 +426,7 @@ coastal_pop_nona <- coastal_pop3 %>%
 write_csv(coastal_pop_nona, file.path(here("globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv")))
 ```
 
-************* ENDED HERE ************
+
 ## Calculate Area of 25mi Inland Buffers
 
 ```{r calculate area and mar. pressure, eval=FALSE}
@@ -464,15 +464,15 @@ No gapfilling was completed as part of this data prep methodology. Datasets are 
 
 ```{r save prs_pop_density and mar_pop_25mi layers, eval=FALSE}
 
-prs <- read.csv("globalprep/mar_prs_population/v2020/output/prs_pop_density.csv") %>%
+prs <- read.csv("globalprep/mar_prs_population/v2024/output/prs_pop_density.csv") %>%
   dplyr::mutate(pressure_score = 0)
 
-write.csv(prs, "globalprep/mar_prs_population/v2020/output/prs_pop_density_gf.csv", row.names = FALSE)
+write.csv(prs, "globalprep/mar_prs_population/v2024/output/prs_pop_density_gf.csv", row.names = FALSE)
 
-mar <- read.csv("globalprep/mar_prs_population/v2020/output/mar_pop_25mi.csv") %>%
+mar <- read.csv("globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv") %>%
   dplyr::mutate(popsum = 0)
 
-write.csv(mar, "globalprep/mar_prs_population/v2020/output/mar_pop_25mi_gf.csv", row.names = FALSE)
+write.csv(mar, "globalprep/mar_prs_population/v2024/output/mar_pop_25mi_gf.csv", row.names = FALSE)
 
 ```
 
@@ -506,7 +506,7 @@ pop_rgn <- pop_rgn %>%
   dplyr::summarize(population = sum(population)) %>%
   data.frame()
 
-write.csv(pop_rgn, "globalprep/mar_prs_population/v2020/output/UN_population.csv", row.names = FALSE)
+write.csv(pop_rgn, "globalprep/mar_prs_population/v2024/output/UN_population.csv", row.names = FALSE)
 ohi_rgns <- ohicore::rgn_master
 ```
 
@@ -517,9 +517,14 @@ ohi_rgns <- ohicore::rgn_master
 compare_yr <- 2020 # doing below functions for comparison between raster and UN population data for 2015
 
 ## Sum counts regionally for the scenario year
-pop_rast <- raster(file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, compare_yr)))
-zones <- raster(file.path(dir_M, "git-annex/globalprep/spatial/v2017/regions_land_ocean.tif")) # pulling from 2017 server data
-pop_counts <- zonal(pop_rast, zones, fun = "sum", na.rm = TRUE, progress="text")
+pop_rast <- terra::rast(file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, compare_yr)))
+names(pop_rast) = c("pop_2020")
+
+zones <- terra::rast(file.path(dir_M, "git-annex/globalprep/spatial/v2024/eez_25mi_inland_wgs1984.tif")) # pulling from 2024 server data
+names(zones) = c("zone")
+zones <- terra::as.factor(zones)
+
+pop_counts <- terra::zonal(pop_rast, zones, fun = "sum", na.rm = TRUE)
 
 pop_UN <- pop_rgn %>%
   dplyr::filter(year == compare_yr) %>%
@@ -527,37 +532,31 @@ pop_UN <- pop_rgn %>%
 
 ## Join filtered UN population and summed calculated counts
 compare_pop <- data.frame(pop_counts) %>%
+  dplyr::rename(sum = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2020_30_sec) %>% 
   dplyr::select(rgn_id = zone, pop_rast = sum) %>%
+  dplyr::mutate(rgn_id = as.numeric(rgn_id)) %>%
   dplyr::left_join(pop_UN, by="rgn_id") %>% 
   filter(!is.na(pop_UN))
-options(scipen = 999)
 
+options(scipen = 999)
 compare_pop$diff <- compare_pop$pop_rast - compare_pop$pop_UN
 
-median <- median(compare_pop$diff)
-pct_diff <- compare_pop$diff/compare_pop$pop_UN
-median_diff <- median(pct_diff)
-median_diff
-## Comparing to the population data that came from ArcGIS Pro! 
+## Comparing to the population data that came from ArcGIS Pro! This would only work for the compare year 2020 because the Arc data came from that year. So commenting it out
 
-fp_gis <- file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/coastal_pop/WGS_1984_OHI_Coastal_Population_Estimates_TableToExcel.xlsx")
+# fp_gis <- file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/coastal_pop/WGS_1984_OHI_Coastal_Population_Estimates_TableToExcel.xlsx")
+# 
+# gis_pop <- readxl::read_xlsx(fp_gis, col_names = TRUE) %>% 
+#   dplyr::select(-c(OBJECTID, COUNT, AREA)) %>% 
+#   dplyr::rename(rgn_id = Value)
+# 
+# compare_pop <- compare_pop %>% 
+#   dplyr::left_join(gis_pop, by = "rgn_id")
+# 
+# # Difference between gis data population estimates versus UN population estimates
+# options(scipen = 999)
+# compare_pop$gis_diff <- compare_pop$pop_rast - compare_pop$SUM
 
-gis_pop <- readxl::read_xlsx(fp_gis, col_names = TRUE) %>% 
-  dplyr::select(-c(OBJECTID, COUNT, AREA)) %>% 
-  dplyr::rename(rgn_id = Value)
 
-compare_pop <- compare_pop %>% 
-  dplyr::left_join(gis_pop, by = "rgn_id")
-
-# Difference between gis data population estimates versus UN population estimates
-compare_pop$gis_diff <- compare_pop$SUM - compare_pop$pop_UN
-
-median <- median(compare_pop$gis_diff)
-pct_diff <- compare_pop$SUM/compare_pop$pop_UN
-median_diff <- median(pct_diff)
-median_diff
-range <- range(compare_pop$gis_diff)
-which.min(compare_pop$gis_diff)
 ## Check plot - investigate outliers (post to issue first)
 pop_compare_plot <- ggplot(compare_pop) +
   geom_point(aes(pop_rast, pop_UN, label = rgn_id), alpha = .6) +
@@ -582,7 +581,7 @@ ggplotly(pop_compare_log)
 
 ```{r comparison, eval=FALSE}
 
-prev_scen_yr <- paste0("v", as.numeric(substr(scenario_yr, 2, 5)) -1)
+prev_scen_yr <- paste0("v", as.numeric(substr(scenario_yr, 2, 5)) -3)
 
 old <-  read_csv(here('globalprep/mar_prs_population/v2019/output/mar_pop_25mi.csv')) %>% 
   dplyr::select(rgn_id, year, popsum_old=popsum)
@@ -622,14 +621,6 @@ ggplotly(area_compare_plot)
 summary(old_area)
 
 ```
-
-Find core country outlines 
-Find land outlines and create an internal buffer 
-Choose which buffer is most appropriate for coastal populations
-Use this for eco tourism an clean water pressure 
-Rasterize the buffer to use for future reference
-
-**Find where the OHI regions shapefiles are and potentially use those polygons instead of rasters from the get** 
 
 ## Manual option for creating interpolated files (See note)
 
