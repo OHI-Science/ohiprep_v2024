@@ -28,7 +28,7 @@ np_commodity_lookup <- function(data, com2prod) {
     keyword <- keywords[i]
     d_missing_l <- setdiff(
       commodities[str_detect(commodities, fixed(keyword, ignore_case=T))], 
-      subset(com2prod, product==prod, commodity, drop=T))
+      subset(com2prod, product == prod, commodity, drop=T))
     
     if (length(d_missing_l) > 0) {
       cat(sprintf("\nMISSING in the lookup the following commodites in product='%s' having keyword='%s' in data file %s:\n    %s\n", 
@@ -137,7 +137,7 @@ np_harvest_gapflag <- function(h) {
     group_by(rgn_id, commodity) %>%
     mutate(
       no_data = is.na(tonnes) & is.na(usd),
-      year_last = max(year, na.rm=T),    
+      year_last = max(year, na.rm = T),    
       gapfill   = 
         ifelse(no_data & year != year_last, 'zerofill', 
                ifelse(no_data & year == year_last, 'endfill',
@@ -168,12 +168,12 @@ np_zerofill <- function(h) {
   h1 <- h %>%
     group_by(rgn_id, commodity) %>%
     mutate(
-      tonnes    = ifelse(gapfill=='zerofill', 0, tonnes),
-      usd       = ifelse(gapfill=='zerofill', 0, usd)) %>%
+      tonnes    = ifelse(gapfill == 'zerofill', 0, tonnes),
+      usd       = ifelse(gapfill == 'zerofill', 0, usd)) %>%
     ### for years where neither tonnes nor usd data are available, fill with 0.
     mutate(
-      tonnes    = ifelse(is.na(tonnes) & usd==0, 0, tonnes),
-      usd       = ifelse(is.na(usd) & tonnes==0, 0, usd)) %>%
+      tonnes    = ifelse(is.na(tonnes) & usd == 0, 0, tonnes),
+      usd       = ifelse(is.na(usd) & tonnes == 0, 0, usd)) %>%
     ### for years where one side is zero and the other is NA, fill NA with zero. 
     ungroup() %>%
     arrange(rgn_id, product, commodity, year)
@@ -230,31 +230,31 @@ np_regr_coef <- function(h, scope = 'rgn_id', vars = 'tdy') {
       commodity   = as.character(commodity), 
       usd_ix0     = coef(mdl)['(Intercept)'],
       usd_coef    = coef(mdl)['usd'],
-      yr_tns_coef = ifelse(vars=='tdy', coef(mdl)['year'], 0)) %>%
+      yr_tns_coef = ifelse(vars == 'tdy', coef(mdl)['year'], 0)) %>%
     dplyr::ungroup()
   
   # if appropriate, add conditional about gapfilling if sum(nas) > 0
   m_usd <- h %>%
     mutate(usd_nas = sum(is.na(usd))) %>%
     filter(usd_nas > 0 & !is.na(usd) & !is.na(tonnes)) %>%
-    do(mdl = lm(model[2], data=.)) %>%
+    do(mdl = lm(model[2], data = .)) %>%
     dplyr::summarize(
       scope_id    = switch(scope, rgn_id = rgn_id, georgn_id = georgn_id, global = NA),
       commodity   = as.character(commodity), 
       tonnes_ix0  = coef(mdl)['(Intercept)'],
       tonnes_coef = coef(mdl)['tonnes'],
-      yr_usd_coef = ifelse(vars=='tdy', coef(mdl)['year'], 0)) %>%
+      yr_usd_coef = ifelse(vars == 'tdy', coef(mdl)['year'], 0)) %>%
     ungroup()
   
-  if(dim(m_tonnes)[1]==0) {      
+  if (dim(m_tonnes)[1] == 0) {      
     # m_tonnes = no data; can't full_join, mutate manually
     m <- m_usd    %>% mutate(usd_ix0 = NA, usd_coef = NA, yr_tns_coef = NA)
-  } else if(dim(m_usd)[1]==0) {  
+  } else if (dim(m_usd)[1] == 0) {  
     # m_usd = no data; can't full_join, mutate manually
     m <- m_tonnes %>% mutate(tonnes_ix0 = NA, tonnes_coef = NA, yr_usd_coef = NA)
   } else {
     # OK to perform full_join
-    m <- full_join(m_tonnes, m_usd, by=c('scope_id','commodity'))
+    m <- full_join(m_tonnes, m_usd, by = c('scope_id','commodity'))
   }
   
   m <- switch(scope, 
@@ -267,7 +267,7 @@ np_regr_coef <- function(h, scope = 'rgn_id', vars = 'tdy') {
 
 
 
-np_regr_fill <- function(h, years_back=50, min_paired_obs=4, scope = 'rgn_id', vars = 'tdy') {
+np_regr_fill <- function(h, years_back = 50, min_paired_obs = 4, scope = 'rgn_id', vars = 'tdy') {
   ### Gap-fills NAs for tonnes and usd in dataframe h.  Regression model 
   ###   and regression scope are denoted by passed parameters.
   ### * years_back=50:     This determines how far back in the time series to include within the regression.
@@ -304,7 +304,7 @@ np_regr_fill <- function(h, years_back=50, min_paired_obs=4, scope = 'rgn_id', v
   
   h_mdl <- h %>%
     ### Using regression models, gap-fill NAs in tonnes and USD
-    left_join(coefficients, by=by_flag) %>%
+    left_join(coefficients, by = by_flag) %>%
     mutate(
       #      tonnes_orig = tonnes, 
       tonnes_mdl  = usd_ix0 + usd_coef * usd + yr_tns_coef * year,
@@ -318,7 +318,7 @@ np_regr_fill <- function(h, years_back=50, min_paired_obs=4, scope = 'rgn_id', v
       gapfill     = ifelse(is.na(usd) & year >= lower_bound_year & !is.na(tonnes_coef), gap_flag[2], gapfill),
       ### conditions: usd is NA (needs to be filled); year is recent; and coefficient is not NA.
       usd         = ifelse(is.na(usd) & year >= lower_bound_year, pmax(0, usd_mdl), usd)) %>%
-    mutate(year_last = max(year, na.rm=T)) %>% # add year_last variable
+    mutate(year_last = max(year, na.rm = T)) %>% # add year_last variable
     mutate(gapfill = ifelse(is.na(tonnes) & is.na(usd) & year == year_last, 'endfill', gapfill)) %>% ## fix bad classifications
     dplyr::select(-usd_ix0, -tonnes_ix0, -usd_coef, -tonnes_coef, -usd_mdl, -tonnes_mdl, -yr_tns_coef, -yr_usd_coef, year_last) %>%
     ### removes internal function-specific variables
@@ -335,12 +335,12 @@ np_end_fill <- function(h) {
   h1 <- h %>%
     group_by(rgn_id, commodity) %>%
     mutate(
-      year_last   = max(year, na.rm=TRUE),
-      year_prev   = lag(year, order_by=year),
-      tonnes_prev = lag(tonnes, order_by=year),
-      usd_prev    = lag(usd, order_by=year),
-      tonnes      = ifelse((gapfill=='endfill' & year==year_last & year_prev==year-1), tonnes_prev, tonnes),
-      usd         = ifelse((gapfill=='endfill' & year==year_last & year_prev==year-1), usd_prev, usd)) %>%
+      year_last   = max(year, na.rm = TRUE),
+      year_prev   = lag(year, order_by = year),
+      tonnes_prev = lag(tonnes, order_by = year),
+      usd_prev    = lag(usd, order_by = year),
+      tonnes      = ifelse((gapfill == 'endfill' & year == year_last & year_prev == year - 1), tonnes_prev, tonnes),
+      usd         = ifelse((gapfill == 'endfill' & year == year_last & year_prev == year - 1), usd_prev, usd)) %>%
     ungroup() %>%
     dplyr::select(-tonnes_prev, -usd_prev, -year_prev, -year_last) %>%
     ### clean up regression model gap-fill variables and end-fill variables.
@@ -357,11 +357,11 @@ np_datacheck <- function(h) {
     group_by(rgn_name, rgn_id, commodity) %>%
     mutate(
       no_data = is.na(tonnes) & is.na(usd),
-      paired = (!is.na(tonnes) & tonnes>0 & !is.na(usd) & usd>0)) %>%
+      paired = (!is.na(tonnes) & tonnes > 0 & !is.na(usd) & usd > 0)) %>%
     summarize(
       num_years = length(tonnes),
-      usd_unique_nz = length(unique(usd[usd>0 & !is.na(usd)])),
-      tns_unique_nz = length(unique(tonnes[tonnes>0 & !is.na(tonnes)])),
+      usd_unique_nz = length(unique(usd[usd > 0 & !is.na(usd)])),
+      tns_unique_nz = length(unique(tonnes[tonnes > 0 & !is.na(tonnes)])),
       usd_na = sum(is.na(usd)),
       tns_na = sum(is.na(tonnes)),
       paired_obs = sum(paired),

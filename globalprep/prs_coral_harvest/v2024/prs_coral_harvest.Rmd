@@ -237,6 +237,11 @@ for (f in files) {
   
   # v2024: removed yugoslavia sfr in both quantity and value
   # ascension saint helena and tristan da cunha in quantity and value
+  # 85,World,Europe,Northern Europe,Ascension
+  # 86,World,Europe,Northern Europe,Saint Helena
+  # 88,World,Europe,Northern Europe,Tristan da Cunha
+  # these do not appear in the previous year's data, and there is no coral data within this aggregation of groups. I will be updating ohicore::split_regions() to include the new case of this group so that it is properly addressed in the np goal's dataprep (the region does have some data for other commodity groups including fish_oil and ornamental fish)
+  
   
   # v2024: had the same duplicates as v2023; all are fixed in the group by and summarize (aggregating groups by ohi rgn_id among other variables, which sums the "duplicates" above into appropriate rgn_id groups)
   
@@ -264,12 +269,12 @@ for (f in files) {
 }
 toc()
 # v2023: 152.934 sec elapsed
-# v2024: 97.65 sec elapsed
+# v2024: 96.25 sec elapsed
 ```
 
 
 ### Testing issue with gapfilling:
-```{r}
+```{r ,eval=FALSE}
 # ==== Data investigation ====
 # there appear to be no NAs in the "value" dataset -- this is causing issues
 # during gapfilling, as the np_regr_coef() function uses 
@@ -282,7 +287,7 @@ quant_file <- files[1]
 
 # these methods yield identical datasets
 quant_raw <- read.csv(quant_file, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE)
-quant_raw_new <- read_csv(quant_file)
+quant_raw_new <- readr::read_csv(quant_file)
 
 units <- c('tonnes','usd')[str_detect(quant_file, c('quant','value'))] # detect unit name using lowercase American English
 
@@ -304,15 +309,15 @@ quant_raw_tidy <- quant_raw_clean %>%
 # Data Wrangle
 
 Read in the tonnes and usd data that was completed in the Natural Products ornamentals dataprep (and above). Combining the quantity and value data and a bit of cleaning to remove data prior to first reporting year for coral commodities and regions. 
-```{r, eval = FALSE}
+```{r, eval=FALSE}
 ## Read in quant dataset from intermediate folder
-h_tonnes <- read.csv(here::here(current_int_folder, "tonnes.csv"))
+h_tonnes <- readr::read_csv(here::here(current_int_folder, "tonnes.csv"))
 
 ## Read in value dataset from intermediate folder
-h_usd <- read.csv(here::here(current_prs_folder, "usd.csv"))
+h_usd <- readr::read_csv(here::here(current_int_folder, "usd.csv"))
 
 ## concatenates h_tonnes and h_usd data
-## h includes rgn_name, rgn_id, commodity, product, year, tonnes, usd.
+## h includes rgn_name, rgn_id, commodity, product, year, tonnes, and usd.
 h <- h_usd %>%
     full_join(h_tonnes, by = c("rgn_name", "rgn_id", "commodity", "product", "year")) %>%
     mutate(commodity = as.character(commodity)) %>%
@@ -320,22 +325,22 @@ h <- h_usd %>%
   # dplyr::filter(product == "corals") ##filter for our commodities of interest
 
 ## clips out years prior to first reporting year, for each commodity per region
-h <- h %>% np_harvest_preclip()
+h_clip <- h %>% np_harvest_preclip()
 ```
 
 
-```{r}
+```{r , eval=FALSE}
 # test plot
 library(RColorBrewer)
 
-h_agg_plot_df <- h %>% 
+h_agg_plot_df <- h_clip %>% 
   dplyr::ungroup() %>% 
   dplyr::group_by(rgn_id, rgn_name, product, year) %>% 
   summarize(total_usd = sum(usd, na.rm = TRUE),
             total_tonnes = sum(tonnes, na.rm = TRUE),
             .groups = "drop")
 
-h_product_agg_df <- h %>% 
+h_product_agg_df <- h_clip %>% 
   dplyr::ungroup() %>% 
   dplyr::group_by(product, year) %>% 
   summarize(total_usd = sum(usd, na.rm = TRUE),
@@ -375,14 +380,15 @@ Summary of gapfilling that is performed:
  * End-fill:  For years where NAs still exist in final year, carry forward data from prior year (after other gapfilling techniques).
 
 ```{r, eval = FALSE}  
-h <- h %>% np_harvest_gapflag()
+# Flag for gap-filling
+h_gapflag <- h_clip %>% np_harvest_gapflag()
 ## Adds flag for required gap-filling, based upon NAs in data. 
 ## NOTE: Does not perform any gap-filling.
-## At this point, h includes: 
+## At this point, h_gapflag includes: 
 ##    rgn_name   rgn_id   commodity   product   year   tonnes   usd   gapfill
 ## 'gapfill' will be in (zerofill, endfill, tbd, none)
 
-data_check <- h %>% np_datacheck()
+data_check <- h_gapflag %>% np_datacheck()
 ## for each commodity within each region, creates (but doesn't save...) summary info:
 ##   num_years:        the length of the data series for this commodity in this region
 ##   usd_unique_nz:    (or 'tns') number of unique non-zero values for usd or tonnes 
@@ -392,47 +398,48 @@ data_check <- h %>% np_datacheck()
 ##   unique_pairs:     lesser of usd_unique_pairs and tns_unique_pairs
 ##   count_no_data:    number of paired NAs - years with no value reported
 
-h <- h %>% np_zerofill()
+# Fill with zeroes when appropriate
+h_zerofill <- h_gapflag %>% np_zerofill()
 ## for post-reporting years with NA for both tonnes and USD, fill zero - 
 ##    assumes that non-reporting indicates zero harvest to report.
 ## Also cross-fills zeros where one side is 0, other is NA (not flagged as gapfill)
 
-h <- h %>% np_lowdata_filter()
+h_lowdata_filter <- h_zerofill %>% np_lowdata_filter()
 ## Exclude commodities (within a region) that have few non-zero data points.
 ## Optional parameter with default: nonzero_h_yr_min = 4
 ## NOTE: This filter has consequences for the regression, but also has meaning in terms of 
 ##    not inflicting a penalty on regions trying, and then stopping, an experimental harvest.
 
 ## Melanie's script to add a georegional ID tag based on country keys and IDs.
-h <- h %>%
-  add_georegion_id()
+h <- h_lowdata_filter %>% add_georegion_id()
 
-# testing this line
+# Gapfill quantity (tonnes) if value (usd) present based on model (tonnes ~ usd) or (tonnes ~ usd + year)
 h <- h %>% np_regr_fill(years_back = 10, vars = 'td', scope = 'rgn_id')
-
 h <- h %>% np_regr_fill(vars = 'tdy', scope = 'georgn_id')
 h <- h %>% np_regr_fill(vars = 'tdy', scope = 'global')
 ## np_regr_fill() is a generalized regression gapfill function. Parameters (with defaults):
-## * years_back=50 (int):     This determines how far back in the time series to include within the regression.
-## * min_paired_obs=4 (int):  This determines how many paired observations are required to attempt a regression.
-## * scope = 'rgn_id' (str):  ('rgn_id', 'georgn_id', 'global') Determines grouping scale for regression.
-## * vars = 'tdy' (str):      ('td', 'tdy') Determines model: (tonnes ~ usd) or (tonnes ~ usd + year) [and vice versa]
+## * years_back=50 (int):    This determines how far back in the time series to include within the regression.
+## * min_paired_obs=4 (int): This determines how many paired observations are required to attempt a regression.
+## * scope = 'rgn_id' (str): ('rgn_id', 'georgn_id', 'global') Determines grouping scale for regression.
+## * vars = 'tdy' (str):     ('td', 'tdy') Determines model: (tonnes ~ usd) or (tonnes ~ usd + year) [and vice versa]
 
+# For final year of data, if both usd and tonnes originally reported as NA, pull forward values for usd and tonnes from the previous year. This should happen after regression fill.
 h <- h %>% np_end_fill()
-## For final year of data, if both usd and tonnes originally reported as NA, pull forward
-##    values for usd and tonnes from the previous year.  This should happen after regression fill.
 
+
+# Store commodity-level data, before moving on to the product-level smoothing.
 h_comm <- h
-## Store commodity-level data, before moving on to the product-level smoothing.
 
 ## Output gapfilling report to .csv files.
 ## Very few usd gapfilling, and none in recent years (data used to weight contributions), so will ignore this: gapfill=="r2_u_gr"
 h_gap <- h %>%
-  dplyr::mutate(gapfill = ifelse(gapfill == "r2_u_gr", "none", gapfill)) %>%   # focusing only on tonnes gapfilling
+  dplyr::mutate(gapfill = ifelse(gapfill == "r2_u_gr", "none", gapfill)) %>% # focusing only on tonnes gapfilling
   dplyr::select(rgn_id, commodity, product, year, gapfill) %>%
   dplyr::filter(product == "corals")
 
-write.csv(h_gap, here(current_prs_folder, "output", "prs_coral_gf.csv"), row.names = FALSE, na = '')
+#write.csv(h_gap, here(current_prs_folder, "output", "prs_coral_gf.csv"), row.names = FALSE, na = '')
+readr::write_csv(h_gap, here(current_prs_folder, "output", "prs_coral_gf.csv"), na = '')
+
 ```
 
 # Final Data Wranglng
@@ -584,12 +591,18 @@ combined_coral <- previous_version_coral %>%
 
 # if wanting to look at highest differences
 changes <- combined_coral %>%
-  mutate(diff = abs(old_prs-new_prs))
+  mutate(diff = abs(old_prs - new_prs))
+
+# select highest differences
+highest_changes <- changes %>% dplyr::arrange(desc(diff))
 
 # see what rows have NAs and take note if anything is odd
 na_regions <- combined_coral[!complete.cases(combined_coral), ]
 na_regions %>% select(rgn_id) %>% unique()
 # v2023: no NAs
+# v2024:
+# NAs for region 127 from 1999-2021 (127: World,Latin America and the Caribbean,Caribbean,Saint Vincent and the Grenadines)
+# rgn 212 from 2017-2021 (212: World,Oceania,Micronesia,Kiribati)
 
 # check all data from previous version vs. all data from current version
 plot(combined_coral$old_prs, combined_coral$new_prs,
@@ -635,6 +648,12 @@ plot(combined_coral_common_yr$old_prs, combined_coral_common_yr$new_prs,
      xlab = paste0("Old Pressure Data Year ", (as.numeric(prev_scen_year) - 3), " v", prev_scen_year),
      ylab = paste0("New Pressure Data Year ", (as.numeric(scen_year) - 4), " v", scen_year))
 abline(0,1, col = "red")
+
+# comparing changes in the data for the same year
+data_yr_changes <- combined_coral_common_yr %>%
+  mutate(diff = abs(old_prs - new_prs))
+
+data_yr_top_diff <- data_yr_changes %>% dplyr::arrange(desc(diff))
 
 # glance at rolling production for one region
 roll_prod <- readr::read_csv(here::here(current_int_folder, "tonnes_coral_harvest.csv")) %>%
