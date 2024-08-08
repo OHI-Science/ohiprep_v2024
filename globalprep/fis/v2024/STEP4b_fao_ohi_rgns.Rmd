@@ -265,37 +265,108 @@ unique(RAM_na_multi$region)
 # [1] "South America"          
 # [2] "Mediterranean-Black Sea"
 
-# ----- Start with South America -----
 
 #### We know from the RAM excel sheet "Stock Changes History" that these stocks used to be named something else. So we will look at last years "RAM_fao_ohi_rgns" to figure out the ohi region ids for these stocks. Not relevant for v2024.
 
-
 ####  now lets google each stocklong individually to figure out what OHI regions they are in
 
-# v2024: 
+# ---- South America ----
 # [1] "CHTRACCH"; Chilean jack mackerel Chilean EEZ and offshore
+# https://www.fishsource.org/stock_page/756 
+# OHI regions: Chile (224), Peru (138), Ecuador (137)
+# fao_id: 87
+# See: `https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg` 
+
+ram_fao_areaname_multinational_south_america <- RAM_na_multi %>%
+  dplyr::filter(region %in% c("South America")) %>%
+  distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %>% # these are all just general rules, taken from an emLAB project: https://github.com/emlab-ucsb/sustain-sci-subsidy-reform-paper/blob/master/data/lookup-tables/assign_fao_areas_to_ram_v4.491.Rmd
+  mutate(areaname_fao_area = case_when(
+    areaname == "Chilean EEZ and offshore" ~ "87",
+    TRUE ~ "87" # Otherwise we assume it's 87, because we are making a new column named areaname_fao_area
+  )) %>% 
+  mutate(ohi_rgn = case_when(
+    stockid == "CHTRACCH" ~ "224;138;137",
+    TRUE ~ "NA"
+  )) %>%
+  separate_rows(c(ohi_rgn, areaname_fao_area), sep = ";", convert = TRUE) %>%
+  dplyr::select("rgn_id" = "ohi_rgn", "fao_id" = "areaname_fao_area", RAM_area_m2, stockid, stocklong)
+
+# ----- Mediterranean-Black Sea -----
 # [2] "RMULLMEDGSA7"; Red mullet Gulf of Lions
+# https://firms.fao.org/firms/resource/13618/en
+# OHI regions: France (179), Spain (182)
+# fao_id: 37 
+# See: `https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg` 
+
 # [3] "SARDMEDGSA17-18";  Sardine Adriatic Sea (GSA 17,18)
-# [4] "SPRBLKGSA29"; Sprat Black Sea
-
-# [1] 
-
-# [2]
-
-# [3]  
 # stocklong: Sardine Adriatic Sea (GSA 17,18)
 # https://www.fishsource.org/stock_page/779
 # OHI regions: Albania (82), Montenegro (186),  Croatia (187), Italy (184), Slovenia (188)
 # fao_id: 37 
 # See: `https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg` 
 
-# [4]
+# [4] "SPRBLKGSA29"; Sprat Black Sea
 # stocklong: Sprat Black Sea
 # https://www.fishsource.org/stock_page/2323 
 # OHI regions: Turkey (76), Bulgaria (71), Romania (72)
 # fao_id: 37
 # See: `https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg` 
 
+ram_fao_areaname_multinational_mbs <- RAM_na_multi %>%
+  dplyr::filter(region %in% c("Mediterranean-Black Sea")) %>%
+  distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %>% # these are all just general rules, taken from an emLAB project: https://github.com/emlab-ucsb/sustain-sci-subsidy-reform-paper/blob/master/data/lookup-tables/assign_fao_areas_to_ram_v4.491.Rmd
+  mutate(areaname_fao_area = case_when(
+    areaname == "Gulf of Lions" ~ "37",
+    areaname == "Adriatic Sea (GSA 17,18)" ~ "37",
+    areaname == "Black Sea" ~ "37",
+    TRUE ~ "37" # Otherwise we assume it's 37, because we are making a new column named areaname_fao_area
+  )) %>% 
+  mutate(ohi_rgn = case_when(
+    stockid == "RMULLMEDGSA7" ~ "179;182",
+    stockid == "SARDMEDGSA17-18" ~ "82;186;187;184;188",
+    stockid == "SPRBLKGSA29" ~ "76;71;72",
+    TRUE ~ "NA"
+  )) %>%
+  separate_rows(c(ohi_rgn, areaname_fao_area), sep = ";", convert = TRUE) %>%
+  dplyr::select("rgn_id" = "ohi_rgn", "fao_id" = "areaname_fao_area", RAM_area_m2, stockid, stocklong)
+
+# ====== Join them all together =======
+
+RAM_na_all <- rbind(RAM_na_non_multi, ram_fao_areaname_multinational_mbs, ram_fao_areaname_multinational_south_america) ## now all of the NA ones have rgn_id and fao_id! 
+
+summary(RAM_na_all)
+
+# v2024: 
+ #     rgn_id          fao_id     
+ # Min.   : 71.0   Min.   :37.00  
+ # 1st Qu.: 82.0   1st Qu.:37.00  
+ # Median :179.0   Median :37.00  
+ # Mean   :146.6   Mean   :48.54  
+ # 3rd Qu.:186.0   3rd Qu.:37.00  
+ # Max.   :224.0   Max.   :87.00  
+ #                                
+ #  RAM_area_m2 
+ # Min.   : NA  
+ # 1st Qu.: NA  
+ # Median : NA  
+ # Mean   :NaN  
+ # 3rd Qu.: NA  
+ # Max.   : NA  
+ # NA's   :13   
+ #   stockid         
+ # Length:13         
+ # Class :character  
+ # Mode  :character  
+                
+ #  stocklong        
+ # Length:13         
+ # Class :character  
+ # Mode  :character 
+```
+
+For reference, here is what v2023 did:
+
+```{r v2023_rgn_research}
 # v2023
 # Europe - European Union and Europe non EU
 # Map of ICES/NAFO fishing areas: https://www.researchgate.net/figure/Map-of-the-ICES-and-NAFO-fishing-areas_fig1_268343176 (referenced for related areas)
@@ -520,7 +591,7 @@ ram_fao_areaname_multinational_indian_ocean <- RAM_na_multi %>%
 
 ## Join them all together 
 
-RAM_na_all <- rbind(RAM_na_non_multi, ram_fao_areaname_multinational_europe, ram_fao_areaname_multinational_atlantic_ocean, ram_fao_areaname_multinational_pacific_ocean, ram_fao_areaname_multinational_indian_ocean) ## now all of the NA ones have rgn_id and fao_id! 
+# RAM_na_all <- rbind(RAM_na_non_multi, ram_fao_areaname_multinational_europe, ram_fao_areaname_multinational_atlantic_ocean, ram_fao_areaname_multinational_pacific_ocean, ram_fao_areaname_multinational_indian_ocean) ## now all of the NA ones have rgn_id and fao_id! 
 
 summary(RAM_na_all)
 # v2023:
@@ -552,10 +623,11 @@ summary(RAM_na_all)
 ### Fix Incorrect FAO-OHI Matches
 
 Each row must have both an FAO id and a rgn id. Fix duplicate/incorrect fao-ohi matches by using ohi_fao_rgns spatial file
+
 ```{r}
 ## Spatial file with fao and ohi regions, F_CODE is the FAO id
-fao_ohi <- st_read(dsn = file.path(dir_M, "git-annex/globalprep/fis/v2017/int"),
-                   layer = "ohi_fao_rgns")
+fao_ohi <- st_read(dsn = here::here(dir_M, "git-annex","globalprep","fis","v2017","int"),
+                   layer = "ohi_fao_rgns") # Geodetic CRS:  WGS 84
 st_geometry(fao_ohi) <- NULL # removes geometry
 
 fao_ohi_id <- fao_ohi %>%
@@ -563,7 +635,7 @@ fao_ohi_id <- fao_ohi %>%
   arrange(rgn_id) %>% 
   mutate(fao_id = as.numeric(as.character(fao_id))) %>% 
   mutate(rgn_id = as.numeric(as.character(rgn_id))) %>% 
-  distinct()
+  distinct() 
 
 ## Filter for correct fao-ohi pairs in the RAM regions table 
 RAM_rgns_new_final <- fao_ohi_id %>% 
@@ -575,10 +647,11 @@ RAM_rgns_new_final <- fao_ohi_id %>%
 Compare with unfiltered RAM regions table to check on fao-ohi pairs that were dropped
 ```{r}
 ## Number of unique stocks after joining
-nrow(RAM_rgns_new_final) #112 #v2023: 182
+nrow(RAM_rgns_new_final) #v2024: 13
+
 ## Number of unique stocks before joining
 RAM_temp <- RAM_na_all %>% select(rgn_id, fao_id, stockid, stocklong) %>% distinct() %>% arrange(stocklong, fao_id)
-nrow(RAM_temp) #113 #v2023: 340
+nrow(RAM_temp) #v2024: 13
 
 ## add identifier for the two RAM table versions
 RAM_temp$idtemp <- 1:nrow(RAM_temp)
@@ -587,29 +660,37 @@ RAM_rgns_new_final$idtemp2 <- 1:nrow(RAM_rgns_new_final)
 ## view the ohi-fao pairs that would be removed
 combine <- RAM_temp %>% 
   full_join(RAM_rgns_new_final, by = c("rgn_id", "fao_id", "stockid", "stocklong")) %>% 
-  filter(is.na(idtemp2)) ## we lost 1 here... This is ok though # v2023: is now 158 rows but 11 unique stocks
+  filter(is.na(idtemp2)) ## v2024: we did not lose any!
 ```
 
 Tidy up RAM data table.  After the final check (located below), I hand added some new regions for some of the stocks. 
 ```{r}
-# v2023: none hand-added
-write.csv(RAM_rgns_new_final, "int/RAM_new_stocks.csv", row.names=FALSE)
-## check that there are still 9 unique stock ids
-length(unique(RAM_rgns_new_final$stockid)) # 26, should be 27 but we lost SFMAKOSATL since US is not within the FAO zones of South Atlantic
+# v2024: none hand-added
+## directory for intermediate outputs
+int_dir <- here::here("globalprep","fis", version_year, "int")
+
+write_csv(RAM_rgns_new_final, here(int_dir, "RAM_new_stocks.csv"))
+
+## check that there are still 4 unique stock ids
+length(unique(RAM_rgns_new_final$stockid)) # v2024: 4, great!
 ```
 
-### Combine with full dataset
+### RETURN: Combine with full dataset
 
 Combine newly added stocks with ohi and fao region information to the old stock data table. Make sure there are no NAs!
+
 ```{r, eval=FALSE}
-RAM_final <- bind_rows(read_csv(file.path("int/RAM_new_stocks.csv"))) %>% 
+RAM_final <- bind_rows(read_csv(here::here(int_dir,"RAM_new_stocks.csv"))) %>% 
   select(-idtemp2)
 
 RAM_fao_ohi_rgn_final <- RAM_rgns_old %>% 
   full_join(RAM_final, by = c("rgn_id", "fao_id", "stockid", "stocklong")) %>%
   select(-RAM_area_m2.y, RAM_area_m2 = RAM_area_m2.x) 
- 
 
-write.csv(RAM_fao_ohi_rgn_final, "int/RAM_fao_ohi_rgns_final.csv", row.names=FALSE)
+RAM_fao_ohi_rgn_final_v2 <- RAM_rgns_old %>% 
+  full_join(RAM_final, by = c("rgn_id", "fao_id", "stockid", "stocklong", "RAM_area_m2"))
+ 
+# save the final output!
+write_csv(RAM_fao_ohi_rgn_final, here(int_dir, "RAM_fao_ohi_rgns_final.csv"))
 ```
 

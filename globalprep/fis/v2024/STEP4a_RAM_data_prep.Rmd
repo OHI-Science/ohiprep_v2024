@@ -423,21 +423,27 @@ If there are many differences between RAM spatial file and RAM metadata, check t
 
 ```{r final, eval = FALSE}
 ## Read in RAM spatial stocks file
-ram_spatial <- read.csv("int/RAM_fao_ohi_rgns_final.csv", stringsAsFactors = FALSE)
+ram_spatial <- read_csv(here(int_dir, "RAM_fao_ohi_rgns_final.csv"))
 
 ram_meta <- metadata %>% 
   dplyr::select(stockid, stocklong, scientificname)
 
 setdiff(ram_spatial$stockid, ram_meta$stockid) # make sure all the spatial data has corresponding metadata (should be 0). It is not 0, probably because these are ones that have been removed from the RAM database since the 2017 assessment... delete these from the data frame below. 
 
+# v2024: 
+#  [1] "HERR2529-33"   "HERR2529-34"   "HERR2529-35"  
+#  [4] "HERR2529-36"   "HERR2529-37"   "HERR30-32"    
+#  [7] "SOLEIIIa-2225" "SOLEIIIa-2226" "SOLEIIIa-2227"
+# [10] "SOLEIIIa-2228"
+
 # join with metadata to get scientific name
-ram_spatial <- ram_spatial %>%
+ram_spatial_meta <- ram_spatial %>%
   dplyr::select(-stocklong) %>%
   left_join(ram_meta, by = c("stockid")) %>%
   rename(RAM_species = scientificname) %>%
   filter(!is.na(stocklong)) ## filtering out ones that didn't match above
 
-setdiff(ram_spatial$stockid, ram_meta$stockid) # now it is 0
+setdiff(ram_spatial_meta$stockid, ram_meta$stockid) # v2024: now it is 0, we can move on
 ```
 
 ## Standardize species names
@@ -445,7 +451,7 @@ setdiff(ram_spatial$stockid, ram_meta$stockid) # now it is 0
 In most cases, the RAM and SAUP data use the same species names, but there are a few exceptions.  The following code identifies species in the RAM data that are not in the SAUP data. In these cases, different species names may be used (although not necessarily because some of the species may be present in RAM, but not SAUP, for other reasons). For these species, I used fishbase to explore synonyms and create a table to harmonize the RAM species names with the SAUP species names (saved as: int/RAM_species_to_SAUP.csv).
 
 ```{r name harmonize, eval = FALSE}
-ram_bmsy_gf_final <- read_csv(file.path("int/ram_stock_bmsy_gf.csv"))
+ram_bmsy_gf_final <- read_csv(here(int_dir, "ram_stock_bmsy_gf.csv"))
 
 # get list of RAM species, scientific name
 ram_sp <- ram_bmsy_gf_final %>%
@@ -454,9 +460,8 @@ ram_sp <- ram_bmsy_gf_final %>%
   unique() %>%
   arrange(scientificname)
 
-
 # SAUP species, sci name (read in the datatable that includes TaxonKey)
-SAUP_sp <- read_csv(file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv')) %>% # use most recent one available
+SAUP_sp <- read_csv(here(dir_M,"git-annex","globalprep","fis","v2022","int","stock_catch_by_rgn_taxa.csv")) %>% # use most recent one available
   dplyr::rename(SAUP_scientificname = TaxonName) %>%
   dplyr::select(SAUP_scientificname) %>%
   unique() %>%
@@ -464,27 +469,26 @@ SAUP_sp <- read_csv(file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_ca
 
 
 # compare names - what's in RAM that's not in SAUP
-tmp <- data.frame(scientificname = sort(setdiff(ram_sp$scientificname, SAUP_sp$SAUP_scientificname))) # 39 species names
+tmp <- data.frame(scientificname = sort(setdiff(ram_sp$scientificname, SAUP_sp$SAUP_scientificname))) # 40 species names
 
 # compare names - what's in SAUP that's not in RAM
-tmp2 <- data.frame(scientificname = sort(setdiff(SAUP_sp$SAUP_scientificname, ram_sp$scientificname))) # 2341 species names.. unfortunately a lot.
+tmp2 <- data.frame(scientificname = sort(setdiff(SAUP_sp$SAUP_scientificname, ram_sp$scientificname))) # 2343 species names.. unfortunately a lot.
 
-write.csv(tmp, "int/unmatched_RAM_species.csv", row.names=FALSE)
-write.csv(tmp2, "int/SAUP_species_no_RAM.csv", row.names=FALSE)
-
+write_csv(tmp, here(int_dir, "unmatched_RAM_species.csv"))
+write_csv(tmp2, here(int_dir, "SAUP_species_no_RAM.csv"))
 
 
 ## join ram spatial with RAM species on scientific name. We can use this to help check whether questionable species names across the ram and SAUP data match by region and fao id...
 ram_sp_fao_ohi <- tmp %>%
-  left_join(ram_spatial, by = c("scientificname" = "RAM_species")) %>%
+  left_join(ram_spatial_meta, by = c("scientificname" = "RAM_species")) %>%
   unique()
 
-write_csv(ram_sp_fao_ohi, "int/new_ram_sp.csv")  
+write_csv(ram_sp_fao_ohi, here(int_dir, "new_ram_sp.csv"))  
 
 ## get SAUP fao_ohi regions
-SAUP_sp_fao_ohi <- read_csv(file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv')) %>% # use most recent one available
+SAUP_sp_fao_ohi <- read_csv(here(dir_M, "git-annex","globalprep","fis","v2022","int", "stock_catch_by_rgn_taxa.csv")) %>% # use most recent one available
   dplyr::rename(SAUP_scientificname = TaxonName) %>%
-   dplyr::filter(year > 1979) # %>%
+  dplyr::filter(year > 1979) # %>%
   #filter(str_detect(SAUP_scientificname, "Lepidorhombus"))
 
 # manually copy the below file from the previous year to the current version
