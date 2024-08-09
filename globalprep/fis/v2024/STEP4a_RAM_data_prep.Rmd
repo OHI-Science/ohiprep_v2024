@@ -87,7 +87,7 @@ data_dir_version_year <- paste0("d", current_year)
 # Raw data directory (on Mazu)
 raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
 
-# CMS (Copernicus Marine Service) raw data directory
+# RAM raw data directory
 RAM_dir <- here(raw_data_dir, "RAM", data_dir_version_year)
 
 # intermediate directory
