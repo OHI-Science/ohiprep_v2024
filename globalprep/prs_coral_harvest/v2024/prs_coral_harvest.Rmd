@@ -613,6 +613,9 @@ changes <- combined_coral %>%
 
 # select highest differences
 highest_changes <- changes %>% dplyr::arrange(desc(diff))
+# 208,World,Asia,South-Eastern Asia,Singapore
+# 40,World,Asia,Southern Asia,Sri Lanka
+# 14,World,Asia,Eastern Asia,Taiwan
 
 # see what rows have NAs and take note if anything is odd
 na_regions <- combined_coral[!complete.cases(combined_coral), ]
@@ -628,23 +631,25 @@ plot(combined_coral$old_prs, combined_coral$new_prs,
      ylab = paste0("New Pressure All Years v", scen_year))
 abline(0,1, col = "red")
 
-# explore some deviations v2023
+# explore some deviations v2023 & v2024
 previous_version_coral_latest_yr <- previous_version_coral %>%
-  filter(year == common_year)
+  filter(year == common_year) # year 2020 in v2024
 
 current_version_coral_latest_yr <- current_version_coral %>%
   filter(year == as.character(as.numeric(scen_year) - 2)) # set to latest year of data
 
 combined_latest_yr <- previous_version_coral_latest_yr %>%
   left_join(current_version_coral_latest_yr, by = "rgn_id") %>%
-  dplyr::select(-year.x, -year.y)
+  dplyr::select(-year.x, -year.y) # 2020 and 2022 in v2024
 
 plot(combined_latest_yr$old_prs, combined_latest_yr$new_prs,
      xlab = paste0("Old Pressure Data Year ", common_year, " v", prev_scen_year),
      ylab = paste0("New Pressure Data Year ", (as.numeric(scen_year) - 2), " v", scen_year))
 abline(0,1, col = "red")
 
-# compare within the new data itself 2020 vs. 2021 since both years are new v2023
+# compare within the new data itself 
+# 2020 vs. 2021 since both years are new v2023
+# 2021 vs. 2022 in v2024
 current_version_coral_prior_yr <- current_version_coral %>%
   filter(year == as.character(as.numeric(scen_year) - 3)) # set to 1 prior to latest year of data
 
@@ -672,9 +677,10 @@ data_yr_changes <- combined_coral_common_yr %>%
   mutate(diff = abs(old_prs - new_prs))
 
 data_yr_top_diff <- data_yr_changes %>% dplyr::arrange(desc(diff))
+#data_yr_top_diff
 
 # glance at rolling production for one region
-roll_prod <- readr::read_csv(here::here(current_int_folder, "tonnes_coral_harvest.csv")) %>%
+roll_prod_check <- readr::read_csv(here::here(current_int_folder, "tonnes_coral_harvest.csv")) %>%
   filter(rgn_id == 207)
 ```
 
