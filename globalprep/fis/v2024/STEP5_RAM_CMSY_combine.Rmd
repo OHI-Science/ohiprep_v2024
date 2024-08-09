@@ -135,8 +135,28 @@ data <- mean_catch %>%
 
 
 sum(!is.na(data$ram_bmsy))/nrow(data) # about 7.32% of catch records have RAM data - v2024
-sum(data$mean_catch[!is.na(data$ram_bmsy)])/sum(data$mean_catch) # about 46.3% of tons of catch have RAM data (this is less than last year, which was 47%!) - v2024
+perc_ram <- sum(data$mean_catch[!is.na(data$ram_bmsy)])/sum(data$mean_catch) *100 # about 46.3% of tons of catch have RAM data (this is less than last year, which was 47%!) - v2024
 ```
+
+```{r}
+# to see how much data is sourced from RAM vs CMSY 
+compare_ram_cmsy <- data.frame(
+  category = c("RAM", "CMSY"),
+  percentage = c(perc_ram, 100 - perc_ram)
+)
+
+# visualize the distribution of RAM vs CMSY data used
+ggplot(compare_ram_cmsy, aes(x = category, y = percentage)) +
+  geom_bar(stat = "identity", width = 0.5) +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 100), 
+                     breaks = seq(0, 100, by = 20)) +
+  labs(title = "RAM vs CMSY Data Usage for B/Bmsy (v2024)",
+       x = "",
+       y = "Percent of total catch") +
+  theme_minimal()
+```
+
 
 Save & view duplicate stocks:
 ```{r}
@@ -251,7 +271,7 @@ bbmsy_dups_fixed_old <- bbmsy %>%
 
 Data check
 ```{r}
-## check pitcairn
+## check regions (pitcairn and usa) for changes
 old <- read_csv(here("globalprep","fis","v2023","output","fis_bbmsy_gf.csv"))
 
 new <- read_csv(here("globalprep","fis","v2024","output","fis_bbmsy_gf.csv"))
@@ -263,6 +283,37 @@ mean(old_pit$bbmsy, na.rm = TRUE) # 1.135239
 new_pit <- new %>%
   filter(rgn_id == 146)
 mean(new_pit$bbmsy, na.rm = TRUE) # 1.135239 -- the exact same in v2024
+
+old_usa <- old %>%
+  filter(rgn_id == 163)
+mean(old_usa$bbmsy, na.rm = TRUE) # 1.136894
+
+new_usa <- new %>%
+  filter(rgn_id == 163)
+mean(new_usa$bbmsy, na.rm = TRUE) # 1.150863 -- not the exact same, but close! v2024
+
+# v2024: plot differences for better understanding
+compare <- new %>%
+  left_join(old, by = c("rgn_id", "stock_id", "taxon_key", "year")) %>%
+  mutate(diff = bbmsy.x - bbmsy.y) %>%
+  filter(year %in% c(2016:2019))
+
+# v2024: points above the red line indicate an increase in B/Bmsy from 2023 to 2024, while points below indicate a decrease
+comparison_plot <- ggplot(compare, aes(x = bbmsy.x, y = bbmsy.y)) +
+  geom_point(alpha = 0.5) + 
+  geom_abline(color = "darkred", linetype = "dashed") +  # reference line
+  labs(
+    title = "B/Bmsy Values: v2023 vs v2024",
+    x = "v2023 B/Bmsy",
+    y = "v2024 B/Bmsy"
+  ) +
+  theme_minimal() +
+  coord_fixed(ratio = 1)  +
+  geom_smooth(method = "lm", se = FALSE, color = "lightblue") # the trend is slightly downward, meaning there is a slight decrease in B/Bmsy values in 2024 compared to 2023.
+comparison_plot
 ```
 
+```{r}
+final_b_bmsy <- read_csv(here(output_dir, "fis_bbmsy.csv"))
+```
 
