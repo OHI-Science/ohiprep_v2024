@@ -29,9 +29,9 @@ The percentage of the population with access to improved sanitation facilities (
 
 **Consider for future assessments:** make the "Safely managed" data more complete, and reconsider whether these data would be better to use.
 
-Definition of each variable according to the data source: "At least basic": Use of improved facilities that are not shared with other households.
+Definition of each variable according to the data source: "At least basic": Use of improved facilities that are not shared with other households. Missing values are calculated by doing 100 - (the proportion of the population using limited sanitation services + the proportion of the population using unimproved sanitation services + the proportion of the population using open defecation).
 
-"Safely managed": Use of improved facilities that are not shared with other households and where excreta are safely disposed of in situ or transported and treated offsite.
+"Safely managed": Use of improved facilities that are not shared with other households and where excreta are safely disposed of in situ or transported and treated offsite- drinking water from an improved source that is accessible on premises, available when needed and free from faecal and priority chemical contamination.
 
 ------------------------------------------------------------------------
 
@@ -425,7 +425,6 @@ write_csv(gf_data, here("globalprep/prs_cw_pathogen", version_year, "output/po_p
 
 First calculate coastal population density (people/km^2^) is calculated by dividing the population within 25 miles of the coast by km^2^ within the 25 mile inland coastal area (yes! This is confusing because area is in km\^2, despite the boundary being 25 miles inland).
 
-###for the population question, they only use total country population from World Development Indicators to create weighted averages of sanitation proportion since there are more regions in the sanitation data set than OHI regions-but the actual sanitation proportion is multiplied by population density within 25 mi of the coast- however this dataset is not correct and needs to be changed(for example fiji's coastal population in this dataset is higher than the total population of fiji which is obviously not right)
 
 ```{r, results="hide", message = FALSE, warning = FALSE, eval=FALSE}
 
@@ -475,7 +474,6 @@ The number of people per km\^2 without access to sanitation is calculated by:
 3.  Number of people without access are log transformed (ln(x+1))
 
 ```{r, message = FALSE, warning = FALSE, eval=FALSE}
-##total country population was only used to find the sanitation access proportion by _ sanitation percentage by population to get a proportion from 0-1, this was multiplied by 25 miles from shore population density to get coastal population's density sanitation access
 unsani_pop <- sani_complete %>%  
     dplyr::select(rgn_id, rgn_name, year, basic_sani_prop) %>%
     dplyr::left_join(pop_density, 
