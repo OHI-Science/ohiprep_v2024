@@ -1,23 +1,20 @@
 ---
 title: 'OHI 2024: Ocean Acidification Data Prep'
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
-title: "My Quarto Document"
-jupyter: /home/lecuona/.virtualenvs/r-reticulate/bin/python
-output: 
-  html_document:
-    code_folding: show
+format:
+  html:
+    code-fold: show
     toc: true
-    toc_depth: 3
-    toc_float: yes
-    number_sections: false
+    toc-depth: 3
+    toc-float: true
+    number-sections: false
     theme: cerulean
-    highlight: haddock
-    includes: 
-      in_header: '../../../src/templates/ohi_hdr.html'
-  pdf_document:
+    highlight-style: haddock
+    include-in-header: '../../../src/templates/ohi_hdr.html'
+  pdf:
     toc: true
-editor_options: 
-  markdown: 
+editor: 
+  markdown:
     wrap: sentence
   chunk_output_type: inline
 ---
@@ -26,9 +23,14 @@ editor_options:
 
 **Overview**
 
-The [data source product](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description) corresponds to a REP L4 time series of monthly global reconstructed surface ocean pCO2, air-sea fluxes of CO2, pH, total alkalinity, dissolved inorganic carbon, saturation state with respect to calcite and aragonite, and associated uncertainties on a 0.25° x 0.25° regular grid. The product is obtained from an ensemble-based forward feed neural network approach mapping situ data for surface ocean fugacity (SOCAT data base, Bakker et al. 2016, <https://www.socat.info/>) and sea surface salinity, temperature, sea surface height, chlorophyll a, mixed layer depth and atmospheric CO2 mole fraction. Sea-air flux fields are computed from the air-sea gradient of pCO2 and the dependence on wind speed of Wanninkhof (2014). Surface ocean pH on total scale, dissolved inorganic carbon, and saturation states are then computed from surface ocean pCO2 and reconstructed surface ocean alkalinity using the CO2sys speciation software \[See: Citation information\].
+The [data source product](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description) corresponds to a REP L4 time series of monthly global reconstructed surface ocean pCO2, air-sea fluxes of CO2, pH, total alkalinity, dissolved inorganic carbon, saturation state with respect to calcite and aragonite, and associated uncertainties on a 0.25° x 0.25° regular grid.
+The product is obtained from an ensemble-based forward feed neural network approach mapping situ data for surface ocean fugacity (SOCAT data base, Bakker et al. 2016, <https://www.socat.info/>) and sea surface salinity, temperature, sea surface height, chlorophyll a, mixed layer depth and atmospheric CO2 mole fraction.
+Sea-air flux fields are computed from the air-sea gradient of pCO2 and the dependence on wind speed of Wanninkhof (2014).
+Surface ocean pH on total scale, dissolved inorganic carbon, and saturation states are then computed from surface ocean pCO2 and reconstructed surface ocean alkalinity using the CO2sys speciation software \[See: Citation information\].
 
-Specifically, we want to evaluate aragonite saturation. This is because it is a good metric for ocean acidification pressure on marine organisms. Some sources referring to this include:
+Specifically, we want to evaluate aragonite saturation.
+This is because it is a good metric for ocean acidification pressure on marine organisms.
+Some sources referring to this include:
 
 [Ocean Acidification \| Learn Science at Scitable](https://www.nature.com/scitable/knowledge/library/ocean-acidification-25822734/)
 
@@ -37,23 +39,28 @@ Specifically, we want to evaluate aragonite saturation. This is because it is a 
 3)  $HCO_3^- ↔ CO_3^{2-} + H^+$
 4)  $CO_2(aq) + CO_3^{2-} + H_2O → 2HCO_3^-$
 
-For **supersaturated** (Ω \> 1) conditions, with an excess of \[ $CO_3^{2-}$ \]seawater, a crystal of $CaCO_3$ will tend to grow, and in **undersaturated** (Ω \< 1) conditions, \$CaCO_3\$ will dissolve. \[$CO_3^{2-}$\]saturation is a weak function of temperature and salinity but a strong function of water depth (pressure) meaning that deeper waters are typically more corrosive. How \[saturation level\] affects calcifying organisms is difficult to predict however, because different species exert varying degrees of biological control on the calcification process. **Therefore, it may be a better idea to look at the current level of aragonite.**
+For **supersaturated** (Ω \> 1) conditions, with an excess of \[ $CO_3^{2-}$ \]seawater, a crystal of $CaCO_3$ will tend to grow, and in **undersaturated** (Ω \< 1) conditions, $CaCO_3$ will dissolve.
+\[$CO_3^{2-}$\]saturation is a weak function of temperature and salinity but a strong function of water depth (pressure) meaning that deeper waters are typically more corrosive.
+How \[saturation level\] affects calcifying organisms is difficult to predict however, because different species exert varying degrees of biological control on the calcification process.
+**Therefore, it may be a better idea to look at the current level of aragonite.**
 
 [Ocean Acidification: Saturation State - Science On a Sphere](https://sos.noaa.gov/catalog/datasets/ocean-acidification-saturation-state/#:~:text=Aragonite%20saturation%20state%20is%20commonly,organisms%20with%20calcium%20carbonate%20structures)
 
-Aragonite saturation state is commonly used to track ocean acidification because **it is a measure of carbonate ion concentration**. Aragonite is one of the more soluble forms of calcium carbonate and is [widely used by marine calcifiers]{.underline} (organisms with calcium carbonate structures).
+Aragonite saturation state is commonly used to track ocean acidification because **it is a measure of carbonate ion concentration**.
+Aragonite is one of the more soluble forms of calcium carbonate and is [widely used by marine calcifiers]{.underline} (organisms with calcium carbonate structures).
 
 [Climate Change Indicators: Ocean Acidity \| US EPA.](https://www.epa.gov/climate-indicators/climate-change-indicators-ocean-acidity#:~:text=The%20global%20map%20in%20Figure,data%20(2006%E2%80%932015).)
 
 Aragonite is a specific form of calcium carbonate that many organisms produce and use to build their skeletons and shells, and the saturation state is a measure of how easily aragonite can dissolve in the water.
 
-The **lower** the saturation level, the **more difficult** it is for organisms to build and maintain their protective skeletons and shells.
+The [**lower**]{.underline} the saturation level, the [**more difficult**]{.underline} it is for organisms to build and maintain their protective skeletons and shells.
 
 Aragonite saturation has only been measured at selected locations during the last few decades, but it can be calculated reliably for different times and locations based on the relationships scientists have observed among aragonite saturation, pH, dissolved carbon, water temperature, concentrations of carbon dioxide in the atmosphere, and other factors that can be measured.
 
-# Updates from 2024 assessment
+### Updates from 2024 assessment
 
-Will be filled as the data is evaluated...
+Copernicus Marine Service's Global Ocean Surface Carbon product was found by Melanie Frazier, which has been an excellent resource.
+This layer is a revamped version of previous years', and can be updated in future years now. In the future, I would finish updating the script by changing certain `raster::calc` and `raster::stack` functions (etc) to the `terra` package.
 
 # Data Source
 
@@ -119,11 +126,12 @@ Will be filled as the data is evaluated...
 -   Create annual mean rasters for the new data by stacking the monthly rasters by year and using `raster::calc` to calculate the mean for that year.
     -   Save within `/home/shares/ohi/git-annex/globalprep/prs_oa/v2024/int/oa_annual_mean`
 
-5.  Rescale from 0 to 1
+5.  Rescale each annual raster between 0 to 1 using the historical average data as a reference -- v2024 updated the function
 
 6.  Project, resample, and check the extent of the new data, historical ref data, and zones raster from OHI
 
-7.  Calculate Zonal Statistics 
+7.  Calculate Zonal Statistics using the "mean" between the zones raster and the rescaled annual rasters for each region.
+    Finish by saving the dataframe within `/home/lecuona/OHI_Intro/ohiprep_v2024/globalprep/prs_oa/v2024/output`.
 
 # Setup
 
@@ -155,11 +163,11 @@ librarian::shelf(
   doParallel, # for using multiple cores, if needed
   tidyverse, 
   ohicore,
-  reticulate,
   ggplot2,
   reticulate, # for python coding
   ncmeta,
-  ncdf4
+  ncdf4,
+  plotly
 )
 
 # ---- sources! ----
@@ -185,18 +193,14 @@ oa_dir <- here(dir_M, "git-annex", "globalprep", "prs_oa", version_year)
 int_dir <- here(oa_dir, "int")
 # dir.create(int_dir) # to create the path on Mazu if it has not already been done
 
+# final output dir
+output_dir <- here("globalprep","prs_oa", version_year, "output")
+
 # set colors
 cols = rev(colorRampPalette(brewer.pal(9, 'Spectral'))(255)) # rainbow color scheme
 
 # Read in eez raster with cells at 1km -- used for resampling and zonal statistics (held on an NCEAS server)
 zones <- terra::rast(here::here(dir_M, "git-annex", "globalprep","spatial","v2017","regions_eez_with_fao_ant.tif"))
-```
-
-```{r, eval = FALSE}
-# Examine the OHI eez raster
-plot(zones) # examine the .tif and ensure it looks correct
-crs(zones) # v2024: PROJCRS[\"Mollweide\",\n
-res(zones) # 934.4789 934.4789, lower cell size = higher resolution
 ```
 
 ## Install copernicusmarine tool in python
@@ -229,12 +233,14 @@ print(f"copernicusmarine version: {copernicusmarine.__version__}") # if correctl
 
 ## New Data Download (Copernicus Marine Service, 2010 - 2022; Downloaded August 1, 2024)
 
-In Quarto documents, you are able to fluidly exchange between python and R code by specifying what language will be used in the chunk name. This is extremely helpful for us, as it allows us to use the python API on the [CMS website](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/download). Here are the steps to download the data properly:
+In Quarto documents, you are able to fluidly exchange between python and R code by specifying what language will be used in the chunk name.
+This is extremely helpful for us, as it allows us to use the python API on the [CMS website](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/download).
+Here are the steps to download the data properly:
 
 1.  Login to CMS: go to their website and make your username and password. It is quick and should be usable immediately after the credentials have been made.
 2.  Go to <https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description>. This is the link to the "Global Ocean Surface Carbon" product. Ensure that you read the overview and check for any changes from the previous year (references, characteristics, etc).
 3.  Click the "Download data" button. FYI: the button itself does not have words on it, it is just an arrow pointing downwards. It is in the upper right hand corner of the page, next to the star and map icons.
-4.  This will bring you to their graphical tool download page. For the **Variables**, "Clear all" and select only "Aragonite saturation state in sea water: *omega_ar \[-\]*". Scroll to the bottom of the page, and under **Date Range**, specify 2010-01-01 at a time of 00:00:00 to your current year, 20xx-12-01 at a time of 00:00:00, to ensure you are obtaining the full year.
+4.  This will bring you to their graphical tool download page. For the [**Variables**]{.underline}, "Clear all" and select only "Aragonite saturation state in sea water: *omega_ar \[-\]*". Scroll to the bottom of the page, and under **Date Range**, specify 2010-01-01 at a time of 00:00:00 to your current year, 20xx-12-01 at a time of 00:00:00, to ensure you are obtaining the full year.
 5.  After, instead of clicking the dark blue "Download" button, you will select the grey "Automate" button. Select Python API, and copy the `copernicusmarine.subset()` code. **This would be pasted starting from `copernicus.subset(...` to `...disable_progress_bar=False,`**
 
 [![](python_api_code_ex.png){fig-align="center"}](https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/download)
@@ -287,7 +293,10 @@ print(f"Data downloaded to: {os.path.join(cms_dir, 'global_aragonite_saturation_
 
 ## Historical Data Download
 
-This will be used as a reference point when rescaling later on. The mean of the historical data (1985 - 2000) from CMS will be used. The download process is the same as for the new yearly data, however it has a different **Date Range** (1985-01-01T00:00:00 - 2000-12-01T00:00:00). Each year, the only thing that should change is the "current_year" object, unless there has been a reevaluation and the dates used for the historical reference point is changed.
+This will be used as a reference point when rescaling later on.
+The mean of the historical data (1985 - 2000) from CMS will be used.
+The download process is the same as for the new yearly data, however it has a different **Date Range** (1985-01-01T00:00:00 - 2000-12-01T00:00:00).
+Each year, the only thing that should change is the "current_year" object, unless there has been a reevaluation and the dates used for the historical reference point is changed.
 
 ```{python}
 import os
@@ -328,7 +337,8 @@ print(f"Data downloaded to: {os.path.join(cms_dir, 'historical_1985_2000_aragoni
 
 ## Manual download of raw data, if automation has issues -- not necessary!!
 
-The rest of the code in the script does not use the manually downloaded data, but if it is necessary you can read it in using this method and proceed. However, keep in mind that automation is more reproducible.
+The rest of the code in the script does not use the manually downloaded data, but if it is necessary you can read it in using this method and proceed.
+However, keep in mind that automation is more reproducible.
 
 ```{r}
 # open the NetCDF file
@@ -479,57 +489,33 @@ crs(annual_2010) # v2024: GEOGCRS[\"WGS 84\",\n. The same as before `raster::cal
 
 This pressure layer is rescaled so that all values lie between 0 and 1 using both a historical reference period and a biological reference point.
 
-As a reminder, **supersaturated** conditions are when Ω \> 1, with an excess of \[ $CO_3^{2-}$ \]seawater, where a crystal of $CaCO_3$ will tend to grow. **Undersaturated** conditions are when Ω \< 1, of which $CaCO_3$ will dissolve.
+As a reminder, **supersaturated** conditions are when Ω \> 1, with an excess of \[ $CO_3^{2-}$ \]seawater, where a crystal of $CaCO_3$ will tend to grow.
+**Undersaturated** conditions are when Ω \< 1, of which $CaCO_3$ will dissolve.
 
-All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1. For all other cells, rescaling the aragonite staturation state value to between 0 and 1 relies upon the change in saturation relative to the reference period.
+All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1.
+For those that are supersaturated and greater than a value of 3, they will be set to a pressure score of 0.
+For all other cells, rescaling the aragonite staturation state value to between 0 and 1 relies upon the change in saturation relative to the reference period (historical_avg).
 
 Deviation from aragonite saturation state is determined for each year in the study period using this equation:
 
-$$\Delta \Omega_{year} = \frac{(\Omega_{base} - \Omega_{year})}{(\Omega_{base} - 1)}$$
+$$1 - (\frac{oapressure-1}{3-1})$$
 
-Note that the current value is subtracted from the baseline; this way, a reduction in $\Omega$ becomes a positive pressure value. It is then normalized by the current mean state; so a decrease in $\Omega$ while the current state is high indicates less pressure than the same decrease when the current state is near 1.
+And for all areas in which historical values are \> 1 or \<= 3:
 
-Afterwards, $\Delta \Omega_{year}$ is then modified to account for increases in aragonite saturation state (pressure = 0) and aragonite sat state less than 1 (pressure = 1).
+$$\Delta \Omega_{year} = \frac{(\Omega_{hist} - \Omega_{current})}{(\Omega_{hist} - 1)}$$
 
-The `oaRescale` function rescales each of the annual rasters. If the current value is less than or equal to 1, it is set to 1, otherwise the value is calculated from the above equation.
+Note that the current value is subtracted from the baseline(hist); this way, a reduction in $\Omega$ becomes a positive pressure value.
+It is then normalized by the current mean state; so a decrease in $\Omega$ while the current state is high indicates less pressure than the same decrease when the current state is near 1.
 
-```{r rescale}
-# function written in v2016, updated v2024
-# for each layer, all values <=1 are assigned a 1, otherwise old-new/(old-1)
-annual_avg_moll_rescaled_dir <- here::here(oa_dir, "int","annual_avg_moll_rescaled") 
-dir.create(annual_avg_moll_rescaled_dir) # create Mazu directory for rescaled rasters if not already created
+Afterwards, $\Delta \Omega_{year}$ is then reclassified to account for increases in aragonite saturation state (when values are negative, pressure = 0) and aragonite sat state less than 1 (values are greater than 1, pressure = 1).
 
-# Read in historical raster data from earlier
-hist <- terra::rast(here::here(int_dir, "oa_1985_2000_historical_average.tif"))
+The `oaRescale` function rescales each of the annual rasters accordingly.
 
-# make a list of the already saved annual rasters
-oa_annual_files <- list.files(path = here(oa_annual_mean_dir),
-                              full.names = TRUE) # returns the full path, not just the file name
-
-oaRescale <- function(file){
-  
-  yr = as.numeric(substr(file, nchar(file)-7, nchar(file)-4)) # get year of file using the file's path/name
-  annual_mean = terra::rast(file) # rasterize annual mean aragonite raster for each given year 
-  hist[hist <= 1] = 1 # all values at or less than 1 are given a value of 1 (undersaturated conditions)
-  annual_mean[annual_mean <= 1] <- 1 # all values at or less than 1 are given a value of 1 (undersaturated conditions)
-  diff = (hist - annual_mean)/(hist) # deviation from aragonite saturation state for each year in the study period
-  annual_mean[annual_mean > 1] <- diff[annual_mean > 1] # all cells with values greater than 1 are swapped out with their amount of change scaled to how close to 1 
-  annual_mean[annual_mean < 0] <- 0 # all values less than 0 (indicating a decrease in acidity, increase in aragonite saturation) are capped at 0
-  
-writeRaster(annual_mean, 
-            filename = paste0(annual_avg_moll_rescaled_dir, '/oa_rescaled_', yr, ".tif"),
-            overwrite = TRUE)
-}
-
-# ---- apply the function to the list of annual mean files -----
-lapply(oa_annual_files, oaRescale)
-```
-
-# Re-worked Rescaling
+## Re-worked (v2024) Function for Rescaling
 
 ```{r}
-annual_avg_moll_rescaled_dir <- here::here(oa_dir, "int","annual_avg_moll_rescaled") 
-# dir.create(annual_avg_moll_rescaled_dir) # create Mazu directory for rescaled rasters if not already created
+annual_avg_rescaled_dir <- here::here(oa_dir, version_year, "int","annual_avg_rescaled") 
+# dir.create(annual_avg_rescaled_dir) # create Mazu directory for rescaled rasters if not already created
 
 # Read in historical raster data from earlier
 historical_avg <- terra::rast(here::here(int_dir, "oa_1985_2000_historical_average.tif"))
@@ -552,16 +538,18 @@ oaRescale_updated <- function(file){
   oa_pressure <- terra::ifel(oa_yr_avg > 3, 0, oa_pressure) 
   # any saturation values that are greater than 3 are way above supersaturation, so they would have the lowest pressure possible (reclassify as 0)
   
-  oa_pressure <- terra::ifel(oa_pressure > 1 & oa_pressure <= 3, 1 - (oa_pressure - 1)/(3 - 1), oa_pressure) 
+  oa_pressure <- terra::ifel(oa_pressure > 1 & oa_pressure <= 3, 1 - (oa_pressure - 1)/(3 - 1), oa_pressure)
   # for arag sat values between 1 and 3, the rescaled value would be 1 - (oa_pressure - 1)/(3 - 1)
   
   oa_pressure <- terra::ifel(historical_avg > 1 & historical_avg <= 3, diff, oa_pressure) 
   #  if the historic values also land between 1 and 3, we replace the linear interpolation values from `diff`
   
-  # oa_pressure <- (oa_pressure - minmax(oa_pressure)[1]) / (minmax(oa_pressure)[2] - minmax(oa_pressure)[1]) # rescaling values outside 0-1
+  oa_pressure <- terra::ifel(oa_pressure < 0, 0, oa_pressure) # any rescaled values less then 0 should be considered no pressure, because that means the current value was larger than the historical value, and therefore the aragonite sat increased in reference to the historical value
+
+  oa_pressure <- terra::ifel(oa_pressure > 1, 1, oa_pressure) # any rescaled values greater than 1 should be considered 100% pressure, because that means the current value was smaller than the historical value, and therefore the aragonite sat decreased a lot in reference to the historical value
   
   writeRaster(oa_pressure, 
-              filename = paste0(annual_avg_moll_rescaled_dir, '/oa_rescaled_', yr, ".tif"),
+              filename = paste0(annual_avg_rescaled_dir, '/oa_rescaled_', yr, ".tif"),
               overwrite = TRUE)
   
 }
@@ -570,261 +558,168 @@ oaRescale_updated <- function(file){
 lapply(oa_annual_files, oaRescale_updated)
 ```
 
+Now, visualize the rescaled rasters and check that rescaling worked correctly.
+
 ```{r}
-# plot the rescaled rasters to ensure it looks correct
-ff <- list.files(path = here::here(annual_avg_moll_rescaled_dir), pattern = '.tif$',
+# plot the rescaled rasters to ensure it looks correct.  
+ff <- list.files(path = here::here(annual_avg_rescaled_dir), pattern = '.tif$',
                  full.names = TRUE) 
-oa_rescaled <- terra::rast(ff)
-plot(oa_rescaled)
-plot(log(oa_rescaled+1))
-```
-
-### Testing rescaling
-
-```{r}
-current <- c(0, 0.1, 0.5, 0.75, 0.95, 0.99, 1, 1.1, 1.5, 1.75, 2, 2.25, 2.50,
-2.75, 3.0, 3.5)
-hist <- c(0.5, 0.75, 1, 1.5, 2, 2.5, 3)
-oa_data <- expand.grid(current=current, hist=hist)
-oa_data <- oa_data %>%
-mutate(diff = (hist-current)/(hist-1)) %>%
-mutate(rescale_low_historic = ifelse(current <= 1, 1, diff))
-
-
-```
-
-
-#### Anna's testing:
-
-```{r, }
-# Function to generate bimodal distribution
-generate_bimodal <- function(n) {
-  # Generate two normal distributions
-  dist1 <- rnorm(n/2, mean = 1.5, sd = 0.5)
-  dist2 <- rnorm(n/2, mean = 3.5, sd = 0.5)
-  
-  # Combine the distributions
-  mixture <- c(dist1, dist2)
-  
-  # Clip values to range 0-5
-  pmax(pmin(mixture, 5), 0)
-}
-
-# Generate two sets of bimodal distributions
-set.seed(123)  # for reproducibility
-hist <- (generate_bimodal(1000))
-current <- generate_bimodal(1000)
-
-# Visualize the distributions
-par(mfrow = c(1, 2))
-hist(hist, main = "Distribution of Hist(orical) values", xlab = "Value", breaks = 30)
-hist(current, main = "Distribution of Current values", xlab = "Value", breaks = 30)
-
-
-
-hist_df <- as.data.frame(x = hist)
-current_df <- as.data.frame(x = current)
-
-vals_df <- cbind(hist_df, current_df)
-
-diff_df <- vals_df %>% 
-  mutate(diff = (hist - current)/(hist - 1))
-
-ggplot(diff_df, aes(x = diff)) + 
-  geom_histogram(binwidth = 0.5,
-                 color = "red") +
-  labs(title = "Distribution of 'diff' values",
-       subtitle = "across all locations") +
-  theme_bw()
-
-diff_filter <- diff_df %>% filter(hist > 1 & hist <= 3)
-
-ggplot(diff_filter, aes(x = diff)) + 
-  geom_histogram(binwidth = 0.5,
-                 color = "red") +
-  labs(title = "Distribution of 'diff' values",
-       subtitle = "where historical values > 1 & <= 3") +
-  theme_bw()
-
-
-current_reclass <- diff_df %>% 
-  mutate(current_reclass_vals = case_when(
-    current <= 1 ~ 1,
-    current > 3 ~ 0,
-    current > 1 & current <= 3 ~ (1 - ((current - 1)/(3 - 1))),
-    .default = current
-  ))
-
-ggplot(current_reclass, aes(x = current_reclass_vals)) + 
-  geom_histogram(color = "blue", fill = "grey") +
-  theme_bw() +
-  labs(title = "Distribution of values after adjusting current values",
-       subtitle = "current <=1 ~1, current > 3 ~ 0, current > 1 & current <= 3 ~ (1 - ((current - 1)/(3 - 1)))",
-       x = "reclassified current values")
-
-pressure_df <- current_reclass %>% 
-  mutate(final_press_vals = case_when(
-    hist > 1 & hist <= 3 ~ diff,
-    .default = current_reclass_vals
-  ))
-
-ggplot(pressure_df, aes(x = final_press_vals)) + 
-  geom_histogram(binwidth = 0.5,
-    color = "purple", fill = "grey") +
-  theme_bw() +
-  labs(title = "Distribution of values after using 'diff' values",
-  subtitle = "for locations where hist > 1 & hist <= 3",
-  x = "final 'pressure' values...")
-```
-
-```
-
-
-
-## Interpolate if needed?
-
-Since there are oceanic cells with no information in the raw data, we need to fill in these gaps. We do this by interpolating across the globe using the data we have with an Inverse Distance Weighting (IDW) function. Previously this was done using `arcpy` from ArcGIS.
-
-```{r}
-# check for NAs
-global(oa_rescaled, fun="isNA", na.rm=FALSE)
+oa_rescaled <- terra::rast(ff) # make into a multilayer spatraster so that all annual rasters can be seen
+plot(oa_rescaled) # v2024: this looks great!
 ```
 
 # Zonal Statistics and Results
 
 ## Reproject, resample, check extents, and mask
 
-```{r}
-# reproject to Mollweide for OHI consistency
-# the `terra::project` function by default uses bilinear interpolation for continuous data (used bc the dataset does not have clear boundaries) and nearest neighbor for categorical data (not used in this case, but just to know)
-mollCRS <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs" # mollweide EPSG for reprojecting, within `common.R`
-
-tic()
-nc_raster_moll <- terra::project(oa_multi_raster, mollCRS) # using terra::project, which inherently resamples using bilinear interpolation
-toc() # v2024: 98.562 sec elapsed
-
-plot(nc_raster_moll)
-
-# ---- reproject the historical raster -----
-# needs to be reprojected
-crs(oa_hist_multilayer_nc) # v2024: GEOGCRS[\"WGS 84 (CRS84)\",\n
-
-oa_hist_moll_nc <- project(oa_hist_multilayer_nc, ocean) # reproject to Mollweide
-
-plot(oa_hist_moll_nc) # this is monthly data; we need to stack the raster layers by year and calculate the overall mean across all years for a historical average reference
+```{r, eval = FALSE}
+# Examine the OHI eez raster
+plot(zones) # examine the .tif and ensure it looks correct
+crs(zones) # v2024: PROJCRS[\"Mollweide\",\n
+res(zones) # 934.4789 934.4789, lower cell size = higher resolution
 ```
 
-As seen above, after projecting to Mollweide, the rasters have purple rectangles in areas where there should not be values. To fix this and avoid issues in the future, it may be good to use the `ocean.tif` read as an object "ocean" within the setup chunk and make the resolution equal to our data's resolution. We can then mask the multi-layer SpatRaster of our data to the resampled `ocean`, ensuring that the CRS, extent, and resolution is all the same between the two.
+Now, let's reproject the rescaled rasters to `zones`, for OHI consistency
 
 ```{r}
-# project the data to the `ocean.tif` 
-nc_moll_ocean <- terra::project(oa_multi_raster, terra::crs(ocean))
+# tic()
+# oa_rescaled_moll <- terra::project(oa_rescaled, zones) # using terra::project, which inherently resamples using bilinear interpolation
+# toc() 
+annual_avg_rescaled_moll_dir <- here::here(oa_dir, "int","annual_avg_rescaled_moll") 
+# dir.create(annual_avg_rescaled_moll_dir) # create Mazu directory for rescaled rasters if not already created
 
-# > terra::res(ocean) == terra::res(nc_moll_ocean)
-# [1] FALSE FALSE
+# make a list of the already saved and rescaled annual rasters
+oa_rescaled_annual_files <- list.files(path = here(annual_avg_rescaled_dir),
+                              full.names = TRUE) # returns the full path, not just the file name
 
-# terra::res(nc_moll_ocean) # 11256.74 11256.74
-# terra::res(ocean) # 934.4789 934.4789
 
-# > terra::res(ocean) > terra::res(nc_moll_ocean)
-# [1] FALSE FALSE
+# do not run in parallel because it is not compatible with terra::project() (package might be updated in the future to accommodate parallelization)
+# reprojects each rescaled raster, sets the long/lat projection
 
-# > terra::res(ocean) < terra::res(nc_moll_ocean)
-# [1] TRUE TRUE
+reprojecting_func <- function(file){
+  
+  yr = as.numeric(substr(file, nchar(file)-7, nchar(file)-4)) # get year of file using the file's path/name
+  
+  # Read in eez raster with cells at 1km -- used for resampling and zonal statistics (held on an NCEAS server)
+  zones <- terra::rast(here::here(dir_M, "git-annex", "globalprep","spatial","v2017","regions_eez_with_fao_ant.tif"))
+  
+  # # supress suxiliary files
+  # setGDALconfig("GDAL_PAM_ENABLED", "FALSE")
+  
+  # read in annual raster
+  r <- terra::rast(file[i])
+  
+  # reprojecting to the OHI zones file to ensure they have the same extent and proj
+  r_moll <- terra::project(r, crs(zones), threads = TRUE)
+  
+  # resample to ensure they have the same resolution and write out the file to Mazu
+  r_moll_resample <- terra::resample(x = r_moll, y = zones, method = "bilinear", filename = paste0(annual_avg_rescaled_moll_dir, '/oa_rescaled_moll_', yr, ".tif"), overwrite = TRUE)
+  
+}
 
-# plot(nc_moll_ocean)
-
-# resample the `ocean.tif` to the same resolution as our data, allowing us to mask
-ocean_res_to_nc <- terra::resample(x = ocean, y = nc_moll_ocean)
-
-# > terra::res(ocean_res_to_nc) == terra::res(nc_moll_ocean)
-# [1] TRUE TRUE
-# > terra::ext(ocean_res_to_nc) == terra::ext(nc_moll_ocean)
-# [1] TRUE
+tic()
+lapply(oa_rescaled_annual_files, reprojecting_func)
+toc() # v2024: 1047.173 sec elapsed
 ```
 
+Now, visualize the reprojected rasters to ensure it looks correct.
+
 ```{r}
-# mask to ocean extent
-tic()
-ocean_mask_test <- terra::mask(x = nc_moll_ocean, mask = ocean_res_to_nc)
-toc()
+# plot the rescaled rasters to ensure it looks correct.  
+reproj_annual_rasts <- list.files(path = here::here(annual_avg_rescaled_moll_dir), pattern = '.tif$',
+                 full.names = TRUE) 
+oa_reprojected <- terra::rast(reproj_annual_rasts) # make into a multilayer spatraster so that all annual rasters can be seen
+plot(oa_reprojected) # v2024: this looks great!
 
-plot(ocean_mask_test)
+ext(oa_reprojected) == ext(zones) # v2024: TRUE
+res(oa_reprojected) == res(zones) # v2024: TRUE
+crs(oa_reprojected) == crs(zones) # v2024: TRUE
 
-# ---- mask to `rgns_3nm_offshore_mol.tif`----
-# read it in
-rgns_3nm_offshore <- terra::rast(here(dir_M, "git-annex","globalprep","spatial","v2018","rgns_3nm_offshore_mol.tif"))
-
-crs(rgns_3nm_offshore)
-
-# resample to same resolution as nc_moll_ocean
-resamp_3nm_offshore <- terra::resample(x = rgns_3nm_offshore, y = nc_moll_ocean)
-
-# mask nc_moll_ocean to the eezs by region
-tic()
-oa_global_eez_multi <- terra::mask(x = nc_moll_ocean, mask = resamp_3nm_offshore)
-toc()
-
-plot(oa_global_eez_multi$omega_ar_1)
+# great! Now we can move on to zonal stats.
 ```
 
-## Calculate Zonal Stats
+## Calculate Zonal Statistics
 
 ```{r}
-# project and rescale here!!
-# come back and do each individual annual raster and parallelize!!
 # remember: `zones` from setup chunk
-# from `/home/shares/ohi/git-annex/globalprep/spatial/v2017`
+# zones is from `/home/shares/ohi/git-annex/globalprep/spatial/v2017`
 # regions_eez_with_fao_ant.tif: This includes all the ocean regions (eez/fao/antarctica), but the raster cell values correspond to the rgn_ant_id in regions_2017_update.  This file is most often used to extract pressure values for each region.
-
-crs(zones) # "PROJCRS[\"Mollweide\",\n  good, matches our rescaled rasters!
-res(zones) # 934.4789 934.4789
-ext(zones) == ext(oa_rescaled) # FALSE, does not match our rescaled rasters
-
-# resample the data to make the extents equal so zonal statistics can be calculated
-tic() # may need to add parallelization this takes a while
-oa_resampled <- terra::resample(x = oa_rescaled, y = zones) # rename object
-toc()
-
-# check that the extents are the same now
-ext(zones_resampled) == ext(oa_rescaled) # TRUE, matches our rescaled multilayer raster!
 
 # use zonal statistics to calculate the average score of all the cells within each region
 tic()
-regions_stats <- terra::zonal(oa_resampled, zones, fun = "mean", na.rm = TRUE, progress = "text") %>% 
-  data.frame() 
-toc() # 
+regions_stats <- terra::zonal(oa_reprojected, zones, fun = "mean", na.rm = TRUE, progress = "text") %>%
+  data.frame() %>%
+  setNames(c("rgn_id", "scores_2010","scores_2011","scores_2012","scores_2013","scores_2014","scores_2015","scores_2016","scores_2017","scores_2018","scores_2019","scores_2020","scores_2021","scores_2022"))
+toc() # v2024: 361.876 sec elapsed
 
-# all OHI regions to compare to our zonal statistics and see what is missing
+# bring in all OHI regions and their names to compare to our zonal statistics and see what is missing
 rgn_data <- read_sf(here(dir_M, "git-annex", "globalprep", "spatial", "v2017"), "regions_2017_update") %>%
   st_set_geometry(NULL) %>%
   dplyr::filter(rgn_type == "eez") %>%
   dplyr::select(rgn_id = rgn_ant_id, rgn_name)
 
-# use `setdiff()` to see if any regions are missing
-setdiff(regions_stats$zone, rgn_data$rgn_id) # v2024: NULL -- great!!
-setdiff(rgn_data$rgn_id, regions_stats$zone) # CHECK BACK ON THIS!!
+# use `setdiff()` between the original zonal stats and the OHI regions to see if any regions are missing
+setdiff(regions_stats$rgn_id, rgn_data$rgn_id) # v2024: good! only the high seas regions that are not within the 250 OHI regions: 260 261 262 263 264 266 267 269 270 272 273 274 275 276 277
+setdiff(rgn_data$rgn_id, regions_stats$rgn_id) # v2024: integer(0)
 
+# clean up the zonal statistics resulting dataframe
 regions_stats_clean <- regions_stats %>%
-  rename(rgn_id = zone) %>%
-  filter(rgn_id <= 250) %>%
-  gather("year", "pressure_score", -1) %>%
-  mutate(year = as.numeric(as.character(substring(year, 7, 8)))) %>%
-  mutate(year = 1993 + year - 1) # convert from numbers to actual years
+  filter(rgn_id <= 250) %>% # to filter out zonal artifacts
+  gather("year", "pressure_score", -1) %>% # convert into tidier format
+  mutate(year = as.numeric(as.character(substring(year, 8, 11)))) %>% # replace year from "scores_yr" into "yr"
+  mutate(pressure_score = format(pressure_score, scientific = FALSE)) # remove scientific notation formating
+
+# write out acid.csv, which is in the same format as previous years.  All future .csv write-outs are in different formats than previous years
+# write_csv(regions_stats_clean, "output/acid.csv")
+
+# bringing the names in to allow for greater readability
+regions_stats_join <- left_join(regions_stats_clean, rgn_data, by = "rgn_id") %>% 
+  relocate(rgn_name, .after = rgn_id)
 ```
 
-# Final Pressure Layer
+# Final Pressure Scores
 
-```{r plot_final}
-
-```
-
-# Gap-filled cells
-
-We want to create a raster layer that shows all cells that were gap-filled. Since they were the same cells interpolated across all years, we only need to create one raster.
+Visualize the final scores!
 
 ```{r}
+pressure_oa_plot <- regions_stats_join %>%
+  plot_ly(x = ~year, y = ~pressure_score, color = ~rgn_name, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "Ocean Acidification Pressure Scores by Region",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Pressure Score"))
+pressure_oa_plot
 
+# save plot
+# htmlwidgets::saveWidget(pressure_oa_plot, file = "output/prs_oa_all_years_plot.html")
+```
+
+Save output files in `output_dir`, refer back to the setup chunk.
+
+```{r plot_final}
+# ----- save all data (commented out in case someone runs the whole script) ---------
+# write_csv(regions_stats_join, "prs_oa_all_yrs.csv")
+
+# group the data by year
+yearly_data <- regions_stats_join %>%
+  group_by(year) %>% # group by all years, in this case it should be 2010 - 2022
+  group_split() # splits into a list of tibbles by the previous grouping.  It may be deprecated in the future... check documentation
+
+# get a list of unique years
+years <- regions_stats_join %>%
+  pull(year) %>% # specifying the year column, similar to using the $
+  unique() %>% # all unique values in that column
+  sort() # by default will sort in ascending order, double check "years" to make sure.
+
+# create a function to write CSV files in the output folder
+write_csv_by_year <- function(data, year) {
+  filename <- file.path("output", paste0("prs_oa_", year, ".csv"))
+  write.csv(data, file = filename, row.names = FALSE)
+}
+
+# ----- save yearly data (commented out in case someone runs the whole script) ---------
+## use map2 (which allows two vectors of the same length) to iterate over the split data and years to write individual csvs for each year
+# map2(yearly_data, years, write_csv_by_year) 
 ```
 
 # Citation information

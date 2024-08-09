@@ -1,0 +1,214 @@
+---
+title: "OHI 2021: Food Provision, Investigate Differences"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+---
+
+# Summary
+
+Data check during data prep.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+# Setup
+```{r}
+
+## Libraries
+library(dplyr)
+library(tidyr)
+library(readr)
+library(sf)
+library(ggplot2)
+library(stringr)
+library(here) 
+library(plotly)
+
+setwd(here::here("globalprep","fis","v2021"))
+
+source('../../../workflow/R/common.R')
+
+```
+
+## Mean catch differences v2021 vs v2020:
+
+```{r}
+new <- read.csv("output/mean_catch_minus_feed.csv")
+new_filt <- new %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  mutate(new_log_catch = log(mean_catch+1)) %>% 
+  filter(year == 2014) %>% 
+  dplyr::select(rgn_id, stock_id_taxonkey, new_log_catch, new_mean_catch = mean_catch) 
+
+old <- read.csv("../v2020/output/mean_catch_minus_feed.csv")
+old_filt <- old %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  rename(year = year) %>% 
+  mutate(old_log_catch = log(mean_catch+1)) %>%
+  filter(year == 2014) %>% 
+  dplyr::select(rgn_id, stock_id_taxonkey, old_log_catch, old_mean_catch = mean_catch)
+  
+check <- old_filt %>% 
+  full_join(new_filt, by = c("rgn_id","stock_id_taxonkey")) %>% 
+  mutate(new_log_catch = ifelse(is.na(new_log_catch), 0, new_log_catch)) %>% 
+  mutate(old_log_catch = ifelse(is.na(old_log_catch), 0, old_log_catch))
+
+
+## For quick plot
+plot(check$old_log_catch,check$new_log_catch)
+abline(col="red", 0,1)
+
+## Plot with plotly to see region id when hovering over points (takes a while)
+plot_check <- ggplot(check, aes(old_log_catch, new_log_catch, col = rgn_id)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(col="red") +
+  ggtitle("Catch Comparison for 2014 (v2020, v2021)")
+
+plot_check
+
+ #ggplotly(plot_check) #might crash RStudio
+
+
+check <- old_filt %>% 
+  left_join(new_filt, by = c("rgn_id","stock_id_taxonkey"))
+ 
+sum(check$old_mean_catch) # 50392242 old
+
+sum(check$new_mean_catch, na.rm = TRUE) # 47003440
+
+50392242 - 47003440; # SAUP has ~3 million less tonnes for that year
+
+
+new <- read.csv("output/mean_catch_minus_feed.csv")
+new_filt <- new %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  mutate(new_log_catch = log(mean_catch+1)) %>% 
+  #filter(year == 2014) %>% 
+  dplyr::select(rgn_id, stock_id_taxonkey, year, new_log_catch, new_mean_catch = mean_catch) %>%
+  group_by(year, rgn_id) %>%
+  summarise(new_total_mean = sum(new_mean_catch, na.rm = TRUE)) %>%
+  ungroup()
+
+old <- read.csv("../v2020/output/mean_catch_minus_feed.csv")
+old_filt <- old %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  rename(year = year) %>% 
+  mutate(old_log_catch = log(mean_catch+1)) %>%
+ # filter(year == 2014) %>% 
+  dplyr::select(rgn_id, stock_id_taxonkey, year, old_log_catch, old_mean_catch = mean_catch) %>%
+  group_by(year, rgn_id) %>%
+  summarise(old_total_mean = sum(old_mean_catch, na.rm = TRUE)) %>%
+  ungroup()
+  
+check <- old_filt %>%
+  left_join(new_filt) %>%
+  mutate(diff = new_total_mean - old_total_mean) 
+
+ # %>%
+ #  filter(year == 2014)
+
+plot(check$old_total_mean,check$new_total_mean)
+abline(col="red", 0,1)
+
+test <- check %>%
+  filter(is.na(diff)) %>%
+  distinct(rgn_id) %>%
+  left_join(rgns_eez)
+
+## western sahara should have catch? 
+## Bouvet is ok... since it is fully protected and uninhabited
+## Juan de nova.. ok uninhabited (basically)
+## Ile Europa.. ok uninhabited
+## Gibraltar should probably have catch? 
+## Monaco should probably have catch?
+## Oecussi Ambeno should probably have catch?
+
+
+## COMPARE SAUP DATASETS v2021 and v2017
+
+new <- read.csv("int/mean_catch.csv")
+new_filt <- new %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  mutate(new_log_catch = log(mean_catch+1)) %>% 
+  filter(year == 2014) %>% 
+  dplyr::select(rgn_id, stock_id_taxonkey, new_log_catch, new_mean_catch = mean_catch) 
+
+old <- read.csv("../v2017/data/mean_catch.csv")
+old_filt <- old %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  rename(year = year) %>% 
+  mutate(old_log_catch = log(mean_catch+1)) %>%
+  filter(year == 2014) %>% 
+  dplyr::select(rgn_id, stock_id_taxonkey, old_log_catch, old_mean_catch = mean_catch)
+  
+check <- old_filt %>% 
+  full_join(new_filt, by = c("rgn_id","stock_id_taxonkey")) %>% 
+  mutate(new_log_catch = ifelse(is.na(new_log_catch), 0, new_log_catch)) %>% 
+  mutate(old_log_catch = ifelse(is.na(old_log_catch), 0, old_log_catch))
+
+
+## For quick plot
+plot(check$old_log_catch,check$new_log_catch)
+abline(col="red", 0,1)
+
+## Plot with plotly to see region id when hovering over points (takes a while)
+plot_check <- ggplot(check, aes(old_log_catch, new_log_catch, col = rgn_id)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(col="red") +
+  ggtitle("Catch Comparison for 2014 (v2017, v2021)")
+
+plot_check
+
+
+new_filt <- new %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  mutate(new_log_catch = log(mean_catch+1)) %>% 
+  #filter(year == 2014) %>% 
+  dplyr::select(rgn_id, stock_id_taxonkey, year, new_log_catch, new_mean_catch = mean_catch) %>%
+  group_by(year, rgn_id) %>%
+  summarise(new_total_mean = sum(new_mean_catch, na.rm = TRUE)) %>%
+  ungroup()
+
+
+old_filt <- old %>% 
+  #filter(stock_id_taxonkey == "Carangidae-31_400314") %>% 
+  rename(year = year) %>% 
+  mutate(old_log_catch = log(mean_catch+1)) %>%
+ # filter(year == 2014) %>% 
+  dplyr::select(rgn_id, stock_id_taxonkey, year, old_log_catch, old_mean_catch = mean_catch) %>%
+  group_by(year, rgn_id) %>%
+  summarise(old_total_mean = sum(old_mean_catch, na.rm = TRUE)) %>%
+  ungroup()
+
+
+check <- old_filt %>%
+  left_join(new_filt) %>%
+  mutate(diff = new_total_mean - old_total_mean) 
+
+ # %>%
+ #  filter(year == 2014)
+
+plot(check$old_total_mean,check$new_total_mean)
+abline(col="red", 0,1)
+
+
+test <- check %>%
+  filter(is.na(diff)) %>%
+  distinct(rgn_id) %>%
+  left_join(rgns_eez)
+
+```
+

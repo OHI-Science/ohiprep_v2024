@@ -42,24 +42,28 @@ fao_clean_data_new <- function(m, sub_N = 0.1) {
   
   m1 <- m %>%
     mutate(  
+      # Remove "E" from values (E = Estimate) ----
       value = str_replace(value, fixed('E '), ''), 
       value = str_replace(value, fixed(' E'), ''),
       ### FAO denotes with E when they have estimated the value using best available data,
       ###   sometimes comes at start (commodities), sometimes at end (mariculture)...?
-      value = ifelse(value == '...', NA, value),
-      ### FAO's code for NA
+      # Replace '...' with NA ----
+      value = ifelse(value == '...', NA, value), # FAO's code for NA
       #value = str_replace(value, fixed(' N'), sub_N),
-      value = case_when(str_detect(value,"0  N") ~ as.character(sub_N),
-                        str_detect(value, " N") ~ str_remove(value, " N"),
-                        TRUE ~value),
+      value = case_when(str_detect(value, "0  N") ~ as.character(sub_N), # if 0 N, replace with sub_N
+                        str_detect(value, " N") ~ str_remove(value, " N"), # if number precedes N, remove N
+                        TRUE ~ value),
       ### FAO denotes something as 'N' when it is > 0 but < 1/2 of a unit. 
       ### Replace with lowdata_value.
-      value = str_replace(value, fixed(  '-'), '0'),  
+      # Replace '-' with 0 ----
+      value = str_replace(value, fixed('-'), '0'),  
       ### FAO's code for true 0
-      value = ifelse(value =='', NA, value)) %>%
+      # Replace missing values with NA ----
+      value = ifelse(value == '', NA, value)) %>%
+    # Coerce data types ----
     mutate(
       value = as.numeric(as.character(value)),
-      year  = as.integer(as.character(year)))       # search in R_inferno.pdf for "shame on you"
+      year = as.integer(as.character(year)))       # search in R_inferno.pdf for "shame on you"
   
   return(m1)
 }

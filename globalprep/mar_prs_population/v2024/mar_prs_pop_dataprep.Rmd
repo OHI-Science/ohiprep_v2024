@@ -1,0 +1,805 @@
+---
+title: 'OHI 2024 - Mariculture Population Pressure Layers'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+[REFERENCE RMD FILE](https://ohi-science.org/ohiprep_v2021/globalprep/mar_prs_population/v2021/mar_prs_pop_dataprep.html)
+
+
+# Summary
+
+This document describes the steps for obtaining and wrangling the data used to calculate the mariculture population pressure sub-dimension for the 2021 global assessment. The general data preparation calculations are summarized [here](http://ohi-science.org/ohi-global/layers.html#inland_coastal_population). For context and explanation see the mariculture (subgoal of food provision) [model summary](http://ohi-science.org/ohi-global/goals.html#food_provision:_mariculture).
+
+# Updates from previous assessment
+UN population data were not updated since 2021. CIES data were not updated but the data obtained was changed from population_density .tif files to population_count .tif files. 
+
+* We are no longer reprojecting and resampling population data to World Mollweide projection, as that affected the population data for "border" regions (i.e. those on the border of where the projection wraps around) far too much. 
+  
+  * We have instead modified the eez_25mi_inland raster to WGS 1984 projection using "nearest neighbor" method for resampling and not modified the population rasters. 
+
+* In addition, because the previous script used the raster package, this new script has been changed to utilize the terra package instead. 
+  
+  * Some processes are less iterative in the terra package so must be done in sequence, however the processes that can function iteratively have been made so. 
+
+
+***
+
+# Data Sources
+
+## Gridded Population of the World (v4.11) by CIESE and CIAT
+
+**Reference**: http://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11/data-download
+
+Center for International Earth Science Information Network - CIESIN - Columbia University. 2018. Gridded Population of the World, Version 4 (GPWv4): Population Density Adjusted to Match 2015 Revision UN WPP Country Totals, Revision 11. Palisades, NY: NASA Socioeconomic Data and Applications Center (SEDAC). https://doi.org/10.7927/H4F47M65. Accessed 17 April 2019
+
+**Downloaded**: 25 july 2024
+
+**Description**:
+The Gridded Population of the World, Version 4 (GPWv4): Population **Count** Adjusted to Match 2015 Revision of UN WPP Country Totals, Revision 11 consists of estimates of human population density (number of persons per square kilometer) based on counts consistent with national censuses and population registers with respect to relative spatial distribution, but adjusted to match the 2015 Revision of the United Nation's World Population Prospects (UN WPP) country totals, for the years 2000, 2005, 2011, 2015, and 2020. A proportional allocation gridding algorithm, utilizing approximately 13.5 million national and sub-national administrative units, was used to assign UN WPP-adjusted population counts to 30 arc-second grid cells. The density rasters were created by dividing the UN WPP-adjusted population count raster for a given target year by the land area raster.  Documentation for gridded population of the world is located [here](http://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11/docs).
+
+**Native data resolution**: 30 arc-seconds
+
+**Time range**: 2000-2020
+
+**Format**: GeoTiff
+
+## UN Population
+
+UN population data is used in this data prep routine to check population counts; spatially distributed counts derived from the gridded world population are aggregated by region and checked against the UN population estimates.
+
+**Reference**: https://esa.un.org/unpd/wpp/
+
+**Downloaded**: 26 June 2020
+
+**Description**: Population (in thousands) for countries.
+
+**Native data resolution**: Country scores
+
+**Time range**: 1950-2020
+
+**Format**: Excel file
+
+**Data cleaning process**: Values from the "ESTIMATES" tab of "WPP2019_POP_F01_1_TOTAL_POPULATION_BOTH_SEXES.xlsx" were copied for all countries and years (1950-2020) and pasted into new "UN_pop_clean_v2020.csv".
+
+***
+
+# Setup
+
+Load all relevant libraries including parallel processing packages
+```{r setup, message=FALSE, warning=FALSE, verbose=FALSE, eval=FALSE}
+
+## Set options for all chunks in code
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width = 6, fig.height = 4, fig.path = "figs/")
+
+## Load packages, installing them first where necessary
+pkg <- c("raster", "sp", "sf", "fasterize", "tidyverse", "foreach", "parallel","doParallel")
+new_pkg <- pkg[!(pkg %in% installed.packages())]
+if (length(new_pkg)){install.packages(new_pkg)}
+if (!("ohicore" %in% installed.packages())){devtools::install_github("ohi-science/ohicore")}
+
+library(ohicore)
+
+## Spatial libraries
+library(raster)
+# library(rgdal)
+library(sp)
+library(fasterize)
+library(sf) # Vector spatial data
+library(terra) # Raster spatial data
+library(tidyterra) # For rasters in GGplot
+
+## Data wrangling libraries
+library(tidyverse)
+library(here)
+library(plotly)
+library(dplyr)
+
+## Parallel processing libraries
+library(parallel)
+library(foreach)
+library(doParallel)
+
+```
+
+Define frequently used pathnames. Change scenario and data years in file pathnames code chunk to reflect the most recent data (d) and current assessment year (v).
+```{r file paths, eval=FALSE}
+
+## Source common and spatial common files
+source('http://ohi-science.org/ohiprep_v2020/workflow/R/common.R')
+
+## Update these!
+scenario_yr <- "v2024" # change to reflect assessment year!
+data_yr_gpw <- "d2024" # change to reflect year of most recently downloaded Gridded Population of the World (GPW) data!
+data_yr_un_pop <- "d2020" # change to reflect year of most recently downloaded UN population data! (no change for v2024)
+
+## Define commonly used file paths (matched to what we did in ico_data_prep.Rmd)
+dir_server <- file.path(dir_M, "git-annex/globalprep/_raw_data")
+dir_github <- here("/globalprep/mar_prs_population", scenario_yr)
+
+## Checking to see if there is a README in the mar_prs_pop and mar_prs_pop/v20?? folders - all goal prep files will need a README!
+if(!file.exists(file.path(dir_github, 'README.md'))) {
+  warning(sprintf('No README detected in %s', dir_github))
+}
+if(!file.exists(file.path(dirname(dir_github), 'README.md'))) {
+  warning(sprintf('No README detected in %s', file.path(dirname(dir_github))))
+}
+
+```
+
+## Import Raw Data
+
+```{r import raw data, eval=FALSE}
+
+## Read in the raw density data to be reprojected and resampled
+raw <- list.files(file.path(dir_server, sprintf("CIESEandCIAT_population/%s", data_yr_gpw)),
+                  full.names = TRUE, pattern = "\\.tif$",
+                  recursive = TRUE)
+raw <- raw[grep("count_", raw)] # keep only the files that include the word "density"
+raw # check that this looks correct; can double check with the folder on Mazu server folder
+
+# Rename count files to better work with grep function and interpolate function. These are our start rasters for the 'yearly_interpolate_terra' function
+raw1 <- terra::rast(raw[1]) %>% 
+  terra::writeRaster(., filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, 2000)))
+
+raw2 <- terra::rast(raw[2]) %>% 
+  terra::writeRaster(., filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, 2005)))
+
+raw3 <- terra::rast(raw[3]) %>% 
+  terra::writeRaster(., filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, 2010)))
+
+raw4 <- terra::rast(raw[4]) %>% 
+  terra::writeRaster(., filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, 2015)))
+
+raw5 <- terra::rast(raw[5]) %>% 
+  terra::writeRaster(., filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, 2020)))
+
+ohi_rasters() # loads rasters
+# eez_raster <- zones # sourced from ohi_rasters()
+
+## Import raw, cleaned UN population data to be wrangled then used to confirm gpw-derived spatial population
+pop <- read.csv(file.path(dir_server, 
+                          sprintf("UnitedNations_population/%s/UN_pop_clean_v2020.csv", data_yr_un_pop)), # change year if updated
+                strip.white = TRUE, stringsAsFactors = FALSE)
+
+```
+
+# Methods and Calculations
+
+## Reproject EEZ + 25-mile Inland Raster
+
+Gridded world population counts from CIESE and CIAT are in WGS 1984 Projection, and the ocean_plus25mile_inland.tif is projected in the World Mollweide coordinate reference system. We will resample the ocean raster using nearest neighbor method to match the population count raster 0.008333333 x 0.008333333 degree resolution. 
+
+Why reproject the ocean raster? It is a categorical raster defining zones, whereas the population raster is a continuous raster with highly variable cell values. As a result, changing the projection of the categorical raster would minimize errors propagating through calculations because it is 1. not directly modifying the data that we're interested in, and 2. categorical, indicating that the faster "nearest neighbor" method of resampling won't realistically change the underlying structure of the regions - only borders, which are typically less developed and less populated [And There Was Light:
+Trade and the Development of Border Regions](https://people.unil.ch/mariusbrulhart/files/2023/06/borderlights.pdf). 
+
+Therefore, when choosing which raster to manipulate, we saw 1. that modifying the population raster resulted in some pretty large errors propagating, 2. manipulating the ocean raster is methodologically more sound, and 3. Because we're not manipulating the population raster scale, it doesn't need to be population density, so we can use an unequal areas projection to run zonal statistics. 
+
+```{r create eez + 25-mile inland raster, eval=FALSE}
+
+# No longer using shape files, raster only
+
+count_rast <- raster::raster(raw[5]) # load one raw raster to use as template for reprojection using raster package
+
+count_rast <- terra::rast(count_rast) # Convert it to SpatRaster using terra::rast()
+
+# Load EEZ + 25mile inland raster using raster package
+eez_25mi_inland <- raster::raster(file.path(dir_M, "git-annex/globalprep/spatial/v2019/ocean_plus25mile_inland.tif"))
+
+eez_25mi_inland <- terra::rast(eez_25mi_inland) # Convert it to SpatRaster using terra::rast()
+
+(eez_25mi_inland) # Check out the object 
+
+# View the datatype of the raster (should be categorical raster to conduct zonal statistics properyly)
+terra::datatype(eez_25mi_inland) # 'FLT4S'
+
+# Converting it to 'int' before factorizing so that any numbers are rounded to whole 
+ocean_rast_int <- terra::as.int(eez_25mi_inland) # Changing from float raster to integer raster 
+
+plot(ocean_rast_int)  # Checking to make sure that it makes sense 
+
+# Reproject integer raster to WGS 1984 (same as population count raster)
+ocean_int_reproj <- terra::project(x = ocean_rast_int, count_rast, method="near") # Reprojecting to population raster projection  
+
+plot(ocean_int_reproj) # Checking to make sure that it makes sense
+
+# Factorizing the regions raster to ensure that it is categorical 
+ocean_fact_reproj <- terra::as.factor(ocean_int_reproj) 
+
+plot(ocean_fact_reproj) # Checking to make sure it makes sense 
+
+# intersecting the two rasters to obtain TRUE where they overlap and FALSE where they do not 
+pop_intersect <- terra::intersect(count_rast, ocean_fact_reproj)
+
+plot(pop_intersect) # Making sure that I know where R thinks the two overlap. This makes sense!! 
+
+# Checking names of the layers --> The layer name for ocean raster should be 'zone' for zonal statistics
+names(ocean_fact_reproj) # [1] "ocean_plus25mile_inland"
+
+names(ocean_fact_reproj) = c("zone") # [1] "zone"
+
+# Another command can be used to set the layer name of ocean raster 
+
+# terra::set.names(ocean_fact_reproj, "zone")
+
+## Writing the ocean raster out to Mazu --> for future reference, you only need to load this raster and then rename the layer to 'zone'
+
+# zonal_rast <- terra::writeRaster(ocean_fact_reproj, filename = file.path(dir_M, "git-annex/globalprep/spatial/v2024/eez_25mi_inland_wgs1984.tif"), overwrite = TRUE, datatype='INT4U')
+```
+
+## Interpolate between Years
+
+GWPv4 data is for years 2005, 2010, 2015, and 2020. Data for missing years must be generated by interpolation.
+
+```{r functions for interpolation, eval=FALSE}
+
+## Define and apply function to calculate yearly change in population density 
+## Create function for average yearly change
+library(terra)
+
+yearly_diff_terra <- function(year_min, year_max, count_files = raw, scenario_yr, dir_M){
+  # Load the raster files
+  # contingency for rasters with year = 2015 because the grep dont work (picks up all the files because they all have a 2015 in them)
+  if(year_max == 2015){
+    contingency <- paste0("rev11_", year_max)
+    rast_max <- rast(count_files[grep(contingency, count_files)])
+  } else {
+    rast_max <- rast(count_files[grep(year_max, count_files)])
+  }
+  if(year_min == 2015){
+    contingency2 <- paste0("rev11_", year_min)
+    rast_min <- rast(count_files[grep(contingency2, count_files)])
+  } else {
+    rast_min <- rast(count_files[grep(year_min, count_files)])
+  }
+  
+  # Calculate the difference and divide by 5
+  rast_diff <- (rast_max - rast_min) / 5
+  
+  # Define the output file path
+  output_file <- file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/yearly_change_%s_to_%s.tif", scenario_yr, year_min, year_max))
+  
+  # Save the result to mazu folder 
+  terra::writeRaster(rast_diff, filename = output_file, overwrite = TRUE)
+}
+
+# Create four new files --> yearly change 2000-2005, 2005-2010, 2010-2015, and 2015-2020
+## This will allow us to use each yearly change raster to interpolate years between each increment
+yearly_diff_terra(2000, 2005, count_files = raw, dir_M = dir_M, scenario_yr = scenario_yr)
+
+yearly_diff_terra(2005, 2010, count_files = raw, dir_M = dir_M, scenario_yr = scenario_yr)
+
+yearly_diff_terra(2010, 2015, count_files = raw, dir_M = dir_M, scenario_yr = scenario_yr)
+
+yearly_diff_terra(2015, 2020, count_files = raw, dir_M = dir_M, scenario_yr = scenario_yr)
+
+################### 
+# Take a break here and check to make sure that the Mazu folder has both "yearly_change_YYYY_to_YYYY" files and "human_count_YYYY" files. Should be four and five, respectively
+
+
+## Now that we have the yearly change for each five year increment, we're going to reload the files list to have access for the yearly_interpolate_terra function
+files <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/int"), pattern = ".tif$", full = TRUE)
+
+## Defining function to interpolate years between increments 
+yearly_interpolate_terra <- function(files, raw_files, start_years, dir_M=dir_M, scenario_yr=scenario_yr) {
+  # Find the files in Mazu folder --> should be written out above to have correct naming convention
+  # Define start year 
+  for (start_year in start_years) { # The start years will have 4 files: 2000, 2005, 2010, 2015
+    
+    end_year = start_year+5
+    raster_initial <- terra::rast(raw_files[grep(sprintf("rev11_%s", start_year), raw_files)])
+    
+    names(raster_initial) <- sprintf("pop_%s", start_year)
+    
+    # Save the initial raster (not necessary but doing it anyways)
+    terra::writeRaster(raster_initial, 
+                       filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, start_year)), 
+                       overwrite = TRUE)
+
+        # load change raster 
+        change_raster <- terra::rast(files[grep(sprintf("change_%s_to_%s", start_year, end_year), files)])
+        
+        #. Define each year increment between the start year and end year 
+        for (i in 1:4) {
+          yr <- start_year + i # EX: start_year=2000, end_year=2005, yr = 2001, 2002, 2003, 2004
+          if (yr <= end_year) { # Check that year is less than or equal to the end_year (should be)
+            # Define each raster that its calculating as raster_current 
+            ## Calculated with yearly change times the year out that its calculating (1, 2, 3, 4)
+            raster_current <- raster_initial + (i * change_raster) # calculate w/ yearly change * 
+            # Rename the current raster with name and the yr variable 
+            names(raster_current) <- sprintf("pop_%s", yr)
+            
+            # Write it out to the mazu directory 
+            terra::writeRaster(raster_current, 
+                               filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), 
+                               overwrite = TRUE)
+          }
+        }
+        
+        # Update for the next iteration --> the new raster_initial is the last end year 
+        raster_initial <- terra::rast(raw[grep(sprintf("rev11_%s", end_year), raw)])
+        # Rename so that the layer is named pop_'end_year'
+        names(raster_initial) <- sprintf("pop_%s", end_year)
+  }
+}
+
+# Letting it rip (but making sure everything is correct beforehand)
+files <- list.files(file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int", scenario_yr), pattern = ".tif$", full = TRUE) 
+start_years <- c(2000, 2005, 2010, 2015) # Starting years
+dir_M # Checking dir_M
+scenario_yr <- scenario_yr # Update with your scenario year
+scenario_yr # Check to make sure 
+
+yearly_interpolate_terra(files=files, raw_files = raw, start_years=start_years, dir_M, scenario_yr)
+
+# # Check a random raster from the mazu directory
+# count_2018 <- terra::rast(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/int/human_count_2018_mol.tif"))
+# plot(count_2018)
+
+```
+
+## Append or Extract by OHI Regions
+
+Stack rasters of population counts for each year, sum within regions (using eez_25mi_inland) for each year, and save this as `coastal_pop_zonal_sums.csv` in the intermediate folder. Gather this into long format dataframe, and save as `output/mar_pop_25mi.csv`.
+
+```{r extract population data from all population layers, eval=FALSE}
+
+# Load files and create a SpatRaster of the human_count files (each layer is going to be a year)  ----
+
+# Call in the files created using the interpolate_years_terra function
+files <- list.files(file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/int"), pattern = "human_count_\\d{4}_mol.tif$", full = TRUE)
+
+files # Check to make sure that they are the correct files 
+
+pop_all_years <- terra::rast(files) # Use terra::rast() on list files to make a spatraster with as many layers as there are files 
+
+# Check it out 
+(pop_all_years) # Has 21 layers, one for each of our raster files 
+
+# Read in EEZ plus 25mi inland WGS 1984*** raster and tidy for zonal statistics ---- 
+zone_raster <- terra::rast(file.path(dir_M, "git-annex/globalprep/spatial/v2024/eez_25mi_inland_wgs1984.tif"))
+
+# Check it out --> resolution, layer name
+(zone_raster)
+
+# Need to make it a categorical raster for zonal statistics. See what it loads in as?
+terra::datatype(zone_raster) # [1] "INT4U"
+
+zone_raster <- terra::as.factor(zone_raster) # Ensuring R knows its a categorical raster. Won't have a datatype anymore though
+
+# Need to check names to make sure they are 'zone' for zonal statistics
+names(zone_raster) # [1] "ocean_plus25mile_inland"
+
+names(zone_raster) = c("zone") # Ensuring R knows that the layer we want defines ZONES!
+
+
+# Conduct zonal statistics, tidy up and write out ----
+
+# Conduct zonal statistics
+coastal_pop <- terra::zonal(pop_all_years, zone_raster, "sum", na.rm=TRUE) 
+
+# Check it to see the column names --> This is 'fixed' (v2024) in following step
+View(coastal_pop)
+
+# Fixing column names (v2024)
+coastal_pop2 <- coastal_pop %>% 
+  dplyr::rename(pop_2000 = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2000_30_sec,
+                pop_2005 = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2005_30_sec,
+                pop_2010 = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2010_30_sec,
+                pop_2015 = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2015_30_sec,
+                pop_2020 = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2020_30_sec)
+
+# Writing to 'int' folder in project to have zonal sums 
+write_csv(coastal_pop2, file.path(here("globalprep/mar_prs_population/v2024/int/coastal_pop_zonal_sums.csv")))
+
+# Pivoting longer to have one "rgn_id" column, one "year" column, and one "popsum" column
+coastal_pop3 <- coastal_pop2 %>% 
+  pivot_longer(cols = -c(zone), names_to = "year", values_to = "popsum") %>% 
+  mutate(year = str_remove_all(year, "pop_"),
+         year = as.numeric(year)) %>% 
+  dplyr::rename(rgn_id = zone) %>%
+  dplyr::mutate(rgn_id = as.numeric(rgn_id)) %>% 
+  dplyr::filter(rgn_id <= 250) 
+
+# Converting NaN's to 0's (mostly occur with uninhabited islands)
+coastal_pop_nona <- coastal_pop3 %>% 
+  dplyr::mutate(popsum = case_when(
+    popsum == "NaN" ~ 0,
+    .default=popsum 
+  ))
+
+# Writing it out to 'int' folder to have the coastal population of each country for all years 
+write_csv(coastal_pop_nona, file.path(here("globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv")))
+```
+
+
+## Calculate Area of 25mi Inland Buffers
+
+```{r calculate area and mar. pressure, eval=FALSE}
+
+# Load in data calculated in spatial folder 
+area <- read_csv(here("globalprep/spatial/v2019/output/area_km2_25mi_inland.csv")) # last updated v2019
+
+```
+
+## Calculate Mariculture Population Pressure
+
+```{r calculate mar. population pressure, eval=FALSE}
+
+## Rescale organized coastal population data
+pop_rescaled <- coastal_pop_nona %>%
+  left_join(area, by="rgn_id") %>%
+  mutate(density = popsum/area_km2) %>%
+  mutate(ln_density = log(density + 1)) %>%
+  mutate(scalar = max(ln_density, na.rm = TRUE)) %>%
+  mutate(dens_rescaled = ln_density/scalar) %>%
+  mutate(dens_rescaled = ifelse(dens_rescaled > 1, 1, dens_rescaled))
+
+filter(pop_rescaled, is.na(area_km2)) # no NA values for the area column (Antarctica not included)
+
+pressure_data <- pop_rescaled %>%
+  dplyr::select(rgn_id, year, pressure_score = dens_rescaled)
+
+write_csv(pressure_data, file.path(here("globalprep/mar_prs_population/v2024/output/prs_pop_density.csv")))
+
+```
+
+## Gapfilling
+
+No gapfilling was completed as part of this data prep methodology. Datasets are saved with "_gf" appended just to indicate they are finalized versions.
+
+```{r save prs_pop_density and mar_pop_25mi layers, eval=FALSE}
+
+prs <- read.csv("globalprep/mar_prs_population/v2024/output/prs_pop_density.csv") %>%
+  dplyr::mutate(pressure_score = 0)
+
+write.csv(prs, "globalprep/mar_prs_population/v2024/output/prs_pop_density_gf.csv", row.names = FALSE)
+
+mar <- read.csv("globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv") %>%
+  dplyr::mutate(popsum = 0)
+
+write.csv(mar, "globalprep/mar_prs_population/v2024/output/mar_pop_25mi_gf.csv", row.names = FALSE)
+
+```
+
+## Data Checks and/or Meta-Analysis
+
+### Create `UN_population.csv` for Data-checking
+
+```{r create un_population.csv, eval=FALSE}
+
+pop_gather <- pop %>%
+  tidyr::gather("year", "population", starts_with("X")) %>%
+  dplyr::mutate(population = gsub(" ", "", population)) %>%
+  dplyr::mutate(year = gsub("X", "", year)) %>%
+  dplyr::mutate(population = as.numeric(as.character(population)) * 1000)
+
+## Ignore Jersey and Guernsey (Channel Islands) for now
+pop_gather_rename <- pop_gather %>%
+  dplyr::mutate(country = ifelse(str_detect(country,"C\\Ste d'Ivoire"), "Cote d'Ivoire", country)) %>%
+  dplyr::mutate(country = ifelse(str_detect(country,"R\\Sunion"), "Reunion", country)) %>%
+  dplyr::mutate(country = ifelse(str_detect(country,"Cura\\Sao"), "Curacao", country)) %>%
+  dplyr::mutate(country = ifelse(country=="China, Taiwan Province of China", "Taiwan", country)) %>%
+  dplyr::mutate(country = ifelse(country=="Dem. People's Republic of Korea", "North Korea", country))
+  
+## Organize the data into regions used in OHI, and save
+pop_rgn <- name_2_rgn(df_in = pop_gather_rename, 
+                      fld_name='country', 
+                      flds_unique=c('year'))
+
+pop_rgn <- pop_rgn %>%
+  dplyr::group_by(rgn_id, year) %>%
+  dplyr::summarize(population = sum(population)) %>%
+  data.frame()
+
+write.csv(pop_rgn, "globalprep/mar_prs_population/v2024/output/UN_population.csv", row.names = FALSE)
+ohi_rgns <- ohicore::rgn_master
+```
+
+### Compare `UN_population` with Calculated Count
+
+```{r check full calculated population against latest UN population data, eval=FALSE}
+
+compare_yr <- 2020 # doing below functions for comparison between raster and UN population data for 2015
+
+## Sum counts regionally for the scenario year
+pop_rast <- terra::rast(file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, compare_yr)))
+names(pop_rast) = c("pop_2020")
+
+zones <- terra::rast(file.path(dir_M, "git-annex/globalprep/spatial/v2024/eez_25mi_inland_wgs1984.tif")) # pulling from 2024 server data
+names(zones) = c("zone")
+zones <- terra::as.factor(zones)
+
+pop_counts <- terra::zonal(pop_rast, zones, fun = "sum", na.rm = TRUE)
+
+pop_UN <- pop_rgn %>%
+  dplyr::filter(year == compare_yr) %>%
+  dplyr::select(rgn_id, pop_UN = population)
+
+## Join filtered UN population and summed calculated counts
+compare_pop <- data.frame(pop_counts) %>%
+  dplyr::rename(sum = gpw_v4_population_count_adjusted_to_2015_unwpp_country_totals_rev11_2020_30_sec) %>% 
+  dplyr::select(rgn_id = zone, pop_rast = sum) %>%
+  dplyr::mutate(rgn_id = as.numeric(rgn_id)) %>%
+  dplyr::left_join(pop_UN, by="rgn_id") %>% 
+  filter(!is.na(pop_UN))
+
+options(scipen = 999)
+compare_pop$diff <- compare_pop$pop_rast - compare_pop$pop_UN
+
+## Comparing to the population data that came from ArcGIS Pro! This would only work for the compare year 2020 because the Arc data came from that year. So commenting it out
+
+# fp_gis <- file.path(dir_M, "git-annex/globalprep/mar_prs_population/v2024/coastal_pop/WGS_1984_OHI_Coastal_Population_Estimates_TableToExcel.xlsx")
+# 
+# gis_pop <- readxl::read_xlsx(fp_gis, col_names = TRUE) %>% 
+#   dplyr::select(-c(OBJECTID, COUNT, AREA)) %>% 
+#   dplyr::rename(rgn_id = Value)
+# 
+# compare_pop <- compare_pop %>% 
+#   dplyr::left_join(gis_pop, by = "rgn_id")
+# 
+# # Difference between gis data population estimates versus UN population estimates
+# options(scipen = 999)
+# compare_pop$gis_diff <- compare_pop$pop_rast - compare_pop$SUM
+
+
+## Check plot - investigate outliers (post to issue first)
+pop_compare_plot <- ggplot(compare_pop) +
+  geom_point(aes(pop_rast, pop_UN, label = rgn_id), alpha = .6) +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(x = sprintf('Calculated Population %s', compare_yr),
+       y = sprintf('UN Population %s', compare_yr),
+       title = 'Population Comparison')
+ggplotly(pop_compare_plot)
+
+## Plot log values of same comparison
+pop_compare_log <- ggplot(compare_pop) +
+  geom_point(aes(log(pop_rast), log(pop_UN), label = rgn_id), alpha = .6) +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(x = sprintf('Log of Calculated Population %s', compare_yr),
+       y = sprintf('Log of UN Population %s', compare_yr),
+       title = 'Population Comparison (log values)')
+ggplotly(pop_compare_log)
+
+```
+
+### Compare to Previous Year
+
+```{r comparison, eval=FALSE}
+
+prev_scen_yr <- paste0("v", as.numeric(substr(scenario_yr, 2, 5)) -3)
+
+old <-  read_csv(here('globalprep/mar_prs_population/v2019/output/mar_pop_25mi.csv')) %>% 
+  dplyr::select(rgn_id, year, popsum_old=popsum)
+
+tmp <- coastal_pop_nona %>%
+  dplyr::left_join(old, by=c("rgn_id", "year"))
+
+years_compare_plot <- ggplot(tmp) +
+  geom_point(aes(log(popsum), log(popsum_old), label = rgn_id), alpha = .6) +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(x = sprintf('Log of Calculated Population %s', scenario_yr),
+       y = sprintf('Log of Calculated Population %s', prev_scen_yr),
+       title = 'Population comparison between assessments')
+ggplotly(years_compare_plot)
+
+```
+
+```{r check_areas, eval=FALSE}
+
+## Compare area with that calculated in previous year (should look very similar)
+
+# v2018: old_area <- read.csv(paste0(prev_scen_yr, "/rgn_area_inland25mi.csv")) %>%
+old_area <- read_csv(here('globalprep/mar_prs_population/v2019/int/area_km2_25mi.csv')) %>%
+  rename(old_area_km2 = area_km2) %>%
+  dplyr::mutate(old_area_km2 = round(old_area_km2)) %>%
+  dplyr::left_join(area, by = "rgn_id")
+
+area_compare_plot <- ggplot(old_area) +
+  geom_point(aes(area_km2, old_area_km2, label = rgn_id), alpha = .6) +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(x = sprintf('%s Area (km2)', scenario_yr),
+       y = sprintf('%s Area (km2)', prev_scen_yr),
+       title = 'Area Calculation Comparison')
+ggplotly(area_compare_plot)
+
+
+summary(old_area)
+
+```
+
+## Manual option for creating interpolated files (See note)
+
+* NOTE: Creating these files and storing them in R will max out the tmp directory storage (limit 40GB) if other large objects are also loaded. It is highly recommended to use the yearly_interpolate_terra function but if that doesn't work then use this method but DONT run it all at once. Run one, check it to make sure it makes sense by runnning the following 
+  
+  * global(raster_2001, "sum", na.rm=TRUE)
+  
+  * Then write it out using writeRaster, and remove it from the environment using rm(object_name) before moving to the next one 
+  
+  * You will need each raw raster (2000, 2005, 2010, 2015) and each yearly change raster for each of the in-between years over a five-year increment, so just remove the "in-between year" rasters after they're written out  
+
+```{r}
+## Pulling from "files"
+
+# raster_2000 <- terra::rast(files[grep(sprintf("count_%s_mol", 2000), files)])
+# 
+# yr=2000
+# 
+# names(raster_2000) = c("pop_2000")
+# 
+# # terra::writeRaster(raster_2000, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# change_1 <- terra::rast(files[grep(sprintf("change_%s_to_%s", 2000, 2005), files)])
+# 
+# i=1
+# yr = 2000+i
+# raster_2001 <- raster_2000 + (i * change_1)
+# 
+# names(raster_2001) = c("pop_2001")
+# 
+# terra::writeRaster(raster_2001, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=2
+# yr=2000+i
+# raster_2002 <- raster_2000 + (i*change_1)
+# 
+# names(raster_2002) = c("pop_2002")
+# 
+# terra::writeRaster(raster_2002, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=3
+# yr=2000+i
+# 
+# raster_2003 <- raster_2000 + (i*change_1)
+# 
+# names(raster_2003) = c("pop_2003")
+# 
+# terra::writeRaster(raster_2003, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=4
+# yr=2000+i
+# 
+# raster_2004 <- raster_2000 + (i*change_1)
+# 
+# names(raster_2004) = c("pop_2004")
+# 
+# terra::writeRaster(raster_2004, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# raster_2005 <- terra::rast(files[grep(sprintf("count_%s_mol", 2005), files)])
+# 
+# change_2 <- terra::rast(files[grep(sprintf("change_%s_to_%s", 2005, 2010), files)])
+# 
+# i=1
+# yr=2005+i
+# 
+# raster_2006 <- raster_2005 + (i*change_2)
+# 
+# names(raster_2006) = c("pop_2006")
+# 
+# terra::writeRaster(raster_2006, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=2
+# yr=2005+i
+# 
+# raster_2007 <- raster_2005 + (i*change_2)
+# 
+# names(raster_2007) = c("pop_2007")
+# 
+# terra::writeRaster(raster_2007, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=3
+# yr=2005+i
+# 
+# raster_2008 <- raster_2005 + (i*change_2)
+# 
+# names(raster_2008) = c("pop_2008")
+# 
+# terra::writeRaster(raster_2008, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=4
+# yr=2005+i
+# 
+# raster_2009 <- raster_2005 + (i*change_2)
+# 
+# names(raster_2009) = c("pop_2009")
+# 
+# terra::writeRaster(raster_2009, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# raster_2010 <- terra::rast(files[grep(sprintf("count_%s_mol", 2010), files)])
+# 
+# change_3 <- terra::rast(files[grep(sprintf("change_%s_to_%s", 2010, 2015), files)])
+# 
+# i=1
+# yr=2010+i
+# 
+# raster_2011 <- raster_2010 + (i*change_3)
+# 
+# names(raster_2011) = c("pop_2011")
+# 
+# terra::writeRaster(raster_2011, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=2
+# yr=2010+i
+# 
+# raster_2012 <- raster_2010 + (i*change_3)
+# 
+# names(raster_2012) = c("pop_2012")
+# 
+# terra::writeRaster(raster_2012, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=3
+# yr=2010+i
+# 
+# raster_2013 <- raster_2010 + (i*change_3)
+# 
+# names(raster_2013) = c("pop_2013")
+# 
+# terra::writeRaster(raster_2013, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=4
+# yr=2010+i
+# 
+# raster_2014 <- raster_2010 + (i*change_3)
+# 
+# names(raster_2014) = c("pop_2014")
+# 
+# terra::writeRaster(raster_2014, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# raster_2015 <- terra::rast(files[grep(sprintf("count_%s_mol", 2015), files)])
+# 
+# change_4 <- terra::rast(files[grep(sprintf("change_%s_to_%s", 2015, 2020), files)])
+# 
+# i=1
+# yr=2015+i
+# 
+# raster_2016 <- raster_2015 + (i*change_4)
+# 
+# names(raster_2016) = c("pop_2016")
+# 
+# terra::writeRaster(raster_2016, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=2
+# yr=2015+i
+# 
+# raster_2017 <- raster_2015 + (i*change_4)
+# 
+# names(raster_2017) = c("pop_2017")
+# 
+# terra::writeRaster(raster_2017, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=3
+# yr=2015+i
+# 
+# raster_2018 <- raster_2015 + (i*change_4)
+# 
+# names(raster_2018) = c("pop_2018")
+# 
+# terra::writeRaster(raster_2018, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# i=4
+# yr=2015+i
+# 
+# raster_2019 <- raster_2015 + (i*change_4)
+# 
+# names(raster_2019) = c("pop_2019")
+# 
+# terra::writeRaster(raster_2019, filename = file.path(dir_M, sprintf("git-annex/globalprep/mar_prs_population/%s/int/human_count_%s_mol.tif", scenario_yr, yr)), overwrite = TRUE)
+# 
+# raster_2020 <- terra::rast(files[grep(sprintf("count_%s_mol", 2020), files)])
+```
+
+

@@ -1,0 +1,796 @@
+---
+title: "OHI 2024: Food Provision/Fisheries, Preparing RAM B/Bmsy data"
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Summary
+
+This script prepares the RAM B/Bmsy data:
+1. Relevant data are collected from the RAM database
+2. Missing years are gapfilled when appropriate
+3. RAM and SAUP species names are harmonized in a few cases
+4. RAM stocks are associated with the corresponding OHI and FAO regions
+
+
+## Updates from previous assessment
+
+- Updated RAM data for v2024
+
+
+***
+
+# Data
+## B/Bmsy values from stock assessments 
+
+Reference: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.65
+
+* Downloaded: 08/07/2024
+* Description: B/Bmsy value by stock and year (other data, which we do not use, are also available in the database)
+* Native data resolution: stock (fish stock, species and region specific)
+* Time range: 1800 - 2023 (we only use the year which matches our fisheries catch data (2019 for v2024))*
+* Format: R data files (.rds)
+* DOI: http://doi.org/10.5281/zenodo.4824192
+
+
+## Stock range data 
+Reference: Christopher M. Free. 2017. Mapping fish stock boundaries for the original Ram Myers stock-recruit database. https://marine.rutgers.edu/~cfree/mapping-fish-stock-boundaries-for-the-original-ram-myers-stock-recruit-database/. downloaded 9/25/2017.
+
+* Downloaded: 08/20/2018
+* Description: Shapefiles for each stock describing their distribution
+* Native data resolution: Spatial shapefiles
+* Format: Shapefiles
+
+***
+
+## Setup
+
+``` {r setup, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'figs/',message = FALSE, warning = FALSE, echo = TRUE, eval=FALSE)
+```
+
+```{r, eval = FALSE}
+## Libraries
+library(dplyr)
+library(tidyr)
+library(readr)
+library(sf)
+library(ggplot2)
+library(here) 
+library(zoo)
+library(patchwork)
+
+# ---- sources! ----
+source(here("workflow", "R", "common.R")) # file creates objects to process data
+
+# ---- set year and file path info ----
+current_year <- 2024 # Update this in the future!!
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+
+# ---- data directories ----
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# RAM raw data directory
+RAM_dir <- here(raw_data_dir, "RAM", data_dir_version_year)
+
+# intermediate directory
+int_dir <- here("globalprep", "fis", version_year, "int")
+```
+
+## Obtain RAM B/Bmsy data
+
+The data is stored as a relational database in an R object. Check that the names of each element have not changed from last year! Update as appropriate in the below list. 
+
+The following tables are included (for full list, see loadDBdata.r in mazu):  
+
+1. timeseries # checked v2024
+The time series data is a data frame containing all assessments conducted per stock with the following headers/columns:  
+(1) assessid (2) stockid (3) stocklong (4) tsid (5) tsyear (6) tsvalue
+
+2. bioparams  # checked v2024
+The time series data is a data frame with parameter values for all stocks and assessments. It has the following headers/columns:  
+(1) assessid (2) stockid (3) stocklong (4) bioid (5) biovalue (6) bioyear (7) bionotes  
+
+3.  timeseries_values_views # checked v2024
+This stores the timeseries values, using the most recent assessment available, with timeseries type. The dataframe contains the following headers/columns: stockid, stocklong, year, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpref, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmgt, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+
+4. timeseries_units_views  # checked v2024
+This stores the timeseries units (or time series source for touse time series), with timeseries type. The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows
+
+5. timeseries_id_views # checked v2024
+This stores the timeseries ids with timeseries id along the columns. The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpref, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmgt, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+
+6. bioparams_values_views  # checked v2024
+This stores the bioparams values, with bioparam type along the columns
+(stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+
+7. bioparams_units_views  # checked v2024
+This stores the bioparams units, with bioparam type along the columns (stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+
+8. bioparams_ids_views  # checked v2024
+This stores the bioparams ids, with bioparam id along the columns
+(TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+
+9. metadata  # checked v2024
+This stores assorted metadata associated with the stock, with datatypes along the columns
+(assessid, stockid, stocklong, assessyear, scientificname, commonname, areaname, managementauthority, assessorfull, region, FisheryType, taxGroup, primary_FAOarea, primary_country) and stock by row.
+
+10. tsmetrics # checked v2024
+Contains metadata, with columns tscategory, tsshort, tslong, tsunitsshort, tsunitslong, tsunique.
+
+11. timeseries_assessments_views # checked v2024
+The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+
+12. timeseries_years_views # checked v2024
+The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+
+13. timeseries_notes_views # checked v2024
+The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+
+14. timeseries_sources_views # checked v2024
+The dataframe contains the following headers/columns: stockid, stocklong, TBbest, TCbest, ERbest, BdivBmsypref, UdivUmsypref, BdivBmgtpret, UdivUmgtpref, TB, SSB, TN, R, TC, TL, RecC, F, ER, TBdivTBmsy, SSBdivSSBmsy, NdivNmsy, FdivFmsy, ERdivERmsy, CdivMSY, CdivMEANC, TBdivTBmgt, SSBdivSSBmgt, NdivNmsy, survBdivsurvBmgt, FdivFmgt, ERdivERmgt, Cpair, TAC, Cadvised, survB, CPUE, EFFORT, and stocks along the rows.
+
+15. bioparams_assessments_views  # checked v2024
+This stores the columns
+(stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+
+15. bioparams_years_views  # checked v2024
+This stores the columns
+(stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+
+15. bioparams_notes_views  # checked v2024
+This stores the columns
+(stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+
+15. bioparams_sources_views  # checked v2024
+This stores the columns
+(stockid, stocklong, TBmsybest, ERmsybest, MSYbest, TBmgtbest, ERmgtbest, TBmsy, SSBmsy, Nmsy, MSY, Fmsy, ERmsy, TBmgt, SSBmgt, Fmgt, ERmgt, TB0, SSB0, M, TBlim, SSBlim, Flim, ERlim) and stocks along the rows.
+
+
+For this data prep we primarily use and consult `timeseries_values_views`, `tsmetrics`, and `metadata`
+```{r load_data, eval = FALSE}
+# Manually download a new database from http://ramlegacy.org/ if applicable
+load(here::here(RAM_dir, "RAMLDB v4.65/R Data/DBdata[asmt][v4.65].RData")) # update if downloading a new database
+
+ram_bmsy_new <- timeseries_values_views %>%
+  dplyr::select(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SSBdivSSBmgt) %>%
+  mutate(ram_bmsy = 
+           ifelse(!is.na(TBdivTBmsy), TBdivTBmsy, SSBdivSSBmsy)) %>%
+  mutate(ram_bmsy =
+           ifelse(is.na(TBdivTBmsy) & is.na(SSBdivSSBmsy), TBdivTBmgt, ram_bmsy)) %>%
+  mutate(ram_bmsy = 
+           ifelse(is.na(TBdivTBmsy) & is.na(SSBdivSSBmsy) & is.na(TBdivTBmgt), SSBdivSSBmgt, ram_bmsy)) %>%
+  dplyr::filter(year > 1979) %>%
+  filter(!is.na(ram_bmsy)) %>%
+  dplyr::select(stockid, stocklong, year, ram_bmsy)
+
+test <- ram_bmsy_new %>%
+  filter(year >=2001, year <=2019) %>%
+  group_by(stockid) %>%
+  mutate(max_year = max(year)) %>%
+  ungroup() %>%
+  distinct(stockid, max_year) %>%
+  group_by(max_year) %>%
+  summarise(n()) %>% 
+  rename(num_max_yrs = c("n()"))
+
+# histogram of all years and how many stocks have their latest year of data in that year
+hist(test$num_max_yrs,breaks=18)
+hist(test$max_year,breaks=18)
+
+sum(test$num_max_yrs) # 474 total stocks
+
+plot(test) # 203 stocks have data until 2019, but that is out of 474 stocks (lots need to be gapfilled)
+```
+
+## Gapfill RAM data when there are missing years
+
+For each stock: 
+ - If you are upfilling you carry over the most recent years value (i.e. data only goes to 2016, you upfill 2017, 2018, and 2019 with the 2016 value)
+ - If you are back filling, you backfill using the value of the oldest most recent year (i.e. you only have values for 2016, 2017, 2018, 2019... you give 2005-2015 the 2016 value)
+ - If you are in-between-filling, you use linear approximation (zoo::na.approx) (i.e. you have 2005-2010 and 2016-2019... fill in 2011-2015 using na.approx)
+ - To be included in this carry-over type gapfilling you have to have a maximum year of 2010 or greater (regardless of the number of years of data... so if you only have 1 year of data, for 2010, then that gets carried over all the way to 2019, or vice-versa)
+
+
+```{r gapfill, eval = FALSE}
+## gap fill ram_bmsy
+## based on this it seems reasonable to gap-fill missing values
+
+ram_gf_check <- ram_bmsy_new %>%
+  filter(year >= 2001) %>%
+  spread(year, ram_bmsy) 
+
+# identify stocks for gapfilling (those with 5 or more years of data since 2005).
+# NOTE: we potentially gapfill to 2001, but we want stocks with adequate *recent* data 
+ram_bmsy_gf <- ram_bmsy_new %>%
+  filter(year >= 2001 & year <= 2019) %>%   # v2024: 2019 corresponds to the final year of SAUP catch data
+  group_by(stockid) %>%
+  mutate(max_year = max(year)) %>%
+  mutate(years_data_2005_now = length(ram_bmsy[year >= 2005])) %>%
+  mutate(years_data_2001_now = length(ram_bmsy[year >= 2001])) %>%
+  ungroup() %>%
+  filter(max_year >= 2010) %>%
+  group_by(stockid) %>%
+  mutate(diff_years = year - lag(year)) %>%
+  mutate(diff_years = ifelse(is.na(diff_years), 0, diff_years))
+# filter(years_data_2005_now >= 5)
+
+# stocks with gaps in between years
+in_between_stocks <- ram_bmsy_gf %>%
+  filter(diff_years >1)
+
+# which stocks have gaps in between years
+in_between_stocks_id <- unique(in_between_stocks$stockid) # v2024: [1] "SDOGATLC" "WPOLLWBS"
+
+# remove diff_years for gapfilling
+ram_bmsy_gf_2 <- ram_bmsy_gf %>%
+  dplyr::select(-diff_years)
+
+
+## Get rows for stocks/years with no B/Bmsy (identified as NA B/Bmsy value for now)
+ram_bmsy_gf_3 <- ram_bmsy_gf_2 %>%
+  spread(year, ram_bmsy) %>% 
+  gather("year", "ram_bmsy", -stockid, -years_data_2005_now, -years_data_2001_now, -stocklong, -max_year) %>%
+  mutate(year = as.numeric(year)) %>%
+  dplyr::select(-years_data_2005_now, -years_data_2001_now)
+
+# remove stocks with in between years
+ram_bmsy_gf_4 <- ram_bmsy_gf_3 %>%
+  filter(!(stockid %in% c(in_between_stocks_id)))
+
+# for those that don't have gaps in between years, gapfill by drawing the recent values up or down
+ram_bmsy_gf_updown <- ram_bmsy_gf_4 %>%
+  mutate(ram_bmsy_gf = ram_bmsy) %>%
+  group_by(stockid) %>%
+  fill(ram_bmsy_gf, .direction = "downup") %>%
+  mutate(gapfilled = ifelse(!is.na(ram_bmsy), "none", "down/upfilling")) 
+
+# df of stocks that have gaps in between years
+ram_bmsy_gf_in_between <- ram_bmsy_gf_3 %>%
+  filter(stockid %in% c(in_between_stocks_id)) %>%
+  group_by(stockid) %>%
+  arrange(stockid, year)
+
+  
+## split and do this 3 times for each stock in a for loop 
+stocks <- unique(ram_bmsy_gf_in_between$stockid) # v2024: [1] "SDOGATLC" "WPOLLWBS" 
+
+ram_bmsy_gf_interpolate <- data.frame(stockid = NA, stocklong = NA, max_year = NA, year = NA, ram_bmsy = NA, ram_bmsy_gf = NA, gapfilled = NA)
+
+for(stock in stocks){
+  
+  # stock = stocks[1]
+  
+  filter_stock <- ram_bmsy_gf_in_between %>%
+    filter(stockid == stock)
+  
+  interpolate <- tibble(filter_stock, ram_bmsy_gf = na.approx(filter_stock$ram_bmsy, rule = 2), gapfilled = "linear interpolation")
+  
+  ram_bmsy_gf_interpolate <- rbind(ram_bmsy_gf_interpolate, interpolate)
+  
+}
+
+## now fix the gapfilled column for the linear interpolation observations.. some of them need to be flagged as "upfilled" 
+ram_bmsy_gf_interpolate_2 <- ram_bmsy_gf_interpolate %>%
+  filter(!is.na(stockid)) %>%
+  mutate(gapfilled = case_when(
+    stockid == "SDOGATLC" & year %in% c(2019) ~ "down/upfilling",
+    TRUE ~ gapfilled
+  )) %>%
+  mutate(gapfilled = ifelse(!is.na(ram_bmsy), "none", gapfilled))
+
+# bind the different dataframes from diff gapfilling methods
+ram_bmsy_gf_final <- rbind(ram_bmsy_gf_interpolate_2, ram_bmsy_gf_updown)
+
+# check that everything has been taken care of
+unique(is.na(ram_bmsy_gf_final$ram_bmsy_gf)) # v2024: FALSE
+
+
+## see unique values of stocks
+tmp <- ram_bmsy_gf_final %>%
+  dplyr::select(stockid, gapfilled) %>%
+  unique()
+
+
+## check out gapfilling stats
+table(tmp$gapfilled) # only 2 stocks use linear interpolation for some years. 231 are down/upfilled. 431 stocks are not gapfilled at all! 
+
+sum(table(tmp$gapfilled))  
+# 664 stocks have at least one year of bbmsy values after 2010
+
+
+summary(ram_bmsy_gf_final)# should be no NAs
+sum(ram_bmsy_gf_final$ram_bmsy_gf < 0 )  # should be 0 
+min(ram_bmsy_gf_final$ram_bmsy_gf, na.rm = TRUE) # v2024: 0.002531646
+
+## gapfilling record keeping
+ram_bmsy_gf_final_fin <- ram_bmsy_gf_final %>%
+  mutate(method = gapfilled) %>%
+  mutate(gapfilled = ifelse(method == "none", "0", "1")) %>%
+  dplyr::select(stockid, year, ram_bmsy = ram_bmsy_gf, gapfilled, method) 
+
+# v2023
+# write.csv(ram_bmsy_gf_final_fin, "int/ram_stock_bmsy_gf.csv", row.names=FALSE)
+
+# v2024
+## directory for intermediate outputs
+int_dir <- here::here("globalprep","fis", version_year, "int")
+
+write_csv(ram_bmsy_gf_final_fin, here(int_dir, "ram_stock_bmsy_gf.csv"))
+```
+
+Get a general idea of how well the model predicts missing data based on observed and model predicted values.  This model appears to do fairly well. 
+
+```{r gf error est, eval=FALSE}
+mod <- lm(ram_bmsy ~ ram_bmsy_gf, data=ram_bmsy_gf_final)
+summary(mod)
+
+# Call:
+# lm(formula = ram_bmsy ~ ram_bmsy_gf, data = ram_bmsy_gf_final)
+# 
+# Residuals:
+#                  Min                   1Q               Median                   3Q                  Max 
+# -0.00000000000012957 -0.00000000000000081 -0.00000000000000037  0.00000000000000004  0.00000000000240348 
+# 
+# Coefficients:
+#                            Estimate              Std. Error                t value             Pr(>|t|)    
+# (Intercept) 0.000000000000002819139 0.000000000000000376042                  7.497   0.0000000000000741 ***
+# ram_bmsy_gf 0.999999999999999777955 0.000000000000000003205 312050693973460224.000 < 0.0000000000000002 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 0.00000000000003019 on 6503 degrees of freedom
+#   (1646 observations deleted due to missingness)
+# Multiple R-squared:      1,	Adjusted R-squared:      1 
+# F-statistic: 9.738e+34 on 1 and 6503 DF,  p-value: < 0.00000000000000022
+
+
+# v2023
+# Call:
+# lm(formula = ram_bmsy ~ ram_bmsy_gf, data = ram_bmsy_gf_final)
+# 
+# Residuals:
+#        Min         1Q     Median         3Q 
+# -1.417e-15 -1.860e-17 -1.000e-18  1.460e-17 
+#        Max 
+#  1.150e-14 
+# 
+# Coefficients:
+#              Estimate Std. Error   t value
+# (Intercept) 1.634e-16  2.446e-18 6.679e+01
+# ram_bmsy_gf 1.000e+00  1.353e-18 7.391e+17
+#             Pr(>|t|)    
+# (Intercept)   <2e-16 ***
+# ram_bmsy_gf   <2e-16 ***
+# ---
+# Signif. codes:  
+# 0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 1.447e-16 on 7566 degrees of freedom
+#   (1001 observations deleted due to missingness)
+# Multiple R-squared:      1,	Adjusted R-squared:      1 
+# F-statistic: 5.462e+35 on 1 and 7566 DF,  p-value: < 2.2e-16
+# 
+# Warning message:
+# In summary.lm(mod) : essentially perfect fit: summary may be unreliable
+
+# v2024
+# Call:
+# lm(formula = ram_bmsy ~ ram_bmsy_gf, data = ram_bmsy_gf_final)
+# 
+# Residuals:
+#        Min         1Q     Median         3Q        Max 
+# -8.881e-16 -1.710e-17 -4.000e-19  1.570e-17  5.538e-15 
+# 
+# Coefficients:
+#               Estimate Std. Error    t value Pr(>|t|)    
+# (Intercept) -3.331e-16  1.475e-18 -2.258e+02   <2e-16 ***
+# ram_bmsy_gf  1.000e+00  8.618e-19  1.160e+18   <2e-16 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 8.141e-17 on 7277 degrees of freedom
+#   (910 observations deleted due to missingness)
+# Multiple R-squared:      1,	Adjusted R-squared:      1 
+# F-statistic: 1.346e+36 on 1 and 7277 DF,  p-value: < 2.2e-16
+# 
+# Warning message:
+# In summary.lm(mod) : essentially perfect fit: summary may be unreliable
+```
+
+
+## Identify FAO and OHI regions for RAM stocks
+
+Identify the FAO/OHI regions where each RAM stock is located (fao and ohi regions are assigned to RAM Data in [STEP4b_fao_ohi_rgns.Rmd](https://mazu.nceas.ucsb.edu/rstudio/files/github/ohiprep_v2023/globalprep/fis/v2023/STEP4b_fao_ohi_rgns.html). **Run STEP4b_fao_ohi_rgns.Rmd now.**
+
+
+If there are many differences between RAM spatial file and RAM metadata, check the STEP4_fao_ohi_rgns.Rmd prep again. 
+
+
+```{r final, eval = FALSE}
+## Read in RAM spatial stocks file
+ram_spatial <- read_csv(here(int_dir, "RAM_fao_ohi_rgns_final.csv"))
+
+ram_meta <- metadata %>% 
+  dplyr::select(stockid, stocklong, scientificname)
+
+setdiff(ram_spatial$stockid, ram_meta$stockid) # make sure all the spatial data has corresponding metadata (should be 0). It is not 0, probably because these are ones that have been removed from the RAM database since the 2017 assessment... delete these from the data frame below. 
+
+# v2024: 
+#  [1] "HERR2529-33"   "HERR2529-34"   "HERR2529-35"  
+#  [4] "HERR2529-36"   "HERR2529-37"   "HERR30-32"    
+#  [7] "SOLEIIIa-2225" "SOLEIIIa-2226" "SOLEIIIa-2227"
+# [10] "SOLEIIIa-2228"
+
+# join with metadata to get scientific name
+ram_spatial_meta <- ram_spatial %>%
+  dplyr::select(-stocklong) %>%
+  left_join(ram_meta, by = c("stockid")) %>%
+  rename(RAM_species = scientificname) %>%
+  filter(!is.na(stocklong)) ## filtering out ones that didn't match above
+
+setdiff(ram_spatial_meta$stockid, ram_meta$stockid) # v2024: now it is 0, we can move on
+```
+
+## Standardize species names
+
+In most cases, the RAM and SAUP data use the same species names, but there are a few exceptions.  The following code identifies species in the RAM data that are not in the SAUP data. In these cases, different species names may be used (although not necessarily because some of the species may be present in RAM, but not SAUP, for other reasons). For these species, I used fishbase to explore synonyms and create a table to harmonize the RAM species names with the SAUP species names (saved as: int/RAM_species_to_SAUP.csv).
+
+```{r name harmonize, eval = FALSE}
+ram_bmsy_gf_final <- read_csv(here(int_dir, "ram_stock_bmsy_gf.csv"))
+
+# get list of RAM species, scientific name
+ram_sp <- ram_bmsy_gf_final %>%
+  left_join(data.frame(metadata), by = "stockid") %>%
+  dplyr::select(scientificname) %>%
+  unique() %>%
+  arrange(scientificname)
+
+# SAUP species, sci name (read in the datatable that includes TaxonKey)
+SAUP_sp <- read_csv(here(dir_M,"git-annex","globalprep","fis","v2022","int","stock_catch_by_rgn_taxa.csv")) %>% # use most recent one available
+  dplyr::rename(SAUP_scientificname = TaxonName) %>%
+  dplyr::select(SAUP_scientificname) %>%
+  unique() %>%
+  arrange(SAUP_scientificname)
+
+
+# compare names - what's in RAM that's not in SAUP
+tmp <- data.frame(scientificname = sort(setdiff(ram_sp$scientificname, SAUP_sp$SAUP_scientificname))) # 40 species names
+
+# compare names - what's in SAUP that's not in RAM
+tmp2 <- data.frame(scientificname = sort(setdiff(SAUP_sp$SAUP_scientificname, ram_sp$scientificname))) # 2343 species names.. unfortunately a lot.
+
+write_csv(tmp, here(int_dir, "unmatched_RAM_species.csv"))
+write_csv(tmp2, here(int_dir, "SAUP_species_no_RAM.csv"))
+
+
+## join ram spatial with RAM species on scientific name. We can use this to help check whether questionable species names across the ram and SAUP data match by region and fao id...
+ram_sp_fao_ohi <- tmp %>%
+  left_join(ram_spatial_meta, by = c("scientificname" = "RAM_species")) %>%
+  unique() 
+
+write_csv(ram_sp_fao_ohi, here(int_dir, "new_ram_sp.csv"))  
+
+## get SAUP fao_ohi regions
+SAUP_sp_fao_ohi <- read_csv(here(dir_M, "git-annex","globalprep","fis","v2022","int", "stock_catch_by_rgn_taxa.csv")) %>% # use most recent one available
+  dplyr::rename(SAUP_scientificname = TaxonName) %>%
+  dplyr::filter(year > 1979) # %>%
+  # filter(str_detect(SAUP_scientificname, "Mullus"))
+
+# manually copy the below file from the previous year to the current version
+RAM_species_to_SAUP <- read_csv(here(int_dir, "RAM_species_to_SAUP.csv"))
+
+# Then I hand-looked up each of the missing ones from "unmatched_RAM_species.csv", and added those new ones to "RAM_species_to_SAUP.csv" to generate this list - most still unmatched.
+
+setdiff(tmp$scientificname, RAM_species_to_SAUP$RAM_species) ## these are the new species to add to "RAM_species_to_SAUP.csv".
+# v2024: [1] "Mullus barbatus": could not find 
+
+# v2024 adding new species (change to relevant species for current year):
+species_to_add <- data.frame(
+  RAM_species = c("Mullus barbatus"),
+  SAUP_species = c("Mullus barbatus barbatus")
+) 
+
+RAM_species_to_SAUP_updated <- rbind(RAM_species_to_SAUP, species_to_add)
+
+write_csv(RAM_species_to_SAUP_updated, here(int_dir, "RAM_species_to_SAUP.csv")
+
+ram_name_corr <- read_csv(here(int_dir, "RAM_species_to_SAUP.csv")) %>%
+   filter(!is.na(SAUP_species))  # SAUP to RAM name conversion
+
+ram_name_corr # matched species, unfortunately only 13
+```
+
+
+### Final formatting
+
+Harmonize names between RAM and SAUP data.
+```{r, eval=FALSE}
+# correct names in a few cases to match with SAUP names
+ram_name_corr <- read_csv(here(int_dir, "RAM_species_to_SAUP.csv")) %>%
+  filter(!is.na(SAUP_species)) # SAUP to RAM name conversion
+
+ram_spatial <- ram_spatial_meta %>%
+  left_join(ram_name_corr, by="RAM_species") %>%
+  dplyr::mutate(species = ifelse(!is.na(SAUP_species), SAUP_species, RAM_species)) %>%
+  dplyr::select(rgn_id, fao_id, stockid, stocklong, species, RAM_area_m2)
+
+length(unique(ram_spatial$stockid)) # v2024: 498 RAM stocks with B/Bmsy data
+length(unique(ram_spatial$species)) # v2024: 237
+```
+
+
+Re-name `stockid` column to `stockid_ram` and create new column `stockid` that matches with the `stockid` column in the CMSY data table prepared in [STEP3_calculate_bbmsy.Rmd](https://cdn.rawgit.com/OHI-Science/ohiprep_v2021/master/globalprep/fis/v2021/STEP3_calculate_bbmsy.html).
+
+```{r, eval = FALSE}
+## Combine RAM spatial data with B/Bmsy data
+ram_bmsy_gf <- read_csv(here(int_dir,"ram_stock_bmsy_gf.csv"))
+
+
+# check every stock has a location:
+setdiff(ram_bmsy_gf$stockid, ram_spatial$stockid) # should be 0: every ram stock should have ohi/fao rgn
+# v2023 and v2024: for some reason SFMAKOSATL and HERR4RFA are not in ram_spatial. SFMAKOSATL was determined to be because the fishing/OHI region, the US, is not in the FAOs of the South Atlantic, so this one is ok. HERR4RFA seemed to also show up in v2023 and v2021, so it is uncertain why this one was not in ram_spatial, and it will be manually added in. Could not find RAM_area_m2 info for it so putting NA, which is consistent with HERR4RSP.
+# stockid: HERR4RFA
+# stocklong: Herring NAFO division 4R (Fall spawners)
+# Below is copied from HERR4RSP (Spring spawner of the same fish)
+# species: Clupea harengus
+# rgn_id: 218
+# fao_id: 21
+# change the below or comment it out if not relevant for the current version year
+stock_to_add <- data.frame(
+  rgn_id = 218,
+  fao_id = 21,
+  RAM_area_m2 = NA,
+  stockid = "HERR4RFA",
+  stocklong = "Herring NAFO division 4R (Fall spawners)",
+  species = "Clupea harengus"
+  )
+
+ram_spatial <- rbind(ram_spatial, stock_to_add)
+
+# check it worked
+setdiff(ram_bmsy_gf$stockid, ram_spatial$stockid) # it worked, only SFMAKOSATL there now
+
+# check dropped stocks
+setdiff(ram_spatial$stockid, ram_bmsy_gf$stockid) # these are stocks that were dropped due to insufficient years of data
+# v2024:
+#  [1] "GEMFISHNZ"                   
+#  [2] "GEMFISHSE"                   
+#  [3] "NZLINGESE"                   
+#  [4] "NZLINGWSE"                   
+#  [5] "WAREHOUESE"                  
+#  [6] "WAREHOUWSE"                  
+#  [7] "STMARLINNEPAC"               
+#  [8] "WEAKFISHATLC"                
+#  [9] "BLACKGROUPERGMSATL"          
+# [10] "SNOSESHARATL"                
+# [11] "YEGROUPGM"                   
+# [12] "ESOLEPCOAST"                 
+# [13] "SNROCKPCOAST"                
+# [14] "GRNSTROCKPCOAST"             
+# [15] "BKCDLFENI"                   
+# [16] "BLACKOREOPR"                 
+# [17] "GSTRGZRSTA7"                 
+# [18] "SMOOTHOREOBP"                
+# [19] "SMOOTHOREOEPR"               
+# [20] "SMOOTHOREOSLD"               
+# [21] "SMOOTHOREOWECR"              
+# [22] "TARAKNZ"                     
+# [23] "BLACKOREOWECR"               
+# [24] "NZLINGLIN6b"                 
+# [25] "ATLCROAKMATLC"               
+# [26] "CUSK4X"                      
+# [27] "PORSHARATL"                  
+# [28] "ATHAL5YZ"                    
+# [29] "WINDOWGOMGB"                 
+# [30] "WINDOWSNEMATL"               
+# [31] "BNOSESHARATL"                
+# [32] "LISQUIDATLC"                 
+# [33] "BKINGCRABPI"                 
+# [34] "REYEROCKGA"                  
+# [35] "CROCKWCVANISOGQCI"           
+# [36] "BLUEROCKCAL"                 
+# [37] "CMACKPCOAST"                 
+# [38] "GOPHERSPCOAST"               
+# [39] "STFLOUNNPCOAST"              
+# [40] "STFLOUNSPCOAST"              
+# [41] "ATOOTHFISHRS"                
+# [42] "YELLGB"                      
+# [43] "ATHAL3NOPs4VWX5Zc"           
+# [44] "HAKENRTN"                    
+# [45] "MACKNEICES"                  
+# [46] "WHITNS-VIId"                 
+# [47] "HERRVIaVIIbc"                
+# [48] "CODFAPL"                     
+# [49] "HADFAPL"                     
+# [50] "POLLFAPL"                    
+# [51] "WHITVIa"                     
+# [52] "CODVIIek"                    
+# [53] "PLAICECHW"                   
+# [54] "HERRNIRS"                    
+# [55] "CODIS"                       
+# [56] "SOLEIS"                      
+# [57] "HADROCK"                     
+# [58] "COD3Ps"                      
+# [59] "BLINGVb-VI-VII"              
+# [60] "HADNS-IIIa-VIa"              
+# [61] "HMACKIIa-IVa-Vb-VIa-VII-VIII"
+# [62] "HMACKIXa"                    
+# [63] "NEPHFU14"                    
+# [64] "NEPHFU17"                    
+# [65] "NEPHFU7"                     
+# [66] "WHITVIIa"                    
+# [67] "SPURDNEATL"                  
+# [68] "REDDEEPI-II"                 
+# [69] "SARDVIIIabd"
+
+ram_data <- ram_bmsy_gf %>% 
+  left_join(ram_spatial, by = "stockid", relationship = "many-to-many") %>%
+  rename(stockid_ram = stockid) %>% 
+  dplyr::mutate(stockid = paste(species, fao_id, sep="-")) %>%
+  dplyr::mutate(stockid = gsub(" ", "_", stockid)) %>%
+  dplyr::select(rgn_id, stockid, stockid_ram, stocklong, year, RAM_area_m2, ram_bmsy, gapfilled, method) %>%
+  unique() %>% 
+  filter(!is.na(rgn_id))
+
+write_csv(ram_data, here(int_dir, "ram_bmsy.csv"))
+summary(ram_data)
+# v2024:
+ #     rgn_id         stockid         
+ # Min.   :     1   Length:77311      
+ # 1st Qu.:    98   Class :character  
+ # Median :   163   Mode  :character  
+ # Mean   :  9191                     
+ # 3rd Qu.:   218                     
+ # Max.   :288300                     
+ #                                    
+ # stockid_ram         stocklong        
+ # Length:77311       Length:77311      
+ # Class :character   Class :character  
+ # Mode  :character   Mode  :character  
+ #                                      
+ #                                      
+ #                                      
+ #                                      
+ #      year       RAM_area_m2       
+ # Min.   :2001   Min.   :0.000e+00  
+ # 1st Qu.:2005   1st Qu.:6.125e+09  
+ # Median :2010   Median :1.231e+11  
+ # Mean   :2010   Mean   :7.154e+11  
+ # 3rd Qu.:2015   3rd Qu.:4.412e+11  
+ # Max.   :2019   Max.   :3.044e+13  
+ #                NA's   :10982      
+ #    ram_bmsy           gapfilled     
+ # Min.   : 0.002532   Min.   :0.0000  
+ # 1st Qu.: 0.646000   1st Qu.:0.0000  
+ # Median : 1.020000   Median :0.0000  
+ # Mean   : 1.171864   Mean   :0.1206  
+ # 3rd Qu.: 1.580000   3rd Qu.:0.0000  
+ # Max.   :21.719476   Max.   :1.0000  
+ #                                     
+ #    method         
+ # Length:77311      
+ # Class :character  
+ # Mode  :character 
+
+## check out Katsuwonus_pelamis-51 since this is one of the stocks that was problematic with the old gapfilling methods # v2024: it is present in `ram_data`!
+
+
+ram_2023 <- read_csv(here("globalprep", "fis", "v2023","int","ram_bmsy.csv")) #%>%
+  # dplyr::mutate(stockid = substr(stockid, 1, nchar(stockid) - 3)) %>%
+  # drop_na(ram_bmsy)
+
+#ram_old_2022 <- read_csv("archive/ram_bmsy.csv") # v2023: code didn't work
+
+ram_2024 <- read_csv(here(int_dir, "ram_bmsy.csv"))
+
+check <- ram_2024 %>%
+  filter(stockid == "Katsuwonus_pelamis-51") %>%
+  arrange(rgn_id, year) 
+
+
+check_2 <- ram_2023 %>%
+  filter(stockid == "Katsuwonus_pelamis-51") %>%
+  arrange(rgn_id, year) 
+# exactly the same to v2024
+
+
+plot(check$ram_bmsy, check_2$ram_bmsy, 
+     main = "Check for Katsuwonus_pelamis-51",
+     xlab = "Current Version",
+     ylab = "Previous Version") # makes sense!
+
+
+compare <- ram_2024 %>%
+  left_join(ram_2023, by = c("rgn_id", "stockid", "stockid_ram", "stocklong", "year", "RAM_area_m2")) %>%
+  mutate(diff = ram_bmsy.x - ram_bmsy.y) %>%
+  filter(ram_bmsy.x < 2) %>%
+  filter(year %in% c(2016:2019))
+
+# v2024: points above the red line indicate an increase in B/Bmsy from 2023 to 2024, while points below indicate a decrease
+comparison_plot <- ggplot(compare, aes(x = ram_bmsy.y, y = ram_bmsy.x)) +
+  geom_point(alpha = 0.5) + 
+  geom_abline(color = "darkred", linetype = "dashed") +  # reference line
+  labs(
+    title = "RAM data B/Bmsy Values: v2023 vs v2024",
+    x = "v2023 B/Bmsy",
+    y = "v2024 B/Bmsy"
+  ) +
+  theme_minimal() +
+  coord_fixed(ratio = 1)  +
+  geom_smooth(method = "lm", se = FALSE, color = "lightblue") # the trend is downward, so it looks like overall there were more decreases in B/Bmsy in 2024 compared to 2023.
+comparison_plot
+
+# v2024: largest differences shown in a bubble plot
+largest_diffs_plot <- ggplot(compare, aes(x = ram_bmsy.y, y = ram_bmsy.x)) +
+  geom_point(aes(size = abs(diff), color = diff > 0)) +
+  scale_size_continuous(name = "|Difference|") +
+  scale_color_manual(name = "B/Bmsy", values = c("darkred", "lightgreen"), labels = c("Decreased", "Increased")) +
+  theme_minimal() +
+  labs(title = "v2023 Bmsy data vs. v2024 Bmsy data", x = "v2023 BMSY", y = "v2024 BMSY")
+largest_diffs_plot
+
+
+## v2023: added this comparison since above graph wasn't showing the full picture
+compare_drop_na_y <- compare %>%
+  drop_na(ram_bmsy.y)
+
+y_plot <- ggplot(compare, aes(x = ram_bmsy.y)) +
+  geom_histogram() +
+  xlim(0, 5) +
+  labs(x = "RAM BMSY Old Data",
+       y = "Count")
+
+x_plot <- ggplot(compare, aes(x = ram_bmsy.x)) +
+  geom_histogram() +
+  xlim(0, 5) +
+  labs(x = "RAM BMSY New Data",
+       y = "Count")
+
+x_plot + y_plot 
+```
+
+```{r}
+# v2024: added some aesthetics to graphs
+# v2023 data histogram
+y_plot <- ggplot(compare, aes(x = ram_bmsy.y)) +
+  geom_histogram(bins = 30, fill = "#69b3a2", color = "#e9ecef", alpha = 0.8) +
+  xlim(0, 5) +
+  labs(x = "RAM Bmsy (v2023)",
+       y = "Count") +
+  theme_minimal()
+
+# v2024 data histogram
+x_plot <- ggplot(compare, aes(x = ram_bmsy.x)) +
+  geom_histogram(bins = 30, fill = "#404080", color = "#e9ecef", alpha = 0.8) +
+  xlim(0, 5) +
+  labs(x = "RAM Bmsy (v2024)",
+       y = " ") +
+  theme_minimal()
+
+# use patchwork to compare the histograms of v2023 and v2024 data side by side
+combined_plot <- y_plot + x_plot +
+  plot_layout(ncol = 2) +
+  plot_annotation(
+    title = "RAM Bmsy Distributions: v2023 vs v2024"
+  )
+combined_plot # histogram distributions look pretty similar
+```
+
