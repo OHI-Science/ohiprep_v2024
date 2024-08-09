@@ -135,8 +135,28 @@ data <- mean_catch %>%
 
 
 sum(!is.na(data$ram_bmsy))/nrow(data) # about 7.32% of catch records have RAM data - v2024
-sum(data$mean_catch[!is.na(data$ram_bmsy)])/sum(data$mean_catch) # about 46.3% of tons of catch have RAM data (this is less than last year, which was 47%!) - v2024
+perc_ram <- sum(data$mean_catch[!is.na(data$ram_bmsy)])/sum(data$mean_catch) *100 # about 46.3% of tons of catch have RAM data (this is less than last year, which was 47%!) - v2024
 ```
+
+```{r}
+# to see how much data is sourced from RAM vs CMSY 
+compare_ram_cmsy <- data.frame(
+  category = c("RAM", "CMSY"),
+  percentage = c(perc_ram, 100 - perc_ram)
+)
+
+# visualize the distribution of RAM vs CMSY data used
+ggplot(compare_ram_cmsy, aes(x = category, y = percentage)) +
+  geom_bar(stat = "identity", width = 0.5) +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 100), 
+                     breaks = seq(0, 100, by = 20)) +
+  labs(title = "RAM vs CMSY Data Usage for B/Bmsy (v2024)",
+       x = "",
+       y = "Percent of total catch") +
+  theme_minimal()
+```
+
 
 Save & view duplicate stocks:
 ```{r}
@@ -293,4 +313,7 @@ comparison_plot <- ggplot(compare, aes(x = bbmsy.x, y = bbmsy.y)) +
 comparison_plot
 ```
 
+```{r}
+final_b_bmsy <- read_csv(here(output_dir, "fis_bbmsy.csv"))
+```
 
