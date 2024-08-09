@@ -25,7 +25,10 @@ This document describes the steps for preparing the pathogen pollution and patho
 The percentage of the population with access to improved sanitation facilities (World Health Organization and United Nations Children's Fund, Joint Monitoring Programme, 2011) was used in combination with measurements of coastal population as a proxy for pathogens in coastal waters. Access to improved sanitation facilities is defined as the percentage of the population in a country with at least adequate access to disposal facilities that can effectively prevent human, animal, and insect contact with excreta. These data are a country-wide average (not specific to the coastal region).
 
 # Updates from previous assessment
+# v2023?
 1. Updated data download through the SDMX REST API to programmatically access data, instead of downloading an Excel file. We are using the wash_households data flow. This resulted in small changes to the data: for example in the previous data some values for the at least basic sanitation proportion were denoted as >99, which we previously set as 99.5. The total at least basic indicator for these countries (and some others) were often not available from the API, but we were able to calculate the at least basic indicator by summing the limited, unimproved, and open defecation proportions for a given country and subtracting them from 100. The values were previously rounded to the nearest whole percentage, use of the API resulted in more precise values.The previous data set included a population column, which was not available from the API. We instead accessed the total population for each region from the WDI package (World Bank World Development Indicators). Other changes involved updating data wrangling to get the data from the API into the same format as the previous data. 
+#v2024
+1. Updated mar_prs_pop_dataprep.Rmd which is pulled into this script for coastal population estimate calculations
 
 **Consider for future assessments:** make the "Safely managed" data more complete, and reconsider whether these data would be better to use.
 
@@ -74,6 +77,7 @@ library(rsdmx)
 library(countrycode)
 library(WDI) #reinstall to access new years of population data
 
+
 source('https://raw.githubusercontent.com/OHI-Science/ohiprep_v2021/gh-pages/workflow/R/common.R')
 
 #update these each year
@@ -98,6 +102,9 @@ sanitation <- readSDMX(url) %>% as_tibble()
 
 #save to the raw data folder for reproduceability in case the data changes
 write_csv(sanitation,  here("globalprep/prs_cw_pathogen", version_year, "raw/2024_WASH.csv"))
+
+#fill in data_end in the previous chunk by checking this
+unique(sanitation$TIME_PERIOD)
 
 ```
 
@@ -258,8 +265,8 @@ summary(sani_gf)
 # 161 NAs in v2019
 # 212 NAs in v2021; makes sense, there are more years of data
 # 191 NAS in v2023
+# 188 NAs in v2024
 
-## v2024 doesnt show gaps for specific years?? but gf_counts are really low: avg is 1.02 and max is 16
 
 #list of regions that need gapfilling
 dplyr::filter(sani_gf, gf_count>0) %>% 
@@ -363,7 +370,6 @@ low_pop <- low_pop %>%
   dplyr::filter(est_population < 100 | is.na(est_population)) 
 
 
-
 #Fill in all inhabited in rgn_inhab with perfect sanitation prop
 sani_complete <- sani_georgn_gf %>% 
   dplyr::mutate(basic_sani_prop = ifelse(rgn_id %in% low_pop$rgn_id, 1, basic_sani_prop)) %>% 
@@ -429,11 +435,10 @@ First calculate coastal population density (people/km^2^) is calculated by divid
 ```{r, results="hide", message = FALSE, warning = FALSE, eval=FALSE}
 
 # Population within 25 miles of coastline - v2021; last updated in 2021
-## Population within 25 miles of coastline - v2024; last updated in 2023 data last uploaded in 2020
-population <- read_csv(here("globalprep/mar_prs_population/v2021/output/mar_pop_25mi.csv")) %>%
+## Population within 25 miles of coastline - v2024; last updated in 2024 data last uploaded in 2024
+population <- read_csv(here("globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv")) %>%
   dplyr::arrange(rgn_id, year)
-#since this file has not been updated for v2023 yet we will fill 2021 and 2022 values based on the 2020 value for each region
-##not changing this for 2024 yet cuz i am scared
+##file updated for v2024
 
 unique_regions <- unique(population$rgn_id)
 
@@ -607,6 +612,8 @@ ggplotly(ggplot(compare, aes(y = trend, x = trend_2021, labels = rgn_id)) +
 # A few regions have large variation in trend between v2021 and v2019
 # positive outliers: rgn_id 161, rgn_id 154
 # negative outliers: 48, 8 
+# A few regions have large variation in trend between v2024 and v20123
+# negative outliers: 118(-0.56), 39(-0.48)
 
 
 # Outlier investigation 
@@ -627,7 +634,9 @@ abline(0,1, col="red")
 
 ### Compare results
 
-We checked the main discrepancies and these were due to changes in source data. Fairly small changes in access can lead to fairly large changes in pressure scores, depending on the population. There are slightly higher pressure scores this year (indicated by points tending to be above the 1-1 red line) due to modifications of reference point calculations.
+2023? We checked the main discrepancies and these were due to changes in source data. Fairly small changes in access can lead to fairly large changes in pressure scores, depending on the population. There are slightly higher pressure scores this year (indicated by points tending to be above the 1-1 red line) due to modifications of reference point calculations.
+
+2024: a lot of points were below the line due to the coastal population estimate rmd being updated to higher values.
 
 ### Outlier exploration
 
@@ -644,4 +653,8 @@ unsani_prs_old_all <- read_csv(here("globalprep/prs_cw_pathogen", previous_versi
   rename(pressure_score_2019 = pressure_score) %>% 
   left_join(unsani_prs, by=c("rgn_id", "year")) %>% 
   mutate(diff = pressure_score-pressure_score_2019)
+
+summary(unsani_prs_old_all)
+#v2024 min difference is -0.4228 max is 0.0893
+
 ```
