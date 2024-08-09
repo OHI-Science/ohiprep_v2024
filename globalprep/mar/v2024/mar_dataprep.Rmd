@@ -104,11 +104,13 @@ current_year <- 2024 # update this!
 version_year <- paste0("v", current_year)
 current_mar_dir <- here::here("globalprep", "mar", version_year)
 
-## Load FAO-specific user-defined functions
-source(here::here("globalprep", "mar", version_year, "mar_fxs.R")) # functions specific to mariculture dealing with compound countries
-source(here::here("workflow", "R", "fao_fxn.R")) # old function for cleaning fao data
-#source(here::here("workflow", "R", "fao_online_portal_clean.R")) #new fao cleaning function # switched to new version in 2024
-source(here::here("workflow", "R", "fao_query_data_tidy.R")) # 2024 version of FAO data tidying function
+# ---- Load FAO-specific user-defined functions ----
+# functions specific to mariculture dealing with compound countries, updated in 2024
+source(here::here("globalprep", "mar", version_year, "mar_fxs.R")) 
+# functions for cleaning fao data
+source(here::here("workflow", "R", "fao_fxn.R")) 
+#source(here::here("workflow", "R", "fao_online_portal_clean.R")) # fao cleaning function # switched to new version in 2024
+source(here::here("workflow", "R", "fao_query_data_tidy.R")) # 2024 version of FAO data tidying function 
 source(here::here("workflow", "R", "common.R")) # directory locations, OHI essentials
 
 # general raw data directory in Mazu
@@ -138,7 +140,7 @@ current_data_folder <- paste0("d", current_year) # assessment year for file path
 previous_data_folder <- paste0("d", last_year)  # previous assessment year
 
 #update the data file name to the current last year of data 
-mar_raw <- read_csv(file.path(FAO_mariculture_dir, current_data_folder,
+mar_raw <- readr::read_csv(file.path(FAO_mariculture_dir, current_data_folder,
                           paste0("FAO_GlobalAquacultureProduction_Quantity_1950_", latest_data_year, ".csv")))
 
 head(mar_raw)
@@ -266,6 +268,7 @@ mar_name_split <- mar_value_filter %>%
   # Channel Islands: Jersey and Guernsey
   # Bonaire/S.Eustatius/Saba
   # Yugoslavia SFR: no longer a country after 1992, no values 
+  # v2024: added new formatting of "Bonaire, Sint Eustatius and Saba"
 
 # note: this function was updated in 2024 to use pivot_longer instead of gather, and the new grouped name of "Bonaire, Sint Eustatius and Saba" was accounted for
 
@@ -277,6 +280,8 @@ mar_rgn <- name_2_rgn(df_in = mar_name_split,
 # ---- Addressing duplicates, warnings ----
 # v2024 notes:
 ## deletes Yugoslavia SFR -- this is okay because after 1991 (starting in 1992), the dataset differentiates between the countries that used to make up Yugoslavia (like Croatia, Serbia and Montenegro (Serbia is landlocked and we'll need to deal with the duplicates from this group), Bosnia and Herzegovina, Slovenia) starting in 1992.
+
+# initially deleted bonaire sint eustatius and saba, but once the mar_split() function in mar_fxs.R was updated (and re-sourced), this problem was resolved.
 
 ## Serbia and Montenegro: separate data for Montenegro beginning in 2006; Serbia is landlocked, so these values only apply to Montenegro (data is from FAO major fishing area classifications: Mediterranean and Black Sea)
 
@@ -317,25 +322,25 @@ For example: Production of blue shrimp in Maine starts in 1983 -- don't include 
 Checked to make sure that there weren't instances in which it made more sense to carry the previous year's data forward as a method of gapfilling. This didn't seem to be the case.
 
 
-```{r test-yrs}
-# v2024 method 
-tic()
-
-# update dataframe -- fill out "years" column for all countries -- fill with NAs if no data for value
-# mar_rgn_agg with years (yrs) filled
-mar_rgn_yrs <- mar_rgn_agg %>% 
-  dplyr::mutate(year = as.numeric(year),
-         rgn_id = as.character(rgn_id)) %>% 
-  dplyr::group_by(rgn_id, rgn_name, species, family, Taxon_code, fao, environment) %>% 
-  tidyr::complete(
-    year = min(mar_rgn_agg$year):max(mar_rgn_agg$year),
-    fill = list(value = NA)) %>% 
-  dplyr::mutate(rgn_id = as.numeric(rgn_id)) %>% 
-  dplyr::arrange(rgn_id, species, year, Taxon_code, family, fao, environment) %>% 
-  dplyr::ungroup()
-
-toc()
-# this may take a minute to run # 25.81 s
+```{r test-yrs, eval=FALSE}
+# # v2024 method [scrapped]
+# tic()
+# 
+# # update dataframe -- fill out "years" column for all countries -- fill with NAs if no data for value
+# # mar_rgn_agg with years (yrs) filled
+# mar_rgn_yrs <- mar_rgn_agg %>% 
+#   dplyr::mutate(year = as.numeric(year),
+#          rgn_id = as.character(rgn_id)) %>% 
+#   dplyr::group_by(rgn_id, rgn_name, species, family, Taxon_code, fao, environment) %>% 
+#   tidyr::complete(
+#     year = min(mar_rgn_agg$year):max(mar_rgn_agg$year),
+#     fill = list(value = NA)) %>% 
+#   dplyr::mutate(rgn_id = as.numeric(rgn_id)) %>% 
+#   dplyr::arrange(rgn_id, species, year, Taxon_code, family, fao, environment) %>% 
+#   dplyr::ungroup()
+# 
+# toc()
+# # this may take a minute to run # 25.81 s
 ```
 
 
@@ -348,7 +353,7 @@ mar_rgn_spread <- tidyr::pivot_wider(mar_rgn_agg,
 dim(mar_rgn_spread)
 
 # Turn data frame back into long format
-mar_rgn_yrs_filled <- pivot_longer(mar_rgn_spread,
+mar_rgn_yrs_filled <- tidyr::pivot_longer(mar_rgn_spread,
                            cols = num_range("",paste0(1950:latest_data_year)),
                            names_to = "year",
                            values_to = "value") %>% 
@@ -365,7 +370,7 @@ mar_rgn_gf <- mar_rgn_yrs_filled %>%
   filter(cum_value > 0) %>% # Eliminates years before mariculture began
   mutate(gap_0_fill = ifelse(is.na(value), "NA_to_zero", "0")) %>% # Record gapfill
   mutate(value = ifelse(is.na(value), 0, value)) %>% # Finally, convert all NAs in original column to 0
-  select(-cum_value, -value_w_0)
+  dplyr::select(-cum_value, -value_w_0)
 ```
 
 Check how may NA values were converted to 0
@@ -389,9 +394,9 @@ Remove family-region-environment time series with less than four years of maricu
 mar_rgn_gf_filter <- mar_rgn_gf %>% 
   group_by(rgn_id, family, fao, environment) %>%
   mutate (not_0 = length(value[value > 0])) %>% # Length of vector of years greater than 0
-  filter (not_0 > 3) %>% # Filter for groups that have at least four years of mariculture production 
+  filter(not_0 > 3) %>% # Filter for groups that have at least four years of mariculture production 
   ungroup() %>% 
-  select(rgn_id, species, fao, environment, year, value, Taxon_code, family, gap_0_fill) 
+  dplyr::select(rgn_id, species, fao, environment, year, value, Taxon_code, family, gap_0_fill) 
 
 maric <- mar_rgn_gf_filter
 ```
@@ -403,8 +408,7 @@ Used to estimate total mariculture yield per country.
 Saves the Mariculture-FP file
 
 ```{r save-mariculture-yield, eval=FALSE}
-write.csv(maric, file = here::here(current_mar_dir, "output", "MAR_FP_data.csv"),
-          row.names = FALSE)
+readr::write_csv(maric, file = here::here(current_mar_dir, "output", "MAR_FP_data.csv"))
 ```
 
 # Sustainability Scores from Seafood Watch Data
@@ -417,20 +421,34 @@ These data describe the sustainability country/species combinations. In cases wh
 
 # ---- Load in Seafood Watch sustainability scores data from Mazu: ----
 # Read in new Seafood Watch data 
-sw_sus <- read.csv(file.path(seafood_watch_dir, current_data_folder,
+# sw_sus <- read.csv(file.path(seafood_watch_dir,
+#                              #current_data_folder,
+#                              previous_data_folder, # had to use old data in v2024
+#                              "SFW_Aquaculture_ratings_053123.csv"), # update with name of new data file
+#                    check.names = FALSE, stringsAsFactors = FALSE, na.strings = c("NA", ""))
+
+sw_sus_raw <- readr::read_csv(file.path(seafood_watch_dir,
+                             #current_data_folder,
+                             previous_data_folder, # had to use old data in v2024
                              "SFW_Aquaculture_ratings_053123.csv"), # update with name of new data file
-                   check.names = FALSE, stringsAsFactors = FALSE, na.strings = c("NA", ""))
+                   na = c("NA", ""))
 
-# v2024: potential rewrite:
-# sw_sus_raw <- read_csv(file.path(seafood_watch_dir, current_data_folder, "SFW_Aquaculture_ratings_XXXXXX.csv"),
-#                        na = c("NA", ""))
-
-head(sw_sus)
+head(sw_sus_raw)
 
 # Read in Seafood Watch data from previous year
-old_sw_sus <- read.csv(file.path(seafood_watch_dir, previous_data_folder,
-                                 "SFW_Aquaculture_ratings_053123.csv"), # update with name of data file from previous year 
-                       check.names = FALSE, stringsAsFactors = FALSE, na.strings = c("NA", ""))
+# old_sw_sus <- read.csv(file.path(seafood_watch_dir, previous_data_folder,
+#                                  "SFW_Aquaculture_ratings_053123.csv"), # update with name of data file from previous year 
+#                        check.names = FALSE, stringsAsFactors = FALSE, na.strings = c("NA", ""))
+
+# v2024: couldn't get new seafood watch data, so pulling in data from prior year
+
+old_sw_sus <- readr::read_csv(file.path(seafood_watch_dir,
+                                 #previous_data_folder,
+                                 paste0("d", current_year - 2),
+                                 "SFW_Aquaculture_ratings_062222.csv"
+                               #  "SFW_Aquaculture_ratings_053123.csv"
+                               ), # update with name of data file from previous year 
+                       na = c("NA", ""))
 ```
 
 ## Wrangle
@@ -497,15 +515,15 @@ species-specific characteristics, and particularly between native and non-native
 A C6 score of 10 indicates a very low risk of escape with low estimated competitiveness and genetic interactions. An Escape Criterion (C6) score ≤ 1 is considered "Critical" (pg. 52), and may indicate a "High Concern" risk of escape and "High Concern" potential for competitiveness and genetic impact. 
 
 
-```{r}
-# v2024 potential rewrite:
+```{r tidy_sw-sus, eval = FALSE}
+# ---- Tidy Seafood Watch (SFW) data ----
 sw_sus <- sw_sus_raw %>% 
   # rename columns ----
   janitor::clean_names() %>% 
   dplyr::rename(sw_species = "common_names",
                 fao_species = "fao_common_name", 
-                fdo_species = "fdo_common_name",
-                water_body = "bo_ws", # so curious as to why this is what janitor::clean_names does to BOWs
+                fda_species = "fda_common_name",
+                water_body = "bo_ws", # so curious as to why this is what janitor::clean_names does to BOWs...
                 country = "countries",
                 method = "methods",
                 score = "assessment_score",
@@ -519,30 +537,6 @@ sw_sus <- sw_sus_raw %>%
   # set scores less than 0 equal to 0
   mutate(score = case_when(score < 0 ~ 0,
             TRUE ~ score))
-  
-```
-
-```{r tidy_sw-sus, eval = FALSE}
-# ---- Tidy Seafood Watch (SFW) data ----
-## Rename columns
-sw_sus <- sw_sus %>%
-  rename(report_title = 'ReportTitle',
-         published_date = 'PublishedDate',
-         sw_species = 'CommonNames',
-         fao_species = 'FAOCommonName',
-         fda_species = 'FDACommonName',
-         water_body = 'BOWs',
-         country = 'Countries',
-        scientific_name = 'ScientificName',
-         method = 'Methods',
-         score = 'AssessmentScore', 
-         escapes_score = 'C6Score',
-         rec = 'AssessmentColor' 
-         ) %>% 
-  dplyr::select(report_title, published_date, sw_species, scientific_name, fao_species, fda_species, country, water_body, method, escapes_score, score, rec) %>%
-  filter(!(method %in% c("Freshwater net pen"))) %>% 
-  mutate(score = case_when(score < 0 ~ 0,
-            TRUE ~ score))
 
 ## Change species names using FAO species name (fao_species); if NA, use common name (sw_species)
 sw_sus$species <- ifelse(!is.na(sw_sus$fao_species), sw_sus$fao_species, sw_sus$sw_species)
@@ -554,7 +548,9 @@ sw_sus$species <- ifelse(!is.na(sw_sus$fao_species), sw_sus$fao_species, sw_sus$
 
 ## These need to be re-added later (get cut when associated with region ids)
 sw_sus_no_rgn <- filter(sw_sus, is.na(country)|country == "Worldwide")
-# 118 entries with no country, in 2023 assessment there were 114 "Worldwide" rows and only 1 NA row
+# 118 entries with no country, 
+# in 2023 assessment there were 114 "Worldwide" rows and only 1 NA row
+# 115 entries in 2024
 ```
 
 ### Convert country names to OHI region IDs.
@@ -573,28 +569,38 @@ sw_sus_df <- sw_sus %>%
   # remove all NA and 'Worldwide' rows in order to correctly rejoin those in the next steps, these rows are stored in the variable sw_sus_no_rgn
   filter(!is.na(country), country!="Worldwide")
   
-## Convert country names to OHI region IDs. (ohicore/R/name_2_rgn.R)
-sw_sus_rgn <- name_2_rgn(df_in = sw_sus_df, 
+# Convert country names to OHI region IDs. (ohicore/R/name_2_rgn.R)
+sw_sus_rgn <- ohicore::name_2_rgn(df_in = sw_sus_df, 
                        fld_name='country', 
                        flds_unique=c('fao_species', 'fda_species', 'sw_species', 'score'),
                        keep_fld_name = TRUE) # 'country' now shows the original Seafood Watch data name; 'rgn_name' is what we want to use from now on
-# 151 entries
+# v2023: 151 entries
+# v2024: (used same data, 151 entries)
 
-## Re-add NA countries
+# v2024 duplicates found: 
+# 1 Chile         
+# 2 Norway        
+# 3 United Kingdom
+# 4 United States 
+# 5 Canada  
+# after investigating the data further, these duplicates don't seem to be an issue -- each entry is an unique species and/or based on an unique report
+
+# Add NA countries back in 
 sw_sus_rgn <- bind_rows(sw_sus_rgn, sw_sus_no_rgn) %>%
   unique()
 # 259 entries
+# v2024: same (because same exact data)
 
 #2023 switched to comparing common names because the scientific name column was two columns in the previous years data. Could compare scientific names next year. No differences in species detected. 
 
-setdiff(sw_sus_rgn$sw_species, old_sw_sus$CommonNames)
-setdiff(old_sw_sus$CommonNames, sw_sus_rgn$sw_species) 
+setdiff(sw_sus_rgn$sw_species, old_sw_sus$CommonNames) # character(0)
+setdiff(old_sw_sus$CommonNames, sw_sus_rgn$sw_species) # character(0)
 ```
 
 Check that the non-matches between Seafood Watch sustainability data species (sw_sus_rgn) and the FAO mariculture species in the wrangled FAO Aquaculture Production data table (maric) are not due to spelling errors or slightly different names. We want to include as many species that have sustainability scores as possible
 
 ```{r sw-sus_check-non-matches, eval = FALSE}
-maric <- read_csv(here::here(current_mar_dir, "output", "MAR_FP_data.csv"))
+maric <- readr::read_csv(here::here(current_mar_dir, "output", "MAR_FP_data.csv"))
 
 ## Make sure same species are spelled the same in the two data tables (e.g. check that there are no extra spaces)
 sort(setdiff(sw_sus_rgn$species, maric$species)) # Seafood Watch species with no FAO data
@@ -608,7 +614,6 @@ sort(setdiff(maric$species, sw_sus_rgn$species)) # FAO species with no Seafood W
 
 Fix the non matches
 
-v2024 note to self [COME BACK]: could be good to rename variables instead of continuously rewriting "maric" -- takes up more space in the environment but feels like better code hygeine
 
 
 ```{r sw-sus_fix-non-matches, eval = FALSE}
@@ -809,7 +814,7 @@ Now look at a summary after appending all the Seafood Watch data
 summary(mar_sw_sus) 
 # 21215 NA values out of 32051 total obs; ~68% without scores (2022)
 # 16378 NA values out of 33732 total obs ~ 49% without scores (2023)
-# _____ NA values out of ___ total obs; ~ __ without scores (2024)
+# 17122 NA values out of 34916 total obs; ~ 49% without scores (2024)
 ```
 
 Gapfilling based on families and taxon_code
@@ -974,8 +979,8 @@ genEscapes_gf <- tonnes_esc %>%
   summarize(genEscapes = weighted.mean(gapfill, tonnes, na.rm = TRUE)) %>%
   ungroup() %>%
   filter(year == latest_data_year) %>%
-  select(rgn_id, pressures.score=genEscapes) %>%
-  mutate(pressures.score=ifelse(pressures.score == "NaN", NA, pressures.score)) %>%
+  select(rgn_id, pressures.score = genEscapes) %>%
+  mutate(pressures.score = ifelse(pressures.score == "NaN", NA, pressures.score)) %>%
   data.frame()
 
 ```
@@ -987,7 +992,7 @@ genEscapes_gf <- tonnes_esc %>%
 ```{r save-gen-esc-gapfilled, eval = FALSE}
 
 ## Saves the Genetic Escapes Gapfill file
-write.csv(genEscapes_gf, here(current_mar_dir, "output", "GenEsc_gf.csv"), row.names = FALSE)
+readr::write_csv(genEscapes_gf, here(current_mar_dir, "output", "GenEsc_gf.csv"))
 
 ```
 
@@ -997,7 +1002,7 @@ Obtain escapee data layers from `genEscapes`
 
 # Create the escapee data layers:
 data <- genEscapes %>%
-    select(rgn_id, year, pressure_score = genEscapes)
+    dplyr::select(rgn_id, year, pressure_score = genEscapes)
 
 ```
 
@@ -1006,7 +1011,7 @@ data <- genEscapes %>%
 ```{r save-gen-esc-pressure-layer, eval = FALSE}
 
 ## Saves the Genetic Escapes data file 
-write.csv(data, here(current_mar_dir, "output", "GenEsc.csv"), row.names=FALSE)  
+readr::write_csv(data, here(current_mar_dir, "output", "GenEsc.csv"))  
 
 ```
 
@@ -1016,21 +1021,21 @@ write.csv(data, here(current_mar_dir, "output", "GenEsc.csv"), row.names=FALSE)
 
 ## Save mariculture harvest data
 mar_harvest_tonnes <- mar_sw_sus_final %>%
-  select(rgn_id, taxa_code, taxa_group, family, year, tonnes)
+  dplyr::select(rgn_id, taxa_code, taxa_group, family, year, tonnes)
 
 anyDuplicated(mar_harvest_tonnes) # Check for duplication
 
 ## Saves the appropriate Mariculture Harvest Tonnes file
-write.csv(mar_harvest_tonnes, here(current_mar_dir, "output", "mar_harvest_tonnes.csv"), row.names=F)
+readr::write_csv(mar_harvest_tonnes, here(current_mar_dir, "output", "mar_harvest_tonnes.csv"))
 
 
 ## Save gapfill data for mariculture harvest
 mar_harvest_tonnes_gf <- mar_sw_sus_final %>%
-  select(rgn_id, taxa_code, taxa_group, family, year, tonnes=gapfill_fao)
+  dplyr::select(rgn_id, taxa_code, taxa_group, family, year, tonnes = gapfill_fao)
 
 
 ## Saves the appropriate Mariculture Harvest Gapfill file 
-write.csv(mar_harvest_tonnes_gf, here(current_mar_dir, "output", "mar_harvest_tonnes_gf.csv"), row.names=F)
+write.csv(mar_harvest_tonnes_gf, here(current_mar_dir, "output", "mar_harvest_tonnes_gf.csv"), row.names = F)
 
 # define the maximum sustainability score, check with: summary(mar_sw_sus_final)
 max_sus <- 0.77
@@ -1038,7 +1043,7 @@ max_sus <- 0.77
 ## Save sustainability scores data for 2023 (SFW data year)
 mar_sustainability_score <- mar_sw_sus_final %>%
   mutate(year = current_year) %>% #change year if data not updated to current year
-  select(rgn_id, year, taxa_code, sust_coeff = Sust) %>%
+  dplyr::select(rgn_id, year, taxa_code, sust_coeff = Sust) %>%
   unique() %>%
   mutate(sust_coeff = ifelse(sust_coeff > max_sus, 1, sust_coeff/max_sus)) # rescale to the highest sust score
 
@@ -1046,7 +1051,7 @@ anyDuplicated(mar_sustainability_score)
 
 
 ## Saves the appropriate Sustainability Score file 
-write.csv(mar_sustainability_score, here(current_mar_dir, "output", "mar_sustainability.csv"), row.names=F)
+write.csv(mar_sustainability_score, here(current_mar_dir, "output", "mar_sustainability.csv"), row.names = F)
 
 
 ## Save gapfill data for sustainability scores
@@ -1056,7 +1061,7 @@ mar_sustainability_score_gf = mar_sw_sus_final %>%
 
 
 ## Saves the appropriate Sustainability Score Gapfill file 
-write.csv(mar_sustainability_score_gf, here(current_mar_dir, "output", "mar_sustainability_gf.csv"), row.names=F)
+write.csv(mar_sustainability_score_gf, here(current_mar_dir, "output", "mar_sustainability_gf.csv"), row.names = F)
 
 
 ## save mar sustainability for data checking; rgn_id, species, score
