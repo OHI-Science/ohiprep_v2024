@@ -1026,7 +1026,7 @@ mar_harvest_tonnes <- mar_sw_sus_final %>%
 anyDuplicated(mar_harvest_tonnes) # Check for duplication
 
 ## Saves the appropriate Mariculture Harvest Tonnes file
-readr::write_csv(mar_harvest_tonnes, here(current_mar_dir, "output", "mar_harvest_tonnes.csv"))
+write.csv(mar_harvest_tonnes, here(current_mar_dir, "output", "mar_harvest_tonnes.csv"), row.names = F)
 
 
 ## Save gapfill data for mariculture harvest
@@ -1036,6 +1036,7 @@ mar_harvest_tonnes_gf <- mar_sw_sus_final %>%
 
 ## Saves the appropriate Mariculture Harvest Gapfill file 
 write.csv(mar_harvest_tonnes_gf, here(current_mar_dir, "output", "mar_harvest_tonnes_gf.csv"), row.names = F)
+#write_csv(mar_harvest_tonnes_gf, here(current_mar_dir, "output", "mar_harvest_tonnes_gf.csv"))
 
 # define the maximum sustainability score, check with: summary(mar_sw_sus_final)
 max_sus <- 0.77
@@ -1072,7 +1073,7 @@ mar_sustainability_score <- mar_sw_sus_final %>%
     mutate(sust_coeff = ifelse(sust_coeff > max_sus, 1, sust_coeff/max_sus)) # rescale to the highest sust score
 
 ## Saves the appropriate Sustainability Score file
-write.csv(mar_sustainability_score, here(current_mar_dir, "int", "mar_sustainability_check.csv"), row.names=F)
+write.csv(mar_sustainability_score, here(current_mar_dir, "int", "mar_sustainability_check.csv"), row.names = F)
 
 ```
 
