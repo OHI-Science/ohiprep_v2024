@@ -17,7 +17,6 @@ output:
 ---
 
 ```{r}
-
 knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
 ```
 
@@ -29,7 +28,8 @@ knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'Figs/',
 
 ```{r}
 library(dplyr)
-library(rgdal)
+library(terra)
+library(tidyterra)
 library(raster)
 library(here)
 library(ggridges)
@@ -397,6 +397,10 @@ spp_habs_and_systems <- spp_habs_from_api %>%
   ### 21931 spp marine by habitat only (NAs dropped); note undoubtedly
 ### some "other" and "unknown" that are NOT marine - only 17332 when
 ### excluding "other" and "unknown"
+ #2024
+  ### 23987 spp marine by habitat only (NAs dropped); note undoubtedly
+### some "other" and "unknown" that are NOT marine - only 18915 when
+### excluding "other" and "unknown"
  
  
  
@@ -421,6 +425,16 @@ spp_marine <- spp_habs_and_systems %>%
 ### NOTE: This still includes hippos because of estuaries - see next cut.
    #2022:
 ### These 17055 spp either are positively coded hab or NA hab, and
+### ALSO classified as marine system.  This is a reasonably aggressive
+### cut that seems to minimize false positives and false negatives.
+### NOTE: This still includes hippos because of estuaries - see next cut.
+ #2022:
+### These 17055 spp either are positively coded hab or NA hab, and
+### ALSO classified as marine system.  This is a reasonably aggressive
+### cut that seems to minimize false positives and false negatives.
+### NOTE: This still includes hippos because of estuaries - see next cut.
+ #2024:
+### These 18611 spp either are positively coded hab or NA hab, and
 ### ALSO classified as marine system.  This is a reasonably aggressive
 ### cut that seems to minimize false positives and false negatives.
 ### NOTE: This still includes hippos because of estuaries - see next cut.
@@ -453,6 +467,9 @@ marg_suit <- spp_marine %>%
 ### 20 spp
 #2022:
 ### 21 spp
+#2024:
+### 21 spp
+
 write_csv(marg_suit, file.path(dir_setup, 'int',
                                sprintf('spp_marine_marginal_%s.csv', api_version)))
   
@@ -488,7 +505,7 @@ iucn_marine_spp <- read_csv(file.path(dir_goal, '_data',
                                       sprintf('spp_marine_from_api_%s.csv', api_version))) %>%
   left_join(iucn_spp_info)
 ### Subpopulations are in here too, by ID number
-### Always check how many observations there after a join. 2019: 13404, 2020: 16019, 2021: 16380, 2022: 17034
+### Always check how many observations there after a join. 2019: 13404, 2020: 16019, 2021: 16380, 2022: 17034, 2024: 18590
                                                           
 
 reload <- FALSE
