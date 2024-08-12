@@ -213,6 +213,12 @@ The species_list.csv is a master list of all the mariculture species in the FAO 
 mar_sp <- readr::read_csv(here::here(current_mar_dir, "raw", "species_list.csv")) %>%
   dplyr::select(FAO_name, exclude, Taxon_code, family, notes, notes_2)
 
+
+# old_mar_sp <- readr::read_csv(here::here("globalprep/mar/v2023/raw/species_list.csv")) %>%
+#   dplyr::select(FAO_name, exclude, Taxon_code, family, notes, notes_2)
+# old_test_spp <- setdiff(mar$FAO_name, old_mar_sp$FAO_name)
+# old_test_spp
+
 # find differences between species names in new FAO data vs. species list
 new_spp <- setdiff(mar$FAO_name, mar_sp$FAO_name)
 
