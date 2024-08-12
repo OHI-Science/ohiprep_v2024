@@ -51,6 +51,7 @@ library(zoo)
 library(stringr)
 library(readr)
 library(here)
+library(plotly)
 
 source(here("workflow", "R", "common.R"))
 
@@ -313,7 +314,60 @@ comparison_plot <- ggplot(compare, aes(x = bbmsy.x, y = bbmsy.y)) +
 comparison_plot
 ```
 
+For understanding results: 
+
+[When B/BMSY = 1, then biomass equals BMSY. If B/BMSY falls below 1, biomass is too low to provide maximum sustainable yield.](https://catchshareindicators.org/wp-content/uploads/2013/12/NE_Biomass_Feb-2014.pdf) 
+
 ```{r}
+# read in our final data frame saved earlier
 final_b_bmsy <- read_csv(here(output_dir, "fis_bbmsy.csv"))
+
+# interactive plotly of b/bmsy for each stock
+fis_plot <- final_b_bmsy %>%
+  plot_ly(x = ~year, y = ~bbmsy, color = ~stock_id, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "B/Bmsy by Stock ID",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "B/Bmsy (overfished is < 1)"))
+fis_plot
+
+# comparison of how many stocks are over/underfished in total
+fish_status <-final_b_bmsy %>% 
+  mutate(fish_status = case_when(
+    bbmsy < 1 ~ "overfished",
+    bbmsy >= 1 ~ "sustainable",
+    .default = NA
+  ))
+
+fish_status_summary_2019 <- fish_status %>%
+  filter(year %in% 2019) %>% 
+  group_by(rgn_id, fish_status) %>%
+  summarise(count = n()) %>%
+  filter(!is.na(fish_status))
+
+# ggplot(fish_status_summary_2019, aes(x = fish_status, y = count, fill = fish_status)) +
+#   geom_bar(position = "dodge", stat = "identity") +
+#   labs(title = "Comparison of Overfished and Sustainable Stocks by Region in 2019",
+#        x = "B/Bmsy Stock Status",
+#        y = "Number of stocks") +
+#   theme_minimal()
+# 
+# fish_status_summary_all_time <- fish_status %>%
+#   group_by(rgn_id, fish_status) %>%
+#   summarise(count = n()) %>%
+#   filter(!is.na(fish_status))
+# 
+# ggplot(fish_status_summary, aes(x = fish_status, y = count, fill = fish_status)) +
+#   geom_bar(stat = "identity") +
+#   labs(title = "Comparison of Overfished and Sustainable Stocks",
+#        x = "B/Bmsy Stock Status",
+#        y = "Number of stocks") +
+#   theme_minimal()
+
+
+# comparison of how many stocks are over/underfished by region
+
 ```
+
+
 
