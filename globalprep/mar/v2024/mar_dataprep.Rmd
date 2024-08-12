@@ -213,7 +213,7 @@ The species_list.csv is a master list of all the mariculture species in the FAO 
 mar_sp <- readr::read_csv(here::here(current_mar_dir, "raw", "species_list.csv")) %>%
   dplyr::select(FAO_name, exclude, Taxon_code, family, notes, notes_2)
 
-
+# to compare to previous year's csv (in v2024)
 # old_mar_sp <- readr::read_csv(here::here("globalprep/mar/v2023/raw/species_list.csv")) %>%
 #   dplyr::select(FAO_name, exclude, Taxon_code, family, notes, notes_2)
 # old_test_spp <- setdiff(mar$FAO_name, old_mar_sp$FAO_name)
@@ -227,6 +227,17 @@ new_spp # Check: if dim has 0 rows it means all match
 
 ### NOTE: if the list of species to add is huge, and it is unmanageable to do by hand, see the mar_dataprep.Rmd in the v2020 folder, and it will have code to use Taxize. Otherwise just do it by hand, because taxize is a pain, and most of them won't be found in taxize anyways... 
 
+# Name fixing (v2024)
+mar <- mar %>% 
+  mutate(FAO_name = case_when(
+    FAO_name %in% c("Mexican spiny loster") ~ "Mexican spiny lobster",
+    .default = FAO_name
+  ))
+
+# run the new_spp code again to check if this update has been successfully implemented
+#new_spp <- setdiff(mar$FAO_name, mar_sp$FAO_name)
+#new_spp
+
 # Remove species not relevant to mariculture goal (i.e., non-food species)
 mar_sp_join <- mar %>% dplyr::left_join(mar_sp, by = "FAO_name")
 
@@ -235,7 +246,7 @@ mar_join_int <- mar_sp_join %>%
   dplyr::filter(exclude < 1) %>% # filter out species that should be excluded from the MAR subgoal
   dplyr::mutate(include = 1 - exclude) %>% # create an "include" column (1-exclude) 
   dplyr::rename(species = FAO_name) %>%  # rename FAO_name to species
-  dplyr::mutate(value_include = value*include) # multiply value by proportion of harvest to include
+  dplyr::mutate(value_include = value * include) # multiply value by proportion of harvest to include
 
 ## Check to see if 85% of seaweed goes to human consumption... filter for seaweeds, sum the tonnes included, divide by total tonnes seaweed
 # seaweed_check2 <- mar_join_int %>%
@@ -390,7 +401,7 @@ table(mar_rgn_gf$gap_0_fill)
 ## 6441 of these out of 30170 + 6441 cases had NA values converted to 0 - 2021 assessment
 ## 7037 of these out of 30975 + 7037 cases had NA values converted to 0 - 2022 assessment
 ##7367 of these out of 34187 + 7367 cases had NA values converted to 0 -2023 assessment
-## 8200 of these out of 35023 + 8200 (43223) cases had NA values converted to 0 - 2024 assessment = 0.1897 ≈ 19% of values
+## 8200 of these out of 35025 + 8201 (43226) cases had NA values converted to 0 = 0.1897 ≈ 19% of values - 2024 assessment 
 ```
 
 Remove family-region-environment time series with less than four years of mariculture production \> 0 tonnes (assume these are not established mariculture programs).
@@ -665,7 +676,7 @@ maric <- maric %>%
 #run this code to check that there are no duplicates for any species, year, rgn_id combinations. If there are they will be unintentionally deleted later, so you may need to change family or taxon codes to match and rerun the above group by
 duplicate_check <- maric %>% group_by(environment, species, year, rgn_id) %>% 
   summarize(n = n())
-unique(duplicate_check$n) #should be one
+unique(duplicate_check$n) #should be 1
 
 
 #Add a unique identifier per cultivated stock that describes each species, region, and environment grouping.
