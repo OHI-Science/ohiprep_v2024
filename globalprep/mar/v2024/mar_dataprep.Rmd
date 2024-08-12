@@ -1107,7 +1107,7 @@ mar_new_1 <- mar_new_data %>%
 
 
 yield_1 <- mar_old_1 %>% 
-  full_join(mar_new_1, by = c("rgn_id","species","environment")); View(yield_1)
+  full_join(mar_new_1, by = c("rgn_id", "species", "environment")); View(yield_1)
 
 # Plot
 comp_plot_1 <- ggplot() + 
@@ -1288,7 +1288,7 @@ comp_plot_7 <- ggplot() +
 ggplotly(comp_plot_7)
 
 
-# ---- Compare yield data for Denmark; ----
+# ---- Compare yield data for Denmark ----
 # pressure score decreased (not sure which version this comment was about)
 mar_old_8 <- mar_old_data %>% 
   filter(rgn_id == 175, year == previous_latest_data_year) %>% 
@@ -1300,7 +1300,7 @@ mar_new_8 <- mar_new_data %>%
 yield_8 <- mar_old_8 %>% 
   full_join(mar_new_8, by = c("rgn_id","species","fao", "environment")); View(yield_8)
 
-plot(yield$old_value, yield$value);abline(0,1,col="red")
+plot(yield_8$old_value, yield_8$value); abline(0, 1, col = "red")
 
 comp_plot_8 <- ggplot() + 
   geom_point(data = yield_8,
@@ -1315,7 +1315,7 @@ comp_plot_8 <- ggplot() +
 ggplotly(comp_plot_8)
 
 
-# ---- Compare yield data for Ecuador, ----
+# ---- Compare yield data for Ecuador ----
 # score increased by a lot (again, not sure which version this comment is from)
 # v2024: (2022 data) whiteleg shrimp yield has notably increased 
 mar_old_9 <- mar_old_data %>% 
@@ -1348,7 +1348,7 @@ ggplotly(comp_plot_9)
 
 # Compare new/old Mariculture sustainability scores
 
-sust_old <- readr::read_csv(here::here("globalprep", "mar", paste0( "v", last_year),
+sust_old <- readr::read_csv(here::here("globalprep", "mar", paste0("v", last_year),
                                        "output", "mar_sustainability.csv")) %>% 
   dplyr::select(rgn_id, taxa_code, sust_old = sust_coeff)
 
@@ -1358,13 +1358,13 @@ sust_old$species <- str_remove(sust_old$taxa_code, "\\_[^.]*$")
 sust_new <- readr::read_csv(here::here(current_mar_dir, "int", "mar_sustainability_check.csv")) %>% 
   dplyr::select(rgn_id, species, sust_new = sust_coeff)
 
-test <- sust_new %>% 
+sust_compare <- sust_new %>% 
   full_join(sust_old, by = c("rgn_id", "species")) %>%
   mutate(difference = sust_new - sust_old) %>%
   group_by(rgn_id) %>%
   summarize(mean_rgn_sus_diff = mean(difference, na.rm = TRUE))
 
-mean_diff_sus <- ggplot(test, aes(x = rgn_id, y = mean_rgn_sus_diff)) + 
+mean_diff_sus <- ggplot(sust_compare, aes(x = rgn_id, y = mean_rgn_sus_diff)) + 
   geom_point() +
   theme_bw() +
   labs(title = paste("Mariculture Sustainability: Mean Difference <br>", latest_data_year, "Data - ", previous_latest_data_year, "Data"))
@@ -1381,72 +1381,79 @@ Comparing this year's data to previous year's data. Expect small variation from 
 # ==== Compare genetic escapes pressure score; ====
 # saw large changes between 2018 and 2017 assessment years. No big changes between 2019 and 2018 assessment years. Big changes from 2019 to 2020 due to a data update. Small changes between 2020 and 2021 due to updating the FAO data, gapfilling caused this. Also fixed some name errors. Small changes between 2021 and 2022, added a few name conversions. Some changes between 2022 and 2023, fixed a handful of errors. 
 
-old <- read.csv(here(current_mar_dir, "output", "GenEsc.csv")) %>%
-  filter(year == previous_latest_data_year) %>% 
-  select(rgn_id, year, prs_score_old=pressure_score)
+current_gen_esc_data <- readr::read_csv(here::here(current_mar_dir, "output", "GenEsc.csv"))
 
-new <- read.csv(here(current_mar_dir, "output", "GenEsc.csv")) %>%
+gen_old <- current_gen_esc_data %>%
+  filter(year == previous_latest_data_year) %>% 
+  dplyr::select(rgn_id, year, prs_score_old = pressure_score)
+
+gen_new <- current_gen_esc_data %>%
   filter(year == latest_data_year) %>%
-  select(rgn_id, year, pressure_score)
+  dplyr::select(rgn_id, year, pressure_score)
 
-compare <- full_join(old, new, by=c("rgn_id"))
+gen_compare <- full_join(gen_old, gen_new, by = c("rgn_id"))
+
+# plot current data of previous and current year
+comp_gen_years_plot <- ggplot() + 
+  geom_point(data = gen_compare, aes(x = prs_score_old, y = pressure_score, text = paste("Region ID:", rgn_id))) +
+  labs(x = paste("Previous Pressure", previous_latest_data_year), y = paste("Current Pressure", latest_data_year)) +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  theme_bw()
+
+ggplotly(comp_gen_years_plot)
 
 
-comp_plot <- ggplot() + 
-  geom_point(data = compare, aes(x = prs_score_old, y = pressure_score, text = paste("Region ID:", rgn_id))) +
-  labs(x = paste("Previous pressure",previous_latest_data_year), y = paste("Current pressure", latest_data_year)) +
-  geom_abline(slope = 1, intercept = 0, col = "red")
+# ---- Compare old genetic escape pressure scores for the same year ----
 
-ggplotly(comp_plot)
+old_gen_esc_data <- readr::read_csv(here::here("globalprep", "mar", paste0("v", last_year),
+                                  "output", "GenEsc.csv")) 
 
-
-# Compare old genetic escape pressure scores for the same year 
-old <- read.csv(file.path("..", paste0( "v", last_year), "output", "GenEsc.csv")) %>%
+old_last_year <- old_gen_esc_data %>%
   filter(year == previous_latest_data_year) %>% 
-  select(rgn_id, year, prs_score_old=pressure_score)
+  select(rgn_id, year, prs_score_old = pressure_score)
 
-new <-  read.csv(here(current_mar_dir, "output", "GenEsc.csv")) %>% 
+new_last_year <- current_gen_esc_data %>% 
   filter(year == previous_latest_data_year) %>%
   select(rgn_id, year, pressure_score)
 
-compare <- full_join(old, new, by=c("rgn_id"))#; View(compare)
+compare_gen_data_years <- full_join(old_last_year, new_last_year, by = c("rgn_id")); View(compare_gen_data_years)
 
-comp_plot <- ggplot() + 
-  geom_point(data = compare, aes(x = prs_score_old, y = pressure_score, text = paste("Regionid:", rgn_id))) +
-  labs(x = paste("Previous pressure",previous_latest_data_year), y = paste("Current pressure", previous_latest_data_year)) +
-  geom_abline(slope = 1, intercept = 0, col = "red")
+comp_gen_data_years_plot <- ggplot() + 
+  geom_point(data = compare_gen_data_years, aes(x = prs_score_old, y = pressure_score, text = paste("Region ID:", rgn_id))) +
+  labs(x = paste("Previous Pressure", previous_latest_data_year), y = paste("Current Pressure", previous_latest_data_year)) +
+  geom_abline(slope = 1, intercept = 0, col = "red") + theme_bw()
 
 
-ggplotly(comp_plot)
+ggplotly(comp_gen_data_years_plot)
 
 
 
 # Compare genetic escapes pressure scores for Vietnam, data was updated by FAO
-old <- read.csv(file.path("..", paste0( "v", last_year), "output", "GenEsc.csv")) %>%
+old_gen_vietnam <- old_gen_esc_data %>%
   filter(rgn_id == 207) %>% 
-  select(rgn_id, year, prs_score_old=pressure_score)
+  select(rgn_id, year, prs_score_old = pressure_score)
 
-new <- read.csv(here(current_mar_dir, "output", "GenEsc.csv")) %>%
+new_gen_vietnam <- current_gen_esc_data %>%
   filter(rgn_id == 207) %>% 
   select(rgn_id, year, pressure_score)
 
-compare <- full_join(old, new, by = c("rgn_id", "year")); #View(compare)
+compare_gen_vietnam <- full_join(old_gen_vietnam, new_gen_vietnam, by = c("rgn_id", "year")); View(compare_gen_vietnam)
 
-plot(compare$prs_score_old, compare$pressure_score);abline(0, 1, col = "red")
+plot(compare_gen_vietnam$prs_score_old, compare_gen_vietnam$pressure_score); abline(0, 1, col = "red")
 
 
 # Compare genetic escapes pressure scores for Denmark
-old <- read.csv(file.path("..", paste0( "v", last_year), "output", "GenEsc.csv")) %>%
+old_gen_denmark <- old_gen_esc_data %>%
   filter(rgn_id == 175) %>% 
   select(rgn_id, year, prs_score_old = pressure_score)
 
-new <- read.csv(here(current_mar_dir, "output", "GenEsc.csv")) %>%
+new_gen_denmark <- current_gen_esc_data %>%
   filter(rgn_id == 175) %>% 
   select(rgn_id, year, pressure_score)
 
-compare <- full_join(old, new, by = c("rgn_id","year")); View(compare)
+compare_gen_denmark <- full_join(old_gen_denmark, new_gen_denmark, by = c("rgn_id","year")); View(compare_gen_denmark)
 
-plot(compare$prs_score_old, compare$pressure_score);abline(0, 1, col = "red")
+plot(compare_gen_denmark$prs_score_old, compare_gen_denmark$pressure_score); abline(0, 1, col = "red")
 ```
 
 ------------------------------------------------------------------------
