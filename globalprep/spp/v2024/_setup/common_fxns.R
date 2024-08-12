@@ -165,10 +165,10 @@ api_file <- file.path(dir_M, 'git-annex/globalprep/spp',
 api_key <- scan(api_file, what = 'character')
 
 # api_version <- fromJSON('http://apiv3.iucnredlist.org/api/v3/version') %>%
-# .$version
+#   .$version
 
 
-api_version <- '2022-1'
+api_version <- '2024-1'
 
 
 get_from_api <- function(url, param, api_key, delay) {
