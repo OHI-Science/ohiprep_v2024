@@ -1026,7 +1026,8 @@ mar_harvest_tonnes <- mar_sw_sus_final %>%
 anyDuplicated(mar_harvest_tonnes) # Check for duplication
 
 ## Saves the appropriate Mariculture Harvest Tonnes file
-write.csv(mar_harvest_tonnes, here(current_mar_dir, "output", "mar_harvest_tonnes.csv"), row.names = F)
+#write.csv(mar_harvest_tonnes, here(current_mar_dir, "output", "mar_harvest_tonnes.csv"), row.names = F)
+readr::write_csv(mar_harvest_tonnes, here::here(current_mar_dir, "output", "mar_harvest_tonnes.csv"))
 
 
 ## Save gapfill data for mariculture harvest
@@ -1035,8 +1036,8 @@ mar_harvest_tonnes_gf <- mar_sw_sus_final %>%
 
 
 ## Saves the appropriate Mariculture Harvest Gapfill file 
-write.csv(mar_harvest_tonnes_gf, here(current_mar_dir, "output", "mar_harvest_tonnes_gf.csv"), row.names = F)
-#write_csv(mar_harvest_tonnes_gf, here(current_mar_dir, "output", "mar_harvest_tonnes_gf.csv"))
+#write.csv(mar_harvest_tonnes_gf, here(current_mar_dir, "output", "mar_harvest_tonnes_gf.csv"), row.names = F)
+readr::write_csv(mar_harvest_tonnes_gf, here::here(current_mar_dir, "output", "mar_harvest_tonnes_gf.csv"))
 
 # define the maximum sustainability score, check with: summary(mar_sw_sus_final)
 max_sus <- 0.77
@@ -1052,7 +1053,8 @@ anyDuplicated(mar_sustainability_score)
 
 
 ## Saves the appropriate Sustainability Score file 
-write.csv(mar_sustainability_score, here(current_mar_dir, "output", "mar_sustainability.csv"), row.names = F)
+#write.csv(mar_sustainability_score, here(current_mar_dir, "output", "mar_sustainability.csv"), row.names = F)
+readr::write_csv(mar_sustainability_score, here::here(current_mar_dir, "output", "mar_sustainability.csv"))
 
 
 ## Save gapfill data for sustainability scores
@@ -1062,7 +1064,8 @@ mar_sustainability_score_gf = mar_sw_sus_final %>%
 
 
 ## Saves the appropriate Sustainability Score Gapfill file 
-write.csv(mar_sustainability_score_gf, here(current_mar_dir, "output", "mar_sustainability_gf.csv"), row.names = F)
+#write.csv(mar_sustainability_score_gf, here(current_mar_dir, "output", "mar_sustainability_gf.csv"), row.names = F)
+readr::write_csv(mar_sustainability_score_gf, here::here(current_mar_dir, "output", "mar_sustainability_gf.csv"))
 
 
 ## save mar sustainability for data checking; rgn_id, species, score
@@ -1073,7 +1076,8 @@ mar_sustainability_score <- mar_sw_sus_final %>%
     mutate(sust_coeff = ifelse(sust_coeff > max_sus, 1, sust_coeff/max_sus)) # rescale to the highest sust score
 
 ## Saves the appropriate Sustainability Score file
-write.csv(mar_sustainability_score, here(current_mar_dir, "int", "mar_sustainability_check.csv"), row.names = F)
+#write.csv(mar_sustainability_score, here(current_mar_dir, "int", "mar_sustainability_check.csv"), row.names = F)
+readr::write_csv(mar_sustainability_score, here::here(current_mar_dir, "int", "mar_sustainability_check.csv"))
 
 ```
 
@@ -1082,169 +1086,288 @@ write.csv(mar_sustainability_score, here(current_mar_dir, "int", "mar_sustainabi
 Comparing this year's data to previous year's data. Expect small variation from year to year. Plot to view differences.
 
 ```{r data-check, eval = FALSE}
+options(scipen = 999)
 
-# Read in old and new data for plots
-mar_old_data <- read.csv(file.path("..", paste0( "v", last_year), "output", "MAR_FP_data.csv")) 
-mar_new_data <- read.csv("output/MAR_FP_data.csv") 
+# ============== Mariculture Yield =============================================
+
+# ---- Read in old and new data for plots ----
+mar_old_data <- readr::read_csv(here::here("globalprep", "mar", paste0( "v", last_year), "output", "MAR_FP_data.csv")) 
+mar_new_data <- readr::read_csv(here::here(current_mar_dir, "output", "MAR_FP_data.csv"))
 
 
-## Compare mariculture yield data for all countries: 2021 versus 2020
-mar_old <- mar_old_data %>% 
+# ---- Compare mariculture yield data for all countries: ----
+# previous data year (2021) vs. current data year (2022) 
+mar_old_1 <- mar_old_data %>% 
   filter(year == previous_latest_data_year) %>% 
-  select(rgn_id, species, old_value = value, environment)
-mar_new <- mar_new_data %>% 
+  dplyr::select(rgn_id, species, old_value = value, environment)
+
+mar_new_1 <- mar_new_data %>% 
   filter(year == latest_data_year) %>% 
-  select(rgn_id, species, value, environment)
+  dplyr::select(rgn_id, species, value, environment)
 
 
-yield <- mar_old %>% 
-  full_join(mar_new, by = c("rgn_id","species","environment"))#; View(yield)
+yield_1 <- mar_old_1 %>% 
+  full_join(mar_new_1, by = c("rgn_id","species","environment")); View(yield_1)
 
-comp_plot <- ggplot() + 
-  geom_point(data = yield, aes(x = old_value, y = value, text = paste("species", species, "<br>Regionid:", rgn_id))) +
-  labs(x = paste("previous value",previous_latest_data_year), y = paste("Current Value", latest_data_year)) +
+# Plot
+comp_plot_1 <- ggplot() + 
+  geom_point(data = yield_1, aes(x = old_value, y = value, text = paste("species:", species, "<br>region ID:", rgn_id))) +
+  labs(x = paste("Previous Value", previous_latest_data_year), y = paste("Current Value", latest_data_year)) +
+  geom_abline(slope = 1, intercept = 0, col = "red")
+
+ggplotly(comp_plot_1)
+
+
+# ---- Compare mariculture yield data for all countries: ----
+# 2021 last year to 2021 this year (previous_latest_data_year)
+mar_old_2 <- mar_old_data %>% 
+  filter(year == previous_latest_data_year) %>% 
+  dplyr::select(rgn_id, species, old_value = value, environment, fao)
+
+mar_new_2 <- mar_new_data %>% 
+  filter(year == previous_latest_data_year) %>% 
+  dplyr::select(rgn_id, species, value, environment, fao)
+
+yield_2 <- mar_old_2 %>% 
+  full_join(mar_new_2, by = c("rgn_id","species", "environment", "fao")); View(yield_2)
+
+
+comp_plot_2 <- ggplot() + 
+  geom_point(data = yield_2, aes(x = old_value, y = value, text = paste("Species:", species, "<br>Region ID:", rgn_id))) +
+  labs(x = paste("Previous Value", previous_latest_data_year), y = paste("Current Value", previous_latest_data_year)) +
   geom_abline(slope = 1, intercept = 0, col = "red")
 
 
-ggplotly(comp_plot)
+ggplotly(comp_plot_2)
 
 
-
-## Compare mariculture yield data for all countries: 2020 last year to 2020 this year
-mar_old <- mar_old_data %>% 
-  filter(year == previous_latest_data_year) %>% 
-  select(rgn_id, species, old_value = value, environment, fao)
-mar_new <- mar_new_data %>% 
-  filter(year == previous_latest_data_year) %>% 
-  select(rgn_id, species, value, environment, fao)
-
-yield <- mar_old %>% 
-  full_join(mar_new, by = c("rgn_id","species", "environment", "fao")); View(yield)
-
-
-comp_plot <- ggplot() + 
-  geom_point(data = yield, aes(x = old_value, y = value, text = paste("species", species, "<br>Regionid:", rgn_id))) +
-  labs(x = paste("Previous value",previous_latest_data_year), y = paste("Current Value", previous_latest_data_year)) +
-  geom_abline(slope = 1, intercept = 0, col = "red")
-
-
-ggplotly(comp_plot)
-
-
-## Compare mariculture yield data for Russia: 2019 data from 2021 assessment to 2020 data from 2022 assessment
-mar_old <- mar_old_data %>% 
+# ---- Compare mariculture yield data for Russia: ----
+# 2021 data from 2023 assessment to 2022 data from 2024 assessment
+mar_old_3 <- mar_old_data %>% 
   filter(rgn_id == 73, year == previous_latest_data_year) %>% 
-  select(rgn_id, species, fao, old_value = value, environment)
-mar_new <- mar_new_data %>% 
+  dplyr::select(rgn_id, species, fao, old_value = value, environment)
+
+mar_new_3 <- mar_new_data %>% 
   filter(rgn_id == 73, year == latest_data_year) %>% 
-  select(rgn_id, species, fao, value, environment)
+  dplyr::select(rgn_id, species, fao, value, environment)
 
-yield <- mar_old %>% 
-  full_join(mar_new, by = c("rgn_id","species","fao")); View(yield)
+yield_3 <- mar_old_3 %>% 
+  full_join(mar_new_3, by = c("rgn_id","species","fao")); View(yield_3)
 
-plot(yield$old_value, yield$value);abline(0,1,col="red")
+# old plot code
+plot(yield_3$old_value, yield_3$value); abline(0, 1, col = "red")
+# new plot code
+comp_plot_3 <- ggplot() + 
+  geom_point(data = yield_3,
+             aes(x = old_value, y = value,
+                 text = paste("species:", species,
+                              "<br>region ID:", rgn_id))) +
+  labs(x = paste("Previous Value", previous_latest_data_year),
+       y = paste("Current Value", latest_data_year),
+       title = "Russia Mariculture Yield Data Comparison") +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  theme_bw()
+
+ggplotly(comp_plot_3)
 
 
-## Compare mariculture yield data for Iceland: 2019 data from 2021 assessment to 2020 data from 2022 assessment
-mar_old <- mar_old_data %>% 
+# ---- Compare mariculture yield data for Iceland: ----
+# 2021 data from 2023 assessment to 2022 data from 2024 assessment
+# one Atlantic Salmon observation was doubled (copied) in 2022 so I added "environment" which resolved the issue (Brackish vs Marine issue)
+mar_old_4 <- mar_old_data %>% 
   filter(rgn_id == 143, year == previous_latest_data_year) %>% 
-  select(rgn_id, species, fao, old_value = value)
-mar_new <- mar_new_data %>% 
+  dplyr::select(rgn_id, species, fao, old_value = value, environment) %>% 
+  ungroup()
+
+mar_new_4 <- mar_new_data %>% 
   filter(rgn_id == 143, year == latest_data_year) %>% 
-  select(rgn_id, species, fao, value)
+  dplyr::select(rgn_id, species, fao, value, environment) %>% 
+  ungroup()
 
-yield <- mar_old %>% 
-  full_join(mar_new, by = c("rgn_id","species","fao")); View(yield)
+yield_4 <- mar_old_4 %>% 
+  full_join(mar_new_4, by = c("rgn_id","species","fao", "environment")); View(yield_4)
 
-plot(yield$old_value, yield$value);abline(0,1,col="red")
+# old plot code
+plot(yield_4$old_value, yield_4$value);abline(0,1,col="red")
+# new plot code
+comp_plot_4 <- ggplot() + 
+  geom_point(data = yield_4,
+             aes(x = old_value, y = value,
+                 text = paste("species:", species,
+                              "<br>region ID:", rgn_id))) +
+  labs(x = paste("Previous Value", previous_latest_data_year),
+       y = paste("Current Value", latest_data_year),
+       title = "Iceland Mariculture Yield Data Comparison") +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  theme_bw()
+
+ggplotly(comp_plot_4)
 
 
-## Compare mariculture yield data for Vietnam
-mar_old <- mar_old_data %>% 
+# ---- Compare mariculture yield data for Vietnam ----
+mar_old_5 <- mar_old_data %>% 
   filter(rgn_id == 207, year == previous_latest_data_year) %>% 
-  select(rgn_id, species, fao, environment, old_value = value)
-mar_new <- mar_new_data %>% 
+  dplyr::select(rgn_id, species, fao, environment, old_value = value)
+mar_new_5 <- mar_new_data %>% 
   filter(rgn_id == 207, year == latest_data_year) %>% 
-  select(rgn_id, species, fao, environment, value)
+  dplyr::select(rgn_id, species, fao, environment, value)
 
-yield <- mar_old %>% 
-  full_join(mar_new, by = c("rgn_id","species","fao", "environment")); #View(yield)
+yield_5 <- mar_old_5 %>% 
+  full_join(mar_new_5, by = c("rgn_id","species","fao", "environment")); View(yield_5)
 
-plot(yield$old_value, yield$value)
+plot(yield_5$old_value, yield_5$value,
+     xlab = paste("Previous Value", previous_latest_data_year),
+     ylab = paste("Current Value", latest_data_year),
+     main = "Vietnam mariculture yield data comparison"); abline(0, 1, col = "red")
+
+comp_plot_5 <- ggplot() + 
+  geom_point(data = yield_5,
+             aes(x = old_value, y = value,
+                 text = paste("species:", species, "<br>region ID:", rgn_id))) +
+  labs(x = paste("Previous Value", previous_latest_data_year),
+       y = paste("Current Value", latest_data_year),
+       title = "Vietnam Mariculture Yield Data Comparison") +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  theme_bw()
+
+ggplotly(comp_plot_5)
 
 
-## Compare yield data for Belize; yield of Whiteleg shrimp was halved between 2019 and 2020 assessment years.
-mar_old <- mar_old_data%>% 
+# ---- Compare yield data for Belize; ----
+# yield of Whiteleg shrimp was halved between 2019 and 2020 assessment years.
+# Whiteleg shrimp doubled between 2021 and 2022
+mar_old_6 <- mar_old_data %>% 
   filter(rgn_id == 164, year == previous_latest_data_year) %>% 
-  select(rgn_id, species, fao, old_value = value)
-mar_new <- mar_new_data %>% 
+  dplyr::select(rgn_id, species, fao, old_value = value)
+mar_new_6 <- mar_new_data %>% 
   filter(rgn_id == 164, year == latest_data_year) %>% 
-  select(rgn_id, species, fao, value)
+  dplyr::select(rgn_id, species, fao, value)
 
-yield <- mar_old %>% 
-  full_join(mar_new, by = c("rgn_id","species","fao")); View(yield)
+yield_6 <- mar_old_6 %>% 
+  full_join(mar_new_6, by = c("rgn_id","species","fao")); View(yield_6)
+
+comp_plot_6 <- ggplot() + 
+  geom_point(data = yield_6,
+             aes(x = old_value, y = value,
+                 text = paste("species:", species, "<br>region ID:", rgn_id))) +
+  labs(x = paste("Previous Value", previous_latest_data_year),
+       y = paste("Current Value", latest_data_year),
+       title = "Belize Mariculture Yield Data Comparison") +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  theme_bw()
+
+ggplotly(comp_plot_6)
 
 
-## Compare yield data for tanzania
-mar_old <- mar_old_data %>% 
+# ---- Compare yield data for Tanzania ----
+mar_old_7 <- mar_old_data %>% 
   filter(rgn_id == 202, year == previous_latest_data_year) %>% 
-  select(rgn_id, species, fao, old_value = value, environment)
-mar_new <- mar_new_data %>% 
+  dplyr::select(rgn_id, species, fao, old_value = value, environment)
+mar_new_7 <- mar_new_data %>% 
   filter(rgn_id == 202, year == previous_latest_data_year) %>% 
-  select(rgn_id, species, fao, value, environment)
+  dplyr::select(rgn_id, species, fao, value, environment)
 
-yield <- mar_old %>% 
-  full_join(mar_new, by = c("rgn_id","species","fao", "environment"))
+yield_7 <- mar_old_7 %>% 
+  full_join(mar_new_7, by = c("rgn_id","species","fao", "environment"))
 
-plot(yield$old_value, yield$value);abline(0,1,col="red")
+plot(yield_7$old_value, yield_7$value,
+     xlab = paste("Previous Value", previous_latest_data_year),
+     ylab = paste("Current Value", latest_data_year),
+     main = "Tanzania mariculture yield data comparison"); abline(0, 1, col = "red")
+
+comp_plot_7 <- ggplot() + 
+  geom_point(data = yield_7,
+             aes(x = old_value, y = value,
+                 text = paste("species:", species, "<br>region ID:", rgn_id))) +
+  labs(x = paste("Previous Value", previous_latest_data_year),
+       y = paste("Current Value", latest_data_year),
+       title = "Tanzania Mariculture Yield Data Comparison") +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  theme_bw()
+
+ggplotly(comp_plot_7)
 
 
-## Compare yield data for denmark; pressure score decreased
-mar_old <- mar_old_data %>% 
+# ---- Compare yield data for Denmark; ----
+# pressure score decreased (not sure which version this comment was about)
+mar_old_8 <- mar_old_data %>% 
   filter(rgn_id == 175, year == previous_latest_data_year) %>% 
-  select(rgn_id, species, fao, old_value = value, environment)
-mar_new <- mar_new_data %>% 
+  dplyr::select(rgn_id, species, fao, old_value = value, environment)
+mar_new_8 <- mar_new_data %>% 
   filter(rgn_id == 175, year == latest_data_year) %>% 
-  select(rgn_id, species, fao, value, environment)
+  dplyr::select(rgn_id, species, fao, value, environment)
 
-yield <- mar_old %>% 
-  full_join(mar_new, by = c("rgn_id","species","fao", "environment")); View(yield)
+yield_8 <- mar_old_8 %>% 
+  full_join(mar_new_8, by = c("rgn_id","species","fao", "environment")); View(yield_8)
 
 plot(yield$old_value, yield$value);abline(0,1,col="red")
 
-## Compare yield data for Ecuador, score increased by a lot
-mar_old <- mar_old_data %>% 
+comp_plot_8 <- ggplot() + 
+  geom_point(data = yield_8,
+             aes(x = old_value, y = value,
+                 text = paste("species:", species, "<br>region ID:", rgn_id))) +
+  labs(x = paste("Previous Value", previous_latest_data_year),
+       y = paste("Current Value", latest_data_year),
+       title = "Denmark Mariculture Yield Data Comparison") +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  theme_bw()
+
+ggplotly(comp_plot_8)
+
+
+# ---- Compare yield data for Ecuador, ----
+# score increased by a lot (again, not sure which version this comment is from)
+# v2024: (2022 data) whiteleg shrimp yield has notably increased 
+mar_old_9 <- mar_old_data %>% 
   filter(rgn_id == 137, year == previous_latest_data_year) %>% 
-  select(rgn_id, species, fao, old_value = value)
-mar_new <- mar_new_data %>% 
+  dplyr::select(rgn_id, species, fao, old_value = value, environment)
+
+mar_new_9 <- mar_new_data %>% 
   filter(rgn_id == 137, year == latest_data_year) %>% 
-  select(rgn_id, species, fao, value)
+  dplyr::select(rgn_id, species, fao, value, environment)
 
-yield <- mar_old %>% 
-  full_join(mar_new, by = c("rgn_id","species","fao")); View(yield)
+yield_9 <- mar_old_9 %>% 
+  full_join(mar_new_9, by = c("rgn_id","species","fao")); View(yield_9)
 
-plot(yield$old_value, yield$value)
+plot(yield_9$old_value, yield_9$value)
 
-# ----Sustainability scores--------------------------------------------------------------------------
+comp_plot_9 <- ggplot() + 
+  geom_point(data = yield_9,
+             aes(x = old_value, y = value,
+                 text = paste("species:", species, "<br>region ID:", rgn_id))) +
+  labs(x = paste("Previous Value", previous_latest_data_year),
+       y = paste("Current Value", latest_data_year),
+       title = "Ecuador Mariculture Yield Data Comparison") +
+  geom_abline(slope = 1, intercept = 0, col = "red") +
+  theme_bw()
+
+ggplotly(comp_plot_9)
 
 
-## Compare new/old Mariculture sustainability scores
+# ============= Sustainability scores ==========================================
 
-sust_old <- read.csv(file.path("..", paste0( "v", last_year), "output/mar_sustainability.csv")) %>% 
-  select(rgn_id, taxa_code, sust_old = sust_coeff)
+# Compare new/old Mariculture sustainability scores
 
-  sust_old$species = str_remove(sust_old$taxa_code, "\\_[^.]*$")
-sust_new <- read.csv("int/mar_sustainability_check.csv") %>% 
-  select(rgn_id, species, sust_new = sust_coeff)
+sust_old <- readr::read_csv(here::here("globalprep", "mar", paste0( "v", last_year),
+                                       "output", "mar_sustainability.csv")) %>% 
+  dplyr::select(rgn_id, taxa_code, sust_old = sust_coeff)
+
+# tidy up species names (such as "Abalones_1"), rename as species column
+sust_old$species <- str_remove(sust_old$taxa_code, "\\_[^.]*$") 
+
+sust_new <- readr::read_csv(here::here(current_mar_dir, "int", "mar_sustainability_check.csv")) %>% 
+  dplyr::select(rgn_id, species, sust_new = sust_coeff)
 
 test <- sust_new %>% 
-  full_join(sust_old, by=c("rgn_id", "species")) %>%
+  full_join(sust_old, by = c("rgn_id", "species")) %>%
   mutate(difference = sust_new - sust_old) %>%
   group_by(rgn_id) %>%
   summarize(mean_rgn_sus_diff = mean(difference, na.rm = TRUE))
 
 mean_diff_sus <- ggplot(test, aes(x = rgn_id, y = mean_rgn_sus_diff)) + 
-  geom_point()
+  geom_point() +
+  theme_bw() +
+  labs(title = paste("Mariculture Sustainability: Mean Difference <br>", latest_data_year, "Data - ", previous_latest_data_year, "Data"))
 
 ggplotly(mean_diff_sus)
 ```
@@ -1270,15 +1393,14 @@ compare <- full_join(old, new, by=c("rgn_id"))
 
 
 comp_plot <- ggplot() + 
-  geom_point(data = compare, aes(x = prs_score_old, y = pressure_score, text = paste("Regionid:", rgn_id))) +
+  geom_point(data = compare, aes(x = prs_score_old, y = pressure_score, text = paste("Region ID:", rgn_id))) +
   labs(x = paste("Previous pressure",previous_latest_data_year), y = paste("Current pressure", latest_data_year)) +
   geom_abline(slope = 1, intercept = 0, col = "red")
-
 
 ggplotly(comp_plot)
 
 
-# compare old genetic escape pressure scores for the same year 
+# Compare old genetic escape pressure scores for the same year 
 old <- read.csv(file.path("..", paste0( "v", last_year), "output", "GenEsc.csv")) %>%
   filter(year == previous_latest_data_year) %>% 
   select(rgn_id, year, prs_score_old=pressure_score)
@@ -1299,7 +1421,7 @@ ggplotly(comp_plot)
 
 
 
-## Compare genetic escapes pressure scores for Vietnam, data was updated by fao
+# Compare genetic escapes pressure scores for Vietnam, data was updated by FAO
 old <- read.csv(file.path("..", paste0( "v", last_year), "output", "GenEsc.csv")) %>%
   filter(rgn_id == 207) %>% 
   select(rgn_id, year, prs_score_old=pressure_score)
@@ -1313,7 +1435,7 @@ compare <- full_join(old, new, by = c("rgn_id", "year")); #View(compare)
 plot(compare$prs_score_old, compare$pressure_score);abline(0, 1, col = "red")
 
 
-## Compare genetic escapes pressure scores for Denmark
+# Compare genetic escapes pressure scores for Denmark
 old <- read.csv(file.path("..", paste0( "v", last_year), "output", "GenEsc.csv")) %>%
   filter(rgn_id == 175) %>% 
   select(rgn_id, year, prs_score_old = pressure_score)
