@@ -1,5 +1,5 @@
 ---
-title: "OHI 2023: Food Provision, Preparing catch data for BBmsy calculations and mean catch (weights in FIS model) and FP weights"
+title: "OHI 2024: Food Provision, Preparing catch data for BBmsy calculations and mean catch (weights in FIS model) and FP weights"
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
@@ -33,7 +33,7 @@ An example of our aggregation process: New Zealand is located entirely in FAO re
 First, we need to match SAUP EEZ regions to OHI regions, and summarize per region, year, and species.
 
 ## Updates from previous assessment
-- None. This script wasn't run in v2023. Associated data files within the repo were copied from v2022 to v2023.
+- None. This script wasn't run in v2024. Associated data files within the repo were copied from v2023 to v2024.
 
 ***
 
@@ -74,13 +74,11 @@ library(tidyverse)
 library(readxl)
 library(data.table)
 
-setwd(here::here("globalprep/fis/v2022"))
-source('../../../workflow/R/common.R')
+source(here::here("workflow", "R", "common.R")) # file creates objects to process data
 
 ## Paths for data
-fis_path = file.path(dir_M,"git-annex/globalprep/fis/v2022/int") 
-SAUP_path <- file.path(dir_M, "git-annex/globalprep/fis/v2022")
-
+fis_path <- here::here(dir_M,"git-annex", "globalprep", "fis", "v2022", "int") 
+SAUP_path <- here::here(dir_M, "git-annex", "globalprep","fis","v2022")
 ```
 
 ***
@@ -88,8 +86,8 @@ SAUP_path <- file.path(dir_M, "git-annex/globalprep/fis/v2022")
 # Create lookup tables to match OHI region names to SAUP area_name (EEZ) 
 
 ```{r, eval = FALSE}
-fao_eez_prod <- read.csv(file.path(SAUP_path, "eez_fao_ids_prod.csv"))
-fao_high_seas <- read.csv(file.path(SAUP_path, "high_seas_fao_ids_prod.csv"))
+fao_eez_prod <- read.csv(here(SAUP_path, "eez_fao_ids_prod.csv"))
+fao_high_seas <- read.csv(here(SAUP_path, "high_seas_fao_ids_prod.csv"))
 
 
 high_seas_regions <- fao_high_seas %>%

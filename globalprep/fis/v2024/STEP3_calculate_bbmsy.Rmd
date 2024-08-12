@@ -1,5 +1,5 @@
 ---
-title: "OHI 2023: Food Provision, Calculating fisheries stock status"
+title: "OHI 2024: Food Provision, Calculating fisheries stock status"
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
@@ -24,7 +24,7 @@ The [`datalimited`](https://github.com/datalimited/datalimited) R package, devel
 
 # Updates from previous scenario year
 
-- None. This script wasn't run in v2023. Associated data files within the repo were copied from v2022 to v2023.
+- None. This script wasn't run in v2024. Associated data files within the repo were copied from v2023 to v2024.
 
 # Setup 
 
@@ -49,11 +49,7 @@ library(tidyverse)
 library(doParallel)
 library(here)
 
-setwd(here::here("globalprep/fis/v2022"))
-
-
-source(here('workflow/R/common.R'))
-
+source(here::here("workflow", "R", "common.R")) # file creates objects to process data
 ```
 
 # Load catch data

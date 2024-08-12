@@ -39,7 +39,7 @@ mar_split <- function(m) {
     select(c(country, fao, environment, species, year, Taxon_code, family, value))
   
   m <- m %>%
-    filter(country != "Bonaire, Sint Eustatius and Saba") %>%
+    filter(!country %in% c("Bonaire, Sint Eustatius and Saba")) %>%
     bind_rows(m_ant2_new) %>% 
     arrange(country, fao, environment, species, year, value)
   
