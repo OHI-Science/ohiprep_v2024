@@ -42,15 +42,14 @@ where for each IUCN threat category:
 -   *S~cat~* is the number of assessed species in the category
 -   *w~cat~* is the status weight assigned for that category (note, these are the inverse of the risk value used in the SPP calculations):
 -   'LC' = 1.0, 'NT' = 0.8, 'VU' = 0.6, 'EN' = 0.4, 'CR' = 0.2, 'EX' = 0.0
--   'LC' = **Least Concern**, 'NT' = **Near Threatened**, 'VU' = **Vulnerable**, 'EN' = **Endangered**, 'CR' = **Critically Endangered**, 'EX' = **Extinct**
 
 ICO trend is calculated in a similar manner, but weightings are assigned according to IUCN population trend: 'Decreasing' = -0.5, 'Stable' = 0.0, 'Increasing' = +0.5.
 
 # v2024 updates:
 
-Additional year of IUCN Red List data added.  Note that the Red List v3 API will be deprecated soon, in lieu of the v4 API.
+Additional year of IUCN Red List data added. Note that the Red List v3 API will be deprecated soon, in lieu of the v4 API.
 
-# v2023 updates: 
+# v2023 updates:
 
 Additional year of IUCN Red List data added.
 
@@ -65,10 +64,10 @@ The iconic species list was updated by adding species from [Reyes-García et al.
 **Species native country and status information:**
 
 -   **Reference**: IUCN 2022. IUCN Red List of Threatened Species. Version 2022-2 \<www.iucnredlist.org\>
--   **Accessed**: Aug 10, 2023
+-   **Accessed**: Aug 13, 2024
 -   **Download**: Download is done through iucnredlist API
 -   **Native data resolution**: Country level (by country name)
--   **Time range**: 1965-2022 (discrete past assessments by species)
+-   **Time range**: 1965-2023 (discrete past assessments by species)
 -   **Format**: JSON
 
 ------------------------------------------------------------------------
@@ -93,7 +92,8 @@ librarian::shelf(
   plotly,
   parallel,
   devtools,
-  ohicore
+  ohicore,
+  kableExtra
 )  
 ### directory paths and relevant files
 current_year  <- 2024
@@ -460,7 +460,7 @@ ico_assess_raw <- lapply(spp_past_assess_chunk_files, FUN = function(x) {
   dplyr::bind_rows()
 
 ###############
-
+# prep the dataframe and join by the iucn id and scientific name
 ico_assess_raw <- ico_assess_raw %>%
   dplyr::rename(iucn_sid = name) %>%
   dplyr::mutate(iucn_sid = as.integer(iucn_sid),
@@ -469,7 +469,7 @@ ico_assess_raw <- ico_assess_raw %>%
                      dplyr::select(iucn_sid, sciname) %>%
                      dplyr::distinct(),
                    )
-# 705 in v2018, 743 in v2019, 463 in v2020, 480 in v2021, 496 in v2022, #783 in v2023
+# 705 in v2018, 743 in v2019, 463 in v2020, 480 in v2021, 496 in v2022, #783 in v2023, #828 in v2024
 
 ##### v2020 error check - same logic goes for 2021... 
 # there's a difference of 280 past assessments which seems like a lot, I feel like past assessments should only be increasing unless for some reason they are no longer accessible on the website
@@ -487,10 +487,14 @@ previous_grouped <- here::here(goal, previous_scen, 'raw', 'ico_assessments_raw.
   dplyr::rename(!!previous_scen := "n")
 
 compare_totals <- left_join(current_grouped, previous_grouped, by="iucn_sid") %>% 
-  dplyr::filter(!!previous_scen != !!version_year) %>% 
-  dplyr::mutate(diff = !!sym(previous_scen) - !!sym(version_year))
+  dplyr::filter(!!sym(previous_scen) != !!sym(version_year)) %>% # v2024 update: use `sym()` to have it recognize the columns correctly and filter for any rows in which v2023 does not equal v2024
+  dplyr::mutate(diff = !!sym(version_year) - !!sym(previous_scen)) # to see whether the assessment was added or dropped
 
-#v2023, 4 species have one more assessment now than they did in the previous version, two species have one less, 136 were not assessed last year 
+# new dataframe that contains only the rows from the joined dataset where there are missing values in either this year's assessment OR last year's assessment
+compare_na <- left_join(current_grouped, previous_grouped, by="iucn_sid") %>% 
+  dplyr::filter(is.na(!!sym(version_year))|is.na(!!sym(previous_scen))) # v2024: 42 obs
+
+# v2024: 7 species have one more assessment now than they did in the previous version, 4 species have one less, 42 were not assessed last year 
 
 previous <- here::here(goal, previous_scen, "raw", "ico_assessments_raw.csv") %>% 
   readr::read_csv() %>% 
@@ -508,10 +512,11 @@ current <- ico_assess_raw %>%
 
 #v2023 it looks like the more recent assessment was removed in the data update for the two species where the number dropped
 
+# v2024: no issue, was fixed between v2022 - v2023
 
 ######
 
-readr::write_csv(ico_assess_raw, file.path(dir_here, 'raw/ico_assessments_raw.csv'))
+readr::write_csv(ico_assess_raw, here(dir_here, 'raw', 'ico_assessments_raw.csv'))
 ```
 
 ```{r, eval=F}
@@ -538,6 +543,32 @@ DD & & \longleftarrow \text{"Status inadequately known-Survey required or data s
 NE & & \longleftarrow \text{"Not recognized ($NR$)"}
 \end{eqnarray*}
 ```
+
+```{r}
+# use `kableExtra` to create a table that depicts the same information
+classification_df <- data.frame(
+  Original = c(
+    "Lower risk/Near threatened (LR/NT)",
+    "Threatened (T)",
+    "Vulnerable (V)",
+    "Endangered (E)",
+    "Lower risk/Conservation dependent (LR/CD)",
+    "Very rare and believed to be decreasing in numbers",
+    "Less rare but believed to be threatened-Requires watching",
+    "Insufficiently known (K)",
+    "Indeterminate (I)",
+    "Status inadequately known-Survey required or data sought",
+    "Not recognized (NR)"
+  ),
+  New = c("NT", "T", "VU", "EN", "LR/CD", "CR", "T", "DD", "DD", "DD", "NE")
+)
+
+classification_table <- classification_df %>%
+  kbl(col.names = c("Original Category/Description", "New Category")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+classification_table
+```
+
 
 ------------------------------------------------------------------------
 
@@ -581,10 +612,11 @@ pop_cat <- tibble::tribble(
 
 ico_assess <- ico_assess %>% 
   dplyr::left_join(pop_cat, by = 'cat') %>%
-  dplyr::filter(!is.na(cat_score)) %>%
+  dplyr::filter(!is.na(cat_score)) %>% # to remove DD or NE (Data Deficient or Not Recognized)
   dplyr::distinct() %>%
   dplyr::arrange(iucn_sid, year)
 
+# v2024: 828, there were new species added this year too
 #v2023 595-makes sense since there were new species added
 # v2021 358 rows in the list - compare to v2020 to double check 
 # v2020 had 341 rows, makes sense that v2021 is more since there are some newer years of assessments in the updated data
@@ -646,6 +678,7 @@ ico_spp_cat <- ico_spp_cat %>%
   dplyr::distinct() #added in v2023
 
 summary(ico_spp_cat)
+# v2024: 85727-355351-88265 NAs for cat_score, eval_yr, cat_2022_score
 #v2023 72906, 264791, 78242 NAs
 # v2020 still has 4715-10118-1540 NAs for cat_score, eval_yr, cat_2016_score
 # v2021 still has 448-10181-1120 NAs for cat_score, eval_yr, cat_2016_score; compare against v2020
@@ -680,7 +713,6 @@ ico_spp_rgn_cat <- ico_spp_rgn_cat %>%
   dplyr::filter(ico_gl | ico_rgn_id == rgn_id) %>% # keep (all globally iconic) and (regionally iconic in region only)
   dplyr::distinct()
 
-
 readr::write_csv(ico_spp_rgn_cat, here::here(dir_here, 'int', 'ico_spp_rgn_cat.csv'))
 # csv retaining data in ico_rgn_id column, but not when it is re-imported
 ```
@@ -705,7 +737,7 @@ ico_spp_rgn_cat <- here::here(dir_here, 'int', 'ico_spp_rgn_cat.csv') %>%
 
 ## Report out for toolbox format (rgn_id | sciname | category or popn_trend for each species within a region).
 ## Note: in toolbox, group_by(rgn_id, sciname) and then summarize(category = mean(category)) to
-##   average any parent/subpop species listings before aggregating to overall average per region.
+## average any parent/subpop species listings before aggregating to overall average per region.
 
 ico_status_raw <- ico_spp_rgn_cat %>%
   dplyr::select(rgn_id, rgn_name, sciname, iucn_sid, cat, cat_score, year, eval_yr) %>%
@@ -715,7 +747,7 @@ ico_status_raw <- ico_spp_rgn_cat %>%
 # Get a preview of status and trend:
 ico_status_calc <- ico_status_raw %>%
   dplyr::group_by(rgn_id, rgn_name, sciname, year) %>%
-  dplyr::filter(!is.na(cat_score)) %>% # remove any DDs (data deficient)
+  dplyr::filter(!is.na(cat_score)) %>% # remove any DDs (data deficient)/ NE (not recognized)
   dplyr::summarize(cat_score = mean(cat_score)) %>% 
   dplyr::group_by(rgn_id, rgn_name, year) %>%
   dplyr::summarize(mean_cat = round(mean(cat_score), 5), 
@@ -735,7 +767,7 @@ for (i in 1993:max(ico_status_calc$year, na.rm = TRUE)) { # i <- 2013
                   ico_trend = round(trend_lm * 5, 5)) %>% # trend prediction five years out
     dplyr::ungroup()
   ico_trend <- ico_trend %>%
-    dplyr::bind_rows(tmp_trend)
+    dplyr::bind_rows(tmp_trend) # v2024: 6541 obs
 }
 
 ico_sum <- ico_status_raw %>%
@@ -755,8 +787,17 @@ readr::write_csv(ico_trend,       here::here(dir_here, 'output', 'ico_trend.csv'
 
 ico_status_raw1[duplicated(ico_status_raw1 ), ] 
 ### NOTE: if iucn_sid were removed, this would show duplicates due to subpops with same category.
-table(ico_status_raw1$category)
 
+table(ico_status_raw1$category)
+# v2024: sad changes :(
+  #  CD    CR    DD    EN    EX    LC    NT    VU 
+  # 536  9513  9291 24544   800 25109 22677 30955
+
+ico_status_raw1_prev <- read_csv(here::here("globalprep","ico", previous_scen, "output","ico_spp_iucn_status.csv"))
+table(ico_status_raw1_prev$category)
+# v2023:
+  #  CD    CR    EN    EX    LC    NT    VU 
+  # 614  8779 22554   589 26405 22516 33274 
 ```
 
 ### Iconic Species full list
