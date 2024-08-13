@@ -31,7 +31,7 @@ knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'Figs/',
 
 ```{r}
 library(dplyr)
-library(rgdal)
+# library(rgdal)
 library(raster)
 library(here)
 library(ggridges)
@@ -43,7 +43,7 @@ source(here('workflow/R/common.R'))
 #library(provRmd); prov_setup()
 
 goal     <- 'spp'
-scenario <- 'v2022'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info
@@ -217,7 +217,7 @@ if(!file.exists(spp_timeseries_file)) {
     
     spp_ts_df_rgn <- mc_get_from_api(spp_hist_url, spp_rgn_ids, api_key, delay = 1)
     
-    if(names(spp_ts_df_rgn) != c('param_id', 'api_error')) {
+    if(any(names(spp_ts_df_rgn) != c('param_id', 'api_error'))) {
       spp_ts_df_rgn <- spp_ts_df_rgn %>%
         dplyr::select(iucn_sid = name, year, rgn_cat = code, iucn_rgn = region_identifier) %>%
         filter(!is.na(iucn_sid))
