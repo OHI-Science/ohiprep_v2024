@@ -14,7 +14,7 @@ output:
   pdf_document:
     toc: true
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 [REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2022/globalprep/ico/v2022/ico_data_prep.Rmd)
@@ -752,7 +752,7 @@ ico_status_calc <- ico_status_raw %>%
   dplyr::group_by(rgn_id, rgn_name, year) %>%
   dplyr::summarize(mean_cat = round(mean(cat_score), 5), 
                    ico_status = (1 - mean_cat) * 100,
-                   n_spp = n()) %>%
+                   n_spp = n()) %>% # n_spp represents the number of species for each unique combination of region ID, region name, and year
   dplyr::ungroup()
 
 ico_trend <- data.frame()
@@ -836,6 +836,16 @@ status_ts_plot <- ggplot(
        color = 'Region')
 
 plotly::ggplotly(status_ts_plot)
+
+# v2024
+# interactive plotly of iconic species status over time by region
+ico_status_plotly <- ico_sum %>%
+  plot_ly(x = ~year, y = ~ico_status, color = ~rgn_name, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "ICO status over time",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "ICO status"))
+ico_status_plotly
 ```
 
 ```{r fig.height = 4, fig.width = 6, fig.align = 'center', eval=FALSE}
@@ -850,15 +860,25 @@ trend_ts_plot <- ggplot(
 
 plotly::ggplotly(trend_ts_plot)
 
+# v2024
+# interactive plot of status trend over time by region
+trend_ts_plotly <- ico_sum %>%
+  plot_ly(x = ~year, y = ~ico_trend, color = ~rgn_name, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "ICO trend over time",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "ICO trend"))
+trend_ts_plotly
 ```
 
 ------------------------------------------------------------------------
 
-## Compare OHI 2023 vs OHI 2022 assessment results
+## Compare OHI 2024 vs OHI 2023 assessment results
 
-Plot the estimated status and trends for 2016 from assessments v2022 and v2023. For v2023 this was the same final year of data.
+Plot the estimated status and trends from assessments v2023 and v2024 to compare. 
 
-```{r fig.height = 4, fig.width = 6, fig.align = 'center', eval=FALSE}
+v2023 code:
+```{r eval=FALSE}
 ico_sum <- here::here(dir_here, 'summary', 'ico_summary.csv') %>% 
   readr::read_csv()
 
@@ -874,7 +894,7 @@ ico_compare <- here::here(goal, previous_scen, 'summary', 'ico_summary.csv') %>%
   dplyr::distinct() %>% 
   dplyr::rename(previous_status = ico_status, previous_trend = ico_trend, previous_nspp = n_spp) %>% 
   dplyr::left_join(status_trend, by = 'rgn_id') %>% 
-  dplyr::mutate(d_nspp = as.factor(n_spp - previous_nspp)) %>% 
+  dplyr::mutate(d_nspp = as.factor(n_spp - previous_nspp)) %>% # represents the difference in the number of species between the current year's assessment and the previous assessment for each region
   mutate(status_diff = ico_status - previous_status)
 # four regions have NAs 
 
@@ -883,7 +903,8 @@ compare_status_plot <- ggplot(ico_compare) +
   geom_abline(slope = 1, intercept = 0, color = 'red') +
   labs(x = sprintf('ICO status %s', previous_scen),
        y = sprintf('ICO status %s', version_year),
-       title = 'ICO Status Comparison')
+       title = 'ICO Status Comparison') +
+  theme_minimal()
 
 plotly::ggplotly(compare_status_plot)
 ```
@@ -897,7 +918,8 @@ trend_compare_plot <- ggplot(ico_compare) +
   geom_abline(slope = 1, intercept = 0, color = 'red') +
   labs(x = sprintf('ICO trend %s', previous_scen),
        y = sprintf('ICO trend %s', version_year),
-       title = 'ICO Trend Comparison')
+       title = 'ICO Trend Comparison') +
+  theme_minimal()
 
 plotly::ggplotly(trend_compare_plot)
 ```
