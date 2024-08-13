@@ -3,8 +3,10 @@ title: "OHI `r format(Sys.Date(), '%Y')`: Mariculture"
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
+    code_folding: show
     toc: true
-    number_sections: true
+    toc_float: yes
+    number_sections: false
     theme: cerulean
     highlight: haddock
     includes: 
@@ -83,7 +85,7 @@ Obtained upon request of SFW.
 
 ```{r setup, message=FALSE, warning=FALSE}
 
-knitr::opts_chunk$set(eval=FALSE)
+knitr::opts_chunk$set(eval = FALSE)
   
 # ---- Load packages ----
 if (!require(librarian)){
