@@ -54,7 +54,7 @@ library(raster)
 library(sf)
 library(fasterize)
 library(dplyr)
-library(rgdal)
+# library(rgdal)
 library(here)
 library(ggplot2)
 library(stringr)
@@ -64,7 +64,7 @@ library(terra)
 source(here('workflow/R/common.R'))
 
 goal     <- 'spp'
-scenario <- 'v2022'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info
@@ -577,13 +577,13 @@ all_prot_df <- wdpa_area_df %>%
   summarize(mpa_pct = sum(mpa_pct)) %>%
   rename(from = cell_id, to = mpa_pct)
 
-notake_raster <- classify(x = rast(rast_cell_id), notake_df, othersNA = TRUE)
+notake_raster <- classify(x = rast(rast_cell_id), notake_df, others = NA)
 plot(notake_raster, main = 'No take protection (Ia, Ib, II + no take)')
 
-conservation_raster <- classify(rast(rast_cell_id), conservation_df, othersNA = TRUE)
+conservation_raster <- classify(rast(rast_cell_id), conservation_df, others = NA)
 plot(conservation_raster, main = 'Conservation protection (Ia - IV + no take)')
 
-all_prot_raster <- classify(rast(rast_cell_id), all_prot_df, othersNA = TRUE)
+all_prot_raster <- classify(rast(rast_cell_id), all_prot_df, others = NA)
 plot(all_prot_raster, main = 'All protection (any category)')
 ```
 

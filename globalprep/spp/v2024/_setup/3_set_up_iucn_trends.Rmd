@@ -29,7 +29,7 @@ knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'Figs/',
                       echo = TRUE, message = FALSE, warning = FALSE, eval = FALSE)
 
 library(dplyr)
-library(rgdal)
+# library(rgdal)
 library(raster)
 library(here)
 library(ggridges)
@@ -38,7 +38,7 @@ library(ggplot2)
 source(here('workflow/R/common.R'))
 
 goal     <- 'spp'
-scenario <- 'v2022'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info
@@ -173,7 +173,11 @@ spp_narr_chunk_files <- list.files(file.path(dir_goal_anx, 'tmp'),
     spp_narr[[i]] <- spp_narr_tmp
   }
   
-
+  ### Edit for v2024: Trouble shooting issue caused by 1 df in the 'spp_narr' list: df 1236
+  ### See issue #302 for example on how to identify if any dfs in the list dont have the
+  ### correct names and use below code to remove them
+  # list_rm <- c(seq(1:1235), seq(1237:2181))
+  # spp_narr1 <- spp_narr[list_rm]
   spp_trend_reclass <- spp_narr %>%
     lapply(FUN = function(x) dplyr::select(x, iucn_sid = name, 
                                     iucn_rgn = region_identifier, 
@@ -298,8 +302,27 @@ trend_regr_91 <- lm(calc_trend ~ pop_trend, data = trend_91)
 
 trend_coeffs_91 <- summary(trend_regr_91)
 
+### v2024 Results:
+# Call:
+# lm(formula = calc_trend ~ pop_trend, data = trend_91)
+# 
+# Residuals:
+#      Min       1Q   Median       3Q      Max 
+# -0.59926 -0.00520  0.00074  0.00456  0.19480 
+# 
+# Coefficients:
+#               Estimate Std. Error t value            Pr(>|t|)    
+# (Intercept) -0.0007423  0.0006252  -1.187               0.235    
+# pop_trend   -0.0059429  0.0007566  -7.855 0.00000000000000703 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 0.02125 on 1698 degrees of freedom
+#   (1129 observations deleted due to missingness)
+# Multiple R-squared:  0.03506,	Adjusted R-squared:  0.0345 
+# F-statistic:  61.7 on 1 and 1698 DF,  p-value: 0.000000000000007029
 
-### BASED ON FILTERING SINCE 1991 (IUCN Red List v1.0)
+### BASED ON FILTERING SINCE 1991 (IUCN Red List v1.0) ### (From previous copied version)
 # Call:
 # lm(formula = calc_trend ~ pop_trend, data = trend_91)
 # 
@@ -350,7 +373,27 @@ trend_regr_01 <- lm(calc_trend ~ pop_trend, data = trend_01)
 
 trend_coeffs_01 <- summary(trend_regr_01)
 
-### BASED ON FILTERING SINCE 2001 (v3.1)
+### v2024 Results:
+# Call:
+# lm(formula = calc_trend ~ pop_trend, data = trend_01)
+# 
+# Residuals:
+#      Min       1Q   Median       3Q      Max 
+# -0.59918 -0.00535  0.00082  0.00456  0.19465 
+# 
+# Coefficients:
+#               Estimate Std. Error t value           Pr(>|t|)    
+# (Intercept) -0.0008249  0.0006538  -1.262              0.207    
+# pop_trend   -0.0061753  0.0007938  -7.779 0.0000000000000128 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 0.02194 on 1646 degrees of freedom
+#   (1066 observations deleted due to missingness)
+# Multiple R-squared:  0.03546,	Adjusted R-squared:  0.03488 
+# F-statistic: 60.52 on 1 and 1646 DF,  p-value: 0.00000000000001278
+
+### BASED ON FILTERING SINCE 2001 (v3.1) ### (From previous copied version)
 # Call:
 # lm(formula = calc_trend ~ pop_trend, data = trend_01)
 # 
