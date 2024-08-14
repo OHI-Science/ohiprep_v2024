@@ -190,6 +190,10 @@ for (f in files){
   m_rgn <- name_2_rgn(df_in = m,
                       fld_name = 'country', 
                       flds_unique = c('commodity', 'product', 'year'))
+  
+  # v2024 removed: 
+  # Ascension, Saint Helena and Tristan da Cunha -- new syntax from previous years, will update ohicore::split_regions() to account for this change
+  # Yugoslavia SFR  -- this is fine, since it broke up into the six modern countries: Croatia, Montenegro, Serbia, Slovenia, Bosnia and Herzegovina, and Macedonia in 1990-1992, which means the relevant data is still captured.
     
 # v2021 duplicates:  [1] "China"                 "China, Hong Kong SAR"  "China, Macao SAR"      "Guadeloupe"           
 # [5] "Martinique"            "Montenegro"            "Russian Federation"    "Serbia and Montenegro"
