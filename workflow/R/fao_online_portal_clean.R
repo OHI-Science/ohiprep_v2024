@@ -5,9 +5,9 @@
 #' @param fao FAO dataset downloaded from Statistical Query Panel
 #' @param initial_data_year initial year available in the dataset
 #' @param last_data_year latest year available in the dataset
-#' @param sub_N value to substitute for rows that have the flaf of N
+#' @param sub_N value to substitute for rows that have the flag of N
 #'
-#' @return returns a cleaned version of the fao data
+#' @return returns a cleaned version of the FAO data
 fao_online_portal_clean <- function(fao, initial_data_year, last_data_year, sub_N = 0.1) {
 
 fao <- fao %>% 
@@ -39,7 +39,7 @@ fao_new <- fao_values %>%
 #replace 
 fao_new <- fao_new%>% 
   mutate(value = case_when((str_detect(flag, "N") & value == 0) ~ sub_N,
-                           TRUE ~value)) %>% #replace values that are 0 and have the flag N with sub_N
+                           TRUE ~ value)) %>% #replace values that are 0 and have the flag N with sub_N
   select(-c(row_id, flag))
 
 

@@ -23,7 +23,9 @@ This analysis converts FAO mariculture data into one of the data layers used to 
 
 # Updates from previous assessment
 
-New year of FAO mariculture data (1950-2021).
+-   New year of FAO mariculture data (1950-2022).
+
+-   Updating script throughout to use tidyverse style, reproducible file paths, updated read and write functions
 
 ------------------------------------------------------------------------
 
@@ -32,13 +34,13 @@ New year of FAO mariculture data (1950-2021).
 ## Production data
 
 **Reference**:\
-<http://www.fao.org/fishery/statistics/software/fishstatj/en#downlApp> FAO Global Aquaculture Production Quantity 1950_2021 FAO metadata found [here](http://www.fao.org/fishery/statistics/global-aquaculture-production/en)
+<http://www.fao.org/fishery/statistics/software/fishstatj/en#downlApp> FAO Global Aquaculture Production Quantity 1950_2022 FAO metadata found [here](http://www.fao.org/fishery/statistics/global-aquaculture-production/en)
 
 **Downloaded**: July 5, 2023
 
 **Description**: Quantity (tonnes) of mariculture for each country, species, year.
 
-**Time range**: 1950-2021
+**Time range**: 1950-2022
 
 ## Seafood Watch sustainability data
 
@@ -61,14 +63,29 @@ library(here)
 library(tidyverse)
 library(plotly)
 
-version_year <- "2023"
-data_years <- c('1950', '2021')
+# ======= Set directories ===========
+# Update scenario year, set up programmatic scenario year updating
+scen_year_number <- 2024 # update this!!
+scen_year <- as.character(scen_year_number)
+prev_scen_year <- as.character(scen_year_number - 1)
+
+data_dir_year <- paste0("d", scen_year)
+prev_data_dir_year <- paste0("d", prev_scen_year)
+v_scen_year <- paste0("v", scen_year)
+
+# version_year <- "2024" 
+# v_scenario_year <- paste0("v", version_year)
+data_years <- c("1950", "2022") # update to correct data years
+
+current_np_dir <- here::here("globalprep", "np", v_scen_year)
+current_mar_dir <- here::here("globalprep", "mar", v_scen_year)
+
 
 ## Load FAO-specific user-defined functions
-source(here('workflow/R/fao_fxn.R')) # function for cleaning FAO files
-source(here('workflow/R/common.R')) # directory locations
-source(here(paste0('globalprep/np/v', version_year, '/R/np_fxn.R')))
-source(here(paste0('globalprep/mar/v', version_year, '/mar_fxs.R'))) # functions specific to mariculture dealing with compound countries
+source(here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
+source(here("workflow", "R", "common.R")) # directory locations
+source(here("globalprep", "np", v_scen_year, "R", "np_fxn.R"))
+source(here("globalprep", "mar", v_scen_year, "mar_fxs.R")) # functions specific to mariculture dealing with compound countries
 ```
 
 # Import Raw Data: FAO Mariculture data
@@ -76,15 +93,19 @@ source(here(paste0('globalprep/mar/v', version_year, '/mar_fxs.R'))) # functions
 Mariculture production in tonnes.
 
 ```{r}
-mar <- read.csv(paste0(dir_M, 
-                       '/git-annex/globalprep/_raw_data/FAO_mariculture/d', 
-                       version_year, paste0('/FAO_GlobalAquacultureProduction_Quantity_1950_', 
-                                            data_years[2], 
-                                            '.csv')),
-                check.names=FALSE, 
-                stringsAsFactors=FALSE)
+mar_raw <- readr::read_csv(here(
+  dir_M, "git-annex", "globalprep", "_raw_data", "FAO_mariculture", data_dir_year,
+  paste0("FAO_GlobalAquacultureProduction_Quantity_1950_",
+         data_years[2], ".csv")))
 
-head(mar) 
+# mar_old <- read.csv(here(dir_M, 
+#                        "git-annex", "globalprep", "_raw_data", "FAO_mariculture", data_dir_year, paste0("FAO_GlobalAquacultureProduction_Quantity_1950_", 
+#                                             data_years[2], 
+#                                             ".csv")),
+#                 check.names = FALSE, 
+#                 stringsAsFactors = FALSE)
+
+head(mar_raw) 
 ```
 
 # Wrangle:
@@ -95,7 +116,7 @@ Filter freshwater mariculture, make long format, and clean FAO codes.
 
 ```{r}
 
-mar <- mar %>%
+mar <- mar_raw %>%
   dplyr::select(-`Unit Name`) %>% #should all be "Tonnes - live weight"
   rename(country = `Country Name En`,
          FAO_name = `ASFIS species Name En`, 
@@ -109,7 +130,7 @@ table(mar$environment)
 
 ## Include only marine and brackishwater environments
 mar <- mar %>%
-filter(environment %in% c("Brackishwater", "Marine"))  
+  filter(environment %in% c("Brackishwater", "Marine"))  
 
 # Change to latest *DATA* year
 latest_year <- data_years[2]
@@ -122,31 +143,42 @@ sub_N = 0.1
 # add an index
 mar <- mar %>% mutate(row_id = row_number())
 
+# note: the following code is very similar to the function in 
+# ohiprep_v2024/workflow/R/fao_online_portal_clean.R
+# and can be updated to just source the function
 
-#pivot all of the year/value columns 
+# pivot all of the year/value columns 
 mar_values <- mar %>% 
   select(-c(paste("1950":latest_year, "Flag"))) %>% 
   pivot_longer(cols = paste0("1950":latest_year),
                names_to = "year",
                values_to = "value")
 
-#pivot all of the flag columns   
-mar_flags <- mar %>% select(-paste0("1950":latest_year)) %>% 
+# pivot all of the flag columns   
+mar_flags <- mar %>% 
+  select(-paste0("1950":latest_year)) %>% 
   pivot_longer(cols = paste("1950":latest_year, "Flag"),
                names_to = "flag_year",
                values_to = "flag") %>% 
   mutate(year = str_remove(flag_year, " Flag")) %>% 
   select(year, flag, row_id)
   
-#combine flag and row id 
+# combine flag and row id 
 mar <- mar_values %>% left_join(mar_flags, by = c("row_id", "year"))
 
 mar <- mar %>% 
   mutate(value = case_when(str_detect(flag, "N") ~ sub_N,
-                               TRUE ~value)) %>%
+                               TRUE ~ value)) %>%
   select(-row_id) %>% 
   mutate(FAO_name = ifelse(!is.na(FAO_name), FAO_name, family_scientific)) 
-    
+
+
+# ---- using fao_online_portal_clean.R function ----
+# note: this function drops the "flag" column!
+source(here("workflow", "R", "fao_online_portal_clean.R"))
+mar_portal_clean <- fao_online_portal_clean(fao = mar, initial_data_year = data_years[1],
+                        last_data_year = data_years[2], sub_N = sub_N) %>% 
+  mutate(FAO_name = ifelse(!is.na(FAO_name), FAO_name, family_scientific)) 
 ```
 
 ## Update seaweed species information
@@ -156,13 +188,27 @@ Filter out seaweed species from 'raw/species_list.csv' (from 'globalprep/mar/v20
 ```{r}
 ## Read in 'species_list.csv' (originally from 'globalprep/mar/v2021/raw'). Filter for 'Taxon_code = AL' (only seaweed species). Rename 'exclude' columns to 'include' since we're now including seaweed species that were excluded in the MAR dataprep (not primarily used as human food). Therefore, "0" means exclude completely (0%), and "1" means include completely (100%).
 
-# Note, this calls out to the mariculture data prep. The mariculture data prep for your year should be done before you retrieve this file. The mariculture preper updates the file. 
-seaweed_sp <- read.csv(here(paste0('globalprep/mar/v', version_year, '/raw/species_list.csv')), stringsAsFactors=FALSE) %>%
+# Note, this calls out to the mariculture data prep. The mariculture data prep for your year should be done before you retrieve this file. The mariculture preper (??) updates the file. 
+
+# species_list_fix <- read_csv(here("globalprep", "mar", "v2023", "raw", "species_list.csv")) %>% 
+#   dplyr::select(-1)
+# 
+# write_csv(species_list_fix, here("globalprep", "mar", "v2023", "raw", "species_list.csv"))
+# 
+# 
+# species_list_fix_24 <- read_csv(here("globalprep", "mar", "v2024", "raw", "species_list.csv")) %>% 
+#   dplyr::select(-1)
+# 
+# write_csv(species_list_fix_24, here("globalprep", "mar", "v2024", "raw", "species_list.csv"))
+
+
+seaweed_sp <- readr::read_csv(here(current_mar_dir, "raw", "species_list.csv")) %>%
   filter(Taxon_code == 'AL') %>%
   rename(include = exclude)
 
 ## Save in 'globalprep/np/vSenario_Year/raw' as 'species_list_np_seaweeds.csv'.
-write.csv(seaweed_sp, paste0("globalprep/np/v", version_year, "/raw/species_list_np_seaweeds.csv"), row.names = FALSE)
+write.csv(seaweed_sp, paste0("globalprep/np/v", scen_year, "/raw/species_list_np_seaweeds.csv"), row.names = FALSE)
+#readr::write_csv(seaweed_sp, here(current_np_dir, "raw", "species_list_np_seaweeds.csv"))
 ```
 
 ## Update species names
