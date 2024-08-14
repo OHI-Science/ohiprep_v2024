@@ -147,7 +147,7 @@ for (f in files){
   m <- m %>%
     fao_clean_data_new() %>%  # swaps out FAO-specific codes. NOTE: optional parameter 'sub_N' can be passed to control how an 'N' code is interpreted.
     select(-c(trade, unit)) %>% # eliminate 'trade' column
-  arrange(country, commodity, is.na(value), year)
+    arrange(country, commodity, is.na(value), year)
   # warning: NAs introduced by coercion
 
   
