@@ -73,8 +73,6 @@ np_split_antilles <- function(m) {
 
 
 
-
-
 # np_harvest_cat <- function(h_tonnes, h_usd) {
 # ### Merge harvest in tonnes to harvest in USD.  
 # ### * forces 'commodity' variable to character, to avoid issues with 
@@ -108,17 +106,17 @@ np_harvest_preclip <- function(h) {
     mutate(no_data = is.na(tonnes) & is.na(usd)) %>%
     arrange(rgn_id, commodity, no_data, year) %>%
     mutate(
-      year_last = max(year, na.rm=T),    
+      year_last = max(year, na.rm = T),    
       ### note: currently year_latest is always most recent year of whole dataset
-      year_beg  = as.integer(ifelse(no_data[1], (year_last + 1), year[1]))) %>%
+      year_beg = as.integer(ifelse(no_data[1], (year_last + 1), year[1]))) %>%
     ### Since ordered by (is.na(tonnes) & is.na(usd)) before year, should pickup first non-NA year.
     ###   If no non-NA years, no_data[1] == TRUE, assign year_beg to be beyond the time series. 
     ### Note: The "as.integer" is there to get around an "incompatible types" error.
     
-    filter(year>=year_beg) %>%
+    filter(year >= year_beg) %>%
     ### eliminates years prior to first reporting
     
-    dplyr::select(-year_beg, -year_last, -no_data) %>%
+    dplyr::select(-c(year_beg, year_last, no_data)) %>%
     ### cleans up all columns created in this function
     ungroup() %>%    
     arrange(rgn_id, product, commodity, year)
