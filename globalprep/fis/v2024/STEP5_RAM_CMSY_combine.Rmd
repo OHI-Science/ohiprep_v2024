@@ -316,7 +316,7 @@ comparison_plot
 
 For understanding results: 
 
-[When B/BMSY = 1, then biomass equals BMSY. If B/BMSY falls below 1, biomass is too low to provide maximum sustainable yield.](https://catchshareindicators.org/wp-content/uploads/2013/12/NE_Biomass_Feb-2014.pdf) 
+[When B/BMSY = 1, then biomass equals BMSY. If B/BMSY falls below 1, biomass is too low to provide maximum sustainable yield.](https://catchshareindicators.org/wp-content/uploads/2013/12/NE_Biomass_Feb-2014.pdf).  This is also seen in Christopher Costello's 2016 paper, ["Global fishery prospects under contrasting management regimes."](https://www.pnas.org/doi/10.1073/pnas.1520420113) 
 
 ```{r}
 # read in our final data frame saved earlier
@@ -345,24 +345,39 @@ fish_status_summary_2019 <- fish_status %>%
   summarise(count = n()) %>%
   filter(!is.na(fish_status))
 
-# ggplot(fish_status_summary_2019, aes(x = fish_status, y = count, fill = fish_status)) +
-#   geom_bar(position = "dodge", stat = "identity") +
-#   labs(title = "Comparison of Overfished and Sustainable Stocks by Region in 2019",
-#        x = "B/Bmsy Stock Status",
-#        y = "Number of stocks") +
-#   theme_minimal()
-# 
-# fish_status_summary_all_time <- fish_status %>%
-#   group_by(rgn_id, fish_status) %>%
-#   summarise(count = n()) %>%
-#   filter(!is.na(fish_status))
-# 
-# ggplot(fish_status_summary, aes(x = fish_status, y = count, fill = fish_status)) +
-#   geom_bar(stat = "identity") +
-#   labs(title = "Comparison of Overfished and Sustainable Stocks",
-#        x = "B/Bmsy Stock Status",
-#        y = "Number of stocks") +
-#   theme_minimal()
+ggplot(fish_status_summary_2019, aes(x = fish_status, y = count, fill = fish_status)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  labs(title = "Comparison of Overfished and Sustainable Stocks in 2019",
+       x = "B/Bmsy Stock Status",
+       y = "Number of stocks") +
+  theme_minimal()
+
+fish_status_summary_all_time <- fish_status %>%
+  group_by(rgn_id, fish_status) %>%
+summarise(count = n()) %>%
+  filter(!is.na(fish_status))
+
+ggplot(fish_status_summary_all_time, aes(x = fish_status, y = count, fill = fish_status)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Comparison of Overfished and Sustainable Stocks 2012 - 2019",
+       x = "B/Bmsy Stock Status",
+       y = "Number of stocks") +
+  theme_minimal()
+
+# ---- 10 most overfished stocks in 2019 (B/Bmsy < 1) ----
+overfished_2019 <- fish_status %>% 
+  filter(fish_status %in% "overfished") 
+
+# interactive plotly of b/bmsy for each stock
+over_fis_plot <- overfished_2019 %>%
+  plot_ly(x = ~year, y = ~bbmsy, color = ~stock_id, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "B/Bmsy by Stock ID",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "B/Bmsy < 1)"))
+over_fis_plot
+
+# ---- all sustainable stocks in 2019 (B/Bmsy > 1) ----
 
 
 # comparison of how many stocks are over/underfished by region

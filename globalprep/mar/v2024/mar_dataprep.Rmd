@@ -3,8 +3,10 @@ title: "OHI `r format(Sys.Date(), '%Y')`: Mariculture"
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
+    code_folding: show
     toc: true
-    number_sections: true
+    toc_float: yes
+    number_sections: false
     theme: cerulean
     highlight: haddock
     includes: 
@@ -21,20 +23,25 @@ This analysis converts FAO mariculture and seafood watch sustainability data int
 
 # 2024 updates from 2023 assessment
 
--   fixed issues system-dependent file paths using `{here}` package
+-   fixed issues relating to system-dependent file paths by using `{here}` package
 
--   made file names reproducible with updated entries in setup chunks
+-   made some file names more reproducible with updated entries in setup chunks
 
--   updated formatting of code and comments
+-   updated formatting of code and comments using in-line/chunk comment headers
 
--   rewrote data cleaning to follow tidyverse style more closely and be more reproducible & less prone to human error 
+-   updated from `read.csv` and `write.csv` to `{readr}`'s  `read_csv` and `write_csv`
 
--   updated `mar_split()` function in `mar_fxs.R` to use `pivot_longer()` instead of `gather()`, and the new grouped name of "Bonaire, Sint Eustatius and Saba" was accounted for
+-   renamed some variables so that iterations of data processing steps weren't overwriting the same variable -- allows for comparison between different stages of dataprep (with a few exceptions mentioned below)
+
+-   generally rewrote data cleaning to follow tidyverse style more closely and be more reproducible & less prone to human error with the exception of some object names that were rewritten to save space (consider updating this in future years)
+
+-   updated `mar_split()` function in `mar_fxs.R` to use `pivot_longer()` instead of `gather()`, and added the new grouped name of "Bonaire, Sint Eustatius and Saba" (make sure to source the current year's `mar_fxs.R`)
 
 -   fixed an issue in `mar_fxs.R` where updated data was not being properly bound to original data
 
--   renamed variables so that iterations of data processing steps weren't overwriting the same variable -- allows for comparison between different stages of dataprep
+-   updated README of FishStatJ data download to be more explicit and functional with updated program; created README with detailed instructions on how to download data from FAO Data Query Portal if next year decides to pivot to this method instead (will need to rewrite data cleaning code, refer to `workflow/R/fao_query_data_tidy.R` for guidance and examples of how we approached this in v2024)
 
+-   added notes on what "escapes" are -- Criterion 6 in Seafood Watch sustainability scoring theory guide https://www.seafoodwatch.org/globalassets/sfw/pdf/standards/aquaculture/seafood-watch-aquaculture-standard-version-a4.pdf
 
 ------------------------------------------------------------------------
 
@@ -78,7 +85,7 @@ Obtained upon request of SFW.
 
 ```{r setup, message=FALSE, warning=FALSE}
 
-knitr::opts_chunk$set(eval=FALSE)
+knitr::opts_chunk$set(eval = FALSE)
   
 # ---- Load packages ----
 if (!require(librarian)){
@@ -106,7 +113,7 @@ current_mar_dir <- here::here("globalprep", "mar", version_year)
 
 # ---- Load FAO-specific user-defined functions ----
 # functions specific to mariculture dealing with compound countries, updated in 2024
-source(here::here("globalprep", "mar", version_year, "mar_fxs.R")) 
+source(here::here("globalprep", "mar", version_year, "mar_fxs.R"))
 # functions for cleaning fao data
 source(here::here("workflow", "R", "fao_fxn.R")) 
 #source(here::here("workflow", "R", "fao_online_portal_clean.R")) # fao cleaning function # switched to new version in 2024
@@ -140,7 +147,7 @@ current_data_folder <- paste0("d", current_year) # assessment year for file path
 previous_data_folder <- paste0("d", last_year)  # previous assessment year
 
 #update the data file name to the current last year of data 
-mar_raw <- readr::read_csv(file.path(FAO_mariculture_dir, current_data_folder,
+mar_raw <- readr::read_csv(here::here(FAO_mariculture_dir, current_data_folder,
                           paste0("FAO_GlobalAquacultureProduction_Quantity_1950_", latest_data_year, ".csv")))
 
 head(mar_raw)
@@ -237,6 +244,7 @@ mar <- mar %>%
 # run the new_spp code again to check if this update has been successfully implemented
 #new_spp <- setdiff(mar$FAO_name, mar_sp$FAO_name)
 #new_spp
+#character(0) # good!
 
 # Remove species not relevant to mariculture goal (i.e., non-food species)
 mar_sp_join <- mar %>% dplyr::left_join(mar_sp, by = "FAO_name")
@@ -401,7 +409,7 @@ table(mar_rgn_gf$gap_0_fill)
 ## 6441 of these out of 30170 + 6441 cases had NA values converted to 0 - 2021 assessment
 ## 7037 of these out of 30975 + 7037 cases had NA values converted to 0 - 2022 assessment
 ##7367 of these out of 34187 + 7367 cases had NA values converted to 0 -2023 assessment
-## 8200 of these out of 35025 + 8201 (43226) cases had NA values converted to 0 = 0.1897 ≈ 19% of values - 2024 assessment 
+## 8201 of these out of 35029 + 8201 (43230) cases had NA values converted to 0 = 0.1897 ≈ 19% of values - 2024 assessment 
 ```
 
 Remove family-region-environment time series with less than four years of mariculture production \> 0 tonnes (assume these are not established mariculture programs).
@@ -440,7 +448,7 @@ These data describe the sustainability country/species combinations. In cases wh
 # Read in new Seafood Watch data 
 # sw_sus <- read.csv(file.path(seafood_watch_dir,
 #                              #current_data_folder,
-#                              previous_data_folder, # had to use old data in v2024
+#                              previous_data_folder, # had to use old data from v2023 in v2024
 #                              "SFW_Aquaculture_ratings_053123.csv"), # update with name of new data file
 #                    check.names = FALSE, stringsAsFactors = FALSE, na.strings = c("NA", ""))
 
@@ -462,8 +470,8 @@ head(sw_sus_raw)
 old_sw_sus <- readr::read_csv(file.path(seafood_watch_dir,
                                  #previous_data_folder,
                                  paste0("d", current_year - 2),
-                                 "SFW_Aquaculture_ratings_062222.csv"
-                               #  "SFW_Aquaculture_ratings_053123.csv"
+                                 "SFW_Aquaculture_ratings_062222.csv" #v2022 data
+                               #  "SFW_Aquaculture_ratings_053123.csv" #v2023 data
                                ), # update with name of data file from previous year 
                        na = c("NA", ""))
 ```
@@ -574,14 +582,15 @@ sw_sus_no_rgn <- filter(sw_sus, is.na(country)|country == "Worldwide")
 
 ```{r sw-sus_convert-region, eval = FALSE}
 
-## Change country names to match OHI region names (separate rows that are associated with multiple countries)
+# ---- Change/update country names to match OHI region names ----
+# Separate rows that are associated with multiple countries
 sw_sus_multiple <- sw_sus %>% 
   filter(str_detect(country, "\\|")) %>%
   separate_rows(country, sep = " \\| ")
 
+# Rejoin the rows we just removed, but in clean format (1 row per country)
 sw_sus_df <- sw_sus %>%
   filter(!str_detect(country, "\\|")) %>%
-  # rejoin the rows we just removed, but in clean format (1 row per country)
   rbind(sw_sus_multiple) %>%
   # remove all NA and 'Worldwide' rows in order to correctly rejoin those in the next steps, these rows are stored in the variable sw_sus_no_rgn
   filter(!is.na(country), country!="Worldwide")
@@ -627,11 +636,11 @@ sort(setdiff(maric$species, sw_sus_rgn$species)) # FAO species with no Seafood W
 #instructions for updating speices:
 ## Hand check each of the species output here, check to make sure there aren't obvious cases when the species is the same, but the names are presented slightly differently in the lists. For example, some species might have an extra space in the name somewhere. If any of these obvious differences exist, we need to go in and change the names to match. 
 ## The FAO list has far more species than the sustainability list. But, go over them to make sure that we are getting sustainability scores for as many species as we can.
+# note -- Seafood Watch makes a distinction between Common sole and Dover sole
 ```
 
-Fix the non matches
 
-
+Fix the non-matches
 
 ```{r sw-sus_fix-non-matches, eval = FALSE}
 
@@ -716,15 +725,18 @@ Assign a Mediterranean bordering rgn id to each waterbody row
 ## Add a line for each country that borders each water body
   # The only water body without a rgn is the Mediterranean; add all countries that border it (source: https://www.medqsr.org/mediterranean-marine-and-coastal-environment#:~:text=Today%2021%20countries%2C%20with%20surface,Syria%2C%20Tunisia%2C%20and%20Turkey.)
 
-## filter for waterbody specific rows 
+# filter for waterbody specific rows 
 sw_sus_rgn_water <- sw_sus_rgn %>%
   filter(match_type == 'sw_sp_w')
 
-## define Mediterranean rgns
+# define Mediterranean rgns
 med_rgns <- data.frame(rgn_id = c(82, 84, 232, 187, 81, 214, 179, 80, 79, 184, 78, 67, 68, 185, 186, 62, 188, 182, 77, 61, 76))
 
 # create new function called expand.grid.df()
 expand.grid.df <- function(...) Reduce(function(...) merge(..., by=NULL), list(...))
+# coming from MEDS, this ^^ was wild to read
+# Reduce: uses a binary function to successively combine the elements of a given vector and a possibly given initial value.
+# merge: Merge two data frames by common columns or row names, or do other versions of database join operations.
 
 gf_sw_sp_w <- expand.grid.df(sw_sus_rgn_water, med_rgns) %>%
   dplyr::select(-rgn_id.x, rgn_id = rgn_id.y)
@@ -782,7 +794,7 @@ mar_sw_sus <- mar_sw_sus %>%
   dplyr::mutate(gapfill_esc = case_when(esc_sw_sp_c == esc_score ~ "none",
                                         is.na(esc_sw_sp_c) & esc_sw_sp_w == esc_score ~ "water_body",
                                         is.na(esc_sw_sp_c) & is.na(esc_sw_sp_w) & esc_sw_sp_g == esc_score ~ "global_species")) %>%
-  dplyr::select(-Sust_sw_sp_c, -Sust_sw_sp_w, -Sust_sw_sp_g, -esc_sw_sp_c, -esc_sw_sp_w, -esc_sw_sp_g) 
+  dplyr::select(-c(Sust_sw_sp_c, Sust_sw_sp_w, Sust_sw_sp_g, esc_sw_sp_c, esc_sw_sp_w, esc_sw_sp_g)) 
 
 summary(mar_sw_sus)
 ```
@@ -797,11 +809,11 @@ Average sustainability scores within regions with more than one score (due to mo
 anyDuplicated(mar_sw_sus)
 # 2022 scenario year: 532
 #2023 280
-# 2024 scenario year: 
+# 2024 scenario year: 316
 
 mar_sw_sus <- mar_sw_sus %>% 
   dplyr::group_by(rgn_id, species) %>% 
-  dplyr::mutate(Sust_avg = mean(Sust, na.rm=TRUE),
+  dplyr::mutate(Sust_avg = mean(Sust, na.rm = TRUE),
                 esc_avg = mean(esc_score, na.rm = TRUE)) %>% 
   dplyr::ungroup()
 
@@ -831,7 +843,7 @@ Now look at a summary after appending all the Seafood Watch data
 summary(mar_sw_sus) 
 # 21215 NA values out of 32051 total obs; ~68% without scores (2022)
 # 16378 NA values out of 33732 total obs ~ 49% without scores (2023)
-# 17122 NA values out of 34916 total obs; ~ 49% without scores (2024)
+# 17126 NA values out of 34920 total obs; ~ 49% without scores (2024)
 ```
 
 Gapfilling based on families and taxon_code
@@ -925,9 +937,11 @@ Steps:
 
 mar_sw_sus_final <- mar_sw_sus %>%
   
+  
   #### sustainability scores ####
   mutate(Sust = ifelse(is.na(Sust), avg_rgn_fam_sust, Sust)) %>% # Gapfill with region/family level
-  mutate(gapfill_sus = ifelse(is.na(gapfill_sus) & Sust == avg_rgn_fam_sust, "region_family_avg", gapfill_sus)) %>% ## add in rgn family gapfill record
+  mutate(gapfill_sus = ifelse(is.na(gapfill_sus) & Sust == avg_rgn_fam_sust, "region_family_avg", gapfill_sus)) %>%
+  ## add in rgn family gapfill record
   mutate(Sust = ifelse(is.na(Sust), avg_gr_fam_sust, Sust)) %>% # Gapfill with georegion/family level
   mutate(gapfill_sus = ifelse(is.na(gapfill_sus) & Sust == avg_gr_fam_sust, "georegion_family_avg", gapfill_sus)) %>% # Add in georegion/family gapfill record
   mutate(Sust = ifelse(is.na(Sust),  avg_fam_sust, Sust)) %>% # Gapfill with family level
@@ -952,9 +966,9 @@ mar_sw_sus_final <- mar_sw_sus %>%
   #mutate(gapfill_esc = ifelse(is.na(gapfill_esc) & esc_score == escapes_gf_score, "seaweed_score", gapfill_esc)) %>%
   mutate(esc_score = ifelse(is.na(esc_score), avg_global_esc, esc_score)) %>% 
   mutate(gapfill_esc = ifelse(is.na(gapfill_esc) & esc_score == avg_global_esc, "global_avg", gapfill_esc)) %>%
-
+  
   #### final tidying ####
-  mutate(taxa_code = paste(species, species_code, sep="_")) %>%
+mutate(taxa_code = paste(species, species_code, sep="_")) %>%
   select(rgn_id, species, species_code, taxa_code, taxa_group = Taxon_code,
          family, year, gapfill_sus, gapfill_esc, gapfill_fao = gap_0_fill,
          tonnes = value, Sust, esc_score) %>%
@@ -989,7 +1003,7 @@ Gapfill values in output file are the proportion of data that is gapfilled.
 
 ```{r obtain-gapfill-info-genEscapes, eval = FALSE}
 
-## Obtain corresponding gapfilling information for each region (average of gapfilled data, weighted by tonnes of mariculture).
+# Obtain corresponding gapfilling information for each region (average of gapfilled data, weighted by tonnes of mariculture).
 genEscapes_gf <- tonnes_esc %>%
   mutate(gapfill = ifelse(gapfill_esc == "none", 0, 1)) %>%
   group_by(rgn_id, year) %>%
@@ -1007,8 +1021,7 @@ genEscapes_gf <- tonnes_esc %>%
 ## Save gapfill data
 
 ```{r save-gen-esc-gapfilled, eval = FALSE}
-
-## Saves the Genetic Escapes Gapfill file
+# Save the Genetic Escapes Gapfill file
 readr::write_csv(genEscapes_gf, here(current_mar_dir, "output", "GenEsc_gf.csv"))
 
 ```

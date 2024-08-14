@@ -5,6 +5,7 @@ output:
   html_document:
     toc: true
     number_sections: true
+    toc_float: yes
     theme: cerulean
     highlight: haddock
     includes: 
@@ -21,6 +22,13 @@ This analysis converts FAO commodities data into data layers used to calculate O
 
 # Updates from previous assessment
 
+### v2024
+- New year of FAO data (2022)\
+- Updated links to datasets\
+- Updated file paths to be more reproducible, enable cross-platform capability (not dependent on direction of directory separator)
+- Updated data cleaning to follow tidyverse style, use of `janitor::clean_names()`
+
+### v2023
 New year of FAO data (2021). Replaced deprecated functions (`replace_at()`, `spread()`, `gather()`)
 
 ------------------------------------------------------------------------
@@ -28,13 +36,16 @@ New year of FAO data (2021). Replaced deprecated functions (`replace_at()`, `spr
 # Data Source
 
 **Reference**:\
-<http://www.fao.org/fishery/statistics/software/fishstatj/en#downlApp> App release date: June 2023 FAO raw commodities quantity 1976_2021 FAO raw commodities value 1976_2021 [FAO metadata](http://www.fao.org/fishery/statistics/global-commodities-production/en)
+<https://www.fao.org/fishery/en/statistics/software/fishstatj> App release date: March 2024 FAO raw commodities quantity 1976_2021 FAO raw commodities value 1976_2022 [FAO metadata](http://www.fao.org/fishery/statistics/global-commodities-production/en)
 
-**Downloaded**: July, 19, 2023
+- Global aquatic trade - All partners aggregated - Quantities and Values - 1976-2022 (Release date: July 2024)
+
+
+**Downloaded**: July, 26, 2024
 
 **Description**: Quantity (tonnes) and value (USD) of raw commodities (Exports only) for each country, taxa, year. The FAO data is subset to include commodities in these categories: ornamental fish, fish oil, seaweed and plants (see: raw/commodities2products_weighting.csv for details).
 
-**Time range**: 1976-2021
+**Time range**: 1976-2022
 
 ------------------------------------------------------------------------
 
@@ -42,28 +53,42 @@ New year of FAO data (2021). Replaced deprecated functions (`replace_at()`, `spr
 
 ```{r setup, warning=FALSE, message=FALSE}
 
-knitr::opts_chunk$set(eval=FALSE)
+knitr::opts_chunk$set(eval = FALSE)
 
-## load libraries, set directories
-library(ohicore)  #devtools::install_github('ohi-science/ohicore@dev')
-library(dplyr)
-library(stringr)
-library(tidyr)
-library(zoo)  
-library(ggplot2)
-library(here)
-library(tidyverse)
-library(plotly)
+# ======= Load packages ============
+if (!require(librarian)) {
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  ohicore, #devtools::install_github('ohi-science/ohicore@dev')
+  dplyr,
+  stringr,
+  tidyr,
+  here,
+  tidyverse,
+  zoo,
+  ggplot2,
+  plotly,
+  tictoc,
+  RColorBrewer
+)
 
+# ======= Set directories ===========
 # Update scenario year, set up programmatic scenario year updating
-scen_year_number <- 2023
+scen_year_number <- 2024
 scen_year <- as.character(scen_year_number)
 prev_scen_year <- as.character(scen_year_number - 1)
+data_dir_year <- paste0("d", scen_year)
+prev_data_dir_year <- paste0("d", prev_scen_year)
+v_scen_year <- paste0("v", scen_year)
+
+current_np_dir <- here::here("globalprep", "np", v_scen_year)
 
 ## Load FAO-specific user-defined functions
-source(here('workflow/R/fao_fxn.R')) # function for cleaning FAO files
-source(here('workflow/R/common.R')) # directory locations
-source(here(paste0("globalprep/np/v", scen_year,"/R/np_fxn.R")))
+source(here::here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
+source(here::here("workflow", "R", "common.R")) # directory locations
+source(here::here(current_np_dir, "R", "np_fxn.R")) # function for handling FAO commodity data specific to NP
 
 ```
 
@@ -72,59 +97,68 @@ source(here(paste0("globalprep/np/v", scen_year,"/R/np_fxn.R")))
 Simultaneously read and process FAO commodities value and quantity data.
 
 ```{r}
-
 ## NOTE: This can be run as a loop, but the "value" and "quant" datasets need to be run individually to make sure
 ##  there are no problems (after this check, they can be looped for efficiency)
 
 
 ## list files included in d2020 folder (value and quant datasets)
-dir_fao_data <- file.path(dir_M, paste0('git-annex/globalprep/_raw_data/FAO_commodities/d', scen_year))
-files <- list.files(dir_fao_data, pattern=glob2rx('*.csv'), full.names=TRUE)
+#dir_fao_data <- file.path(dir_M, paste0('git-annex/globalprep/_raw_data/FAO_commodities/d', scen_year))
+dir_fao_data <- here::here(dir_M, "git-annex", "globalprep", "_raw_data", "FAO_commodities", data_dir_year)
+
+files <- list.files(dir_fao_data, pattern = glob2rx('*.csv'), full.names = TRUE)
 
 ## To compare to old data:
-dir_fao_data_old <- file.path(dir_M, paste0('git-annex/globalprep/_raw_data/FAO_commodities/d', prev_scen_year))
-files_old <- list.files(dir_fao_data_old, pattern=glob2rx('*.csv'), full.names=TRUE)
+#dir_fao_data_old <- file.path(dir_M, paste0('git-annex/globalprep/_raw_data/FAO_commodities/d', prev_scen_year))
+dir_fao_data_old <- here::here(dir_M, "git-annex", "globalprep", "_raw_data", "FAO_commodities", prev_data_dir_year)
 
-## loop
+files_old <- list.files(dir_fao_data_old, pattern = glob2rx('*.csv'), full.names = TRUE)
+
+# ===== loop ================
 for (f in files){
+  f <- files[1] # un-comment and update to test individual files
   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
   
   d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
   # checks names syntactically, strips leading and trailing whitespace, prevents conversion of characters to factors 
+  #d_test <- readr::read_csv(f)
   
   ## Specifies that units are tonnes if we are reading in the Commodities Quantity data csv, and usd if we are reading in the Commodities Value data csv
   units <- c('tonnes','usd')[str_detect(f, c('quant','value'))] # detect unit name using lowercase American English
 
+    # ---- Preliminary cleaning & tidying ----
   ## gather into long format and clean up FAO-specific data foibles
-  ## warning: attributes are not identical across measure variables; they will be dropped: this is fine
+  ## warning: attributes are not identical across measure variables; they will be dropped: this is fine (didn't get this warning in v2024 once code was updated)
   m <- d %>% 
-    dplyr::select(-`Unit (Name)`) %>%
-    rename(country   = `Reporting country (Name)`,
-           commodity = `Commodity (Name)`,
-           trade     = `Trade flow (Name)`) %>%
-    rename_with(~ gsub("\\[", "", .)) %>%
-    rename_with(~ gsub("\\]", "", .)) %>%
-    pivot_longer(cols = -c(country, commodity, trade, Unit),
+    janitor::clean_names() %>% 
+    dplyr::select(-c(unit_name)) %>% # "Tonnes – net product weight" == TPW
+    rename(country = reporting_country_name,
+           commodity = commodity_name,
+           trade = trade_flow_name) %>%
+    rename_with(~ gsub("x", "", .)) %>% # tidy up year column names (clean_names() added "x"s)
+    pivot_longer(cols = -c(country, commodity, trade, unit),
                    names_to = "year", values_to = "value") 
   
-  ## Include only the "Exports" data:
-  ## 2022 - changed from "Export" to "Exports"
+  # ---- Include only the "Exports" data ----
   m <- m %>%
     filter(trade == "Exports")
 
+  # ---- Run fao data cleaning function ----
+  # cleans up flags, swaps out FAO-specific codes for analysis
   m <- m %>%
     fao_clean_data_new() %>%  # swaps out FAO-specific codes. NOTE: optional parameter 'sub_N' can be passed to control how an 'N' code is interpreted.
-    select(-trade, -Unit) %>% # eliminate 'trade' column
+    select(-c(trade, unit)) %>% # eliminate 'trade' column
   arrange(country, commodity, is.na(value), year)
+  # warning: NAs introduced by coercion
 
   
-  ## Products join: attach product categories from com2prod, and
-  ##   filter out all entries that do not match a product category.
+  # ---- Products join ----
+  ## attach product categories from com2prod, and filter out 
+  ## all entries that do not match a product category.
   ## Note: commodity_lookup is user-defined function to compare 
   ##   commodities in data vs commodities in lookup table
   
-  ## load lookup for converting commodities to products
-  com2prod <- read.csv(here(paste0('globalprep/np/v', scen_year, '/raw/commodities2products_weighting.csv')), na.strings='')
+  # Load lookup for converting commodities to products
+  com2prod <- read.csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na.strings = '')
   
   ## version used in 2019:
   ##    read.csv(here('globalprep/np/v2019/raw/commodities2products.csv'), na.strings='')
@@ -142,7 +176,7 @@ for (f in files){
   ## inner_join will attach product names to matching commodities according to
   ##    lookup table 'com2prod', and eliminate all commodities that do not appear in the lookup table.
   m <- m %>%
-      inner_join(com2prod, by='commodity')
+      inner_join(com2prod, by = 'commodity')
     
     
   ## Special case: user-defined function deals with 
@@ -154,8 +188,12 @@ for (f in files){
     filter(country != "Azerbaijan") 
 
   m_rgn <- name_2_rgn(df_in = m,
-                      fld_name='country', 
-                      flds_unique=c('commodity', 'product', 'year'))
+                      fld_name = 'country', 
+                      flds_unique = c('commodity', 'product', 'year'))
+  
+  # v2024 removed: 
+  # Ascension, Saint Helena and Tristan da Cunha -- new syntax from previous years, will update ohicore::split_regions() to account for this change
+  # Yugoslavia SFR  -- this is fine, since it broke up into the six modern countries: Croatia, Montenegro, Serbia, Slovenia, Bosnia and Herzegovina, and Macedonia in 1990-1992, which means the relevant data is still captured.
     
 # v2021 duplicates:  [1] "China"                 "China, Hong Kong SAR"  "China, Macao SAR"      "Guadeloupe"           
 # [5] "Martinique"            "Montenegro"            "Russian Federation"    "Serbia and Montenegro"
