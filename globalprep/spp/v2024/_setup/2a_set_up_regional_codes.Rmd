@@ -23,7 +23,7 @@ knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'Figs/',
 
 
 library(dplyr)
-library(rgdal)
+# library(rgdal)
 library(raster)
 library(here)
 #library(ggridges)
@@ -35,7 +35,7 @@ source(here('workflow/R/common.R'))
 #library(provRmd); prov_setup()
 
 goal     <- 'spp'
-scenario <- 'v2021'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info

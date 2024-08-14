@@ -106,7 +106,7 @@ valid_check <- function(spp_shp) {
   ### can return a vector if multiple polygons with same ID
   if(any(!valid)) {
     cat_msg('Found invalid geometries')
-    
+    spp_shp <- st_make_valid(spp_shp)
     bbox_shp <- st_bbox(spp_shp)
     if(bbox_shp$xmin < -180 | bbox_shp$xmax > 180) {
       cat_msg('Bounding box outside +/- 180; buffering with dist = 0')
@@ -165,10 +165,10 @@ api_file <- file.path(dir_M, 'git-annex/globalprep/spp',
 api_key <- scan(api_file, what = 'character')
 
 # api_version <- fromJSON('http://apiv3.iucnredlist.org/api/v3/version') %>%
-# .$version
+#   .$version
 
 
-api_version <- '2022-1'
+api_version <- '2024-1'
 
 
 get_from_api <- function(url, param, api_key, delay) {

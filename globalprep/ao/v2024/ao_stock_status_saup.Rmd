@@ -20,11 +20,11 @@ editor_options:
 
 # Summary
 
-This script takes prepped non-industrial 2021 SAUP data (created in ao_catch_prep_saup.Rmd), and B/Bmsy estimates of those stocks to calculate a score for artisanal fishing species per OHI region. The FIS data prep will need to be completed prior to this data prep. Also make sure to run ao_catch_prep_saup before this script.  
+This script takes prepped non-industrial v2022 SAUP data which goes up to 2019 (created in ao_catch_prep_saup.Rmd), and B/Bmsy estimates of those stocks to calculate a score for artisanal fishing species per OHI region. The FIS data prep will need to be completed prior to this data prep. Also make sure to run ao_catch_prep_saup before this script.  
 
 ## Updates from previous assessment
 
-For 2023 the Sea Around us Project (SAUP) data used in the ao_catch_prep_saup had not been updated, only the RAM data was updated for the FIS layers. Data files that were not newly updated and were stored in the repository were copied from the v2022 to v2023 folder for consistency. 
+For v2023 and v2024 the Sea Around us Project (SAUP) data used in the ao_catch_prep_saup had not been updated, only the RAM data was updated for the FIS layers. Data files that were not newly updated and were stored in the repository were copied from the v2023 to v2024 folder for consistency. 
 
 ***
 
@@ -68,7 +68,7 @@ For 2023 the Sea Around us Project (SAUP) data used in the ao_catch_prep_saup ha
 ```{r, eval = FALSE}
 library(tidyverse)
 library(here)
-source(here('workflow/R/common.R'))
+source(here("workflow", "R", "common.R"))
 ```
 
 
@@ -76,36 +76,28 @@ source(here('workflow/R/common.R'))
 
 ```{r, eval = FALSE}
 #update these!! 
-version_year <- "v2023"
-previous_version_year <- "v2022"
+version_year <- "v2024"
+previous_version_year <- "v2023"
 
-fis_bbmsy <- read_csv(file.path(here(), "globalprep/fis", version_year, "output/fis_bbmsy.csv"))
+fis_bbmsy <- read_csv(here::here("globalprep","fis", version_year, "output","fis_bbmsy.csv"))
 
 
-catch_AO <- read_csv(file.path(here(), "globalprep/ao/", version_year, "intermediate/mean_catch.csv")) 
+catch_AO <- read_csv(here::here("globalprep","ao", version_year, "intermediate","mean_catch.csv")) 
 
 length(unique(catch_AO$rgn_id)) # there are only 196 regions here... we want there to be 220 regions. Which regions are missing? 
 
-region_data()
-test <- catch_AO %>%
-  left_join(rgns_eez)
+region_data() # to have access to rgns_all and rgns_eez
 
-length(setdiff(rgns_eez$rgn_id, test$rgn_id))
+test <- catch_AO %>%
+  left_join(rgns_eez) 
+
+length(setdiff(rgns_eez$rgn_id, test$rgn_id)) # v2024: 25 regions are within the rgns_eez but not in test
 
 cat(paste(shQuote(setdiff(rgns_eez$rgn_name, test$rgn_name), type = "cmd"), collapse = ","))
 cat(paste(shQuote(setdiff(rgns_eez$rgn_id, test$rgn_id), type = "cmd"), collapse = ","))
 
-
-#  [1] "Macquarie Island"                             "Wake Island"                                  "Glorioso Islands"                            
-#  [4] "Juan de Nova Island"                          "Bassas da India"                              "Ile Europa"                                  
-#  [7] "Ile Tromelin"                                 "British Indian Ocean Territory"               "Gibraltar"                                   
-# [10] "South Georgia and the South Sandwich Islands" "Prince Edward Islands"                        "Crozet Islands"                              
-# [13] "Amsterdam Island and Saint Paul Island"       "Kerguelen Islands"                            "Heard and McDonald Islands"                  
-# [16] "Bouvet Island"                                "Clipperton Island"                            "Jan Mayen"                                   
-# [19] "Jarvis Island"                                "Palmyra Atoll"                                "Howland Island and Baker Island"             
-# [22] "Johnston Atoll"                               "Monaco"                                       "Antarctica"                                  
-# [25] "Oecussi Ambeno"    
-
+# v2024: "Macquarie Island","Wake Island","Glorioso Islands","Juan de Nova Island","Bassas da India","Ile Europa","Ile Tromelin","British Indian Ocean Territory","Gibraltar","South Georgia and the South Sandwich Islands","Prince Edward Islands","Crozet Islands","Amsterdam Island and Saint Paul Island","Kerguelen Islands","Heard and McDonald Islands","Bouvet Island","Clipperton Island","Jan Mayen","Jarvis Island","Palmyra Atoll","Howland Island and Baker Island","Johnston Atoll","Monaco","Antarctica","Oecussi Ambeno"  
+# "4","12","30","33","34","35","36","38","60","89","90","91","92","93","94","105","107","144","149","150","158","159","185","213","237"
 
 ## All small islands.. weird. So we need to gapfill these regions somehow... do they have b/bmsy data?
 
@@ -117,7 +109,7 @@ test <- fis_bbmsy %>%
   left_join(rgns_eez) %>%
   filter(rgn_name %in% missing)
 
-setdiff(missing, unique(test$rgn_name)) # bouvet island is missing?
+setdiff(missing, unique(test$rgn_name)) # bouvet island and Antarctica (scores arent calculated for this, that is okay) is missing?
 ## they do have b/bmsy data! Lets just use their overall b/bmsy scores (for industrial fishing), as their AO b/bsmy scores.. not perfect, but better than nothing!
 
 bouvet_test <- fis_bbmsy %>%
@@ -129,134 +121,134 @@ bouvet_test <- read.csv("https://raw.githubusercontent.com/OHI-Science/ohi-globa
 
 ## First cap b/bmsy scores
 b <- fis_bbmsy %>%
-    dplyr::mutate(bbmsy = ifelse(bbmsy > 1, 1, bbmsy))
+  dplyr::mutate(bbmsy = ifelse(bbmsy > 1, 1, bbmsy))
 
 c <- catch_AO %>%
-    dplyr::mutate(stock_id_taxonkey = as.character(stock_id_taxonkey)) %>%
-    dplyr::mutate(taxon_key = stringr::str_sub(stock_id_taxonkey,-6,-1)) %>%
-    dplyr::mutate(stock_id = substr(stock_id_taxonkey, 1, nchar(stock_id_taxonkey) -
-                               7)) %>%
-    dplyr::mutate(catch = as.numeric(mean_catch)) %>%
-    dplyr::mutate(year = as.numeric(as.character(year))) %>%
-    dplyr::mutate(region_id = as.numeric(as.character(rgn_id))) %>%
-    dplyr::mutate(taxon_key = as.numeric(as.character(taxon_key))) %>%
-    dplyr::select(rgn_id, year, stock_id, taxon_key, mean_catch)
+  dplyr::mutate(stock_id_taxonkey = as.character(stock_id_taxonkey)) %>%
+  dplyr::mutate(taxon_key = stringr::str_sub(stock_id_taxonkey,-6,-1)) %>%
+  dplyr::mutate(stock_id = substr(stock_id_taxonkey, 1, nchar(stock_id_taxonkey) -
+                                    7)) %>%
+  dplyr::mutate(catch = as.numeric(mean_catch)) %>%
+  dplyr::mutate(year = as.numeric(as.character(year))) %>%
+  dplyr::mutate(rgn_id = as.numeric(as.character(rgn_id))) %>%
+  dplyr::mutate(taxon_key = as.numeric(as.character(taxon_key))) %>%
+  dplyr::select(rgn_id, year, stock_id, taxon_key, mean_catch)
 
 
 ## read in fisheries mean catch so we can use to gapfill missing regions
-  fis_mean_catch <- read.csv(file.path("../../fis", version_year, "int/mean_catch.csv")) %>% 
-     dplyr::mutate(stock_id_taxonkey = as.character(stock_id_taxonkey)) %>%
-    dplyr::mutate(taxon_key = sub('.*_', '', stock_id_taxonkey)) %>%
-    dplyr::mutate(stock_id = sub('_[^_]*$', '', stock_id_taxonkey)) %>%
-    dplyr::mutate(catch = as.numeric(mean_catch)) %>%
-    dplyr::mutate(year = as.numeric(as.character(year))) %>%
-    dplyr::mutate(region_id = as.numeric(as.character(rgn_id))) %>%
-    dplyr::mutate(taxon_key = as.numeric(as.character(taxon_key))) %>%
-    dplyr::select(region_id, year, stock_id, taxon_key, catch)
+fis_mean_catch <- read_csv(here::here("globalprep","fis", version_year, "int","mean_catch.csv")) %>% 
+  dplyr::mutate(stock_id_taxonkey = as.character(stock_id_taxonkey)) %>%
+  dplyr::mutate(taxon_key = sub('.*_', '', stock_id_taxonkey)) %>%
+  dplyr::mutate(stock_id = sub('_[^_]*$', '', stock_id_taxonkey)) %>%
+  dplyr::mutate(catch = as.numeric(mean_catch)) %>%
+  dplyr::mutate(year = as.numeric(as.character(year))) %>%
+  dplyr::mutate(rgn_id = as.numeric(as.character(rgn_id))) %>%
+  dplyr::mutate(taxon_key = as.numeric(as.character(taxon_key))) %>%
+  dplyr::select(rgn_id, year, stock_id, taxon_key, catch)
 
-  # test <- fis_mean_catch %>%
-  #   filter(region_id == 105)
+test <- fis_mean_catch %>%
+  filter(rgn_id == 105) # yay!
 
 b <- b %>%
-    dplyr::mutate(bbmsy = as.numeric(bbmsy)) %>%
-    dplyr::mutate(region_id = as.numeric(as.character(rgn_id))) %>%
-    dplyr::mutate(year = as.numeric(as.character(year))) %>%
-    dplyr::mutate(stock_id = as.character(stock_id)) # fix some classes
-  
-  
-  ####
-  # Merge the b/bmsy data with catch data
-  ####
-  data_fis <- c %>%
-    dplyr::left_join(b, by = c('rgn_id', 'stock_id', 'year')) %>%
-    dplyr::select(rgn_id, stock_id, year, taxon_key, mean_catch, bbmsy)
-  
-  
-  gapfill_missing <- b %>%
-    filter(rgn_id %in% missing_id) %>% 
-    left_join(fis_mean_catch, by = c("rgn_id" = "region_id", "stock_id", "year")) %>%
-    dplyr::select(rgn_id, stock_id, year, taxon_key, mean_catch = catch, bbmsy) 
-  
-  fix_bouvet <- fis_mean_catch %>%
-    filter(region_id == 105) %>%
-    dplyr::select(rgn_id = region_id, stock_id, year, taxon_key, mean_catch = catch) %>%
-    mutate(bbmsy = NA)
-  
-  data_fis_final <- rbind(data_fis, gapfill_missing, fix_bouvet)
-  
-  length(unique(data_fis_final$rgn_id)) # 220 regions ; perfect 
-  
-  
-  ###
-  #  Estimate scores for taxa without b/bmsy values
-  # Mean score of other fish in the region is the starting point
-  # Then a penalty is applied based on the level the taxa are reported at
-  ###
-  
-  ## this takes the mean score within each region and year
-  data_fis_gf <- data_fis_final %>%
-    dplyr::group_by(rgn_id, year) %>%
-    dplyr::mutate(mean_score = mean(bbmsy, na.rm = TRUE)) %>%
-    dplyr::ungroup()
-  
-  ## this takes the mean score across all regions within a year
-  # (when no stocks have scores within a region)
-  data_fis_gf <- data_fis_gf %>%
-    dplyr::group_by(year) %>%
-    dplyr::mutate(mean_score_global = mean(bbmsy, na.rm = TRUE)) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(mean_score = ifelse(is.na(mean_score), mean_score_global, mean_score)) %>%
-    dplyr::select(-mean_score_global)
-  
-  
-  data_fis_gf <- data_fis_gf %>%
-    dplyr::mutate(TaxonPenaltyCode = as.numeric(substring(taxon_key, 1, 1))) %>%
-    dplyr::mutate(score_gf = mean_score) %>%
-    dplyr::mutate(method = ifelse(is.na(bbmsy), "Mean gapfilled", NA)) %>%
-    dplyr::mutate(gapfilled = ifelse(is.na(bbmsy), 1, 0)) %>%
-    dplyr::mutate(score = ifelse(is.na(bbmsy), score_gf, bbmsy)) %>%
-    dplyr::mutate(method = ifelse(rgn_id %in% missing_id, "Used fisheries subgoal b/bmsy and catch", method)) %>%
-    dplyr::mutate(gapfilled = ifelse(rgn_id %in% missing_id, 1, gapfilled))
-  
-  test <- data_fis_gf %>%
-    filter(rgn_id == 105)
-   # filter(method == "Used fisheries subgoal b/bmsy and catch") # perfect
-  
-  
-  gap_fill_data <- data_fis_gf %>%
-    dplyr::select(rgn_id,
-           stock_id,
-           taxon_key,
-           year,
-           mean_catch,
-           score,
-           gapfilled,
-           method) 
-  
-  write.csv(gap_fill_data, here(file.path("globalprep/ao", version_year, "output/AO_bbmsy_summary_gf.csv")), row.names = FALSE)
-  
-  score_data <- data_fis_gf %>%
-    dplyr::select(rgn_id, stock_id, year, mean_catch, score)
-  
-   ###
-  # Calculate status for each region
-  ###
+  dplyr::mutate(bbmsy = as.numeric(bbmsy)) %>%
+  dplyr::mutate(rgn_id = as.numeric(as.character(rgn_id))) %>%
+  dplyr::mutate(year = as.numeric(as.character(year))) %>%
+  dplyr::mutate(stock_id = as.character(stock_id)) # fix some classes
+```
 
-  ## Take a catch weighted average of B/Bmsy scores for each region/year.
-  
-  score_data <- score_data %>%
-    dplyr::group_by(rgn_id, year) %>%
-    dplyr::summarize(score = weighted.mean(score, mean_catch)) %>%
-    dplyr::ungroup() 
 
-summary(score_data)
+```{r, eval = FALSE}
+#  ===== Merge the b/bmsy data with catch data ====
+
+data_fis <- c %>%
+  dplyr::left_join(b, by = c('rgn_id', 'stock_id', 'year')) %>%
+  dplyr::select(rgn_id, stock_id, year, taxon_key, mean_catch, bbmsy)
+
+
+gapfill_missing <- b %>%
+  filter(rgn_id %in% missing_id) %>% 
+  left_join(fis_mean_catch, by = c("rgn_id", "stock_id", "year")) %>%
+  dplyr::select(rgn_id, stock_id, year, taxon_key, mean_catch = catch, bbmsy) 
+
+fix_bouvet <- fis_mean_catch %>%
+  filter(rgn_id == 105) %>%
+  dplyr::select(rgn_id, stock_id, year, taxon_key, mean_catch = catch) %>%
+  mutate(bbmsy = NA)
+
+data_fis_final <- rbind(data_fis, gapfill_missing, fix_bouvet)
+
+length(unique(data_fis_final$rgn_id)) # 220 regions ; perfect
+```
+
+
+```{r, eval = FALSE}
+# ==== Estimate scores for taxa without b/bmsy values ====
+# Mean score of other fish in the region is the starting point
+# Then a penalty is applied based on the level the taxa are reported at
+
+## this takes the mean score within each region and year
+data_fis_gf <- data_fis_final %>%
+  dplyr::group_by(rgn_id, year) %>%
+  dplyr::mutate(mean_score = mean(bbmsy, na.rm = TRUE)) %>%
+  dplyr::ungroup()
+
+## this takes the mean score of the bbmsy across all regions within a year and replaces any regions that have no mean_score with the global mean score by year
+# (when no stocks have scores within a region)
+data_fis_gf <- data_fis_gf %>%
+  dplyr::group_by(year) %>%
+  dplyr::mutate(mean_score_global = mean(bbmsy, na.rm = TRUE)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(mean_score = ifelse(is.na(mean_score), mean_score_global, mean_score)) %>%
+  dplyr::select(-mean_score_global)
+
+
+data_fis_gf <- data_fis_gf %>%
+  dplyr::mutate(TaxonPenaltyCode = as.numeric(substring(taxon_key, 1, 1))) %>%
+  dplyr::mutate(score_gf = mean_score) %>%
+  dplyr::mutate(method = ifelse(is.na(bbmsy), "Mean gapfilled", NA)) %>%
+  dplyr::mutate(gapfilled = ifelse(is.na(bbmsy), 1, 0)) %>%
+  dplyr::mutate(score = ifelse(is.na(bbmsy), score_gf, bbmsy)) %>%
+  dplyr::mutate(method = ifelse(rgn_id %in% missing_id, "Used fisheries subgoal b/bmsy and catch", method)) %>%
+  dplyr::mutate(gapfilled = ifelse(rgn_id %in% missing_id, 1, gapfilled))
+
+test <- data_fis_gf %>%
+  filter(rgn_id == 105)
+# filter(method == "Used fisheries subgoal b/bmsy and catch") # perfect
+
+# select only the columns we want
+gap_fill_data <- data_fis_gf %>%
+  dplyr::select(rgn_id,
+                stock_id,
+                taxon_key,
+                year,
+                mean_catch,
+                score,
+                gapfilled,
+                method) 
+
+write_csv(gap_fill_data, here::here("globalprep","ao", version_year, "output","AO_bbmsy_summary_gf.csv"))
+```
+
+
+```{r, eval = FALSE}
+# ===== Calculate status for each region =====
+
+## Take a catch weighted average of B/Bmsy scores for each region/year.
+
+score_data <- data_fis_gf %>%
+  dplyr::select(rgn_id, stock_id, year, mean_catch, score) %>% 
+  dplyr::group_by(rgn_id, year) %>%
+  dplyr::summarize(score = weighted.mean(score, mean_catch)) %>%
+  dplyr::ungroup() 
+
+summary(score_data) # v2024: no NAs, yay!
+
 length(unique(score_data$rgn_id)) # 220 - perfect! 
 
 test <- score_data %>%
   filter(rgn_id %in% missing_id) # perfect! 
 
-write.csv(score_data, here("globalprep/ao/", version_year, "output/ao_nind_scores.csv"), row.names = FALSE)
-
+write_csv(score_data, here::here("globalprep","ao", version_year, "output","ao_nind_scores.csv"))
 ```
 
 ## Data check
@@ -264,33 +256,58 @@ write.csv(score_data, here("globalprep/ao/", version_year, "output/ao_nind_score
 ```{r, eval = FALSE}
 region_data()
 
-stk <- read.csv(here("globalprep/ao/",version_year, "output/ao_nind_scores.csv")) %>%
+stk <- read_csv(here::here("globalprep","ao",version_year, "output","ao_nind_scores.csv")) %>%
   left_join(rgns_eez)
 
-need <- read.csv(here("globalprep/ao/", version_year, "output/wb_gdppcppp_rescaled_gf.csv")) %>%
+need <- read_csv(here::here("globalprep","ao", version_year, "output","wb_gdppcppp_rescaled_gf.csv")) %>%
   left_join(rgns_eez)
 
-setdiff(need$rgn_name, stk$rgn_name)
+setdiff(need$rgn_name, stk$rgn_name) # v2024: character(0); perfect! 
 
-# character(0); perfect! 
-
-#update these!!
+#update these accordingly!! (v2024 still was using the most recent year of SAUP data, which was 2019)
 latest_data_year <- 2019
 previous_assessment_latest_data_year <- 2019
 
 #look at the difference between this year and last
-new <- read.csv(here("globalprep/ao/",version_year, "output/ao_nind_scores.csv")) %>%
+new <- read_csv(here::here("globalprep","ao",version_year, "output","ao_nind_scores.csv")) %>%
   left_join(rgns_eez)
 
-old <- read.csv(here("globalprep/ao/",previous_version_year, "output/ao_nind_scores.csv")) %>% select(rgn_id, year, old_score = score)
+old <- read_csv(here::here("globalprep","ao",previous_version_year, "output","ao_nind_scores.csv")) %>% 
+  select(rgn_id, year, old_score = score)
 
-compare <- new %>% left_join(old, by = c("year", "rgn_id")) %>% filter(year == previous_assessment_latest_data_year)
+compare <- new %>% 
+  left_join(old, by = c("year", "rgn_id")) %>% 
+  filter(year == previous_assessment_latest_data_year) # filter the data to only 2019
+```
+
+
+```{r, eval = FALSE}
+library(plotly)
+library(ggplot2)
 
 compare_plot <- ggplot(data = compare) + geom_point(aes(x = old_score, y = score, text = rgn_id))  +
   geom_abline(color = "red") + 
   labs(x = paste("score", previous_assessment_latest_data_year, previous_version_year),
-                                    y = paste("score", previous_assessment_latest_data_year, version_year), title = paste(previous_assessment_latest_data_year, "data comparison"))
+       y = paste("score", previous_assessment_latest_data_year, version_year), title = paste(previous_assessment_latest_data_year, "data comparison")) +
+  theme_minimal()
 
 ggplotly(compare_plot, tooltip = c("text", "score", "old_score"))
+```
+
+```{r}
+# ==== Percent change between this year and last year =====
+compare_diff <- new %>% 
+  left_join(old, by = c("year", "rgn_id")) %>% 
+  filter(year == previous_assessment_latest_data_year) %>%  # filter the data to only 2019
+  mutate(diff = ((score - old_score)/old_score)*100) # using percent change equation
+
+# interactive plotly of the percent change in ao_sust scores by region between v2023 and v2024 in 2019
+diff_plot <- compare_diff %>%
+  plot_ly(x = ~rgn_id, y = ~diff, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "AO Sustainability Score Percent Change by Region",
+         xaxis = list(title = "Region ID"),
+         yaxis = list(title = "Percent change v2023 vs v2024"))
+diff_plot
 ```
 

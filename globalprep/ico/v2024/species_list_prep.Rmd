@@ -1,0 +1,135 @@
+---
+title: "iconic species list prep"
+output: html_document
+date: "2023-08-05"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This script does not need to be run annually. It was used in v2023 to update the species list, and can be used to update the species included in future years if needed. New species were appended to the original iconic species list, using species from [Reyes-García et al. 2023.](https://www.pnas.org/doi/10.1073/pnas.2217303120)
+
+```{r}
+#setup
+library(here)
+library(tidyverse)
+
+source(here::here('workflow', 'R', 'common.R'))
+
+### directory paths and relevant files
+current_year  <- 2023
+version_year  <- paste0("v", current_year)
+
+goal     <- 'globalprep/ico'
+dir_data <- file.path(dir_M, 'git-annex', goal)
+dir_here <- here::here(goal, version_year)
+
+
+source(here::here(dir_here, 'ico_fxn.R'))
+```
+
+```{r}
+#save the iucn redlist token to the environment
+api_file <- file.path(dir_data, 'api_key_gc.csv')
+api_key <- scan(api_file, what = 'character') 
+```
+
+```{r}
+#read in the old list of species from v2022
+ico_species <- read_csv(here("globalprep/ico/v2022/raw/ico_list_raw.csv"))
+
+#read in the list of culturally important species we would like to add species from
+cis_list <- read_csv(here("globalprep/ico/v2023/raw/pnas.2217303120.csv"))
+
+#read in the list of species IUCN has
+iucn_available <- read_csv(here("globalprep/ico/v2023/raw/spp_list_from_api.csv"))
+
+#filter the new list of species to just the ones available from IUCN
+#145 not available
+not_available <- setdiff(cis_list$Species, iucn_available$sciname)
+
+cis_available <- cis_list %>% 
+  filter(!Species %in% c(not_available))
+
+#remove species that are already in the iconic species list as global
+ico_global <- ico_species %>% 
+  filter(ico_gl == TRUE)
+
+query_list <- setdiff(cis_available$Species, ico_global$sciname)
+
+#query the iucn redlist for habitat data for all of these species
+# Create an empty list to store the results
+results_list <- list()
+
+#find out which species are marine/brakish
+# Loop through each species and query the API for the habitats for these species
+for (species_name in query_list) {
+  # Construct the API endpoint URL for the current species
+  spp_page_url <- paste0('https://apiv3.iucnredlist.org/api/v3/habitats/species/name/', 
+                         URLencode(species_name), '?token=', api_key)
+  
+  # Make the API request and parse the JSON response
+  species_data <-jsonlite::fromJSON(spp_page_url) %>% as_tibble()
+  
+  #add back to the list
+  results_list[[species_name]] <- species_data
+   }
+  
+# Filter out items with empty $result part from results_list
+results_list <- Filter(function(df) {
+  !is.null(df$result) && nrow(df$result) > 0
+}, results_list)
+
+#turn into a single dataframe
+species_results <- bind_rows(results_list) %>%
+  unnest(col = result)
+
+#keep only the species that are marine
+species_new <- species_results %>% 
+  filter(str_detect(habitat, "Marine")) %>% 
+  filter(habitat != "Marine Coastal/Supratidal - Coastal Freshwater Lakes") %>% 
+   mutate(name = if_else(name == "coris julis", "Coris julis", name))
+
+species_new <- unique(species_new$name)
+
+
+cis_add <- cis_list %>% 
+  filter(Species %in% species_new) %>% 
+  left_join(iucn_available, by = c("Species" = "sciname")) %>% 
+  distinct(Species, Continent, .keep_all = TRUE) #drop duplicates (subpopulations)
+
+#turn continents into countries 
+UNgeorgn()
+
+#replace georgns with continents used in cis list
+continent <- UNgeorgn %>% 
+    mutate(
+      Continent = case_when(
+        r1_label == "Americas"~ "North America",
+                                 TRUE ~ r1_label)) %>% 
+    mutate(
+      Continent = case_when(
+        r2_label == "Caribbean"~ "North America",
+        r2_label == "Central America" ~ "North America",
+        r2_label == "South America" ~ "South America",
+                                 TRUE~Continent))
+  
+  
+  cis_countries <- merge(cis_add, continent, by = "Continent") %>% 
+    rename(sciname =Species, ico_rgn_id = rgn_id, comname = main_common) %>% 
+    mutate(ico_gl = FALSE) %>% 
+    select(comname, sciname, ico_gl, ico_rgn_id)
+
+  #add new iconic species list to the old iconic species list 
+  iconic_species_updated <- rbind(cis_countries,ico_species) %>% 
+    distinct(sciname, ico_rgn_id, .keep_all = TRUE) #drop duplicates, ones that were already in iconic species list for that region
+  
+#save the new iconic species list
+write_csv(iconic_species_updated,here("globalprep/ico/v2023/raw/ico_list_raw_updated.csv"))
+
+```

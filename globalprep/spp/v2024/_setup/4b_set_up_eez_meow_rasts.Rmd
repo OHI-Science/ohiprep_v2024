@@ -31,14 +31,14 @@ library(raster)
 library(sf)
 library(fasterize)
 library(dplyr)
-library(rgdal)
+# library(rgdal)
 library(here)
 library(ggplot2)
 
 source(here('workflow/R/common.R'))
 
 goal     <- 'spp'
-scenario <- 'v2021'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info
@@ -241,7 +241,11 @@ if(!file.exists(bathy_rast_file)) {
   bathy_rast <- raster::raster(bathy_rast_file)
 }
 
-plot(bathy_rast, main = 'Bathymetry (minimum depth) raster 10 km^2 Gall-Peters')
+
+library(RColorBrewer)
+color_palette <- colorRampPalette(brewer.pal(9, "Oranges"))
+plot(bathy_rast, main = 'Bathymetry (minimum depth,) raster 10 km^2 Gall-Peters',
+     col = color_palette(100))
 
 ```
 

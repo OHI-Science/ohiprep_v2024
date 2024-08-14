@@ -31,15 +31,15 @@ library(raster)
 library(sf)
 library(fasterize)
 library(dplyr)
-library(rgdal)
+# library(rgdal)
 library(here)
 library(ggplot2)
-library(rgeos)
+# library(rgeos)
 
 source(here('workflow/R/common.R'))
 
 goal     <- 'spp'
-scenario <- 'v2021'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info
@@ -172,8 +172,8 @@ shps_df <- lapply(iucn_dbfs, get_dbf) %>%
     clean_df_names()
   
   colnames(spp_dbf_info)
-#    [1] "sisid"   "binomil" "presenc" "origin"  "seasonl" "compilr" "yrcmpld" "citatin" "source"  "dst_cmm" "version"
-# [12] "shp_lng" "shape_r"
+# [1] "sisid"   "binomil" "presenc" "origin"  "seasonl" "compilr" "yrcmpld" "citatin" "source" 
+# [10] "dst_cmm" "version" "shp_lng" "shape_r"
   
   ### Individual files call the id number 'iucn_sid'; bli is named sisid
   ### 'iucn_sid' as well;
@@ -255,19 +255,34 @@ subpops_match <- subpops_match_raw %>%
 
 ### Check for missed matches:
 
-# api_subpops$api_iucn_sid[!api_subpops$api_iucn_sid %in% subpops_match$api_iucn_sid]
+api_subpops$api_iucn_sid[!api_subpops$api_iucn_sid %in% subpops_match$api_iucn_sid]
 ### API subpop, not matched: 16369383 Tursiops truncatus 
 ###                                   Mediterranean subpopulation
 ### * OK - no polygon for this subpopulation.  Regional assessment?
+
 ### API subpop, not matched: 44187 Orcaella brevirostris 
 ###                                Malampaya Sound subpopulation
 ### * Doesn't look like there is a shape for this subpop... Sorry dude!
+
 ### API subpop, not matched: 123095978 Orcaella brevirostris
 ###                                    loilo-Guimaras Subpopulation  
 ### * Doesn't look like there is a shape for this subpop... Sorry dude!
+
 ### API subpop, not matched: 156206333  Delphinus delphis
 ###                                    Gulf of Corinth subpopulation
 ### * It does look like there is a shape for this one... the medittarean sea.. but it seems like it is already accounted for in the matched subpops... so i think it is ok. 
+
+### API subpop, not matched: 181208820 Tursiops truncatus
+###                                    Gulf of Ambracia subpopulation
+### * It doesn't look like there is a shape for this subpopulation...
+
+### API subpop, not matched: 218582754 Dugong dugon 
+###                                    New Caledonia subpopulation
+### It doesn't look like there is a shape for this subpop ... 
+
+### API subpop, not matched: 218582764 Dugong dugon 
+###                                    Eastern Africa subpopulation
+### It doesn't look like there is a shape for this subpop
 
  shp_subpops[!shp_subpops$shp_subpop %in% subpops_match$shp_subpop, ]
 # all matched
@@ -334,8 +349,8 @@ map_info_raw_iucn <- lapply(iucn_dbfs, get_dbf) %>%
     clean_df_names()
   
   colnames(spp_dbf_info)
-#    [1] "sisid"   "binomil" "presenc" "origin"  "seasonl" "compilr" "yrcmpld" "citatin" "source"  "dst_cmm" "version"
-# [12] "shp_lng" "shape_r"
+ # [1] "sisid"   "binomil" "presenc" "origin"  "seasonl" "compilr" "yrcmpld" "citatin"
+ # [9] "source"  "dst_cmm" "version" "shp_lng" "shape_r"
   
   ### Individual files call the id number 'iucn_sid'; bli is named sisid
   ### 'iucn_sid' as well;
@@ -457,11 +472,11 @@ marine_map_info <- read_csv(file.path(dir_data,
   distinct()
 
 taxa_info <- read_csv(file.path(dir_goal_anx, 'iucn', 
-                                'spp_info_from_api_2020-3.csv')) %>%
+                                'spp_info_from_api_2024-1.csv')) %>%
   dplyr::select(iucn_sid, kingdom:family)
 
 cat_info <- read_csv(file.path(dir_data, 
-                               'iucn_risk_current_2020-3.csv')) %>%
+                               'iucn_risk_current_2024-1.csv')) %>%
   dplyr::select(iucn_sid, cat_score) %>%
   filter(!is.na(cat_score))
 
@@ -511,7 +526,7 @@ all_sum <- bind_rows(fish_sum, nonfish_sum, basic_sum) %>%
          subpops = ifelse(subpops == 0, NA, subpops))
 
 ## Check against last year to see if you have all of the same species. 
-## 201: We do. 
+## 2024: We have the same species, but the setdiff is going to return a list of those that are not matching because the all_sum df has them grouped into "marinefish" as the spp_gp. So I went through and cross-referenced the class, order, and family to make sure that they were all present - they are present 
 
 old_sum <- read_csv(file.path(dir_goal, '_output', 
                              'spp_included_summary.csv'))

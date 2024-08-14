@@ -9,10 +9,10 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Mon Sep 11 08:21:59 2023 by egg" />
+<meta name="author" content="Compiled on Wed Aug 14 16:30:15 2024 by lecuona" />
 
 
-<title>OHI 2023: Download SAUP production data and match FAO regions</title>
+<title>OHI 2024: Download SAUP production data and match FAO regions</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1378,7 +1378,7 @@ overflow: visible;
 </style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -1645,10 +1645,10 @@ border-radius: 0px;
 
 
 
-<h1 class="title toc-ignore">OHI 2023: Download SAUP production data and
+<h1 class="title toc-ignore">OHI 2024: Download SAUP production data and
 match FAO regions</h1>
-<h4 class="author"><em>Compiled on Mon Sep 11 08:21:59 2023 by
-egg</em></h4>
+<h4 class="author"><em>Compiled on Wed Aug 14 16:30:15 2024 by
+lecuona</em></h4>
 
 </div>
 
@@ -1681,8 +1681,8 @@ pressures): <a href="https://github.com/UBC-CIC/Sea_Around_Us_Spatial_Catch" cla
 <div id="updates-from-previous-scenario-year" class="section level1">
 <h1>Updates from previous scenario year</h1>
 <ul>
-<li>None. This script wasn’t run in v2023. Associated data files within
-the repo were copied from v2022 to v2023.</li>
+<li>None. This script wasn’t run in v2024. Associated data files within
+the repo were copied from v2023 to v2024.</li>
 </ul>
 </div>
 <div id="data-source" class="section level1">
@@ -1712,8 +1712,7 @@ status and taxonomic information.</p>
 <span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="fu">library</span>(sf)</span>
 <span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="fu">library</span>(mapview)</span>
 <span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a></span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="fu">setwd</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;globalprep/fis/v2022&quot;</span>))</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&#39;../../../workflow/R/common.R&#39;</span>)</span></code></pre></div>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;workflow&quot;</span>, <span class="st">&quot;R&quot;</span>, <span class="st">&quot;common.R&quot;</span>)) <span class="co"># file creates objects to process data</span></span></code></pre></div>
 <pre><code>## This file makes it easier to process data for the OHI global assessment
 ##  by creating the following objects:
 ## 
@@ -1745,11 +1744,11 @@ need SAUP region id numbers.</p>
 <span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a></span>
 <span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co"># this saup_rgn_ids.csv file comes from this github repository: https://github.com/UBC-CIC/Sea-Around-Us/blob/main/data-dictionary/Appendices.md</span></span>
 <span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a></span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>saup_regions <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;raw/SAUP_regions.csv&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>saup_regions <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">&quot;raw&quot;</span>,<span class="st">&quot;SAUP_regions.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
 <span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">area_name =</span> EEZ, <span class="at">rgn_num =</span> ID) <span class="sc">%&gt;%</span></span>
 <span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_num <span class="sc">!=</span> <span class="dv">0</span>) </span>
 <span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a></span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;raw/saup_rgn_ids.csv&quot;</span>)</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">&quot;raw&quot;</span>,<span class="st">&quot;saup_rgn_ids.csv&quot;</span>))</span>
 <span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a></span>
 <span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(saup_regions<span class="sc">$</span>rgn_num)) <span class="co"># 281.. perfect. I counted through the dropdown here http://www.seaaroundus.org/data/#/search, and they have 281 regions</span></span>
 <span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a></span>
@@ -1774,7 +1773,7 @@ need SAUP region id numbers.</p>
 <span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a></span>
 <span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a>filenames <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="st">&quot;/home/shares/ohi/git-annex/globalprep/_raw_data/SAUP/d2022/by_eez_zip_new&quot;</span>, <span class="at">full.names =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb4-37"><a href="#cb4-37" tabindex="-1"></a></span>
-<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a>region_ids_done <span class="ot">=</span> <span class="fu">extract_numeric</span>(<span class="fu">basename</span>(filenames[<span class="fu">file.size</span>(filenames) <span class="sc">!=</span> 0L]))</span>
+<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a>region_ids_done <span class="ot">=</span> <span class="fu">extract_numeric</span>(<span class="fu">basename</span>(filenames[<span class="fu">file.size</span>(filenames) <span class="sc">!=</span> <span class="dv">0</span><span class="dt">L</span>]))</span>
 <span id="cb4-39"><a href="#cb4-39" tabindex="-1"></a>region_ids_tbd <span class="ot">=</span> <span class="fu">setdiff</span>(region_ids_281<span class="sc">$</span>row, region_ids_done)</span>
 <span id="cb4-40"><a href="#cb4-40" tabindex="-1"></a></span>
 <span id="cb4-41"><a href="#cb4-41" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> region_ids_tbd){</span>
@@ -1899,7 +1898,7 @@ FAO ids for the high seas dataset downloaded above</p>
 <span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a></span>
 <span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>filenames <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="st">&quot;/home/shares/ohi/git-annex/globalprep/_raw_data/SAUP/d2022/by_fao_area_zip&quot;</span>, <span class="at">full.names =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a></span>
-<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>region_ids_done <span class="ot">=</span> <span class="fu">extract_numeric</span>(<span class="fu">basename</span>(filenames[<span class="fu">file.size</span>(filenames) <span class="sc">!=</span> 0L]))</span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>region_ids_done <span class="ot">=</span> <span class="fu">extract_numeric</span>(<span class="fu">basename</span>(filenames[<span class="fu">file.size</span>(filenames) <span class="sc">!=</span> <span class="dv">0</span><span class="dt">L</span>]))</span>
 <span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>region_ids_tbd <span class="ot">=</span> <span class="fu">setdiff</span>(region_ids<span class="sc">$</span>num, region_ids_done)</span>
 <span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a></span>
 <span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> region_ids_tbd){</span>
@@ -2073,7 +2072,6 @@ FAO ids for the high seas dataset downloaded above</p>
 <span id="cb7-112"><a href="#cb7-112" tabindex="-1"></a><span class="co"># now write this out to mazu and we are finished! </span></span>
 <span id="cb7-113"><a href="#cb7-113" tabindex="-1"></a></span>
 <span id="cb7-114"><a href="#cb7-114" tabindex="-1"></a><span class="fu">write.csv</span>(join_eez_fao_ids, <span class="fu">file.path</span>(<span class="st">&quot;/home/shares/ohi/git-annex/globalprep/fis/v2022/eez_fao_ids_prod.csv&quot;</span>), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
-<hr />
 </div>
 
 
