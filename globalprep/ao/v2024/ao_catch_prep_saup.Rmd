@@ -28,13 +28,13 @@ This script takes the SAUP 2022 catch data and creates 1 data layer:
 
 ## Updates from previous assessment
 
-The SAUP data was not updated in v2023, and so this script was not run for that year. Raw and intermediate data stored on Mazu is pulled from the previous data year (V2022). Repository data files were copied over from the V2022 to the V2023 folders. 
+The SAUP data was not updated in v2023 or v2024, so this script uses the 2019 SAUP data for catch. Raw and intermediate data stored on Mazu is pulled from v2022.
 
 ***
 
 # Data Source
 
-**Reference**: Pauly D., Zeller D., Palomares M.L.D. (Editors), 2020. Sea Around Us Concepts, Design and Data (seaaroundus.org).
+**Reference**: Pauly D., Zeller D., Palomares M.L.D. (Editors), 2020. Sea Around Us Concepts, Design and Data (seaaroundus.org)
 
 **Downloaded**: September 27, 2022
 
@@ -71,15 +71,17 @@ library(sf)
 library(tidyverse)
 library(readxl)
 
-setwd(here::here("globalprep/ao/v2022"))
-source('../../../workflow/R/common.R')
+source(here("workflow", "R", "common.R"))
 
 #update as needed
-version_year <- "v2023"
+version_year <- "v2024"
 raw_data_version_year <- "v2022"
 
-## Paths for data
-fis_path = file.path(dir_M,"git-annex/globalprep/fis/v2022/int") # filepath to fisheries path
+## Paths for data in Mazu
+fis_path <- here::here(dir_M,"git-annex","globalprep","fis","v2022","int") # filepath to fisheries path
+
+## Intermediate output directory
+int_dir <- here::here("globalprep","ao", version_year,"intermediate")
 ```
 
 ***
@@ -96,7 +98,7 @@ Look at catch data
 
 
 ## read in the catch data
-catch <- read.csv(file.path(fis_path, "stock_catch_by_rgn_taxa.csv"))
+catch <- read_csv(here(fis_path, "stock_catch_by_rgn_taxa.csv")) # data goes up to 2019
 sort(unique(catch$rgn_id))
 
 
@@ -128,7 +130,7 @@ output_df <- catch %>%
     dplyr::summarise(tons = sum(tons)) %>% 
     dplyr::ungroup()
 
-write.csv(output_df, file = file.path(dir_M,'git-annex/globalprep/ao/v2022/int/ao_stock_catch_by_rgn_taxa.csv'), row.names=FALSE)
+write_csv(output_df, file = here(dir_M,"git-annex","globalprep","ao","v2024","int","ao_stock_catch_by_rgn_taxa.csv"))
 
 test <- output_df %>%
   group_by(year) %>%
@@ -142,7 +144,7 @@ Take a look at catch data with missing ohi and fao regions in **stock_catch_by_r
 ```{r, eval=FALSE}
 region_data()
 
-df <- read_csv(file.path(dir_M,'git-annex/globalprep/ao/v2022/int/ao_stock_catch_by_rgn_taxa.csv')) %>%
+df <- read_csv(here::here(dir_M,'git-annex', 'globalprep', 'ao','v2024','int','ao_stock_catch_by_rgn_taxa.csv')) %>%
   left_join(rgns_eez)
 
 # they all have ohi or fao regions; however there are only 197 regions with artisanal or subsistence catch in the SAUP data.
@@ -163,7 +165,7 @@ Mean catch data is used to weight the B/Bmsy values in the fishery subgoal.
 
 ```{r mean catch, eval=F}
 
-file <- file.path(dir_M,'git-annex/globalprep/ao/v2022/int/ao_stock_catch_by_rgn_taxa.csv')
+file <- here::here(dir_M,'git-annex', 'globalprep', 'ao','v2024','int','ao_stock_catch_by_rgn_taxa.csv')
 
 catch <- read_csv(file) %>%
   rename(common = CommonName, fao_id = fao_rgn, species=TaxonName)
@@ -261,12 +263,12 @@ mean_catch_toolbox <- mean_catch %>%
   filter(year >= 2001) %>%  # filter to include only analysis years
   data.frame()
 
-write.csv(mean_catch_toolbox, "intermediate/mean_catch.csv", row.names=FALSE) ## save the total mean catch csv for reference if needed
+write_csv(mean_catch_toolbox, here::here(int_dir, "mean_catch.csv")) ## save the total mean catch csv for reference if needed
 
 
 length(unique(mean_catch_toolbox$rgn_id)) # only 196 regions... We will gapfill the missing regions...
 
-old <- read.csv("../v2021/intermediate/mean_catch.csv")
+old <- read_csv(here("globalprep","ao","v2021","intermediate","mean_catch.csv"))
 
 length(unique(old$rgn_id)) # only 196 regions
 

@@ -9,10 +9,10 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Mon Sep 11 08:22:31 2023 by egg" />
+<meta name="author" content="Compiled on Wed Aug 14 16:31:25 2024 by lecuona" />
 
 
-<title>OHI 2023: Food Provision, Preparing catch data for BBmsy calculations and mean catch (weights in FIS model) and FP weights</title>
+<title>OHI 2024: Food Provision, Preparing catch data for BBmsy calculations and mean catch (weights in FIS model) and FP weights</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1378,7 +1378,7 @@ overflow: visible;
 </style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -1645,11 +1645,11 @@ border-radius: 0px;
 
 
 
-<h1 class="title toc-ignore">OHI 2023: Food Provision, Preparing catch
+<h1 class="title toc-ignore">OHI 2024: Food Provision, Preparing catch
 data for BBmsy calculations and mean catch (weights in FIS model) and FP
 weights</h1>
-<h4 class="author"><em>Compiled on Mon Sep 11 08:22:31 2023 by
-egg</em></h4>
+<h4 class="author"><em>Compiled on Wed Aug 14 16:31:25 2024 by
+lecuona</em></h4>
 
 </div>
 
@@ -1683,8 +1683,8 @@ summarize per region, year, and species.</p>
 <div id="updates-from-previous-assessment" class="section level2">
 <h2>Updates from previous assessment</h2>
 <ul>
-<li>None. This script wasn’t run in v2023. Associated data files within
-the repo were copied from v2022 to v2023.</li>
+<li>None. This script wasn’t run in v2024. Associated data files within
+the repo were copied from v2023 to v2024.</li>
 </ul>
 <hr />
 </div>
@@ -1719,19 +1719,18 @@ status and taxonomic information.</p>
 <span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="fu">library</span>(readxl)</span>
 <span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="fu">library</span>(data.table)</span>
 <span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a></span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="fu">setwd</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;globalprep/fis/v2022&quot;</span>))</span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&#39;../../../workflow/R/common.R&#39;</span>)</span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a></span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="do">## Paths for data</span></span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>fis_path <span class="ot">=</span> <span class="fu">file.path</span>(dir_M,<span class="st">&quot;git-annex/globalprep/fis/v2022/int&quot;</span>) </span>
-<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a>SAUP_path <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_M, <span class="st">&quot;git-annex/globalprep/fis/v2022&quot;</span>)</span></code></pre></div>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;workflow&quot;</span>, <span class="st">&quot;R&quot;</span>, <span class="st">&quot;common.R&quot;</span>)) <span class="co"># file creates objects to process data</span></span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="do">## Paths for data</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>fis_path <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(dir_M,<span class="st">&quot;git-annex&quot;</span>, <span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;fis&quot;</span>, <span class="st">&quot;v2022&quot;</span>, <span class="st">&quot;int&quot;</span>) </span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>SAUP_path <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(dir_M, <span class="st">&quot;git-annex&quot;</span>, <span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;fis&quot;</span>,<span class="st">&quot;v2022&quot;</span>)</span></code></pre></div>
 <hr />
 </div>
 <div id="create-lookup-tables-to-match-ohi-region-names-to-saup-area_name-eez" class="section level1">
 <h1>Create lookup tables to match OHI region names to SAUP area_name
 (EEZ)</h1>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>fao_eez_prod <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">file.path</span>(SAUP_path, <span class="st">&quot;eez_fao_ids_prod.csv&quot;</span>))</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>fao_high_seas <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">file.path</span>(SAUP_path, <span class="st">&quot;high_seas_fao_ids_prod.csv&quot;</span>))</span>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>fao_eez_prod <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(SAUP_path, <span class="st">&quot;eez_fao_ids_prod.csv&quot;</span>))</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>fao_high_seas <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(SAUP_path, <span class="st">&quot;high_seas_fao_ids_prod.csv&quot;</span>))</span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a></span>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a></span>
 <span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>high_seas_regions <span class="ot">&lt;-</span> fao_high_seas <span class="sc">%&gt;%</span></span>
