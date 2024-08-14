@@ -106,7 +106,7 @@ valid_check <- function(spp_shp) {
   ### can return a vector if multiple polygons with same ID
   if(any(!valid)) {
     cat_msg('Found invalid geometries')
-    
+    spp_shp <- st_make_valid(spp_shp)
     bbox_shp <- st_bbox(spp_shp)
     if(bbox_shp$xmin < -180 | bbox_shp$xmax > 180) {
       cat_msg('Bounding box outside +/- 180; buffering with dist = 0')
