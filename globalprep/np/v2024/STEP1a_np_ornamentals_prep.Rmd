@@ -61,7 +61,7 @@ if (!require(librarian)) {
   library(librarian)
 }
 librarian::shelf(
-  ohicore, #devtools::install_github('ohi-science/ohicore@dev')
+  ohicore, #devtools::install_github('ohi-science/ohicore@dev') #if relevant: restart session after reinstalling
   dplyr,
   stringr,
   tidyr,
