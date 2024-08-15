@@ -68,6 +68,9 @@ For v2023 and v2024 the Sea Around us Project (SAUP) data used in the ao_catch_p
 ```{r, eval = FALSE}
 library(tidyverse)
 library(here)
+library(htmlwidgets)
+library(patchwork)
+library(ggplot2)
 source(here("workflow", "R", "common.R"))
 ```
 
@@ -309,5 +312,46 @@ diff_plot <- compare_diff %>%
          xaxis = list(title = "Region ID"),
          yaxis = list(title = "Percent change v2023 vs v2024"))
 diff_plot
+# saveWidget(diff_plot, here::here("globalprep","ao", version_year, "figs","ao_sust_percent_change.html"))
+
+# looking more into region 3, which had a large percent change in 2019
+compare_diff_rgn_3 <- new %>% 
+  left_join(old, by = c("year", "rgn_id")) %>%
+  filter(rgn_id %in% "3") %>% 
+  mutate(diff = ((score - old_score)/old_score)*100)
+
+# plot of region 3's percent change over time 
+rgn_3_plot <- compare_diff_rgn_3 %>%
+  plot_ly(x = ~year, y = ~diff, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "AO Sustainability Score Percent Change for Norfolk Island",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percent change v2023 vs v2024"))
+rgn_3_plot
+# saveWidget(rgn_3_plot, here::here("globalprep","ao", version_year, "figs","rgn_3_percent_change.html"))
+
+# plot of region 3's v2024 ao_sust score over time
+rgn_3_scores_plot <- compare_diff_rgn_3 %>%
+  plot_ly(x = ~year, y = ~score, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "AO Sustainability Scores v2024 for Norfolk Island",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Scores over time v2024"))
+rgn_3_scores_plot
+
+# plot of region 3's v2023 ao_sust score over time
+rgn_3_oldscores_plot <- compare_diff_rgn_3 %>%
+  plot_ly(x = ~year, y = ~old_score, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "AO Sustainability Scores for Norfolk Island",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Scores over time v2023"))
+rgn_3_oldscores_plot
+
+# patched interactive plot of v2023 and v2024 ao_sust scores
+patch_rgn_3 <- subplot(rgn_3_scores_plot, rgn_3_oldscores_plot, nrows = 2, shareX = TRUE, titleX = TRUE, shareY = FALSE, titleY = TRUE)
+patch_rgn_3
+
+# saveWidget(patch_rgn_3, here::here("globalprep","ao", version_year, "figs","rgn_3_score_comparison.html"))
 ```
 
