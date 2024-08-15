@@ -599,16 +599,14 @@ readr::write_csv(seaweed_harvest_tonnes, here(current_np_dir, "output", "np_seaw
 ## Save gapfill datasets
 
 ```{r}
-
 # save a gapfill dataset for FAO tonnes data:
- 
 mar_FAO_gf <- mar_sw_sus %>% 
   rename("gapfill_fao" = "gap_0_fill") %>%
   mutate(method = ifelse(gapfill_fao == 0, "none", gapfill_fao), 
          gapfilled = ifelse(gapfill_fao == 0, 0, 1)) %>%
   dplyr::select(rgn_id, taxa_code, year, gapfilled, method)
  
-write.csv(mar_FAO_gf, paste0("globalprep/np/v", version_year, "/output/np_seaweed_harvest_tonnes_gf.csv"), row.names = FALSE)
+readr::write_csv(mar_FAO_gf, here(current_np_dir, "output", "np_seaweed_harvest_tonnes_gf.csv"))
  
 # save a gapfill dataset for sustainability dataset
  
