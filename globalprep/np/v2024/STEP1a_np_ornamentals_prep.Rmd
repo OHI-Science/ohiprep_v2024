@@ -85,7 +85,7 @@ v_scen_year <- paste0("v", scen_year)
 
 current_np_dir <- here::here("globalprep", "np", v_scen_year)
 
-## Load FAO-specific user-defined functions
+# Load FAO-specific user-defined functions
 source(here::here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
 source(here::here("workflow", "R", "common.R")) # directory locations
 source(here::here(current_np_dir, "R", "np_fxn.R")) # function for handling FAO commodity data specific to NP
@@ -125,7 +125,7 @@ for (f in files){
   ## Specifies that units are tonnes if we are reading in the Commodities Quantity data csv, and usd if we are reading in the Commodities Value data csv
   units <- c('tonnes','usd')[str_detect(f, c('quant','value'))] # detect unit name using lowercase American English
 
-    # ---- Preliminary cleaning & tidying ----
+  # ---- Preliminary cleaning & tidying ----
   ## gather into long format and clean up FAO-specific data foibles
   ## warning: attributes are not identical across measure variables; they will be dropped: this is fine (didn't get this warning in v2024 once code was updated)
   m <- d %>% 
@@ -146,7 +146,7 @@ for (f in files){
   # cleans up flags, swaps out FAO-specific codes for analysis
   m <- m %>%
     fao_clean_data_new() %>%  # swaps out FAO-specific codes. NOTE: optional parameter 'sub_N' can be passed to control how an 'N' code is interpreted.
-    select(-c(trade, unit)) %>% # eliminate 'trade' column
+    dplyr::select(-c(trade, unit)) %>% # drop 'trade' and 'unit' columns
     arrange(country, commodity, is.na(value), year)
   # warning: NAs introduced by coercion
 
@@ -158,7 +158,8 @@ for (f in files){
   ##   commodities in data vs commodities in lookup table
   
   # Load lookup for converting commodities to products
-  com2prod <- read.csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na.strings = '')
+  #com2prod <- read.csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na.strings = '')
+  com2prod <- read_csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na = '')
   
   ## version used in 2019:
   ##    read.csv(here('globalprep/np/v2019/raw/commodities2products.csv'), na.strings='')
@@ -191,13 +192,22 @@ for (f in files){
                       fld_name = 'country', 
                       flds_unique = c('commodity', 'product', 'year'))
   
+  # check duplicates
+  # m_duplicates <- m_rgn[duplicated(m_rgn[, c("rgn_name", "year", "commodity", "product")]),]
+  # unique(m_duplicates$country)
+  # unique(m_duplicates$rgn_name)
+
+  
   # v2024 removed: 
   # Ascension, Saint Helena and Tristan da Cunha -- new syntax from previous years, will update ohicore::split_regions() to account for this change
   # Yugoslavia SFR  -- this is fine, since it broke up into the six modern countries: Croatia, Montenegro, Serbia, Slovenia, Bosnia and Herzegovina, and Macedonia in 1990-1992, which means the relevant data is still captured.
-    
-# v2021 duplicates:  [1] "China"                 "China, Hong Kong SAR"  "China, Macao SAR"      "Guadeloupe"           
-# [5] "Martinique"            "Montenegro"            "Russian Federation"    "Serbia and Montenegro"
-# [9] "Sudan"                 "Sudan (former)"        "Un. Sov. Soc. Rep."     - these are all fixed in the group by and summarise below  
+  
+  # v2021 duplicates:  [1] "China" "China, Hong Kong SAR" "China, Macao SAR"  "Guadeloupe"           
+  # [5] "Martinique" "Montenegro"  "Russian Federation" "Serbia and Montenegro"
+  # [9] "Sudan" "Sudan (former)" "Un. Sov. Soc. Rep."   - these are all fixed in the group by and summarise below  
+  # v2024 duplicates: 
+  # [1] "China, Hong Kong SAR"  "China, Macao SAR"      "Martinique"    
+  # [4] "Serbia and Montenegro" "Sudan (former)"        "Un. Sov. Soc. Rep." 
   
   ## combine composite regions
   ## When summarizing the dataset, this function provides a modified way to sum the value column while maintaining NA values when both variables are NA (rather than turning to zero values). The function will sum non-NA values normally.
@@ -215,8 +225,9 @@ for (f in files){
   names(m_rgn)[names(m_rgn) == 'value'] <- units  
   
   ## output to .csv - should create two csvs (tonnes.csv and usd.csv)
-  harvest_out <- sprintf(here(paste0('globalprep/np/v', scen_year, '/int/%s.csv')), units)
-  write.csv(m_rgn, harvest_out, row.names = FALSE, na = '')
+  harvest_out <- here::here(current_np_dir, "int", sprintf("%s.csv", units))
+    #(paste0('globalprep/np/v', scen_year, '/int/%s.csv')), units)
+  readr::write_csv(m_rgn, harvest_out, na = '')
 }
 
 
@@ -321,7 +332,7 @@ h_comm <- h
 ## Very few usd gapfilling, and none in recent years (data used to weight contributions), so will ignore this: gapfill=="r2_u_gr"
 h_gap <- h %>%
   mutate(gapfill = ifelse(gapfill == "r2_u_gr", "none", gapfill)) %>%   # focusing only on tonnes gapfilling
-  select(rgn_id, commodity, product, year, gapfill)
+  dplyr::select(rgn_id, commodity, product, year, gapfill)
 
 h_gap_ornamentals <- h_gap %>%
   filter(product == "ornamentals")
@@ -354,13 +365,13 @@ Look at wide format with all commodities and product subtotal (where commodity c
 
 h_x_tonnes <- h_comm %>% 
   bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
-  select(rgn_name, rgn_id, commodity, product, year, tonnes) %>%
+  dplyr::select(rgn_name, rgn_id, commodity, product, year, tonnes) %>%
   arrange(rgn_name, product, commodity, year) %>%
   spread(year, tonnes)
 
 h_x_usd <- h_comm %>% 
   bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
-  select(rgn_name, rgn_id, commodity, product, year, usd) %>%
+  dplyr::select(rgn_name, rgn_id, commodity, product, year, usd) %>%
   arrange(rgn_name, product, commodity, year) %>%
   spread(year, usd)
 
@@ -395,7 +406,7 @@ roll_prod <- h_prod %>%
   mutate(
       tonnes = ifelse(!is.na(tonnes_rollmean), tonnes_rollmean, tonnes_orig),
       usd    = ifelse(!is.na(usd_rollmean),    usd_rollmean,    usd_orig)) %>%
-  select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
+  dplyr::select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
 
 ```
 
@@ -428,7 +439,7 @@ write.csv(smooth_prod, 'int/np_harvest_smoothed_data.csv', row.names = FALSE, na
 
 ## Save tonnes/usd data for weighting purposes 
 tonnes <- smooth_prod %>%
-  select(rgn_id, product, year, tonnes, usd) 
+  dplyr::select(rgn_id, product, year, tonnes, usd) 
 write.csv(tonnes, 'int/np_harvest_tonnes_usd.csv', row.names = FALSE, na = '')
 
 ## Save relative tonnes data for the ornamentals layer 
