@@ -493,7 +493,7 @@ sw_sus_rgn <- bind_rows(sw_sus_rgn, sw_sus_no_rgn) %>%
 **Join the seaweed sustainability data with the mariculture data**
 
 ```{r sw-fao-joining, eval = FALSE}
-maric <- read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weighting.csv"))
+maric <- readr::read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weighting.csv"))
 
 maric <- maric %>%
   group_by(environment, species, year, Taxon_code, rgn_id) %>% 
@@ -506,7 +506,7 @@ duplicate_check <- maric %>% group_by(environment, species, year, rgn_id) %>%
 
 unique(duplicate_check$n) # should be one
 
-## Add a unique identifier per cultivated stock
+# ---- Add a unique identifier per cultivated stock ----
 identifier <- maric %>% 
   dplyr::select(rgn_id, species, environment) %>% 
   unique() %>% 
@@ -599,7 +599,7 @@ readr::write_csv(seaweed_harvest_tonnes, here(current_np_dir, "output", "np_seaw
 ## Save gapfill datasets
 
 ```{r}
-# save a gapfill dataset for FAO tonnes data:
+# save a gapfilled dataset for FAO tonnes data:
 mar_FAO_gf <- mar_sw_sus %>% 
   rename("gapfill_fao" = "gap_0_fill") %>%
   mutate(method = ifelse(gapfill_fao == 0, "none", gapfill_fao), 
@@ -608,25 +608,73 @@ mar_FAO_gf <- mar_sw_sus %>%
  
 readr::write_csv(mar_FAO_gf, here(current_np_dir, "output", "np_seaweed_harvest_tonnes_gf.csv"))
  
-# save a gapfill dataset for sustainability dataset
- 
+# save a gapfilled dataset for mar sustainability dataset
 mar_sust_gf <- mar_sw_sus %>%
   mutate(method = "sfw_seaweed_score",
          gapfilled = 1) %>%
   dplyr::select(rgn_id, year, taxa_code, gapfilled, method)
  
-write.csv(mar_sust_gf, paste0("globalprep/np/v", version_year, "/output/np_seaweed_sust_gf.csv"), row.names = FALSE)
+readr::write_csv(mar_sust_gf, here(current_np_dir, "output", "np_seaweed_sust_gf.csv"))
 ```
 
-Datacheck:
+### Datacheck:
 
-```{r}
-## compare the harvest
+```{r data-check, message=FALSE}
+# ======= compare harvest =================
 
 ## in particular, saint lucia's score increased a lot in 2021
 ## Less drastic increase in 2022 ~22 tons
+## decreased in v2024 (data year 2022) by 3 tons
 
-## Compare yield data for Saint Lucia
+# read in previous year's harvest data
+np_old <- readr::read_csv(here("globalprep", "np", paste0("v", prev_scen_year), "output", "np_seaweed_harvest_tonnes.csv"))
+
+# read in current year's harvest data 
+np_new <- readr::read_csv(here(current_np_dir, "output", "np_seaweed_harvest_tonnes.csv"))
+
+
+# Compare yield data for Saint Lucia
+np_old_sl <- np_old %>% 
+  dplyr::filter(rgn_id == 122, year == 2021) %>% 
+  dplyr::select(rgn_id, taxa_code, tonnes)
+
+np_new_sl <- np_new %>% 
+  filter(rgn_id == 122, year == 2022) %>% 
+  select(rgn_id, taxa_code, tonnes)
+
+yield_sl <- np_old_sl %>% 
+  full_join(np_new_sl, by = c("rgn_id","taxa_code")); View(yield_sl) 
+# taxa_code names changed by _+2
+# this is reasonable because of this earlier step:
+## Add a unique identifier per cultivated stock
+# identifier <- maric %>% 
+#   dplyr::select(rgn_id, species, environment) %>% 
+#   unique() %>% 
+#   mutate(species_code = 1:n())
+# # 93 unique identifiers - v2021
+# # 96 unique identifiers - v2023
+# # 105 unique identifiers - v2024
+
+# v????: the production increased by ~22 tonnes (v2022? 2023?)
+# v2024: production decreased by 3 for Eucheuma seaweeds nei, same (0.0) for Gracilaria seaweeds
+
+# Compare yield data for Vietnam - Vietnam score decreased
+np_old_vietnam <- np_old %>% 
+  filter(rgn_id == 206, year == 2020) %>% 
+  select(rgn_id, taxa_code, year, tonnes)
+
+np_new_vietnam <- np_new %>% 
+  filter(rgn_id == 206, year == 2021) %>% 
+  select(rgn_id, taxa_code, year, tonnes)
+
+yield_vietnam <- np_old_vietnam %>% 
+  full_join(np_new_vietnam, by = c("rgn_id","taxa_code")); View(yield_vietnam) 
+
+
+
+
+# ================= v2022 and v2023 code: =====================================
+# Compare yield data for Saint Lucia
 np_old <- read.csv("../v2022/output/np_seaweed_harvest_tonnes.csv") %>% 
   filter(rgn_id == 122, year == 2020) %>% 
   select(rgn_id, taxa_code, tonnes)
@@ -635,10 +683,10 @@ np_new <- read.csv("output/np_seaweed_harvest_tonnes.csv") %>%
   select(rgn_id, taxa_code, tonnes)
 
 yield <- np_old %>% 
-  full_join(np_new, by = c("rgn_id","taxa_code")); View(yield) ## the production increased by ~22 tonnes 
+  full_join(np_new, by = c("rgn_id","taxa_code")); View(yield) # the production increased by ~22 tonnes 
 
 
-## Compare yield data for Vietnam - Vietnam score decreased
+# Compare yield data for Vietnam - Vietnam score decreased
 np_old <- read.csv("../v2022/output/np_seaweed_harvest_tonnes.csv") %>% 
   filter(rgn_id == 206, year == 2020) %>% 
   select(rgn_id, taxa_code, year, tonnes)
