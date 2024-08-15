@@ -31,15 +31,15 @@ library(raster)
 library(sf)
 library(fasterize)
 library(dplyr)
-library(rgdal)
+# library(rgdal)
 library(here)
 library(ggplot2)
-library(rgeos)
+# library(rgeos)
 
 source(here('workflow/R/common.R'))
 
 goal     <- 'spp'
-scenario <- 'v2021'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info
@@ -135,7 +135,7 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
   ### Loop over each distinct shapefile with species range maps
   ################################################################.
 
-  bli_already_done <- read_csv(file.path(dir_setup, "int/bli_already_done.csv"))  
+  bli_already_done <- read_csv(file.path("/home/dduncan/ohiprep_v2024/globalprep/spp/v2021/_setup", "int/bli_already_done.csv"))  
   bli_done_vec <- bli_already_done$iucn_sid
   
   maps_to_rasterize <- maps_to_rasterize %>%
@@ -143,7 +143,7 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
   
   shps <- maps_to_rasterize$shp_file %>% unique()
   for(i in seq_along(shps)) {
-     #i <- 1
+    i <- 1
     
     shp <- shps[i]
     
@@ -213,6 +213,7 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
                                 mc.cores = 12, 
                                 FUN = function(x) {
          #x <- 81:128
+          x <- 2
         spp <- spp_ids[x]
         
         cat_msg(x, ' of ', length(spp_ids), ': Processing ', spp, ' in ', basename(shp),
@@ -267,6 +268,11 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
 ## Note: v2020: This got to the end and didn't indicate it was finished. I only knew because I periodically stopped the loop and checked after it got to the last couple of sfs and then looked at maps_to_rasterize that it was finished. 
 ## v2021: I had to add some extra if statements to fix column name issues with the new bli data.
 
+test <- read_csv(file.path(dir_goal_anx, 'spp_rasters',
+                                         sprintf('iucn_sid_%s.csv', spp)))
+test2 <- read_csv(file.path("/home/shares/ohi/git-annex/globalprep/spp/v2022/spp_risk_dists", 'spp_rasters',
+                                         sprintf('iucn_sid_%s.csv', spp)))
+setdiff(test$cell_id, spp_present$cell_id)
 ```
 
 

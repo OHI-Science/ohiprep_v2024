@@ -349,8 +349,8 @@ map_info_raw_iucn <- lapply(iucn_dbfs, get_dbf) %>%
     clean_df_names()
   
   colnames(spp_dbf_info)
-#    [1] "sisid"   "binomil" "presenc" "origin"  "seasonl" "compilr" "yrcmpld" "citatin" "source"  "dst_cmm" "version"
-# [12] "shp_lng" "shape_r"
+ # [1] "sisid"   "binomil" "presenc" "origin"  "seasonl" "compilr" "yrcmpld" "citatin"
+ # [9] "source"  "dst_cmm" "version" "shp_lng" "shape_r"
   
   ### Individual files call the id number 'iucn_sid'; bli is named sisid
   ### 'iucn_sid' as well;
@@ -472,11 +472,11 @@ marine_map_info <- read_csv(file.path(dir_data,
   distinct()
 
 taxa_info <- read_csv(file.path(dir_goal_anx, 'iucn', 
-                                'spp_info_from_api_2020-3.csv')) %>%
+                                'spp_info_from_api_2024-1.csv')) %>%
   dplyr::select(iucn_sid, kingdom:family)
 
 cat_info <- read_csv(file.path(dir_data, 
-                               'iucn_risk_current_2020-3.csv')) %>%
+                               'iucn_risk_current_2024-1.csv')) %>%
   dplyr::select(iucn_sid, cat_score) %>%
   filter(!is.na(cat_score))
 
@@ -526,7 +526,7 @@ all_sum <- bind_rows(fish_sum, nonfish_sum, basic_sum) %>%
          subpops = ifelse(subpops == 0, NA, subpops))
 
 ## Check against last year to see if you have all of the same species. 
-## 201: We do. 
+## 2024: We have the same species, but the setdiff is going to return a list of those that are not matching because the all_sum df has them grouped into "marinefish" as the spp_gp. So I went through and cross-referenced the class, order, and family to make sure that they were all present - they are present 
 
 old_sum <- read_csv(file.path(dir_goal, '_output', 
                              'spp_included_summary.csv'))
