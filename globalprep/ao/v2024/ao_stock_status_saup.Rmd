@@ -241,7 +241,7 @@ write_csv(gap_fill_data, here::here("globalprep","ao", version_year, "output","A
 score_data <- data_fis_gf %>%
   dplyr::select(rgn_id, stock_id, year, mean_catch, score) %>% 
   dplyr::group_by(rgn_id, year) %>%
-  dplyr::summarize(score = weighted.mean(score, mean_catch)) %>%
+  dplyr::summarize(score = weighted.mean(score, mean_catch)) %>% # use the mean_catch to get a weighted average of the scores
   dplyr::ungroup() 
 
 summary(score_data) # v2024: no NAs, yay!
@@ -288,13 +288,15 @@ compare <- new %>%
 library(plotly)
 library(ggplot2)
 
-compare_plot <- ggplot(data = compare) + geom_point(aes(x = old_score, y = score, text = rgn_id))  +
-  geom_abline(color = "red") + 
+compare_plot <- ggplot(data = compare) + geom_point(aes(x = old_score, y = score, text = rgn_id, alpha = 0.7))  +
+  geom_abline(color = "blue") + 
   labs(x = paste("score", previous_assessment_latest_data_year, previous_version_year),
        y = paste("score", previous_assessment_latest_data_year, version_year), title = paste(previous_assessment_latest_data_year, "data comparison")) +
   theme_minimal()
+compare_plotly <- ggplotly(compare_plot, tooltip = c("text", "score", "old_score"))
+compare_plotly
 
-ggplotly(compare_plot, tooltip = c("text", "score", "old_score"))
+htmlwidgets::saveWidget(compare_plotly, here::here("globalprep","ao", version_year, "figs","v2023_v2024_compare_plot.html"))
 ```
 
 ```{r}
@@ -353,5 +355,58 @@ patch_rgn_3 <- subplot(rgn_3_scores_plot, rgn_3_oldscores_plot, nrows = 2, share
 patch_rgn_3
 
 # saveWidget(patch_rgn_3, here::here("globalprep","ao", version_year, "figs","rgn_3_score_comparison.html"))
+```
+
+```{r}
+fis_bbmsy <- read_csv(here::here("globalprep","fis", version_year, "output","fis_bbmsy.csv")) # v2024
+
+test_rgn3 <- fis_bbmsy %>%
+  left_join(rgns_eez) %>% 
+  filter(rgn_id %in% "3")
+
+length(unique(test_rgn3$stock_id)) # 12
+length(test_rgn3$stock_id) # 228
+
+fis_bbmsy_prev <- read_csv(here::here("globalprep","fis", previous_version_year, "output","fis_bbmsy.csv")) # v2023
+
+test_rgn3_prev <- fis_bbmsy_prev %>%
+  left_join(rgns_eez) %>% 
+  filter(rgn_id %in% "3")
+
+length(unique(test_rgn3_prev$stock_id)) # 12
+length(test_rgn3_prev$stock_id) # 228
+
+
+# ======= catch =======
+catch_AO <- read_csv(here::here("globalprep","ao", version_year, "intermediate","mean_catch.csv"))
+
+catch_test_rgn3 <- catch_AO %>%
+  left_join(rgns_eez) %>% 
+  filter(rgn_id %in% "3")
+
+length(unique(catch_test_rgn3$stock_id_taxonkey)) # 8
+length(catch_test_rgn3$stock_id_taxonkey) # 152 observations
+
+catch_AO_prev <- read_csv(here::here("globalprep","ao", previous_version_year, "intermediate","mean_catch.csv")) # v2023
+
+catch_test_rgn3_prev <- catch_AO_prev %>%
+  left_join(rgns_eez) %>% 
+  filter(rgn_id %in% "3")
+
+length(unique(catch_test_rgn3_prev$stock_id_taxonkey)) # 8
+length(catch_test_rgn3_prev$stock_id_taxonkey) # 152
+
+
+# see whether there is a decrease or increase in bbmsy/mean_catch
+
+# bbmsy
+compare_bbmsy <- test_rgn3 %>% 
+  left_join(test_rgn3_prev, by = c("year", "rgn_id")) %>% 
+  filter(year == previous_assessment_latest_data_year) %>%
+  mutate(diff = ((score - old_score)/old_score)*100) 
+
+# catch
+
+
 ```
 
