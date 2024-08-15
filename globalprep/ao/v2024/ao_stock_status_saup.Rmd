@@ -309,5 +309,18 @@ diff_plot <- compare_diff %>%
          xaxis = list(title = "Region ID"),
          yaxis = list(title = "Percent change v2023 vs v2024"))
 diff_plot
+
+compare_diff_rgn_3 <- new %>% 
+  left_join(old, by = c("year", "rgn_id")) %>%
+  filter(rgn_id %in% "3") %>% 
+  mutate(diff = ((score - old_score)/old_score)*100)
+
+rgn_3_plot <- compare_diff_rgn_3 %>%
+  plot_ly(x = ~year, y = ~diff, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "AO Sustainability Score Percent Change for Norfolk Island",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percent change v2023 vs v2024"))
+rgn_3_plot
 ```
 
