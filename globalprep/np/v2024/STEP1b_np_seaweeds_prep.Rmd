@@ -516,13 +516,17 @@ identifier <- maric %>%
 # 105 unique identifiers - v2024
 
 # add the unique identifier back to the dataset
-mar_rgn_gf <- left_join(maric, identifier)
+mar_rgn_gf <- left_join(maric, identifier) 
 
 maric <- mar_rgn_gf
+setdiff(mar_rgn_gf$species, sw_sus_rgn$species)
 
-# come back and troubleshoot this -- "score" column is populated only by NAs
-mar_sw_sus <- maric %>%
-  left_join(sw_sus_rgn, by = c("species", "rgn_id")) %>%
+
+# don't be alarmed by the score column being populated by all NAs after this step!
+# we'll fill with a set value in the next step
+mar_sw_sus_join <- maric %>%
+  left_join(sw_sus_rgn, # has score column
+            by = c("species", "rgn_id")) %>%
   dplyr::select(rgn_id, year, species, Taxon_code, score, value, gap_0_fill, species_code) %>% ## none of the specific species match
   rename(tonnes = value)
  
@@ -534,9 +538,12 @@ mar_sw_sus <- maric %>%
 NOTE FOR v2022: Scale this score the max in the seafood watch data, like we did for mariculture.
 
 ```{r}
-mar_sw_sus <- mar_sw_sus %>%
-  mutate(Sust = round(6.72/10,2)) %>% ## since none of the species match, we will give the general worldwide seaweed score from seafood watch (6.72)
+# "calculate" (define) sustainability score for all seaweed 
+mar_sw_sus_calc <- mar_sw_sus_join %>%
+  mutate(sust = round(6.72 / 10,2)) %>% ## since none of the species match, we will give the general worldwide seaweed score from seafood watch (6.72)
   dplyr::select(-score)
+
+# check: sust (sustainability score) should be 0.67 for all
 ```
 
 Since some regions have multiple sustainability scores for the same species due to multiple aquaculture methods, but we don't know what proportions of which methods are used, we take the average of the sustainability scores in these instances.
@@ -544,48 +551,56 @@ Since some regions have multiple sustainability scores for the same species due 
 Average sustainability scores within regions with more than score (due to more than one aquaculture method):
 
 ```{r sw-sus-avg, eval = FALSE}
-mar_sw_sus <- mar_sw_sus %>% 
+# aggregation: average sustainability per species per region
+mar_sw_sus_avg <- mar_sw_sus_calc %>% 
   dplyr::group_by(rgn_id, species) %>% 
-  dplyr::mutate(Sust_avg = mean(Sust, na.rm=TRUE)) %>% 
+  dplyr::mutate(sust_avg = mean(sust, na.rm = TRUE)) %>% 
   dplyr::ungroup()
 ```
 
 Get rid of duplicates for region/species/year:
 
 ```{r sw-sus-dup, eval = FALSE}
-mar_sw_sus <- mar_sw_sus %>% 
-  dplyr::distinct(rgn_id, species, year, .keep_all = TRUE) %>%
-  dplyr::select(-Sust, sust_coeff = Sust_avg, taxon_group = Taxon_code) %>%
-  mutate(taxa_code = paste(species, species_code, sep="_"))
+
+mar_sw_sus <- mar_sw_sus_avg %>% 
+  # keep only unique rows from the data frame
+  dplyr::distinct(rgn_id, species, year,
+                  .keep_all = TRUE) %>% # keep all variables in .data. If a combination of the variables (rgn_id, species, year) is not distinct, this keeps the first row of values.
+  dplyr::select(-sust, sust_coeff = sust_avg, taxon_group = Taxon_code) %>%
+  dplyr::mutate(taxa_code = paste(species, species_code, sep="_"))
 ```
 
 **Now look at a summary after appending all the Seafood Watch data**
 
 ```{r sw-sus-summary, eval = FALSE}
 summary(mar_sw_sus)
-# No NAs in Sust! 
+# No NAs in sust! (sust_coeff) 
 ```
 
 # Save Data:
 
 ```{r}
-## save seaweed mariculture sustainability dataset
+# Save seaweed mariculture sustainability dataset
 seaweed_sust <- mar_sw_sus %>%
   dplyr::select(rgn_id, taxa_code, year, sust_coeff)
-write_csv(seaweed_sust,  paste0("globalprep/np/v", version_year, "/output/np_seaweed_sust.csv"))
-## Save seaweed mariculture harvest tonnes data ("tonnes" column already incorporated include proportions)
+
+readr::write_csv(seaweed_sust, here(current_np_dir, "output", "np_seaweed_sust.csv"))
+
+# Save seaweed mariculture harvest tonnes data ("tonnes" column already incorporated include proportions)
 seaweed_harvest_tonnes <- mar_sw_sus %>%
   dplyr::select(rgn_id, taxa_code, year, tonnes)
+
 anyDuplicated(seaweed_harvest_tonnes) # check for duplication
-write.csv(seaweed_harvest_tonnes, paste0("globalprep/np/v", version_year, "/output/np_seaweed_harvest_tonnes.csv"), row.names=F)
+#> [1] 0
+
+readr::write_csv(seaweed_harvest_tonnes, here(current_np_dir, "output", "np_seaweed_harvest_tonnes.csv"))
 ```
 
 ## Save gapfill datasets
 
 ```{r}
-	
- 
-## save a gapfill dataset for FAO tonnes data:
+
+# save a gapfill dataset for FAO tonnes data:
  
 mar_FAO_gf <- mar_sw_sus %>% 
   rename("gapfill_fao" = "gap_0_fill") %>%
@@ -595,7 +610,7 @@ mar_FAO_gf <- mar_sw_sus %>%
  
 write.csv(mar_FAO_gf, paste0("globalprep/np/v", version_year, "/output/np_seaweed_harvest_tonnes_gf.csv"), row.names = FALSE)
  
-## save a gapfill dataset for sustainability dataset
+# save a gapfill dataset for sustainability dataset
  
 mar_sust_gf <- mar_sw_sus %>%
   mutate(method = "sfw_seaweed_score",
