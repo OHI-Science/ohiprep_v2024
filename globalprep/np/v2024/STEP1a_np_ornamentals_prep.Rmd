@@ -27,6 +27,7 @@ This analysis converts FAO commodities data into data layers used to calculate O
 - Updated links to datasets\
 - Updated file paths to be more reproducible, enable cross-platform capability (not dependent on direction of directory separator)
 - Updated data cleaning to follow tidyverse style, use of `janitor::clean_names()`
+- Updated `read.csv` and `write.csv` to `read_csv` and `write_csv` 
 
 ### v2023
 New year of FAO data (2021). Replaced deprecated functions (`replace_at()`, `spread()`, `gather()`)
@@ -362,7 +363,7 @@ h_prod <- h_comm %>%
             usd = sum(usd, na.rm = TRUE))
           
 ## Error-checking and table exports to see if there are duplicates
-stopifnot(sum(duplicated(h_prod[ , c('rgn_id', 'product', 'year')])) == 0)
+stopifnot(sum(duplicated(h_prod[ , c("rgn_id", "product", "year")])) == 0)
 ```
 
 ## Quick Data Check
@@ -372,13 +373,13 @@ Look at wide format with all commodities and product subtotal (where commodity c
 ```{r}
 
 h_x_tonnes <- h_comm %>% 
-  bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
+  bind_rows(mutate(h_prod, commodity = "Z_TOTAL")) %>%
   dplyr::select(rgn_name, rgn_id, commodity, product, year, tonnes) %>%
   arrange(rgn_name, product, commodity, year) %>%
   spread(year, tonnes)
 
 h_x_usd <- h_comm %>% 
-  bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
+  bind_rows(mutate(h_prod, commodity = "Z_TOTAL")) %>%
   dplyr::select(rgn_name, rgn_id, commodity, product, year, usd) %>%
   arrange(rgn_name, product, commodity, year) %>%
   spread(year, usd)
@@ -407,8 +408,8 @@ roll_prod <- h_prod %>%
   arrange(rgn_id, product, year) %>%
   group_by(rgn_id, product) %>%
   mutate(
-      tonnes_rollmean = rollapply(tonnes, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE),
-      usd_rollmean    = rollapply(   usd, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE)) %>%
+      tonnes_rollmean = rollapply(tonnes, width = 4, FUN = mean, align = 'right', partial = TRUE, na.rm = FALSE),
+      usd_rollmean    = rollapply(   usd, width = 4, FUN = mean, align = 'right', partial = TRUE, na.rm = FALSE)) %>%
   rename(
       tonnes_orig = tonnes, # prevent overwriting of reported and gapfilled values
       usd_orig    = usd) %>% # prevent overwriting of reported and gapfilled values
@@ -463,125 +464,125 @@ readr::write_csv(tonnes_ornamentals_rel, here(current_np_dir, "output", "np_orna
 ## Save exposure and risk layers to ornamentals (so that we can calculate sustainability in ohi-global functions.R)
 
 ```{r}
-### calculates NP exposure based on habitats (ornamentals).
+# ==== calculates NP exposure based on habitats (ornamentals) =============
     ### Returns the first input data frame with a new column for exposure:
     ### [rgn_id rgn_name product year tonnes tonnes_rel prod_weight exposure]
     #########################################.
     
-np_harvest_orn <- read_csv("int/np_harvest_tonnes_usd.csv") %>%
+np_harvest_orn <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>%
   dplyr::select(year, rgn_id, product, tonnes) %>%
   filter(product == "ornamentals") 
 
-    ### Determine Habitat Areas for Exposure
+### Determine Habitat Areas for Exposure
+
+hab_rocky <- read_csv(here("globalprep", "hab_rockyreef", "v2012", "data", "habitat_extent_rocky_reef_updated.csv")) %>%
+  dplyr::select(rgn_id, km2) %>%
+  dplyr::filter(km2 > 0)
 
 
-    hab_rocky <- read_csv(file.path(here(), "globalprep/hab_rockyreef/v2012/data/habitat_extent_rocky_reef_updated.csv")) %>%
-      dplyr::select(rgn_id, km2) %>%
-      dplyr::filter(km2 > 0)
+hab_coral <- read_csv(here("globalprep", "hab_coral", "v2021", "data", "habitat_extent_coral_updated.csv")) %>%
+  dplyr::select(rgn_id, km2) %>%
+  dplyr::filter(km2 > 0)
 
-    
-    hab_coral <- read_csv(file.path(here(), "globalprep/hab_coral/v2021/data/habitat_extent_coral_updated.csv")) %>%
-      dplyr::select(rgn_id, km2) %>%
-      dplyr::filter(km2 > 0)
-    
-    ### area for products in both coral and rocky reef habitats: shells, ornamentals, sponges
-    area_dual_hab <- np_harvest_orn %>%
-      dplyr::left_join(hab_coral %>%
-                         dplyr::rename(coral_km2 = km2),
-                by = c('rgn_id')) %>%
-      left_join(hab_rocky %>%
-                  dplyr::rename(rocky_km2 = km2),
-                by = c('rgn_id')) %>%
-      dplyr::rowwise() %>%
-      dplyr::mutate(km2 = sum(c(rocky_km2, coral_km2), na.rm = TRUE)) %>%
-      dplyr::filter(km2 > 0) %>%
-      dplyr::select(-coral_km2,-rocky_km2)
-    
-    ### Determine Exposure
-    ### exposure: combine areas, get tonnes / area, and rescale with log transform
-    np_exp_orn <-
-      area_dual_hab %>%
-      dplyr::mutate(expos_raw = ifelse(tonnes > 0 &
-                                  km2 > 0, (tonnes / km2), 0)) %>%
-      dplyr::group_by(product) %>%
-      dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
-      dplyr::ungroup() %>%
-      dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
-             exposure = ifelse(exposure > 1, 1, exposure)) %>%
-      dplyr::select(-km2,-expos_raw,-expos_prod_max)
-    ### clean up columns
-    
-    gap_fill <- np_exp_orn %>%
-      dplyr::mutate(gapfilled = ifelse(is.na(exposure), 1, 0)) %>%
-      dplyr::mutate(method = ifelse(is.na(exposure), "prod_average", NA)) %>%
-      dplyr::select(rgn_id = rgn_id, product, year, gapfilled, method)
-    write.csv(gap_fill, "output/np_exposure_ornamentals_gf.csv", row.names = FALSE)
-    
-    ### add exposure for countries with (habitat extent == NA)
-    np_exp_orn <- np_exp_orn %>%
-      dplyr::group_by(product) %>%
-      dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
-      dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
-      dplyr::select(-mean_exp) %>%
-      dplyr::ungroup() %>%
-      dplyr::mutate(product = as.character(product)) %>%
-      dplyr::select(rgn_id, year, product, exposure)
-    
+### area for products in both coral and rocky reef habitats: shells, ornamentals, sponges
+area_dual_hab <- np_harvest_orn %>%
+  dplyr::left_join(hab_coral %>%
+                     dplyr::rename(coral_km2 = km2),
+                   by = c('rgn_id')) %>%
+  left_join(hab_rocky %>%
+              dplyr::rename(rocky_km2 = km2),
+            by = c('rgn_id')) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(km2 = sum(c(rocky_km2, coral_km2), na.rm = TRUE)) %>%
+  dplyr::filter(km2 > 0) %>%
+  dplyr::select(-coral_km2, -rocky_km2)
+
+### Determine Exposure
+### exposure: combine areas, get tonnes / area, and rescale with log transform
+np_exp_orn <- area_dual_hab %>%
+  dplyr::mutate(expos_raw = ifelse(tonnes > 0 &
+                                     km2 > 0, (tonnes / km2), 0)) %>%
+  dplyr::group_by(product) %>%
+  dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
+                exposure = ifelse(exposure > 1, 1, exposure)) %>%
+  dplyr::select(-km2, -expos_raw, -expos_prod_max)
+
+### clean up columns
+gap_fill <- np_exp_orn %>%
+  dplyr::mutate(gapfilled = ifelse(is.na(exposure), 1, 0)) %>%
+  dplyr::mutate(method = ifelse(is.na(exposure), "prod_average", NA)) %>%
+  dplyr::select(rgn_id = rgn_id, product, year, gapfilled, method)
+
+readr::write_csv(gap_fill, here(current_np_dir, "output", "np_exposure_ornamentals_gf.csv"))
+
+### add exposure for countries with (habitat extent == NA)
+np_exp_orn <- np_exp_orn %>%
+  dplyr::group_by(product) %>%
+  dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
+  dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
+  dplyr::select(-mean_exp) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(product = as.character(product)) %>%
+  dplyr::select(rgn_id, year, product, exposure)
+
 ##save exposure as a layer
-    write.csv(np_exp_orn, "output/np_exposure_ornamentals.csv", row.names = FALSE)
-    
+readr::write_csv(np_exp_orn, here(current_np_dir, "output", "np_exposure_ornamentals.csv"))
 
-    ### calculates NP risk based on:
-    ###   ornamentals:      risk = 1 if blast or cyanide fishing
-    ### Returns a data frame of risk, by product, by region:
-    ###
-    #########################################.
-    
 
-    ### Determine Risk
-    
-    r_cyanide <- 
-      read_csv(file.path(here(), "globalprep/np_prs_poison_blast_fishing/v2013/data/gl_thr_poison_3nm_rgn2013.csv")) %>%
-      #AlignDataYears(layer_nm = "np_cyanide", layers_obj = layers) %>%
-      dplyr::filter(!is.na(score) & score > 0) %>%
-      dplyr::select(rgn_id,
-             #year = scenario_year,
-             cyanide = score)
-    
-    r_blast <-
-      read_csv(file.path(here(), "globalprep/np_prs_poison_blast_fishing/v2013/data/gl_thr_blast_3nm_rgn2013.csv")) %>%
-      #AlignDataYears(layer_nm = "np_blast", layers_obj = layers)  %>%
-      filter(!is.na(score) & score > 0) %>%
-      select(rgn_id,
-             #year = scenario_year,
-             blast = score)
-    
-    
-    ### risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code
-    ###  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the "relative intensity of cyanide fishing"
-    risk_orn <- r_cyanide %>%
-      full_join(r_blast, by = c("rgn_id")) %>%
-      mutate(ornamentals = 1) %>%
-      select(rgn_id, ornamentals)
-    
-    ### risk as binary
-    np_risk_orn <-
-      expand.grid(
-        rgn_id  = unique(np_harvest_orn$rgn_id),
-        year = unique(np_harvest_orn$year)
-      ) %>%
-    ### ornamentals
-      left_join(risk_orn, by = c('rgn_id'))  %>%
-      mutate(ornamentals = ifelse(is.na(ornamentals), 0, ornamentals)) %>%
-      gather(product, risk,-rgn_id,-year) %>%
-      mutate(product = as.character(product))
-    
-    np_risk_gf <- np_risk_orn %>%
-      mutate(gapfilled = 0, method = NA) %>%
-      dplyr::select(-risk)
-    write.csv(np_risk_gf, "output/np_risk_ornamentals_gf.csv", row.names = FALSE)
-    
+### calculates NP risk based on:
+###   ornamentals:      risk = 1 if blast or cyanide fishing
+### Returns a data frame of risk, by product, by region:
+###
+#########################################.
+
+
+### Determine Risk
+
+r_cyanide <- 
+  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_poison_3nm_rgn2013.csv")) %>%
+  #AlignDataYears(layer_nm = "np_cyanide", layers_obj = layers) %>%
+  dplyr::filter(!is.na(score) & score > 0) %>%
+  dplyr::select(rgn_id,
+                #year = scenario_year,
+                cyanide = score)
+
+r_blast <-
+  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_blast_3nm_rgn2013.csv")) %>%
+  #AlignDataYears(layer_nm = "np_blast", layers_obj = layers)  %>%
+  filter(!is.na(score) & score > 0) %>%
+  dplyr::select(rgn_id,
+         #year = scenario_year,
+         blast = score)
+
+
+### risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code
+###  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the "relative intensity of cyanide fishing"
+risk_orn <- r_cyanide %>%
+  full_join(r_blast, by = c("rgn_id")) %>%
+  mutate(ornamentals = 1) %>%
+  dplyr::select(rgn_id, ornamentals)
+
+### risk as binary
+np_risk_orn <-
+  expand.grid(
+    rgn_id  = unique(np_harvest_orn$rgn_id),
+    year = unique(np_harvest_orn$year)
+  ) %>%
+  ### ornamentals
+  left_join(risk_orn, by = c("rgn_id"))  %>%
+  mutate(ornamentals = ifelse(is.na(ornamentals), 0, ornamentals)) %>%
+  gather(product, risk,-rgn_id,-year) %>%
+  mutate(product = as.character(product))
+
+np_risk_gf <- np_risk_orn %>%
+  mutate(gapfilled = 0, method = NA) %>%
+  dplyr::select(-risk)
+
+readr::write_csv(np_risk_gf, here(current_np_dir, "output", "np_risk_ornamentals_gf.csv"))
+
 ## write this as a risk layer 
-    write.csv(np_risk_orn, "output/np_risk_ornamentals.csv", row.names = FALSE)
+readr::write_csv(np_risk_orn, here(current_np_dir, "output", "np_risk_ornamentals.csv"))
 
 ```
