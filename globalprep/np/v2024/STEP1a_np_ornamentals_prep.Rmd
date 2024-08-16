@@ -115,15 +115,17 @@ files_old <- list.files(dir_fao_data_old, pattern = glob2rx('*.csv'), full.names
 
 # ===== loop ================
 for (f in files){
-  f <- files[1] # un-comment and update to test individual files
+  f <- files[2] # un-comment and update to test individual files
   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
   
-  d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
+  #d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
   # checks names syntactically, strips leading and trailing whitespace, prevents conversion of characters to factors 
-  #d_test <- readr::read_csv(f)
   
-  ## Specifies that units are tonnes if we are reading in the Commodities Quantity data csv, and usd if we are reading in the Commodities Value data csv
-  units <- c('tonnes','usd')[str_detect(f, c('quant','value'))] # detect unit name using lowercase American English
+  d <- readr::read_csv(f) # makes this a tibble, not a dataframe (check with is_tibble(d))
+  # ignore the warning here -- it's just letting you know about an empty final row (happened quietly in previous read.csv code)
+  
+  # Specifies that units are 'tonnes' if we are reading in the Commodities Quantity data csv, and 'usd' if we are reading in the Commodities Value data csv
+  units <- c("tonnes", "usd")[str_detect(f, c("quant", "value"))] # detect unit name using lowercase American English
 
   # ---- Preliminary cleaning & tidying ----
   ## gather into long format and clean up FAO-specific data foibles
@@ -145,21 +147,22 @@ for (f in files){
   # ---- Run fao data cleaning function ----
   # cleans up flags, swaps out FAO-specific codes for analysis
   m <- m %>%
-    fao_clean_data_new() %>%  # swaps out FAO-specific codes. NOTE: optional parameter 'sub_N' can be passed to control how an 'N' code is interpreted.
+    fao_clean_data_new() %>%  # swaps out FAO-specific codes. NOTE: optional 
+    # parameter 'sub_N' can be passed to control how an 'N' code is interpreted.
     dplyr::select(-c(trade, unit)) %>% # drop 'trade' and 'unit' columns
     arrange(country, commodity, is.na(value), year)
   # warning: NAs introduced by coercion
 
   
   # ---- Products join ----
-  ## attach product categories from com2prod, and filter out 
-  ## all entries that do not match a product category.
-  ## Note: commodity_lookup is user-defined function to compare 
-  ##   commodities in data vs commodities in lookup table
+  ## attach product categories from com2prod, and filter out all entries that 
+  ## do not match a product category.
+  ## Note: commodity_lookup is user-defined function to compare commodities
+  ##  in data vs commodities in lookup table
   
   # Load lookup for converting commodities to products
   #com2prod <- read.csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na.strings = '')
-  com2prod <- read_csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na = '')
+  com2prod <- readr::read_csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na = '')
   
   ## version used in 2019:
   ##    read.csv(here('globalprep/np/v2019/raw/commodities2products.csv'), na.strings='')
@@ -178,6 +181,7 @@ for (f in files){
   ##    lookup table 'com2prod', and eliminate all commodities that do not appear in the lookup table.
   m <- m %>%
       inner_join(com2prod, by = 'commodity')
+  # many-to-many relationship is expected
     
     
   ## Special case: user-defined function deals with 
@@ -188,14 +192,14 @@ for (f in files){
   m <- m  %>%
     filter(country != "Azerbaijan") 
 
-  m_rgn <- name_2_rgn(df_in = m,
+  m_rgn <- ohicore::name_2_rgn(df_in = m,
                       fld_name = 'country', 
                       flds_unique = c('commodity', 'product', 'year'))
   
   # check duplicates
-  # m_duplicates <- m_rgn[duplicated(m_rgn[, c("rgn_name", "year", "commodity", "product")]),]
-  # unique(m_duplicates$country)
-  # unique(m_duplicates$rgn_name)
+  m_duplicates <- m_rgn[duplicated(m_rgn[, c("rgn_name", "year", "commodity", "product")]),]
+  unique(m_duplicates$country)
+  unique(m_duplicates$rgn_name)
 
   
   # v2024 removed: 
@@ -205,7 +209,8 @@ for (f in files){
   # v2021 duplicates:  [1] "China" "China, Hong Kong SAR" "China, Macao SAR"  "Guadeloupe"           
   # [5] "Martinique" "Montenegro"  "Russian Federation" "Serbia and Montenegro"
   # [9] "Sudan" "Sudan (former)" "Un. Sov. Soc. Rep."   - these are all fixed in the group by and summarise below  
-  # v2024 duplicates: 
+  
+  # v2024 duplicates for quantity and value: 
   # [1] "China, Hong Kong SAR"  "China, Macao SAR"      "Martinique"    
   # [4] "Serbia and Montenegro" "Sudan (former)"        "Un. Sov. Soc. Rep." 
   
@@ -229,6 +234,8 @@ for (f in files){
     #(paste0('globalprep/np/v', scen_year, '/int/%s.csv')), units)
   readr::write_csv(m_rgn, harvest_out, na = '')
 }
+
+
 
 ```
 
