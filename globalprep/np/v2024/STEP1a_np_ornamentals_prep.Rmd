@@ -230,7 +230,6 @@ for (f in files){
   readr::write_csv(m_rgn, harvest_out, na = '')
 }
 
-
 ```
 
 # Data Wrangle
