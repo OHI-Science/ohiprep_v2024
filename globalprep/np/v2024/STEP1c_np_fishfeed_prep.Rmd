@@ -58,15 +58,15 @@ This script takes the SAUP 2023 catch data, a list of fish oil/fish meal (FOFM) 
 
 ## RAM Legacy Data
 
-**Reference**: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.61, 05/10/2023
+**Reference**: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.65, 06/17/2024
 
-**Downloaded**: 07/6/2023
+**Downloaded**: 08/07/2024
 
 **Description**: B/Bmsy value by stock and year (other data, which we do not use, are also available in the database)
 
 **Native data resolution**: stock (fish stock, species and region specific)
 
-**Time range**: 1800 - 2022
+**Time range**: 1800 - 2023
 
 **Format**: CSV format
 
@@ -77,16 +77,39 @@ This script takes the SAUP 2023 catch data, a list of fish oil/fish meal (FOFM) 
 ## Setup
 
 ```{r setup, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(eval = FALSE)
 
-knitr::opts_chunk$set(eval=FALSE)
+# ======= Load packages ============
+if (!require(librarian)) {
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  ohicore, #devtools::install_github('ohi-science/ohicore@dev') #if relevant: restart session after reinstalling
+  here,
+  tidyverse,
+  #zoo,
+  plotly,
+  tictoc,
+  RColorBrewer
+)
 
-library(here)
-library(tidyverse)
-library(plotly)
-source(here('workflow/R/common.R'))
-setwd(here())
+# ======= Set directories ===========
+# Update scenario year, set up programmatic scenario year updating
+scen_year_number <- 2024
+scenario_year <- as.character(scen_year_number)
+#prev_scen_year <- as.character(scen_year_number - 1)
+data_dir_year <- paste0("d", scenario_year)
+#prev_data_dir_year <- paste0("d", prev_scen_year)
+v_scen_year <- paste0("v", scenario_year)
 
-scenario_year <- "2023"
+current_np_dir <- here::here("globalprep", "np", v_scen_year)
+scen_year_fis_dir <- here::here("globalprep", "fis", v_scen_year)
+
+# Load FAO-specific user-defined functions
+source(here::here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
+source(here::here("workflow", "R", "common.R")) # directory locations
+source(here::here(current_np_dir, "R", "np_fxn.R")) # function for handling FAO commodity data specific to NP
 
 ```
 
