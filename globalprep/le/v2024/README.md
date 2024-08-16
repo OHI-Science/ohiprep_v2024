@@ -228,10 +228,11 @@ Initially, there are three scripts, each with different starting units of value,
             -   \*\*Citation for paper\*\*  
 
             -   Melnychuk, M. C., Clavelle, T., Owashi, B., and Strauss, K. 2016. Reconstruction of global ex-vessel prices of fished species. - ICES Journal of Marine Science. <doi:10.1093/icesjms/fsw169>.
+            
 -   `eco_tour_prep.Rmd`
     -   Tourism Revenue in USD per Country per Year (2008 - 2019)
 
-    -   Tourism direct GDP as a proportion of total GDP (indicator 8.9.1): **UNWTO Dept. of Statistics (UN Tourism)**
+    -   **Tourism direct GDP as a proportion of total GDP (indicator 8.9.1):** **UNWTO Dept. of Statistics (UN Tourism)**
 
         -   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG>
 
