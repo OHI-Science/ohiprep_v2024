@@ -573,7 +573,7 @@ np_risk_orn <-
   ### ornamentals
   left_join(risk_orn, by = c("rgn_id"))  %>%
   mutate(ornamentals = ifelse(is.na(ornamentals), 0, ornamentals)) %>%
-  gather(product, risk,-rgn_id,-year) %>%
+  gather(product, risk, -rgn_id, -year) %>%
   mutate(product = as.character(product))
 
 np_risk_gf <- np_risk_orn %>%

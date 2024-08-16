@@ -26,6 +26,9 @@ This script takes the SAUP 2023 catch data, a list of fish oil/fish meal (FOFM) 
 
 ## Updates from previous assessment
 
+-   Updated general syntax to follow tidyverse style when/where reasonable\
+-   Updated `catch_zeros` zerofill method to use `pivot_wider()` and `pivot_longer()` instead of `spread()` and `gather()`
+
 ------------------------------------------------------------------------
 
 # Data Source
@@ -209,7 +212,7 @@ catch <- catch %>%
 ## need to get TaxonKey's for each species to join with catch
 
 # read in list we wrote out earlier
-foragefish_list <- readr::read_csv(here(current_np_dir, "int", "master_taxa_list_SAUP.csv"))
+foragefish_list <- readr::read_csv(here::here(current_np_dir, "int", "master_taxa_list_SAUP.csv"))
 
 # find missing species 
 missing_spp <- foragefish_list %>%
@@ -241,7 +244,7 @@ forage_fish_no_saup <- forage_fish_taxa_list %>%
   filter(is.na(TaxonKey)) 
 
 # write out missing species list to int
-write_csv(forage_fish_no_saup, here(current_np_dir, "int", "forage_fish_not_in_SAUP.csv"))
+readr::write_csv(forage_fish_no_saup, here(current_np_dir, "int", "forage_fish_not_in_SAUP.csv"))
 
 
 # join catch data set with forage fish taxa list 
@@ -253,8 +256,14 @@ catch_fishfeed <- catch %>%
 #nrow(catch_fishfeed)
 #[1] 600864 -- v2024
 
+# write output to int folder in np/scenario year directory
+
 # write.csv(catch_fishfeed, file.path(here(), paste0("globalprep/np/v", scenario_year, "/int/saup_catch_forage_fish.csv")), row.names = FALSE)
-write_csv(catch_fishfeed, here(current_np_dir, "int", "saup_catch_forage_fish.csv"))
+#write.csv(catch_fishfeed, here(current_np_dir, "int", "saup_catch_forage_fish.csv"), row.names = F)
+tic()
+readr::write_csv(catch_fishfeed, here::here(current_np_dir, "int", "saup_catch_forage_fish.csv"))
+toc()
+# switching to write_csv reduced file size from 74.9 MB to 68.2 MB and significantly reduced writing time (from ~2 minutes to ~1 second)
 
 test <- catch_fishfeed %>%
   group_by(year) %>%
@@ -271,21 +280,39 @@ test <- catch_fishfeed %>%
 Justification from the [Froelich et al. 2018](https://www.nature.com/articles/s41893-018-0077-1#Sec11): "Currently, it is estimated about 10% of forage fish enter the human diet directly, but the notoriously tiny-boned fish are labour intensive (thus expensive) to process for human consumption, are the foundation of several industries and thus jobs (creating inertia to change) and are not the preferred fish type for most people."
 
 ```{r}
-catch_fishfeed <- read_csv(file.path(here(), paste0("globalprep/np/v", scenario_year, "/int/saup_catch_forage_fish.csv")))
+#library(tidyverse)
+#library(here)
+# catch_fishfeed <- read_csv(file.path(here(), paste0("globalprep/np/v", scenario_year, "/int/saup_catch_forage_fish.csv"))) # leaving v2023 code in case future fellows run into file path issues when using `here()`
+# read in SAUP catch data subsetted to forage fish species 
+catch_fishfeed <- readr::read_csv(here::here(current_np_dir, "int", "saup_catch_forage_fish.csv"))
 
+#lobstr::obj_size(catch_fishfeed)
+#> 72.20 MB
+
+# Multiply by 0.90 to reflect the amount going to feed/oils, not human consumption
 catch_non_human <- catch_fishfeed %>% 
-  mutate(tons_non_human = tons*0.9)
+  mutate(tons_non_human = tons * 0.9) 
 
+# for each region, FAO ID, Taxon Key, stock ID, and year, 
+# find sum of non-human-consumption fish harvest
 catch_non_human <- catch_non_human %>%
   dplyr::select(year, rgn_id, fao_id, stock_id, TaxonKey, tons_non_human) %>%
   group_by(rgn_id, fao_id, TaxonKey, stock_id, year) %>%
   summarize(catch_non_human = sum(tons_non_human)) %>%
   ungroup()
 
+# lobstr::obj_size(catch_non_human)
+# 7.95 MB
+
 test <- catch_non_human %>%
   group_by(year) %>%
-  summarise(sum = sum(catch_non_human)) # looks good ~30 mil per year
-  
+  summarise(sum = sum(catch_non_human)) 
+# looks good ~30 mil per year -- v2021 (this copied comment is in v2021-v2023)
+#summary(test)[4, 2]
+# ~ 26.6 mil per year -- v2024  
+
+# --------- Zero-fill -----------------------
+
 ## these data have no zero catch values, so add years with no reported catch to data table:
 catch_zeros <- catch_non_human %>%
   spread(year, catch_non_human) %>%
@@ -294,8 +321,37 @@ catch_zeros <- catch_non_human %>%
   mutate(year = as.numeric(gsub("X", "", year))) %>%
   mutate(catch_non_human = ifelse(is.na(catch_non_human), 0, catch_non_human))
 
+
+# v2024 update to not use superseded functions `spread()` and `gather()`:
+catch_year_zeros <- catch_non_human %>%
+  pivot_wider(names_from = year, values_from = catch_non_human,
+              names_prefix = "x_",
+              values_fill = 0) %>% 
+  pivot_longer(cols = starts_with("x_"),
+               names_to = "year",
+               values_to = "catch_non_human") %>% 
+  mutate(year = as.numeric(gsub("x_", "", year))) %>% 
+  arrange(year)
+
+
+# these methods yield functionally identical outputs:
+# > sum(catch_zeros == catch_year_zeros)
+# [1] 1691340
+# > length(catch_zeros) * nrow(catch_zeros)
+# [1] 1691340
+
+# the primary difference is that the newer method yields an object of class `tbl_df`, `tbl`, and `data.frame`, while the old method yields an object of class `data.frame`. 
+#all.equal(catch_year_zeros, catch_zeros)
+#attributes(catch_year_zeros); attributes(catch_zeros)
+# lobstr::obj_size(catch_zeros)
+# lobstr::obj_size(catch_year_zeros)
+
+# lobstr::obj_size(catch_non_human)
+# lobstr::obj_size(catch_year_zeros)
+
+
 ## this part eliminates the zero catch values prior to the first reported non-zero catch   
-catch_zeros <- catch_zeros %>%
+catch_year_zeros <- catch_year_zeros %>%
   group_by(fao_id, TaxonKey, stock_id, rgn_id) %>%
   arrange(year) %>%
   mutate(cum_catch = cumsum(catch_non_human)) %>%
@@ -304,7 +360,7 @@ catch_zeros <- catch_zeros %>%
   ungroup()
 
 # Calculate mean catch for ohi regions (using data from 1980 onward). These data are used to weight the RAM b/bmsy values 
-mean_catch <- catch_zeros %>%
+mean_catch <- catch_year_zeros %>%
   filter(year >= 1980) %>%
   group_by(rgn_id, fao_id, TaxonKey, stock_id) %>%
   mutate(mean_catch_non_human = mean(catch_non_human, na.rm=TRUE)) %>% # mean catch for each stock (in a specific ohi-fao region)
