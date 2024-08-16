@@ -342,7 +342,9 @@ h_gap <- h %>%
 
 h_gap_ornamentals <- h_gap %>%
   filter(product == "ornamentals")
-write.csv(h_gap, 'output/np_ornamentals_harvest_tonnes_gf.csv', row.names = FALSE, na = '')
+
+
+readr::write_csv(h_gap, here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_gf.csv"), na = '')
 
 ```
 
@@ -386,8 +388,9 @@ australia <- h_x_usd %>% filter(product == "ornamentals", rgn_name == "Australia
 australia
 
 ## Can open up in Excel to compare subtotals per country-product-year
-write.csv(h_x_tonnes, 'int/np_harvest_tonnes_wide.csv', row.names = FALSE, na = 'NA')
-write.csv(h_x_usd,    'int/np_harvest_usd_wide.csv',    row.names = FALSE, na = 'NA')
+readr::write_csv(h_x_tonnes, here(current_np_dir, "int", "np_harvest_tonnes_wide.csv"), na = 'NA')
+
+readr::write_csv(h_x_usd, here(current_np_dir, "int", "np_harvest_usd_wide.csv"), na = 'NA')
 
 ```
 
@@ -422,12 +425,11 @@ Score harvest (tonnes and usd) relative to peaks. Output values as .csvs. Perfor
 
 ```{r}
 
-
-## Find peak harvest per region-product and apply conservative buffer (scale down)
+# Find peak harvest per region-product and apply conservative buffer (scale down)
 ## Find max USD value over the last 10 years 
 peak_prod <- roll_prod %>%
     group_by(rgn_id, product) %>%
-    mutate(tonnes_peak = max(tonnes, na.rm=T)) %>%
+    mutate(tonnes_peak = max(tonnes, na.rm = T)) %>%
     ungroup() 
 
 ## Determine relative status:
@@ -441,20 +443,20 @@ smooth_prod <- peak_prod %>%
 ```{r}
 
 ## Write entire data frame to .csv:
-write.csv(smooth_prod, 'int/np_harvest_smoothed_data.csv', row.names = FALSE, na = '')
+readr::write_csv(smooth_prod, here(current_np_dir, "int", "np_harvest_smoothed_data.csv"), na = '')
 
 ## Save tonnes/usd data for weighting purposes 
 tonnes <- smooth_prod %>%
   dplyr::select(rgn_id, product, year, tonnes, usd) 
-write.csv(tonnes, 'int/np_harvest_tonnes_usd.csv', row.names = FALSE, na = '')
+
+readr::write_csv(tonnes, here(current_np_dir, "int", "np_harvest_tonnes_usd.csv"), na = '')
 
 ## Save relative tonnes data for the ornamentals layer 
 tonnes_ornamentals_rel <- smooth_prod %>%
   dplyr::filter(product == "ornamentals") %>%
   dplyr::select(rgn_id, product, year, tonnes_rel)
 
-write.csv(tonnes_ornamentals_rel, 'output/np_ornamentals_harvest_tonnes_rel.csv', row.names = FALSE, na = '')
-
+readr::write_csv(tonnes_ornamentals_rel, here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_rel.csv"), na = '')
 
 ```
 
