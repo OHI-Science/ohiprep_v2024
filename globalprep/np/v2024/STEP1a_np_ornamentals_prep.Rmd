@@ -114,8 +114,8 @@ dir_fao_data_old <- here::here(dir_M, "git-annex", "globalprep", "_raw_data", "F
 files_old <- list.files(dir_fao_data_old, pattern = glob2rx('*.csv'), full.names = TRUE)
 
 # ===== loop ================
-for (f in files){
-  f <- files[2] # un-comment and update to test individual files
+for (f in files) {
+  #f <- files[2] # un-comment and update to test individual files
   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
   
   #d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
@@ -197,9 +197,9 @@ for (f in files){
                       flds_unique = c('commodity', 'product', 'year'))
   
   # check duplicates
-  m_duplicates <- m_rgn[duplicated(m_rgn[, c("rgn_name", "year", "commodity", "product")]),]
-  unique(m_duplicates$country)
-  unique(m_duplicates$rgn_name)
+  # m_duplicates <- m_rgn[duplicated(m_rgn[, c("rgn_name", "year", "commodity", "product")]),]
+  # unique(m_duplicates$country)
+  # unique(m_duplicates$rgn_name)
 
   
   # v2024 removed: 
@@ -244,34 +244,34 @@ for (f in files){
 Combining the quantity and value data and a bit of cleaning to remove data prior to first reporting year for each commodity and region.
 
 ```{r}
+# Read in quant dataset from intermediate folder
+h_tonnes <- read_csv(here(current_np_dir, "int", "tonnes.csv"))
 
-## Read in quant dataset from intermediate folder
-h_tonnes <- read.csv(here(paste0('globalprep/np/v', scen_year, '/int/tonnes.csv')))
+# Read in value dataset from intermediate folder
+h_usd <- read_csv(here(current_np_dir, "int", "usd.csv"))
 
-## Read in value dataset from intermediate folder
-h_usd <- read.csv(here(paste0('globalprep/np/v', scen_year, '/int/usd.csv')))
-
-## concatenates h_tonnes and h_usd data
+# concatenate h_tonnes and h_usd data
 ## h includes rgn_name, rgn_id, commodity, product, year, tonnes, usd.
 h <- h_usd %>%
-    full_join(h_tonnes, by=c('rgn_name', 'rgn_id', 'commodity', 'product', 'year')) %>%
+    full_join(h_tonnes, by = c('rgn_name', 'rgn_id', 'commodity', 'product', 'year')) %>%
     mutate(commodity = as.character(commodity)) %>%
     arrange(rgn_id, product, commodity, year) 
 
-## clips out years prior to first reporting year, for each commodity per region
+# clip out years prior to first reporting year, for each commodity per region
 h <- h %>% np_harvest_preclip()
 
 
-## save a file to use in our methods document 
-write.csv(h, "int/h_methods_sum.csv", row.names = FALSE)
+# save a file to use in our methods document 
+readr::write_csv(h, here(current_np_dir, "int", "h_methods_sum.csv"))
 
 # test <- h %>%
 #   group_by(product) %>%
 #   summarise(sum_tonnes = sum(tonnes, na.rm = TRUE),
 #             sum_usd = sum(usd, na.rm = TRUE)) ## we will show this table in the methods doc
 
+# ---- filter for our commodities of interest ----
 h <- h %>%
-    dplyr::filter(product %in% c("fish_oil", "ornamentals", "seaweeds")) ##filter for our commodities of interest
+    dplyr::filter(product %in% c("fish_oil", "ornamentals", "seaweeds")) 
 ```
 
 # Gapfilling
