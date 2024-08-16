@@ -76,7 +76,7 @@ librarian::shelf(
 )
 
 # ======= Set directories ===========
-# Update scenario year, set up programmatic scenario year updating
+# Update scenario year, set up programmatic scenario year updates
 scen_year_number <- 2024
 scen_year <- as.character(scen_year_number)
 prev_scen_year <- as.character(scen_year_number - 1)

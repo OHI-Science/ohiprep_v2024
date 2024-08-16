@@ -95,7 +95,7 @@ librarian::shelf(
 )
 
 # ======= Set directories ===========
-# Update scenario year, set up programmatic scenario year updating
+# Update scenario year, set up programmatic scenario year updates
 scen_year_number <- 2024
 scenario_year <- as.character(scen_year_number)
 #prev_scen_year <- as.character(scen_year_number - 1)
@@ -139,17 +139,18 @@ Get the list of forage fish used for FOFM:
 ```{r, eval=FALSE}
 
 ## Read in Froehlich list of forage fish species
-forage <- read_csv(file.path(here(), paste0("globalprep/np/v", scenario_year, "/raw/msleckman.61.1-CatchMSY_Nis_FAOAreas.csv")))
+forage <- read_csv(here(current_np_dir, "raw", "msleckman.61.1-CatchMSY_Nis_FAOAreas.csv"))
 sort(unique(forage$Species)) #238 forage fish groups listed
 
 # This was not updated in v2023 so we continue to use the 2022 version.
-saup_taxonkey <- read.csv(file.path(here(), paste0("globalprep/fis/v", scenario_year, "/int/taxon_key_v2022.csv")))
+saup_taxonkey <- readr::read_csv(here(scen_year_fis_dir, "int", "taxon_key_v2022.csv"))
   
 ## Combined list:
 foragefish_list <- data.frame(forage_fish = sort(unique(c(unique(forage$Species), saup_taxonkey$TaxonName[saup_taxonkey$forage_fish %in% 1]))))
 
 foragefish_list <- data.frame(forage_fish = sort(unique(forage$Species)))
 
+# Update column names
 foragefish_list <- foragefish_list %>%
   mutate(forage_fish = case_when(
     forage_fish == "Ammodytes spp" ~ "Ammodytes",
@@ -168,21 +169,28 @@ foragefish_list <- foragefish_list %>%
     TRUE ~ forage_fish
   )) %>% # fix some name issues in the forage fish list to match the names in SAUP 
   left_join(saup_taxonkey, by = c("forage_fish" = "TaxonName")) %>% 
-   mutate(inSAUP = ifelse(is.na(TaxonKey), NA, "yes")) ## Now only 9 missing spp.. this is good enough! Note: some of the species that are listed as in the SAUP data, are actually not in the SAUP data. This is because this forage fish list was originally derived from the Watson data, and there are some Watson species which are not in the SAUP data. This is not a problem.
+   mutate(inSAUP = ifelse(is.na(TaxonKey), NA, "yes")) ## Now only 9 missing spp.. this is good enough! Note: some of the species that are listed as in the SAUP data, are actually not in the SAUP data. This is because this forage fish list was originally derived from the Watson data, and there are some Watson species which are not in the SAUP data. This is not a problem. 
+# sum(is.na(foragefish_list$inSAUP))
+## 10 missing spp. in v2024 
 
-write.csv(foragefish_list, here(paste0("globalprep/np/v", scenario_year, "/int/master_taxa_list_SAUP.csv")), row.names=FALSE)
+readr::write_csv(foragefish_list, here(current_np_dir, "int", "master_taxa_list_SAUP.csv"))
 
 ```
 
-## Read in v2021 catch data
+## Read in (v2022) catch data
 
 ```{r}
-# This was not updated in v2023 so we call out to the v2022 year on Mazu
+# This was not updated in v2023 or 2024 so we call out to the v2022 year on Mazu
 file <- file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv')
 
-catch <- read.csv(file) %>%
-  rename(common = CommonName, fao_id = fao_rgn, species=TaxonName)
+# read in Sea Around Us catch data
+catch_raw <- readr::read_csv(file) 
 
+# update column names
+catch <- catch_raw %>%
+  rename(common = CommonName, fao_id = fao_rgn, species = TaxonName)
+
+# view summary
 summary(catch)
 
 
@@ -191,49 +199,69 @@ catch <- catch %>%
   filter(!is.na(rgn_id)) %>%
   filter(!is.na(fao_id)) %>%
   filter(rgn_id <= 250) %>%
-  filter(rgn_id != 213)
+  filter(rgn_id != 213) # drop Antarctica
 
 ```
 
-## Subset the v2022 catch data for our forage fish species
+## Subset the (v2022) catch data for our forage fish species
 
 ```{r}
 ## need to get TaxonKey's for each species to join with catch
 
-foragefish_list <- read.csv(here(paste0("globalprep/np/v", scenario_year, "/int/master_taxa_list_SAUP.csv")))
+# read in list we wrote out earlier
+foragefish_list <- readr::read_csv(here(current_np_dir, "int", "master_taxa_list_SAUP.csv"))
 
+# find missing species 
 missing_spp <- foragefish_list %>%
   filter(is.na(TaxonKey))
 
+# v2024 missing species:
+#  [1] "Ariomma indica"          "Blicca bjoerkna"         "Centrolabrus exoletus"  
+#  [4] "Citharidae"              "Hemiramphus balao"       "Liza saliens"           
+#  [7] "Percarina demidoffi"     "Sardinops caeruleus"     "Sardinops melanostictus"
+# [10] "Sardinops ocellatus
+
 # test <- catch %>%
-#   filter(str_detect(paste(missing_spp$forage_fish, collapse = "|"), species)) # just make sure the NA species are actually not in the SAUP data 
-# sort(unique(test$species)) # no full matches.. 
+#   filter(str_detect(paste(missing_spp$forage_fish, collapse = "|"), species)) # just make sure the NA species are actually not in the SAUP data
+# sort(unique(test$species)) # no full matches..
+# # v2024: [1] "Hemiramphus" "Liza" 
 
-
+# ---- Join forage fish species with catch data ----
 forage_fish_taxa_list <- foragefish_list %>%
+  # subset to only keep catch data for which we have forage species data
   left_join(catch, by = c("forage_fish" = "species", "TaxonKey")) %>%
-  dplyr::select(forage_fish, inSAUP, TaxonKey) %>%
-  unique() %>%
+  dplyr::select(forage_fish, inSAUP, TaxonKey) %>% # drop stock, common name, and extra catch df columns
+  unique() %>% # return unique combinations of grouping variables in the data frame
   mutate(inSAUP = ifelse(
-   is.na(TaxonKey), NA, inSAUP))
+    # if TaxonKey is NA, set inSAUP to NA
+   is.na(TaxonKey), NA, inSAUP)) 
 
-## save a list of species not in SAUP data for bookkeeping
+# save a list of species not in SAUP data for bookkeeping
 forage_fish_no_saup <- forage_fish_taxa_list %>%
   filter(is.na(TaxonKey)) 
 
-write.csv(forage_fish_no_saup, file.path(here(), paste0("globalprep/np/v", scenario_year, "/int/forage_fish_not_in_SAUP.csv")), row.names = FALSE)
+# write out missing species list to int
+write_csv(forage_fish_no_saup, here(current_np_dir, "int", "forage_fish_not_in_SAUP.csv"))
 
 
-## now join with catch data set 
+# join catch data set with forage fish taxa list 
 catch_fishfeed <- catch %>%
   left_join(forage_fish_taxa_list, by = c("TaxonKey")) %>%
+  # subset to only include forage fish species
   dplyr::filter(!is.na(forage_fish))
 
-write.csv(catch_fishfeed, file.path(here(), paste0("globalprep/np/v", scenario_year, "/int/saup_catch_forage_fish.csv")), row.names = FALSE)
+#nrow(catch_fishfeed)
+#[1] 600864 -- v2024
+
+# write.csv(catch_fishfeed, file.path(here(), paste0("globalprep/np/v", scenario_year, "/int/saup_catch_forage_fish.csv")), row.names = FALSE)
+write_csv(catch_fishfeed, here(current_np_dir, "int", "saup_catch_forage_fish.csv"))
 
 test <- catch_fishfeed %>%
   group_by(year) %>%
-  summarise(sum = sum(tons)) ## looks good.. ~30 million per year
+  summarise(sum = sum(tons)) 
+
+#summary(test)[4, 2]
+## looks good.. ~30 million per year in v2023 and v2024
 ```
 
 # Step 2
