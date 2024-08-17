@@ -76,7 +76,7 @@ librarian::shelf(
 )
 
 # ======= Set directories ===========
-# Update scenario year, set up programmatic scenario year updating
+# Update scenario year, set up programmatic scenario year updates
 scen_year_number <- 2024
 scen_year <- as.character(scen_year_number)
 prev_scen_year <- as.character(scen_year_number - 1)
@@ -573,7 +573,7 @@ np_risk_orn <-
   ### ornamentals
   left_join(risk_orn, by = c("rgn_id"))  %>%
   mutate(ornamentals = ifelse(is.na(ornamentals), 0, ornamentals)) %>%
-  gather(product, risk,-rgn_id,-year) %>%
+  gather(product, risk, -rgn_id, -year) %>%
   mutate(product = as.character(product))
 
 np_risk_gf <- np_risk_orn %>%
