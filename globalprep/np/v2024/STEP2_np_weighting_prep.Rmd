@@ -30,6 +30,13 @@ weighting scheme will be applied to the scores to determine how much of
 each natural products layer affects the overall NP score when updating
 in ohi global.
 
+
+## Updates from previous year
+
+-   updated syntax to follow tidyverse style when reasonable; updated functions `read.csv()` and `write.csv()` to `read_csv()` and `write_csv()`
+
+-   updated file paths to be more reproducible, use of `here()` package and updated syntax to reduce system-dependent file paths
+
 ------------------------------------------------------------------------
 
 # Data Source
@@ -279,7 +286,9 @@ orn_tonnes <- np_tonnes %>%
 sw_fill_df <- region_product %>%
   filter(product == "seaweeds")
 
-sw_tonnes <- read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weighting.csv")) %>%
+sw_tonnes_raw <- read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weighting.csv")) 
+
+sw_tonnes <- sw_tonnes_raw %>%
   mutate(product = "seaweeds") %>%
   group_by(rgn_id, year, product) %>%
   summarise(tonnes = sum(tonnes, na.rm = TRUE)) %>%
@@ -298,7 +307,7 @@ sw_tonnes <- read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weighting.
 Now we will calculate the weights per each product. To do this we need
 to multiply our average \$ value for each product \* tonnes of each
 product, and then divide by the total per each region. We will also
-assign year = 2022 so that this can be read into OHI-global (2022
+assign year = (YYYY, e.g., 2022) so that this can be read into OHI-global (YYYY
 corresponds to the year that these weights were calculated).
 
 ```{r}
@@ -321,12 +330,14 @@ prod_weights <- orn_tonnes %>%
   filter(rgn_id != 213)
 
 #write.csv(prod_weights, file.path(prep, "output/np_product_weights.csv"), row.names = FALSE)
-write_csv(prod_weights, here(current_np_dir, "output", "np_product_weights.csv"))
+readr::write_csv(prod_weights, here(current_np_dir, "output", "np_product_weights.csv"))
 
 ```
 
-```{r}
-##datacheck
+
+### Datacheck
+```{r fig.height=5, fig.width=8}
+# Read in previous and current years' np_product_weights to compare
 #old_prod_weights <- read_csv(file.path(prep, paste0("../v", prep_year-3, "/output/np_product_weights.csv")))
 #old_prod_weights <- read_csv(file.path(prep, paste0("../v", prep_year-2, "/output/np_product_weights.csv")))
 old_prod_weights <- read_csv(here(previous_np_dir, "output", "np_product_weights.csv"))
@@ -338,21 +349,46 @@ check <- prod_weights %>%
   mutate(diff = new_weight - weight) %>%
   left_join(rgns_eez)
 
-plot(check$new_weight, check$weight)
+# note -- these are across all years...
+
+plot(check$new_weight, check$weight, main = "All Products")
 abline(0,1, col="red")
 
 check_sw <- check %>%
   filter(product == "seaweeds")
 
-plot(check_sw$new_weight, check_sw$weight)
+plot(check_sw$new_weight, check_sw$weight, main = "Seaweeds")
 abline(0,1, col="red")
 
 check_orn <- check %>%
   filter(product == "ornamentals") %>%
   mutate(difference = new_weight - weight)
 
-plot(check_orn$new_weight, check_orn$weight)
+plot(check_orn$new_weight, check_orn$weight, main = "Ornamentals")
 abline(0,1, col="red")
+
+
+check_fofm <- check %>%
+  filter(product == "fish_oil")
+
+plot(check_fofm$new_weight, check_fofm$weight, main = "Fish Oil / Fish Meal (FOFM)")
+abline(0, 1, col = "red") ## these change because of new SAUP fisheries catch data... 
+
+
+max(check$diff, na.rm = TRUE)
+min(check$diff, na.rm = TRUE)
+
+top_10_diffs <- check %>% arrange(desc(abs(diff))) %>% head(n = 10)
+top_10_diffs %>% relocate(diff, .after = "rgn_id")
+# rgn 164 = Belize 
+    # ~ had a "seaweeds" weight of 0.00 in 2023, now has a weight of 0.98 ≈ 0.9845 diff (v2024)
+    # ~ had a "fish_oil" weight of 1.00 in 2023, now has a weight of 0.015 ≈ -0.9845 diff (v2024) 
+# 155 = Tonga 
+    # ~ had an "ornamentals" weight of 0.97 in 2023, now has a weight of 0.00 ≈ -9.77 (v2024)
+# 153 = Cook Islands
+# 11 = Marshall Islands
+
+# for Cook Islands and Marshall Islands, almost feels like values for `ornamentals` and `fish_oil` got flipped?
 
 ## check saint martin, Niue, Bonaire, Sint Eustasius - should decrease in production
 ## check djibouti - should increase in production
@@ -367,13 +403,240 @@ harvest_tonnes_usd_old <- #read_csv(file.path(prep, paste0("../v", prep_year-1, 
 test2 <- harvest_tonnes_usd_old %>%
   filter(rgn_id == 46)
 
+# test
+# test2
+# v2024: Djibouti (rgn 46) does increase in production
 
 gf_orn <- read_csv(here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_gf.csv"))
 
-check_fofm <- check %>%
-  filter(product == "fish_oil")
-
-plot(check_fofm$new_weight, check_fofm$weight)
-abline(0, 1, col = "red") ## these change because of new SAUP fisheries catch data... 
 
 ```
+
+
+
+
+
+Old old check:
+
+```{r}
+# Read in previous and current years' np_product_weights to compare
+#old_prod_weights <- read_csv(file.path(prep, paste0("../v", prep_year-3, "/output/np_product_weights.csv")))
+#old_prod_weights <- read_csv(file.path(prep, paste0("../v", prep_year-2, "/output/np_product_weights.csv")))
+old_prod_weights <- read_csv(here(previous_np_dir, "output", "np_product_weights.csv"))
+older_prod_weights <- read_csv(here("globalprep", "np", "v2022", "output", "np_product_weights.csv"))
+
+check_older <- older_prod_weights %>%
+  rename("older_weight" = "weight") %>%
+  left_join(old_prod_weights, by = c("rgn_id", "product")) %>%
+  mutate(diff = weight - older_weight) %>%
+  left_join(rgns_eez)
+
+
+plot(check_older$weight, check_older$older_weight, main = "v2023 vs v2022"); abline(0,1, col="red")
+
+plot(check$new_weight, check$weight, main = "v2024 vs v2023"); abline(0,1, col="red")
+
+
+# interactive plot:
+
+weight_comp_plot <- ggplot(check_older, aes(x = older_weight, y = weight,
+                                            color = product,
+                                            text = paste("Region ID:", rgn_id) #, "<br>Product:", product)
+                                            #fill = rgn_id
+                                            )) +
+  geom_abline(intercept = 0, slope = 1, color = "#3498DB", linewidth = 1.3) +  # Change color and size of line
+  geom_point(size = 2) +  # Increase point size
+  scale_color_manual(values = c("fish_oil" = "#edae49", "seaweeds" = "#386641", "ornamentals" = "#83c5be")) +
+  theme_minimal() +
+  labs(x = "v2022 Weights", y = "v2023 Weights",
+       title = "Comparing NP Product Weights",
+       subtitle = "") +
+  theme(legend.position = "none")
+
+plotly::ggplotly(weight_comp_plot) %>% plotly::layout(yaxis = list(hoverformat = '.4f'), xaxis = list(hoverformat = '.4f'))
+
+
+
+
+
+weight_comp_plot_new <- ggplot(check, aes(x = weight, y = new_weight,
+                                            fill = product,
+                                            text = paste("Region ID:", rgn_id, "<br>Product:", product)
+                                            #fill = rgn_id
+                                            )) +
+  geom_abline(intercept = 0, slope = 1, color = "#3498DB", linewidth = 1.3) +  # Change color and size of line
+  geom_point(size = 2) +  # Increase point size
+  scale_fill_manual(values = c("fish_oil" = "#edae49", "seaweeds" = "#386641", "ornamentals" = "#83c5be")) +
+  theme_minimal() +
+  labs(x = "v2022 Weights", y = "v2023 Weights",
+       title = "Comparing NP Product Weights",
+       subtitle = "") +
+  theme(legend.position = "none")
+
+p <- plotly::ggplotly(weight_comp_plot, tooltip = "text") %>% 
+  plotly::layout(
+    hovermode = "closest",
+    yaxis = list(hoverformat = '.4f'), xaxis = list(hoverformat = '.4f'))
+
+# Custom hover template
+p$x$data <- lapply(p$x$data, function(trace) {
+  if (trace$mode == "markers") {
+    trace$hovertemplate <- paste(
+      "%{text}<br>",
+      "<b>Product</b>: %{fill}<br>",
+      "<b>Old Weight</b>: %{x:.4f}<br>",
+      "<b>New Weight</b>: %{y:.4f}<br>"
+      )
+  }
+  return(trace)
+})
+
+p
+```
+
+
+
+```{r}
+library(plotly)
+library(RColorBrewer)
+
+color_scale <- c("fish_oils" = "#edae49", "seaweeds" = "#00798c", "ornamentals" = "#d1495b")
+
+
+test_comp <- check_older %>% plotly::plot_ly(x = ~older_weight, y = ~weight,
+                                             type = "scatter", mode = "markers") %>% 
+  add_trace(
+   # text = ~paste("Region ID:", rgn_id, "<br>Product:", product),
+ #   hoverinfo = "text+x+y",
+   text = (~rgn_id, ~product),
+   marker = list(
+      color = ~product,
+      colors = color_scale
+    ),
+    hovertemplate = paste(
+      '<b>Region ID</b>: %{text}',
+      '<br><b>Old Weight</b>: %{x:.2f}',
+      '<br><b>New Weight</b>: %{y:.2f}<br>'
+    ),
+    #  showlegend = F
+  ) %>% 
+  add_trace(
+    x = c(0,1),
+    y = c(0,1),
+    mode = "lines",
+    line = list(color = "red"),
+    showlegend = FALSE,
+    hoverinfo = "none"
+  ) %>%
+  
+  layout(xaxis = list(hoverformat = '.3f'),
+         yaxis = list(hoverformat = '.3f'))
+
+test_comp
+```
+
+
+- RAM lost some stocks, so some stocks get removed in v4.65 (2024 data download); also got some new stocks
+
+
+
+
+```{r}
+library(ggplot2)
+library(plotly)
+library(dplyr)
+
+color_scale <- c("fish_oils" = "#edae49", "seaweeds" = "#00798c", "ornamentals" = "#d1495b")
+
+# Assuming check_older is your dataframe
+# If not, replace check_older with your actual dataframe name
+
+# Create the ggplot object
+g <- ggplot(check_older, aes(x = older_weight, y = weight, color = product,
+                             text = paste("<b>Region ID:</b>", rgn_id, "<br><b>Product:</b>", product #,
+                                          #"<br>Old weight:", older_weight, "<br>New weight:", weight
+                                          ))) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  scale_color_manual(values = c("fish_oil" = "#edae49", "seaweeds" = "#386641", "ornamentals" = "#83c5be")) +
+  labs(title = "v2023 vs v2022 Weights by Product",
+       x = "v2022 Weight",
+       y = "v2023 Weight",
+       color = "Product") +
+  theme_minimal()
+
+# Convert to plotly
+p <- ggplotly(g, tooltip = "text") %>%
+  layout(
+    hovermode = "closest",
+    xaxis = list(hoverformat = ".4f"),
+    yaxis = list(hoverformat = ".4f")
+  )
+
+# Custom hover template
+p$x$data <- lapply(p$x$data, function(trace) {
+  if (trace$mode == "markers") {
+    trace$hovertemplate <- paste(
+      "%{text}<br>",
+      "<b>Old Weight</b>: %{x:.4f}<br>",
+      "<b>New Weight</b>: %{y:.4f}<br>"
+      )
+  }
+  return(trace)
+})
+
+# Display the plot
+p
+```
+
+
+
+
+```{r}
+library(ggplot2)
+library(plotly)
+library(dplyr)
+
+color_scale <- c("fish_oils" = "#edae49", "seaweeds" = "#00798c", "ornamentals" = "#d1495b")
+
+# Assuming check_older is your dataframe
+# If not, replace check_older with your actual dataframe name
+
+# Create the ggplot object
+g <- ggplot(check, aes(x = weight, y = new_weight, color = product,
+                             text = paste("<b>Region ID:</b>", rgn_id, "<br><b>Product:</b>", product #,
+                                          #"<br>Old weight:", older_weight, "<br>New weight:", weight
+                                          ))) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  scale_color_manual(values = c("fish_oil" = "#edae49", "seaweeds" = "#386641", "ornamentals" = "#83c5be")) +
+  labs(title = "v2024 vs v2023 Natural Product Weights by Product for 2019",
+       x = "v2023 2019 Weight",
+       y = "v2024 2019 Weight",
+       color = "Product") +
+  theme_minimal()
+
+# Convert to plotly
+p <- ggplotly(g, tooltip = "text") %>%
+  layout(
+    hovermode = "closest",
+    xaxis = list(hoverformat = ".4f"),
+    yaxis = list(hoverformat = ".4f")
+  )
+
+# Custom hover template
+p$x$data <- lapply(p$x$data, function(trace) {
+  if (trace$mode == "markers") {
+    trace$hovertemplate <- paste(
+      "%{text}<br>",
+      "<b>Old Weight</b>: %{x:.4f}<br>",
+      "<b>New Weight</b>: %{y:.4f}<br>"
+      )
+  }
+  return(trace)
+})
+
+# Display the plot
+p
+```
+
