@@ -5,7 +5,7 @@ output:
   html_document:
     code_folding: show
     toc: true
-    toc_depth: 1
+    toc_depth: 3
     toc_float: yes
     number_sections: false
     theme: cerulean
@@ -26,8 +26,9 @@ This script takes the SAUP 2023 catch data, a list of fish oil/fish meal (FOFM) 
 
 ## Updates from previous assessment
 
--   Updated general syntax to follow tidyverse style when/where reasonable\
--   Updated `catch_zeros` zerofill method to use `pivot_wider()` and `pivot_longer()` instead of `spread()` and `gather()`
+-   Updated general syntax throughout to follow tidyverse style when/where reasonable\
+-   Updated `catch_zeros` zerofill method to use `pivot_wider()` and `pivot_longer()` instead of `spread()` and `gather()`\
+-   Updated plotting to include `rgn_id` fill for improved utility of data visualization, flipped axes so positive change is more easily and more intuitively visualized ()
 
 ------------------------------------------------------------------------
 
@@ -525,23 +526,26 @@ summary(score_data)
 
 # write.csv(score_data, here(paste0("globalprep/np/v", scenario_year, "/output/np_fofm_scores.csv")), row.names = FALSE)
 
-write_csv(score_data, here(current_np_dir, "output", "np_fofm_scores.csv"))
+readr::write_csv(score_data, here(current_np_dir, "output", "np_fofm_scores.csv"))
 
 
 ```
 
-Testing and comparison
+### Testing and comparison
 
 ```{r}
-
-old <- read_csv(here(paste0("globalprep/np/v", as.character(as.numeric(scenario_year)-1), "/output/np_fofm_scores.csv")))
+old <- readr::read_csv(here::here("globalprep", "np",
+                                  # previous year in NP
+                                  paste0("v", as.character(as.numeric(scenario_year) - 1)),
+                                  "output", "np_fofm_scores.csv"))
 summary(old)
 
-new <- read_csv(here(paste0("globalprep/np/v", scenario_year, "/output/np_fofm_scores.csv")))
-
+new <- readr::read_csv(here::here(current_np_dir, "output", "np_fofm_scores.csv"))
+summary(new)
 # load ohi regions
 region_data()
 
+# Investigating changes in data for same year in different data/scenario years
 
 check <- new %>%
   rename("new_score" = "score") %>%
@@ -551,13 +555,14 @@ check <- new %>%
   mutate(diff = new_score - score) %>%
   filter(year == 2019)
 
-ab_scores <- ggplot(check, aes(x=new_score, y=score)) +
-  geom_abline(intercept = 0, slope = 1, color = "#3498DB", size = 1.5) +  # Change color and size of line
+ab_scores <- ggplot(check, aes(x = score, y = new_score, fill = rgn_id)) +
+  geom_abline(intercept = 0, slope = 1, color = "#3498DB", linewidth = 1.5) +  # Change color and size of line
   geom_point(size = 3) +  # Increase point size
   theme_minimal() +
-  labs(x = "New Score", y = "Score",
+  labs(x = "Score", y = "New Score",
        title = "New Score vs. Score",
-       subtitle = "Year: 2017")
+       subtitle = "Year: 2017") +
+  theme(legend.position = "none")
 
 ggplotly(ab_scores)
 
