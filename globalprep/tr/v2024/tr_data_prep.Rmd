@@ -117,6 +117,226 @@ unwto_dir <- here(raw_data_dir, "UNWTO", data_dir_version_year)
 output_dir <- here("globalprep","tr", version_year, "output")
 ```
 
+# Cleaning data from UNWTO
+
+## International UNWTO Inbound Tourism Arrivals
+
+```{r}
+file_path_unwto_international <- here::here(unwto_dir, "unwto-inbound-arrivals-data.xlsx")
+unwto_arrivals_int <- readxl::read_xlsx(file_path_unwto_international, skip = 4) # read in the raw data
+
+unwto_clean <- unwto_arrivals_int %>% 
+  select(country = `Basic data and indicators`, total_arrivals = `...6`, subdivision_1 = `...7`, subdivision_2 = `...8`, `1995`:`2021`) %>% # select relevant columns
+  fill(country, .direction = "down") %>% # add country name to all data associated with that country
+  pivot_longer(cols = c("total_arrivals", "subdivision_1", "subdivision_2"),
+               values_to = "metric",
+               values_drop_na = TRUE) %>% # make the metrics into one column
+  select(-name) %>% # get rid of the name column since it's just the titles of the metrics which are already there
+  select(country, metric, everything()) %>% # reorder things
+  replace_with_na_all(condition = ~.x == "..") %>% # swap .. with NAs
+  pivot_longer(cols = 3:ncol(.), names_to = "year",
+               values_to = "tourism_arrivals_ct") %>% # make the years not columns anymore
+  pivot_wider(names_from = metric, values_from = tourism_arrivals_ct) %>%
+  mutate(overnights = as.numeric(`Overnights visitors (tourists)`), 
+         same_day = as.numeric(`Same-day visitors (excursionists)`), 
+         total_arrivals = as.numeric(`Total arrivals`),
+         tourism_arrivals_ct = as.numeric(NA)) %>% # rename metrics so easier to work with, make numeric, and add a new column to fill with the new calculated values later
+  select(country, year, overnights, same_day, total_arrivals, tourism_arrivals_ct) %>% # select columns needed for analysis (cruise passengers seem to be included in same-day)
+  group_by(country, year) %>% # group by county and year
+  mutate(
+    tourism_arrivals_ct = case_when(
+      !is.na(overnights) ~ overnights, # if there is a value, dont gapfill
+      is.na(overnights) & !is.na(same_day) & !is.na(total_arrivals) ~ total_arrivals - same_day, # gapfill, when there is no data on overnights, fill with total_arrivals - same day
+      TRUE ~ tourism_arrivals_ct # otherwise, NA
+    ), # there were 0 situations like this in v2024
+    total_arrivals = case_when(
+      !is.na(total_arrivals) ~ total_arrivals, 
+      is.na(total_arrivals) & !is.na(same_day) & !is.na(overnights) ~ overnights + same_day,
+      TRUE ~ total_arrivals
+    )
+  ) %>% # v2024: overnights has 1036 NAs out of 6021
+  # v2024: same_day has 3131 NAs out of 6021
+  # v2024: total_arrivals has 2363 NAs
+  mutate(arrivals_method = ifelse(is.na(overnights) & !is.na(same_day) & !is.na(total_arrivals), "UNWTO - subtraction", NA)) %>%
+  mutate(arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - subtraction", "gapfilled", NA)) %>% # prepare a "gapfilled" column to indicate "gapfilled" or NA
+  ungroup() %>% # ungroup since not needed anymore
+  select(country, year, tourism_arrivals_ct, total_arrivals, arrivals_method, arrivals_gapfilled) %>% # select only needed columns
+  mutate(country = str_to_title(country), # make countries look nice
+         tourism_arrivals_ct = round(as.numeric(tourism_arrivals_ct) * 1000),
+         total_arrivals = round(as.numeric(total_arrivals)*1000)) # since the units were in thousands
+
+# Macquerie, Andaman and Nicobar, Azores, Madeira, Prince Edwards Islands, Oecussi Ambeno, Canary Islands 
+# all duplicated with their governing regions. Aside from the uninhabited ones, I think it actually 
+# makes sense to give them the same score as their vassal states, given that places like Azores and 
+# Canary Islands probably make up a decent chunk of Portugal and Spain tourism...
+# get UNWTO data to have OHI region names
+unwto_match_iso3c <- unwto_clean %>%
+  mutate(iso3c = countrycode::countrycode(sourcevar = country, origin = "country.name", destination = "iso3c")) %>%
+  left_join(rgns_eez, by = c("iso3c" = "eez_iso3")) %>%
+  dplyr::select(rgn_id, year, arrivals_method, arrivals_gapfilled, tourism_arrivals_ct, total_arrivals) %>% # so that the numbers of columns of arguments match for rbind
+  filter(!is.na(rgn_id))
+
+unwto_clean_names_bonaire <- name_2_rgn(df_in = unwto_clean %>% filter(country == "Bonaire"), # do this just for Bonaire since it is the only region not matching above
+                                fld_name = 'country',
+                                # flds_unique = c('year'),
+                                keep_fld_name = TRUE) %>%
+  dplyr::select(rgn_id, year, arrivals_method, arrivals_gapfilled, tourism_arrivals_ct, total_arrivals) #### losing lots of regions here for some reason... most concernedly USA or anything with the word "united"
+
+
+unwto_clean_names <-  rbind(unwto_clean_names_bonaire, unwto_match_iso3c) %>% # rbind back together. I would've used the name_2_rgns fxn for everything, but it was excluding a lot of regions for some reason...
+  left_join(rgns_eez) %>%
+  dplyr::select(rgn_id, rgn_name, year, arrivals_method, arrivals_gapfilled, tourism_arrivals_ct, total_arrivals)
+
+dplyr::setdiff(unwto_clean_names$rgn_name, unwto_clean$country) # renamed, new casing, or islands that did not have values before
+
+# fix duplicates if there are any
+unwto_dupe_fix <- unwto_clean_names %>%
+  group_by(rgn_id, year, arrivals_method, arrivals_gapfilled) %>%
+  summarize(sum_fix = ifelse(all(is.na(tourism_arrivals_ct)), NA, sum(tourism_arrivals_ct, na.rm = TRUE)),
+            sum_fix_2 = ifelse(all(is.na(total_arrivals)), NA, sum(total_arrivals, na.rm = TRUE))) %>%
+  mutate(arrivals_method = ifelse(is.na(arrivals_method) & !is.na(sum_fix), "UNWTO", arrivals_method)) %>%
+  rename(tourism_arrivals_ct = sum_fix,
+         total_arrivals = sum_fix_2)
+
+# check out things so far
+summary(unwto_dupe_fix) 
+# v2023: 828 NAs in arrivals (before filtering the years down and gapfilling), 1708 in `total_arrivals`
+# v2024: 774 NAs in arrivals (before filtering the years down and gapfilling), 1660 in `total_arrivals`
+
+length(unique(unwto_dupe_fix$rgn_id)) # v2024: 179 regions present!
+```
+
+
+## Domestic UNWTO Inbound Tourism Arrivals
+
+```{r}
+file_path_unwto_domestic_trips <- here::here(unwto_dir, "unwto-domestic-trips-data.xlsx")
+unwto_arrivals_dom_trips <- readxl::read_xlsx(file_path_unwto_domestic_trips, skip = 4) # read in the raw domestic trips data
+
+unwto_dom_trips_clean <- unwto_arrivals_dom_trips %>% 
+  select(country = `Basic data and indicators`, total_trips = `...6`, subdivision_1 = `...7`, subdivision_2 = `...8`, `1995`:`2021`) %>% # select relevant columns
+  fill(country, .direction = "down") %>% # add country name to all data associated with that country
+  pivot_longer(cols = c("total_trips", "subdivision_1", "subdivision_2"),
+               values_to = "metric",
+               values_drop_na = TRUE) %>% # make the metrics into one column
+  select(-name) %>% # get rid of the name column since it's just the titles of the metrics which are already there
+  select(country, metric, everything()) %>% # reorder things
+  replace_with_na_all(condition = ~.x == "..") %>% # swap .. with NAs
+  pivot_longer(cols = 3:ncol(.), names_to = "year",
+               values_to = "tourism_arrivals_ct") %>% # make the years not columns anymore
+  pivot_wider(names_from = metric, values_from = tourism_arrivals_ct) %>%
+  mutate(overnights = as.numeric(`Overnights visitors (tourists)`), 
+         same_day = as.numeric(`Same-day visitors (excursionists)`), 
+         total_trips = as.numeric(`Total trips`),
+         tourism_arrivals_ct = as.numeric(NA)) %>% # rename metrics so easier to work with, make numeric, and add a new column to fill with the new calculated values later
+  select(country, year, overnights, same_day, total_trips, tourism_arrivals_ct) %>% # select columns needed for analysis (cruise passengers seem to be included in same-day)
+  group_by(country, year) %>% # group by county and year
+  mutate(
+    tourism_arrivals_ct = case_when(
+      !is.na(overnights) ~ overnights, # if there is a value, dont gapfill
+      is.na(overnights) & !is.na(same_day) & !is.na(total_trips) ~ total_trips - same_day, # gapfill, when there is no data on overnights, fill with total_trips - same day
+      TRUE ~ tourism_arrivals_ct # otherwise, NA
+    ), # there were 0 situations like this in v2024
+    total_trips = case_when(
+      !is.na(total_trips) ~ total_trips, 
+      is.na(total_trips) & !is.na(same_day) & !is.na(overnights) ~ overnights + same_day,
+      TRUE ~ total_trips
+    )
+  ) %>% # v2024: overnights has 1036 NAs out of 6021
+  # v2024: same_day has 3131 NAs out of 6021
+  # v2024: total_trips has 2363 NAs
+  mutate(arrivals_method = ifelse(is.na(overnights) & !is.na(same_day) & !is.na(total_trips), "UNWTO - subtraction", NA)) %>%
+  mutate(arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - subtraction", "gapfilled", NA)) %>% # prepare a "gapfilled" column to indicate "gapfilled" or NA
+  ungroup() %>% # ungroup since not needed anymore
+  select(country, year, tourism_arrivals_ct, total_trips, arrivals_method, arrivals_gapfilled) %>% # select only needed columns
+  mutate(country = str_to_title(country), # make countries look nice
+         tourism_arrivals_ct = round(as.numeric(tourism_arrivals_ct) * 1000),
+         total_trips = round(as.numeric(total_trips)*1000)) # since the units were in thousands
+```
+
+
+```{r}
+file_path_unwto_domestic_acc <- here::here(unwto_dir, "unwto-domestic-accommodation-data.xlsx")
+unwto_arrivals_dom_acc <- readxl::read_xlsx(file_path_unwto_domestic_acc, skip = 4) # read in the raw domestic accomodations data
+
+unwto_clean_dom <- unwto_arrivals_dom_acc %>% 
+  select(country = `Basic data and indicators`, source_arrivals = `...6`, subdivision_1 = `...7`, subdivision_2 = `...8`, `1995`:`2021`) %>% # select relevant columns
+  fill(country, .direction = "down") %>% # add country name to all data associated with that country
+  fill(source_arrivals, .direction = "down") %>% 
+  filter(subdivision_1 %in% "Overnights" | subdivision_1 %in% "Guests") %>% 
+  select(-subdivision_2) %>% # get rid of the NA column
+  replace_with_na_all(condition = ~.x == "..") %>% # swap ".." with NAs
+  mutate(source_arrivals_all = paste(source_arrivals, subdivision_1, sep = ":")) %>% # unite the columns that define the source for easier cleaning and pivoting
+  select(country, source_arrivals_all, 4:ncol(.)) %>% # use the . to specify the whole dataframe
+  pivot_longer(cols = 3:ncol(.), names_to = "year",
+               values_to = "tourism_arrivals_ct") %>% # make the years not columns anymore
+  pivot_wider(names_from = source_arrivals_all, values_from = tourism_arrivals_ct) %>%
+  select(-c("Total:Guests","Hotels and similar establishments:Guests")) %>% # to keep it consistent with the international data, we only want number of overnights
+  mutate(hotel_overnights = as.numeric(`Hotels and similar establishments:Overnights`), 
+         total_overnights = as.numeric(`Total:Overnights`),
+         tourism_arrivals_ct = as.numeric(NA)) %>% # rename metrics so easier to work with, make numeric, and add a new column to fill with the new calculated values later
+  select(country, year, hotel_overnights, total_overnights, tourism_arrivals_ct) %>% # select columns needed for analysis
+  group_by(country, year) %>% # group by county and year
+  mutate(
+    tourism_arrivals_ct = case_when(
+      !is.na(hotel_overnights) ~ hotel_overnights, # if there is a value, dont gapfill
+      is.na(hotel_overnights) & !is.na(total_overnights) ~ total_overnights, # gapfill, when there is no data on hotel overnights, fill with total overnights
+      TRUE ~ tourism_arrivals_ct # otherwise, NA
+    )) %>% 
+  # v2024: hotel_overnights has 3835 NAs out of 6021 (colSums(is.na(unwto_clean_dom)))
+  # v2024: total_overnights has 4614 NAs out of 6021
+  # v2024: tourism_arrivals_ct has 3719 NAs out of 6021 
+  mutate(arrivals_method = ifelse(is.na(hotel_overnights) & !is.na(total_overnights), "UNWTO - total", NA)) %>%
+  mutate(arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - total", "gapfilled", NA)) %>% # prepare a "gapfilled" column to indicate "gapfilled" or NA
+  ungroup() %>% # ungroup since not needed anymore
+  select(country, year, tourism_arrivals_ct, arrivals_method, arrivals_gapfilled) %>% # select only needed columns
+  mutate(country = str_to_title(country), # make countries look nice
+         tourism_arrivals_ct = round(as.numeric(tourism_arrivals_ct) * 1000)) # since the units were in thousands
+
+#
+
+# Macquerie, Andaman and Nicobar, Azores, Madeira, Prince Edwards Islands, Oecussi Ambeno, Canary Islands 
+# all duplicated with their governing regions. Aside from the uninhabited ones, I think it actually 
+# makes sense to give them the same score as their vassal states, given that places like Azores and 
+# Canary Islands probably make up a decent chunk of Portugal and Spain tourism...
+# get UNWTO data to have OHI region names
+unwto_match_iso3c <- unwto_clean %>%
+  mutate(iso3c = countrycode::countrycode(sourcevar = country, origin = "country.name", destination = "iso3c")) %>%
+  left_join(rgns_eez, by = c("iso3c" = "eez_iso3")) %>%
+  dplyr::select(rgn_id, year, arrivals_method, arrivals_gapfilled, tourism_arrivals_ct, total_arrivals) %>% # so that the numbers of columns of arguments match for rbind
+  filter(!is.na(rgn_id))
+
+unwto_clean_names_bonaire <- name_2_rgn(df_in = unwto_clean %>% filter(country == "Bonaire"), # do this just for Bonaire since it is the only region not matching above
+                                        fld_name = 'country',
+                                        # flds_unique = c('year'),
+                                        keep_fld_name = TRUE) %>%
+  dplyr::select(rgn_id, year, arrivals_method, arrivals_gapfilled, tourism_arrivals_ct, total_arrivals) #### losing lots of regions here for some reason... most concernedly USA or anything with the word "united"
+
+
+unwto_clean_names <-  rbind(unwto_clean_names_bonaire, unwto_match_iso3c) %>% # rbind back together. I would've used the name_2_rgns fxn for everything, but it was excluding a lot of regions for some reason...
+  left_join(rgns_eez) %>%
+  dplyr::select(rgn_id, rgn_name, year, arrivals_method, arrivals_gapfilled, tourism_arrivals_ct, total_arrivals)
+
+dplyr::setdiff(unwto_clean_names$rgn_name, unwto_clean$country) # renamed, new casing, or islands that did not have values before
+
+# fix duplicates if there are any
+unwto_dupe_fix <- unwto_clean_names %>%
+  group_by(rgn_id, year, arrivals_method, arrivals_gapfilled) %>%
+  summarize(sum_fix = ifelse(all(is.na(tourism_arrivals_ct)), NA, sum(tourism_arrivals_ct, na.rm = TRUE)),
+            sum_fix_2 = ifelse(all(is.na(total_arrivals)), NA, sum(total_arrivals, na.rm = TRUE))) %>%
+  mutate(arrivals_method = ifelse(is.na(arrivals_method) & !is.na(sum_fix), "UNWTO", arrivals_method)) %>%
+  rename(tourism_arrivals_ct = sum_fix,
+         total_arrivals = sum_fix_2)
+
+# check out things so far
+summary(unwto_dupe_fix) 
+# v2023: 828 NAs in arrivals (before filtering the years down and gapfilling), 1708 in `total_arrivals`
+# v2024: 774 NAs in arrivals (before filtering the years down and gapfilling), 1660 in `total_arrivals`
+
+length(unique(unwto_dupe_fix$rgn_id)) # v2024: 179 regions present!
+```
+
+
 # Ap: Proportion of tourist arrivals to area of coastline to population
 
 We use international arrivals data from the [United Nations World Tourism Organization (UNWTO)](https://www.unwto.org/). Up until the current assessment, we accessed data from the [World Travel & Tourism Council (WTTC)](http://www.wttc.org/), but this is no longer a viable option.

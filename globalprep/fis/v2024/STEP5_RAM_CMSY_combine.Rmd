@@ -312,6 +312,24 @@ comparison_plot <- ggplot(compare, aes(x = bbmsy.x, y = bbmsy.y)) +
   coord_fixed(ratio = 1)  +
   geom_smooth(method = "lm", se = FALSE, color = "lightblue") # the trend is slightly downward, meaning there is a slight decrease in B/Bmsy values in 2024 compared to 2023.
 comparison_plot
+
+# v2024: check for year 2019 only
+compare_2019 <- compare %>%
+  filter(year %in% 2019)
+  
+comparison_plot_2019 <- ggplot(compare_2019, aes(x = bbmsy.x, y = bbmsy.y)) +
+  geom_point(alpha = 0.5) + 
+  geom_abline(color = "darkred", linetype = "dashed") +  # reference line
+  labs(
+    title = "B/Bmsy Values in 2019: v2023 vs v2024",
+    x = "v2023 B/Bmsy",
+    y = "v2024 B/Bmsy"
+  ) +
+  theme_minimal() +
+  coord_fixed(ratio = 1)  +
+  xlim(0, 12) +
+  geom_smooth(method = "lm", se = FALSE, color = "lightblue") # the trend is slightly downward, meaning there is a slight decrease in B/Bmsy values in 2024 compared to 2023.
+comparison_plot_2019
 ```
 
 For understanding results: 
