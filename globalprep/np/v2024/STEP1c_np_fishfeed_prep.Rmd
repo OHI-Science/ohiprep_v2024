@@ -1,19 +1,18 @@
 ---
-title: "OHI 2022: Natural Products, Preparing catch and B/Bmsy data for forage fish species"
+title: 'OHI `r format(Sys.time(), "%Y")`: Natural Products, Preparing catch and B/Bmsy data for forage fish species'
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
     code_folding: show
     toc: true
-    toc_depth: 1
     toc_float: yes
     number_sections: false
     theme: cerulean
     highlight: haddock
     includes: 
       in_header: '../../../workflow/templates/ohi_hdr.html'
-pdf_document:
-  toc: true
+  pdf_document:
+    toc: true
 editor_options: 
   chunk_output_type: console
 ---
@@ -26,8 +25,9 @@ This script takes the SAUP 2023 catch data, a list of fish oil/fish meal (FOFM) 
 
 ## Updates from previous assessment
 
--   Updated general syntax to follow tidyverse style when/where reasonable\
--   Updated `catch_zeros` zerofill method to use `pivot_wider()` and `pivot_longer()` instead of `spread()` and `gather()`
+-   Updated general syntax throughout to follow tidyverse style when/where reasonable\
+-   Updated `catch_zeros` zerofill method to use `pivot_wider()` and `pivot_longer()` instead of `spread()` and `gather()`\
+-   Updated plotting to include `rgn_id` fill for improved utility of data visualization, flipped axes so positive change is more easily and more intuitively visualized ()
 
 ------------------------------------------------------------------------
 
@@ -376,7 +376,8 @@ mean_catch_FOFM <- mean_catch %>%
   data.frame() %>%
   rename(catch = catch_non_human)
 
-write.csv(mean_catch_FOFM,  file.path(here(), paste0("globalprep/np/v", scenario_year, "/int/mean_catch_FOFM.csv")), row.names = FALSE)
+# write.csv(mean_catch_FOFM,  file.path(here(), paste0("globalprep/np/v", scenario_year, "/int/mean_catch_FOFM.csv")), row.names = FALSE)
+readr::write_csv(mean_catch_FOFM, here(current_np_dir, "int", "mean_catch_FOFM.csv"))
 ```
 
 # Steps 3/4/5/6
@@ -384,11 +385,12 @@ write.csv(mean_catch_FOFM,  file.path(here(), paste0("globalprep/np/v", scenario
 ## Join with the final B/Bmsy layer from the fis model, convert the B/Bmsy values to scores (this is done in functions.R for FIS subgoal, but we do it in the dataprep for NP), apply the underharvest penalty, and take a catch weighted average of B/Bmsy scores for each region/year.
 
 ```{r}
-fis_bbmsy <- read_csv(file.path(here(), paste0("globalprep/fis/v", scenario_year, "/output/fis_bbmsy.csv")))
+# fis_bbmsy <- read_csv(file.path(here(), paste0("globalprep/fis/v", scenario_year, "/output/fis_bbmsy.csv")))
+fis_bbmsy <- read_csv(here(scen_year_fis_dir, "output", "fis_bbmsy.csv"))
 
-fis_bbmsy_gf <- read.csv(file.path(here(), paste0("globalprep/fis/v", scenario_year, "/output/fis_bbmsy_gf.csv")))
+fis_bbmsy_gf <- read_csv(here(scen_year_fis_dir, "output", "fis_bbmsy_gf.csv"))
 
-catch_FOFM <- read_csv(file.path(here(), paste0("globalprep/np/v", scenario_year, "/int/mean_catch_FOFM.csv")))
+catch_FOFM <- read_csv(here(current_np_dir, "int", "mean_catch_FOFM.csv"))
 
 
 b <- fis_bbmsy %>%
@@ -406,15 +408,14 @@ c <- catch_FOFM %>%
 
 
 b <- b %>%
-    dplyr::mutate(bbmsy = as.numeric(bbmsy)) %>%
-    dplyr::mutate(region_id = as.numeric(as.character(rgn_id))) %>%
-    dplyr::mutate(year = as.numeric(as.character(year))) %>%
-    dplyr::mutate(stock_id = as.character(stock_id))
-  
+  dplyr::mutate(bbmsy = as.numeric(bbmsy),
+                region_id = as.numeric(as.character(rgn_id)),
+                year = as.numeric(as.character(year)),
+                stock_id = as.character(stock_id))
+
 
 ####
-  #  Calculate scores for Bbmsy values
-  ####
+  # ==== Calculate scores for Bbmsy values ==== ####
   #  *************NOTE *****************************
   #  These values can be altered
   #  ***********************************************
@@ -442,7 +443,7 @@ b <- b %>%
   
   
   ####
-  # Merge the b/bmsy data with catch data
+  # Merge the b/bmsy data with catch data ------------------------------
   ####
   data_fis <- c %>%
     dplyr::left_join(b, by = c('region_id' = 'rgn_id', 'stock_id', 'year')) %>%
@@ -450,7 +451,7 @@ b <- b %>%
   
   
   ###
-  #  Estimate scores for taxa without b/bmsy values
+  #  Estimate scores for taxa without b/bmsy values --------------------
   # Mean score of other fish in the region is the starting point
   # Then a penalty is applied based on the level the taxa are reported at
   ###
@@ -470,7 +471,7 @@ b <- b %>%
     dplyr::mutate(mean_score = ifelse(is.na(mean_score), mean_score_global, mean_score)) %>%
     dplyr::select(-mean_score_global)
   
-   #  *************NOTE *****************************
+  #  *************NOTE *****************************
   #  In some cases, it may make sense to alter the
   #  penalty for not identifying fisheries catch data to
   #  species level.
@@ -498,7 +499,8 @@ b <- b %>%
            gapfilled,
            method) 
   
-  write.csv(gap_fill_data, here(paste0("globalprep/np/v", scenario_year, "/output/NP_bbmsy_summary_gf.csv")), row.names = FALSE)
+  # write.csv(gap_fill_data, here(paste0("globalprep/np/v", scenario_year, "/output/NP_bbmsy_summary_gf.csv")), row.names = FALSE)
+  readr::write_csv(gap_fill_data, here::here(current_np_dir, "output", "NP_bbmsy_summary_gf.csv"))
   
   score_data <- data_fis_gf %>%
     dplyr::select(rgn_id, stock_id, year, catch, score)
@@ -521,25 +523,28 @@ b <- b %>%
 
 summary(score_data)
 
-write.csv(score_data, here(paste0("globalprep/np/v", scenario_year, "/output/np_fofm_scores.csv")), row.names = FALSE)
+# write.csv(score_data, here(paste0("globalprep/np/v", scenario_year, "/output/np_fofm_scores.csv")), row.names = FALSE)
 
-
+readr::write_csv(score_data, here(current_np_dir, "output", "np_fofm_scores.csv"))
 
 
 ```
 
-Testing and comparison
+### Testing and comparison
 
 ```{r}
-
-old <- read_csv(here(paste0("globalprep/np/v", as.character(as.numeric(scenario_year)-1), "/output/np_fofm_scores.csv")))
+old <- readr::read_csv(here::here("globalprep", "np",
+                                  # previous year in NP
+                                  paste0("v", as.character(as.numeric(scenario_year) - 1)),
+                                  "output", "np_fofm_scores.csv"))
 summary(old)
 
-new <- read_csv(here(paste0("globalprep/np/v", scenario_year, "/output/np_fofm_scores.csv")))
-
+new <- readr::read_csv(here::here(current_np_dir, "output", "np_fofm_scores.csv"))
+summary(new)
 # load ohi regions
 region_data()
 
+# Investigating changes in data for same year in different data/scenario years
 
 check <- new %>%
   rename("new_score" = "score") %>%
@@ -549,13 +554,14 @@ check <- new %>%
   mutate(diff = new_score - score) %>%
   filter(year == 2019)
 
-ab_scores <- ggplot(check, aes(x=new_score, y=score)) +
-  geom_abline(intercept = 0, slope = 1, color = "#3498DB", size = 1.5) +  # Change color and size of line
+ab_scores <- ggplot(check, aes(x = score, y = new_score, fill = rgn_id)) +
+  geom_abline(intercept = 0, slope = 1, color = "#3498DB", linewidth = 1.5) +  # Change color and size of line
   geom_point(size = 3) +  # Increase point size
   theme_minimal() +
-  labs(x = "New Score", y = "Score",
+  labs(x = "Score", y = "New Score",
        title = "New Score vs. Score",
-       subtitle = "Year: 2017")
+       subtitle = "Year: 2017") +
+  theme(legend.position = "none")
 
 ggplotly(ab_scores)
 

@@ -9,7 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Fri Aug 16 19:22:05 2024 by ramji" />
+<meta name="author" content="Compiled on Mon Aug 19 17:19:06 2024 by ramji" />
 
 
 <title>OHI 2024: Natural Products: Ornamentals data prep</title>
@@ -1550,7 +1550,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">OHI 2024: Natural Products: Ornamentals
 data prep</h1>
-<h4 class="author"><em>Compiled on Fri Aug 16 19:22:05 2024 by
+<h4 class="author"><em>Compiled on Mon Aug 19 17:19:06 2024 by
 ramji</em></h4>
 
 </div>
@@ -1637,7 +1637,7 @@ raw/commodities2products_weighting.csv for details).</p>
 <span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>)</span>
 <span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a></span>
 <span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a><span class="co"># ======= Set directories ===========</span></span>
-<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a><span class="co"># Update scenario year, set up programmatic scenario year updating</span></span>
+<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a><span class="co"># Update scenario year, set up programmatic scenario year updates</span></span>
 <span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a>scen_year_number <span class="ot">&lt;-</span> <span class="dv">2024</span></span>
 <span id="cb1-25"><a href="#cb1-25" tabindex="-1"></a>scen_year <span class="ot">&lt;-</span> <span class="fu">as.character</span>(scen_year_number)</span>
 <span id="cb1-26"><a href="#cb1-26" tabindex="-1"></a>prev_scen_year <span class="ot">&lt;-</span> <span class="fu">as.character</span>(scen_year_number <span class="sc">-</span> <span class="dv">1</span>)</span>
@@ -2131,7 +2131,7 @@ ohi-global functions.R)</h2>
 <span id="cb12-107"><a href="#cb12-107" tabindex="-1"></a>  <span class="do">### ornamentals</span></span>
 <span id="cb12-108"><a href="#cb12-108" tabindex="-1"></a>  <span class="fu">left_join</span>(risk_orn, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>))  <span class="sc">%&gt;%</span></span>
 <span id="cb12-109"><a href="#cb12-109" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ornamentals =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(ornamentals), <span class="dv">0</span>, ornamentals)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-110"><a href="#cb12-110" tabindex="-1"></a>  <span class="fu">gather</span>(product, risk,<span class="sc">-</span>rgn_id,<span class="sc">-</span>year) <span class="sc">%&gt;%</span></span>
+<span id="cb12-110"><a href="#cb12-110" tabindex="-1"></a>  <span class="fu">gather</span>(product, risk, <span class="sc">-</span>rgn_id, <span class="sc">-</span>year) <span class="sc">%&gt;%</span></span>
 <span id="cb12-111"><a href="#cb12-111" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">product =</span> <span class="fu">as.character</span>(product))</span>
 <span id="cb12-112"><a href="#cb12-112" tabindex="-1"></a></span>
 <span id="cb12-113"><a href="#cb12-113" tabindex="-1"></a>np_risk_gf <span class="ot">&lt;-</span> np_risk_orn <span class="sc">%&gt;%</span></span>
