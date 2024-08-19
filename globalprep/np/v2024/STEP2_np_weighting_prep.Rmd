@@ -1,5 +1,5 @@
 ---
-title: 'OHI 2022: Natural Products: weighting data prep'
+title: 'Natural Products: weighting data prep'
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
@@ -126,16 +126,25 @@ species, year.
 
 knitr::opts_chunk$set(eval=FALSE)
 
+# Read in packages  
 library(here)
 library(tidyverse)
-source(here('workflow/R/common.R'))
-source(here('globalprep/np/v2022/R/np_fxn.R'))
+
+scen_year_number <- 2024
+scenario_year <- as.character(scen_year_number)
+v_scen_year <- paste0("v", scenario_year)
+
+current_np_dir <- here::here("globalprep", "np", v_scen_year)
+previous_np_dir <- here::here("globalprep", "np", paste0("v", scen_year_number - 1))
+
+# Source scripts/functions
+source(here::here("workflow", "R", "common.R")) # directory locations
+source(here::here(current_np_dir, "R", "np_fxn.R")) # function for handling FAO commodity data specific to NP
+
 
 prep_year <- 2023
 
 prep <- file.path(here(paste0("globalprep/np/v", prep_year, "/")))
-
-
 
 ```
 
@@ -147,7 +156,7 @@ UN geopolitical region/global values.
 
 ```{r}
 ## read in the prepped FAO commodities data set 
-harvest_tonnes_usd <- read_csv(file.path(prep, "int/np_harvest_tonnes_usd.csv")) %>%
+harvest_tonnes_usd <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>%
   filter(rgn_id != 213)
 
 max_year = max(harvest_tonnes_usd$year)
@@ -203,7 +212,7 @@ harvest_tonnes_usd_values_gf <- harvest_tonnes_usd_geo_rgn %>%
                                ifelse(is.na(values) & georgn_values == "NaN", 1, 0))) ## now we have a dataset with gapfilled average values and calculated yearly values... now we will save this, and then calculate the 5 year averages
 
 ## save this data frame to int
-write.csv(harvest_tonnes_usd_values_gf, file.path(prep, "int/harvest_tonnes_usd_weighting_gf.csv"), row.names = FALSE)
+write.csv(harvest_tonnes_usd_values_gf, here(current_np_dir, "int", "harvest_tonnes_usd_weighting_gf.csv"), row.names = FALSE)
 
 ## now calculate 5 year averages and assign year = 2020
 weighting_usd_values_final <- harvest_tonnes_usd_values_gf %>%
@@ -213,7 +222,7 @@ weighting_usd_values_final <- harvest_tonnes_usd_values_gf %>%
   ungroup() 
 
 #save this df
-write.csv(weighting_usd_values_final, file.path(prep, "int/harvest_weighting_values.csv"), row.names = FALSE)
+write.csv(weighting_usd_values_final, here(current_np_dir, "int", "harvest_weighting_values.csv"), row.names = FALSE)
 
 ```
 
@@ -222,7 +231,7 @@ Now prep the tonnes data from each product to be per each region for the
 
 ```{r}
 ## Read in FOFM tonnes data
-fofm_tonnes <- read_csv(file.path(prep, "int/mean_catch_FOFM.csv")) %>%
+fofm_tonnes <- read_csv(here(current_np_dir, "int", "mean_catch_FOFM.csv")) %>%
   dplyr::filter(year %in% years) %>%
   mutate(product = "fish_oil") %>%
   group_by(rgn_id, year, product) %>%
@@ -238,7 +247,7 @@ fofm_tonnes <- read_csv(file.path(prep, "int/mean_catch_FOFM.csv")) %>%
 
 
 ## Read in ornamentals tonnes data
-np_tonnes <- read_csv(file.path(prep, "int/np_harvest_tonnes_usd.csv")) %>% 
+np_tonnes <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>% 
   filter(rgn_id != 213)
 
 orn_fill_df <- region_product %>%
@@ -258,7 +267,7 @@ orn_tonnes <- np_tonnes %>%
 sw_fill_df <- region_product %>%
   filter(product == "seaweeds")
 
-sw_tonnes <- read_csv(file.path(prep, "int/np_seaweeds_tonnes_weighting.csv")) %>%
+sw_tonnes <- read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weighting.csv")) %>%
   mutate(product = "seaweeds") %>%
   group_by(rgn_id, year, product) %>%
   summarise(tonnes = sum(tonnes, na.rm = TRUE)) %>%
@@ -281,7 +290,7 @@ assign year = 2022 so that this can be read into OHI-global (2022
 corresponds to the year that these weights were calculated).
 
 ```{r}
-harvest_weighting_values <- read_csv(file.path(prep, "int/harvest_weighting_values.csv")) %>%
+harvest_weighting_values <- read_csv(here(current_np_dir, "int", "harvest_weighting_values.csv")) %>%
   dplyr::select(rgn_id, product, value_per_tonne)
 
 prod_weights <- orn_tonnes %>%
@@ -299,15 +308,17 @@ prod_weights <- orn_tonnes %>%
   dplyr::select(rgn_id, year, product, weight) %>%
   filter(rgn_id != 213)
 
-write.csv(prod_weights, file.path(prep, "output/np_product_weights.csv"), row.names = FALSE)
+#write.csv(prod_weights, file.path(prep, "output/np_product_weights.csv"), row.names = FALSE)
+write_csv(prod_weights, here(current_np_dir, "output", "np_product_weights.csv"))
+
 ```
 
 ```{r}
 ##datacheck
 #old_prod_weights <- read_csv(file.path(prep, paste0("../v", prep_year-3, "/output/np_product_weights.csv")))
 #old_prod_weights <- read_csv(file.path(prep, paste0("../v", prep_year-2, "/output/np_product_weights.csv")))
-old_prod_weights <- read_csv(file.path(prep, paste0("../v", prep_year-1, "/output/np_product_weights.csv")))
-prod_weights <- read_csv(file.path(prep, "output/np_product_weights.csv"))
+old_prod_weights <- read_csv(here(previous_np_dir, "output", "np_product_weights.csv"))
+prod_weights <- read_csv(here(current_np_dir, "output", "np_product_weights.csv"))
 
 check <- prod_weights %>%
   rename("new_weight" = "weight") %>%
@@ -337,19 +348,20 @@ abline(0,1, col="red")
 test <- harvest_tonnes_usd %>%
   filter(rgn_id == 46)
 
-harvest_tonnes_usd_old <- read_csv(file.path(prep, paste0("../v", prep_year-1, "/int/np_harvest_tonnes_usd.csv"))) %>%
+harvest_tonnes_usd_old <- #read_csv(file.path(prep, paste0("../v", prep_year-1, "/int/np_harvest_tonnes_usd.csv"))) %>%
+  read_csv(here(previous_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>%
   filter(rgn_id != 213)
 
 test2 <- harvest_tonnes_usd_old %>%
   filter(rgn_id == 46)
 
 
-gf_orn <- read_csv(file.path(prep, "output/np_ornamentals_harvest_tonnes_gf.csv"))
+gf_orn <- read_csv(here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_gf.csv"))
 
 check_fofm <- check %>%
   filter(product == "fish_oil")
 
 plot(check_fofm$new_weight, check_fofm$weight)
-abline(0,1, col="red") ## these change because of new SAUP fisheries catch data... 
+abline(0, 1, col = "red") ## these change because of new SAUP fisheries catch data... 
 
 ```

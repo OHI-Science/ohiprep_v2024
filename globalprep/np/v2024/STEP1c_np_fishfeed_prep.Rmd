@@ -1,19 +1,18 @@
 ---
-title: "OHI 2022: Natural Products, Preparing catch and B/Bmsy data for forage fish species"
+title: 'OHI `r format(Sys.time(), "%Y")`: Natural Products, Preparing catch and B/Bmsy data for forage fish species'
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
     code_folding: show
     toc: true
-    toc_depth: 3
     toc_float: yes
     number_sections: false
     theme: cerulean
     highlight: haddock
     includes: 
       in_header: '../../../workflow/templates/ohi_hdr.html'
-pdf_document:
-  toc: true
+  pdf_document:
+    toc: true
 editor_options: 
   chunk_output_type: console
 ---
