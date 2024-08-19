@@ -177,9 +177,9 @@ unwto_match_iso3c <- unwto_clean %>%
   filter(!is.na(rgn_id))
 
 unwto_clean_names_bonaire <- name_2_rgn(df_in = unwto_clean %>% filter(country == "Bonaire"), # do this just for Bonaire since it is the only region not matching above
-                                fld_name = 'country',
-                                # flds_unique = c('year'),
-                                keep_fld_name = TRUE) %>%
+                                        fld_name = 'country',
+                                        # flds_unique = c('year'),
+                                        keep_fld_name = TRUE) %>%
   dplyr::select(rgn_id, year, arrivals_method, arrivals_gapfilled, tourism_arrivals_ct, total_arrivals) #### losing lots of regions here for some reason... most concernedly USA or anything with the word "united"
 
 
@@ -223,35 +223,39 @@ unwto_dom_trips_clean <- unwto_arrivals_dom_trips %>%
   select(country, metric, everything()) %>% # reorder things
   replace_with_na_all(condition = ~.x == "..") %>% # swap .. with NAs
   pivot_longer(cols = 3:ncol(.), names_to = "year",
-               values_to = "tourism_arrivals_ct") %>% # make the years not columns anymore
-  pivot_wider(names_from = metric, values_from = tourism_arrivals_ct) %>%
+               values_to = "tourism_arrivals_trips") %>% # make the years not columns anymore
+  pivot_wider(names_from = metric, values_from = tourism_arrivals_trips) %>%
   mutate(overnights = as.numeric(`Overnights visitors (tourists)`), 
          same_day = as.numeric(`Same-day visitors (excursionists)`), 
          total_trips = as.numeric(`Total trips`),
-         tourism_arrivals_ct = as.numeric(NA)) %>% # rename metrics so easier to work with, make numeric, and add a new column to fill with the new calculated values later
-  select(country, year, overnights, same_day, total_trips, tourism_arrivals_ct) %>% # select columns needed for analysis (cruise passengers seem to be included in same-day)
+         tourism_arrivals_trips = as.numeric(NA)) %>% # rename metrics so easier to work with, make numeric, and add a new column to fill with the new calculated values later
+  select(country, year, overnights, same_day, total_trips, tourism_arrivals_trips) %>% # select columns needed for analysis (cruise passengers seem to be included in same-day)
   group_by(country, year) %>% # group by county and year
   mutate(
-    tourism_arrivals_ct = case_when(
+    tourism_arrivals_trips = case_when(
       !is.na(overnights) ~ overnights, # if there is a value, dont gapfill
       is.na(overnights) & !is.na(same_day) & !is.na(total_trips) ~ total_trips - same_day, # gapfill, when there is no data on overnights, fill with total_trips - same day
-      TRUE ~ tourism_arrivals_ct # otherwise, NA
+      TRUE ~ tourism_arrivals_trips # otherwise, NA
     ), # there were 0 situations like this in v2024
     total_trips = case_when(
       !is.na(total_trips) ~ total_trips, 
       is.na(total_trips) & !is.na(same_day) & !is.na(overnights) ~ overnights + same_day,
       TRUE ~ total_trips
     )
-  ) %>% # v2024: overnights has 1036 NAs out of 6021
-  # v2024: same_day has 3131 NAs out of 6021
-  # v2024: total_trips has 2363 NAs
+  ) %>% # v2024: overnights has 5145 NAs out of 6021
+  # v2024: same_day has 5507 NAs out of 6021
+  # v2024: total_trips has 5294 NAs
+  # v2024: total_trips has 5145 NAs
   mutate(arrivals_method = ifelse(is.na(overnights) & !is.na(same_day) & !is.na(total_trips), "UNWTO - subtraction", NA)) %>%
   mutate(arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - subtraction", "gapfilled", NA)) %>% # prepare a "gapfilled" column to indicate "gapfilled" or NA
   ungroup() %>% # ungroup since not needed anymore
-  select(country, year, tourism_arrivals_ct, total_trips, arrivals_method, arrivals_gapfilled) %>% # select only needed columns
+  select(country, year, tourism_arrivals_trips, total_trips, arrivals_method, arrivals_gapfilled) %>% # select only needed columns
   mutate(country = str_to_title(country), # make countries look nice
-         tourism_arrivals_ct = round(as.numeric(tourism_arrivals_ct) * 1000),
-         total_trips = round(as.numeric(total_trips)*1000)) # since the units were in thousands
+         tourism_arrivals_trips = round(as.numeric(tourism_arrivals_trips) * 1000),
+         total_trips = round(as.numeric(total_trips) * 1000)) # since the units were in thousands
+
+kableExtra::kable(colSums(is.na(unwto_dom_trips_clean))) # to see how many NAs are present within the data
+# because we have so many NAs here, this can be used for gapfilling the accomodations data.
 ```
 
 
@@ -293,7 +297,18 @@ unwto_clean_dom <- unwto_arrivals_dom_acc %>%
   mutate(country = str_to_title(country), # make countries look nice
          tourism_arrivals_ct = round(as.numeric(tourism_arrivals_ct) * 1000)) # since the units were in thousands
 
-#
+# join with trips data to gapfill countries that do not have domestic overnight accomodations data
+join_dom_acc_trips <- left_join(unwto_clean_dom, unwto_dom_trips_clean, by = c("country", "year", "arrivals_method","arrivals_gapfilled")) %>% 
+  mutate(
+    tourism_arrivals_all = case_when(
+      !is.na(tourism_arrivals_ct) ~ tourism_arrivals_ct, # if there is a value, dont gapfill
+      is.na(tourism_arrivals_ct) & !is.na(tourism_arrivals_trips) ~ tourism_arrivals_trips, # gapfill, when there is no data on hotel overnights from the accommodations data, fill with trip overnights
+      is.na(tourism_arrivals_ct) & is.na(tourism_arrivals_trips) & !is.na(total_trips) ~ total_trips, # if the overnight data is not present for either, use total trips to gf
+      TRUE ~ tourism_arrivals_ct # otherwise, keep the accommodation overnight data
+    )) %>% 
+  mutate(gf_method = ifelse(is.na(tourism_arrivals_ct) & (!is.na(tourism_arrivals_trips) | !is.na(total_trips)), "UNWTO - trips", arrivals_method)) %>%
+  mutate(arrivals_gf = ifelse(gf_method == "UNWTO - trips", "gapfilled", arrivals_gapfilled)) %>% 
+  select(country, year, tourism_arrivals_all, gf_method, arrivals_gf) # 
 
 # Macquerie, Andaman and Nicobar, Azores, Madeira, Prince Edwards Islands, Oecussi Ambeno, Canary Islands 
 # all duplicated with their governing regions. Aside from the uninhabited ones, I think it actually 
