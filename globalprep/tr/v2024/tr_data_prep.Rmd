@@ -203,7 +203,9 @@ summary(unwto_dupe_fix)
 # v2023: 828 NAs in arrivals (before filtering the years down and gapfilling), 1708 in `total_arrivals`
 # v2024: 774 NAs in arrivals (before filtering the years down and gapfilling), 1660 in `total_arrivals`
 
-length(unique(unwto_dupe_fix$rgn_id)) # v2024: 179 regions present!
+check_international <- unwto_dupe_fix %>% 
+  filter(!is.na(tourism_arrivals_ct))
+length(unique(check_international$rgn_id)) # v2024: 167 regions present!
 ```
 
 
@@ -297,7 +299,7 @@ unwto_clean_dom <- unwto_arrivals_dom_acc %>%
   mutate(country = str_to_title(country), # make countries look nice
          tourism_arrivals_ct = round(as.numeric(tourism_arrivals_ct) * 1000)) # since the units were in thousands
 
-# join with trips data to gapfill countries that do not have domestic overnight accomodations data
+# ---- join with trips data to gapfill countries that do not have domestic overnight accomodations data ---
 join_dom_acc_trips <- left_join(unwto_clean_dom, unwto_dom_trips_clean, by = c("country", "year", "arrivals_method","arrivals_gapfilled")) %>% 
   mutate(
     tourism_arrivals_all = case_when(
@@ -308,47 +310,110 @@ join_dom_acc_trips <- left_join(unwto_clean_dom, unwto_dom_trips_clean, by = c("
     )) %>% 
   mutate(gf_method = ifelse(is.na(tourism_arrivals_ct) & (!is.na(tourism_arrivals_trips) | !is.na(total_trips)), "UNWTO - trips", arrivals_method)) %>%
   mutate(arrivals_gf = ifelse(gf_method == "UNWTO - trips", "gapfilled", arrivals_gapfilled)) %>% 
-  select(country, year, tourism_arrivals_all, gf_method, arrivals_gf) # 
+  select(country, year, tourism_arrivals_all, gf_method, arrivals_gf) 
 
-# Macquerie, Andaman and Nicobar, Azores, Madeira, Prince Edwards Islands, Oecussi Ambeno, Canary Islands 
-# all duplicated with their governing regions. Aside from the uninhabited ones, I think it actually 
-# makes sense to give them the same score as their vassal states, given that places like Azores and 
-# Canary Islands probably make up a decent chunk of Portugal and Spain tourism...
-# get UNWTO data to have OHI region names
-unwto_match_iso3c <- unwto_clean %>%
-  mutate(iso3c = countrycode::countrycode(sourcevar = country, origin = "country.name", destination = "iso3c")) %>%
-  left_join(rgns_eez, by = c("iso3c" = "eez_iso3")) %>%
-  dplyr::select(rgn_id, year, arrivals_method, arrivals_gapfilled, tourism_arrivals_ct, total_arrivals) %>% # so that the numbers of columns of arguments match for rbind
-  filter(!is.na(rgn_id))
-
-unwto_clean_names_bonaire <- name_2_rgn(df_in = unwto_clean %>% filter(country == "Bonaire"), # do this just for Bonaire since it is the only region not matching above
+# run name_2_rgn on the domestic data so it has OHI region ids
+unwto_clean_names_dom <- name_2_rgn(df_in = join_dom_acc_trips, 
                                         fld_name = 'country',
-                                        # flds_unique = c('year'),
                                         keep_fld_name = TRUE) %>%
-  dplyr::select(rgn_id, year, arrivals_method, arrivals_gapfilled, tourism_arrivals_ct, total_arrivals) #### losing lots of regions here for some reason... most concernedly USA or anything with the word "united"
+  dplyr::select(rgn_id, rgn_name, year, tourism_arrivals_all, gf_method, arrivals_gf) # lost many land locked regions, duplicates were also found so we need to look into that
 
+region_data() # to get rgns_eez
 
-unwto_clean_names <-  rbind(unwto_clean_names_bonaire, unwto_match_iso3c) %>% # rbind back together. I would've used the name_2_rgns fxn for everything, but it was excluding a lot of regions for some reason...
-  left_join(rgns_eez) %>%
-  dplyr::select(rgn_id, rgn_name, year, arrivals_method, arrivals_gapfilled, tourism_arrivals_ct, total_arrivals)
+# see whether there are regions that were not properly converted to ohi rgns
+setdiff(unwto_clean_names_dom$rgn_name, rgns_eez$rgn_name) # v2024: Kiribati, but it is OHI region 212 and is preserved in `unwto_clean_names_dom`
 
-dplyr::setdiff(unwto_clean_names$rgn_name, unwto_clean$country) # renamed, new casing, or islands that did not have values before
+# ---- determine if there were any duplicates due to name_2_rgn ----
 
-# fix duplicates if there are any
-unwto_dupe_fix <- unwto_clean_names %>%
-  group_by(rgn_id, year, arrivals_method, arrivals_gapfilled) %>%
-  summarize(sum_fix = ifelse(all(is.na(tourism_arrivals_ct)), NA, sum(tourism_arrivals_ct, na.rm = TRUE)),
-            sum_fix_2 = ifelse(all(is.na(total_arrivals)), NA, sum(total_arrivals, na.rm = TRUE))) %>%
-  mutate(arrivals_method = ifelse(is.na(arrivals_method) & !is.na(sum_fix), "UNWTO", arrivals_method)) %>%
-  rename(tourism_arrivals_ct = sum_fix,
-         total_arrivals = sum_fix_2)
+colSums(is.na(unwto_clean_names_dom)) # v2024: 2852 NAs in tourism_arrivals_all
+length(unwto_clean_names_dom$tourism_arrivals_all) # within 4833 observations for `tourism_arrivals_all`
 
-# check out things so far
-summary(unwto_dupe_fix) 
-# v2023: 828 NAs in arrivals (before filtering the years down and gapfilling), 1708 in `total_arrivals`
-# v2024: 774 NAs in arrivals (before filtering the years down and gapfilling), 1660 in `total_arrivals`
+# this shows rows that have at least one duplicate, including both the first and subsequent occurrences of each duplicated row. The approach of looking from the front and the back ensures that you capture all instances of duplicated data, not just the second and subsequent occurrences (which is what just a duplicated() call would give you).
+duplicates <- unwto_clean_names_dom %>%
+  group_by(rgn_id, year) %>% 
+  filter(n() > 1) %>%
+  ungroup()
+unique(duplicates$rgn_name)
+# v2024: 
+# [1] "China" # only one set of values, the duplicates are NA                                             
+# [2] "Guadeloupe and Martinique" # all NAs                         
+# [3] "Northern Mariana Islands and Guam"  # all NAs                
+# [4] "Montenegro" # values dont overlap, can aggregate                                        
+# [5] "Puerto Rico and Virgin Islands of the United States" # all NAs
 
-length(unique(unwto_dupe_fix$rgn_id)) # v2024: 179 regions present!
+# therefore, move forward by aggregating by region id and year
+## make a function to avoid losing NAs (they turn to 0s) when there are values to aggregate with
+sum_with_na <- function(x) {
+  if (all(is.na(x))) {
+    return(NA)
+  } else {
+    return(sum(x, na.rm = TRUE))
+  }
+}
+
+domestic_clean_names_agg <- unwto_clean_names_dom %>% 
+  group_by(rgn_id, rgn_name, year) %>% 
+  summarize(
+    tourism_arrivals_all = sum_with_na(tourism_arrivals_all), # put each column in the function, so no NAs are lost
+    gf_method = first(gf_method, na_rm = TRUE),
+    arrivals_gf = first(arrivals_gf, na_rm = TRUE),
+    .groups = "drop" # to ungroup, fixes warning from summarise to use reframe (when it is not applicable here)
+  )
+
+# double check to test
+duplicates_2 <- domestic_clean_names_agg %>%
+  group_by(rgn_id, year) %>% 
+  filter(n() > 1) %>%
+  ungroup()
+unique(duplicates_2$rgn_name) # v2024: 0! yay
+
+check_domestic <- domestic_clean_names_agg %>% 
+  filter(!is.na(tourism_arrivals_all))
+
+length(unique(check_domestic$rgn_id)) # v2024: 101 regions present
+```
+
+Let's use `setdiff()` and see which regions that have values overlap between the international and domestic data.  If it is a reasonable amount, I am considering aggregating international and domestic and then for regions that have one or the other, leaving it as such.
+
+```{r}
+domestic_rgns <- unique(check_domestic$rgn_id) # domestic OHI regions with data
+international_rgns <- unique(check_international$rgn_id) # international OHI regions with data
+
+# regions w values in domestic but not in international
+only_in_domestic <- setdiff(domestic_ids, international_ids) 
+# [1]  14  45  84 137 195 210
+
+# regions w values in international but not in domestic
+only_in_international <- setdiff(international_ids, domestic_ids)
+#  [1]   4   6   7   8   9  11  13  17
+#  [9]  19  26  28  32  37  39  46  47
+# [17]  48  49  51  55  57  58  64  65
+# [25]  78  90  96 103 108 110 111 113
+# [33] 114 115 116 117 118 119 120 121
+# [41] 122 123 124 125 129 130 133 147
+# [49] 148 151 152 153 154 155 157 166
+# [57] 167 168 169 190 193 194 198 204
+# [65] 208 212 220 237 244 245 247 250
+
+# regions that have values in both datasets
+in_both <- intersect(domestic_ids, international_ids)
+#  [1]   5  15  16  18  20  24  25  31
+#  [9]  40  41  42  43  50  52  53  54
+# [17]  56  59  61  62  66  67  68  69
+# [25]  70  71  72  73  74  75  76  77
+# [33]  79  80  81  82  98  99 100 101
+# [41] 102 106 112 126 127 131 132 134
+# [49] 135 136 138 139 143 162 163 164
+# [57] 171 172 173 174 175 176 177 178
+# [65] 179 180 181 182 183 184 185 186
+# [73] 187 188 189 191 196 197 199 200
+# [81] 202 203 205 206 207 209 214 215
+# [89] 216 218 222 223 224 231 232
+
+cat("Regions only in domestic data:", length(only_in_domestic), "\n")
+cat("Regions only in international data:", length(only_in_international), "\n")
+cat("Regions in both datasets:", length(in_both), "\n")
+cat("Total unique regions:", length(union(domestic_ids, international_ids)), "\n")
 ```
 
 
