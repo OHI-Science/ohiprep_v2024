@@ -657,12 +657,38 @@ coastal_pop_data_fill <- coastal_pop_data %>%
   mutate(year = 2021) %>%
   rbind(coastal_pop_data) # add 2021 data year, just using year 2020
 
+length(unique(coastal_pop_data_fill$rgn_id)) # v2024: 220 regions available! Any region without data is uninhabited.
+
 # bring in World Bank Global population data from `/home/shares/ohi/git-annex/globalprep/_raw_data/WorldBank/d2024/WorldBank_global_country_population_1960-2023`
 total_population_wb <- read_csv(here(raw_data_dir, "WorldBank", data_dir_version_year, "WorldBank_global_country_population_1960-2023","API_SP.POP.TOTL_DS2_en_csv_v2_1584446.csv"), skip = 3) %>% 
   pivot_longer(cols = 5:ncol(.), names_to = "year",
                values_to = "total_pop") %>% 
   janitor::clean_names()
 
+# give ohi rgns to world bank data
+total_population_rgns <- name_2_rgn(df_in = total_population_wb, 
+                                        fld_name = 'country_name',
+                                        keep_fld_name = TRUE)
+
+# drop Macao and Hong Kong, since we only need mainland China
+# Northern Mariana Islands and Guam, Puerto Rico and Virgin Islands of the United States: aggregate!
+total_population_final <- total_population_rgns %>%
+  filter(country_name != "Hong Kong SAR, China" & country_name != "Macao SAR, China") %>% # only keep mainland, not city specific data
+  group_by(rgn_id, rgn_name, year) %>% 
+  summarise(
+    total_pop = sum(total_pop, na.rm = TRUE), # aggregate by rgn and year
+    .groups = "drop" # ungroup
+  )
+
+length(unique(total_population_final$rgn_name)) # v2024: 166 regions available of total population data!
+
+# ============= join the tourism arrival, coastal population, and total population data =================== #
+arrivals_prop_df <- left_join(arrivals_aggregated, total_population_final, by = c("rgn_id","rgn_name","year")) %>% 
+  mutate(year = as.numeric(year)) %>% 
+  left_join(., coastal_pop_data_fill, by = c("rgn_id","year")) %>% 
+  filter(year %in% 2000:2021) %>% # to keep consistent with the coastal pop data
+  mutate(coastal_prop = (popsum/total_pop)) %>% # values that are greater than 1 are because of inconsistencies between World Bank and the coastal population data.  However, those with a value greater than 1 are mostly islands or small regions with a large coastal area.  In that case, we could say 100% of the tourism could be coastally related.
+  mutate(coastal_prop = ifelse(coastal_prop > 1, 1, coastal_prop)) # for rgns and years in which the total_population is greater than 1, we cap it at 1 
 
 ```
 
