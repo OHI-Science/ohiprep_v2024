@@ -5,6 +5,7 @@ output:
   html_document:
     toc: true
     number_sections: true
+    toc_float: yes
     theme: cerulean
     highlight: haddock
     includes: 
@@ -26,6 +27,8 @@ This analysis converts FAO mariculture data into one of the data layers used to 
 -   New year of FAO mariculture data (1950-2022).
 
 -   Updating script throughout to use tidyverse style, reproducible file paths, updated read and write functions
+
+-   Added more comments/documentation to explain certain steps
 
 ------------------------------------------------------------------------
 
@@ -635,11 +638,11 @@ np_new <- readr::read_csv(here(current_np_dir, "output", "np_seaweed_harvest_ton
 
 # Compare yield data for Saint Lucia
 np_old_sl <- np_old %>% 
-  dplyr::filter(rgn_id == 122, year == 2021) %>% 
+  dplyr::filter(rgn_id == 122, year == (as.integer(data_years[2]) - 1)) %>% 
   dplyr::select(rgn_id, taxa_code, tonnes)
 
 np_new_sl <- np_new %>% 
-  filter(rgn_id == 122, year == 2022) %>% 
+  filter(rgn_id == 122, year == as.integer(data_years[2])) %>% 
   select(rgn_id, taxa_code, tonnes)
 
 yield_sl <- np_old_sl %>% 
@@ -660,17 +663,17 @@ yield_sl <- np_old_sl %>%
 
 # Compare yield data for Vietnam - Vietnam score decreased
 np_old_vietnam <- np_old %>% 
-  filter(rgn_id == 206, year == 2020) %>% 
+  filter(rgn_id == 206, year == (as.integer(data_years[2]) - 1)) %>% 
   select(rgn_id, taxa_code, year, tonnes)
 
 np_new_vietnam <- np_new %>% 
-  filter(rgn_id == 206, year == 2021) %>% 
+  filter(rgn_id == 206, year == as.integer(data_years[2])) %>% 
   select(rgn_id, taxa_code, year, tonnes)
 
 yield_vietnam <- np_old_vietnam %>% 
   full_join(np_new_vietnam, by = c("rgn_id","taxa_code")); View(yield_vietnam) 
 
-
+# v2024: huge increase in Elkhorn seamoss: +129091.7 from 2021 to 2022 
 
 
 # ================= v2022 and v2023 code: =====================================
