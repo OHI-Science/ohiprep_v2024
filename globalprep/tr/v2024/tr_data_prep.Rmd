@@ -89,6 +89,7 @@ library(plotly)
 library(readxl)
 library(naniar)
 library(countrycode)
+library(pdftools)
 
 # ---- sources! ----
 source(here("workflow", "R", "common.R")) # file creates objects to process data
@@ -465,7 +466,7 @@ arrivals_aggregated <- left_join(international_clean_names_agg, domestic_clean_n
 ```
 
 
-# Ap: Proportion of tourist arrivals to area of coastline to population
+# Ap: Proportion of tourist arrivals, multiplied by coastal/total population, to area of coastline to population
 
 We use international arrivals data from the [United Nations World Tourism Organization (UNWTO)](https://www.unwto.org/). Up until the current assessment, we accessed data from the [World Travel & Tourism Council (WTTC)](http://www.wttc.org/), but this is no longer a viable option.
 
@@ -647,8 +648,10 @@ unwto_all_gf <- unwto_gapfill_lm_2019_tourism_all %>%
  # drop_na(total_arrivals) # keep these NAs, we will just give these regions a perfect score...
 ```
 
+Now, lets bring in our tourism data and calculate the coastal proportion! The coastal proportion will then be multiplied by the arrivals value per region and year. Finally, the coastal area will be 
 
 ```{r, eval=FALSE}
+# ------- coastal population data -----------
 # In 2024, the coastal population data was fixed! This is great.  We will now use `globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv`.
 coastal_pop_data <- read_csv(here("globalprep","mar_prs_population","v2024","output","mar_pop_25mi.csv")) ## read in coastal population data from other data layer
 
@@ -664,7 +667,11 @@ total_population_wb <- read_csv(here(raw_data_dir, "WorldBank", data_dir_version
   pivot_longer(cols = 5:ncol(.), names_to = "year",
                values_to = "total_pop") %>% 
   janitor::clean_names()
+```
 
+
+```{r, eval=FALSE}
+# ------- total global population data -----------
 # give ohi rgns to world bank data
 total_population_rgns <- name_2_rgn(df_in = total_population_wb, 
                                         fld_name = 'country_name',
@@ -681,50 +688,90 @@ total_population_final <- total_population_rgns %>%
   )
 
 length(unique(total_population_final$rgn_name)) # v2024: 166 regions available of total population data!
+```
 
+
+```{r, eval=FALSE}
+# ------- coastal area data -----------
+# read in area of coastline data
+inland_filepath <- here::here("globalprep", "lsp", version_year, "int", "area_protected_1km.csv")
+inland_data <- read_csv(inland_filepath)
+offshore_filepath <- here::here("globalprep", "lsp", version_year, "int", "area_protected_3nm.csv")
+offshore_data <- read_csv(offshore_filepath)
+
+# get combined value of inland and offshore for each ohi region
+inland_offshore <- inland_data %>%
+  left_join(offshore_data, by = join_by(rgn_id, year, rgn_name)) %>%
+  select(rgn_id, year, a_tot_km2.x, a_tot_km2.y) %>%
+  group_by(rgn_id, year) %>%
+  mutate(total_inland_offshore_area = a_tot_km2.x + a_tot_km2.y,
+         year = as.numeric(year)) %>%
+  select(rgn_id, year, total_inland_offshore_area)
+```
+
+
+```{r, eval=FALSE}
 # ============= join the tourism arrival, coastal population, and total population data =================== #
+
+options(scipen = 999) # to change options and avoid scientific notation
+
 arrivals_prop_df <- left_join(arrivals_aggregated, total_population_final, by = c("rgn_id","rgn_name","year")) %>% 
   mutate(year = as.numeric(year)) %>% 
   left_join(., coastal_pop_data_fill, by = c("rgn_id","year")) %>% 
+  left_join(., inland_offshore, by = c("rgn_id","year")) %>% 
   filter(year %in% 2000:2021) %>% # to keep consistent with the coastal pop data
   mutate(coastal_prop = (popsum/total_pop)) %>% # values that are greater than 1 are because of inconsistencies between World Bank and the coastal population data.  However, those with a value greater than 1 are mostly islands or small regions with a large coastal area.  In that case, we could say 100% of the tourism could be coastally related.
   mutate(coastal_prop = ifelse(coastal_prop > 1, 1, coastal_prop)) # for rgns and years in which the total_population is greater than 1, we cap it at 1 
 
+ap_final <- arrivals_prop_df %>% 
+  mutate(ap = (tourism_arrivals_ct * coastal_prop)/(total_inland_offshore_area)) # this final `Ap` (arrivals proportion) is in the units of (tourists/km2).  Aka, a higher proportion indicates that there is a larger number of tourists per km2 of coastal area, and there is therefore a higher tourism density.  This number is now ready to be divided by `Sr`, or the sustainability of tourism.
 ```
 
-### Divide tourist arrival count by total arrival count
-
--   In 2023, we considered rescaling by coastal area and/or coastal population, however, we decided to scrap this, as it was unduly harming scores for larger regions. We will just use the tourist arrival/total arrivals metric.
--   Because of some gapfilling and uncertainty in the data, some regions reported higher tourist arrivals than total arrivals. Due to this, we sometimes have ratios \>1. To deal with this, we just give those regions a ratio of 1.
--   Some regions reported only tourist arrivals, and no total arrivals. Because of this, we gapfilled any that didn't have total arrivals with the tourist arrivals. This isn't ideal, but was the best we could do.
-
-```{r, eval=FALSE}
-# divide the number of tourist arrivals by area of coastline and population to get the proportion
-tourism_props <- unwto_all_gf %>%
-    mutate(year = as.numeric(year)) %>%
- # left_join(offshore_data, by = c("rgn_id", "year")) %>%
-  left_join(coastal_pop_data_fill, by = c("rgn_id", "year")) %>%
-  # mutate(Ap = ((tourism_arrivals_ct/total_inland_offshore_area)/popsum)) %>%
-  mutate(total = ifelse(is.na(total), tourism_arrivals_ct, total)) %>%
-  mutate(Ap = tourism_arrivals_ct/total) %>%
-  filter(year >= 2008) %>% # filter to the years we are interested in for any data that isn't filtered yet
-  filter(popsum > 0) %>% # filter out no pop regions
-  left_join(rgns_eez) %>%
-  mutate(Ap = ifelse(Ap > 1, 1, Ap)) # if greater than 1 make 1
-
-# check out things so far
-summary(tourism_props) # should be 0 NAs for Ap if gapfilling worked
-hist(tourism_props$Ap)
-
+```{r}
+# interactive plot of the arrival proportions
+ap_plot <- ap_final %>%
+  plot_ly(x = ~year, y = ~ap, color = ~rgn_name, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "Global Arrival proportions (Ap) by Region",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Arrival proportion (Ap)"))
+ap_plot
 ```
 
-```{r, eval=FALSE}
 
-# make rescaled column the actual value column
-tourism_props_rescaled <- tourism_props %>%
-  dplyr::select(rgn_id, year, arrivals_method, arrivals_gapfilled, Ap)
-  
-```
+<!-- ### Divide tourist arrival count by total arrival count -->
+
+<!-- -   In 2023, we considered rescaling by coastal area and/or coastal population, however, we decided to scrap this, as it was unduly harming scores for larger regions. We will just use the tourist arrival/total arrivals metric. -->
+<!-- -   Because of some gapfilling and uncertainty in the data, some regions reported higher tourist arrivals than total arrivals. Due to this, we sometimes have ratios \>1. To deal with this, we just give those regions a ratio of 1. -->
+<!-- -   Some regions reported only tourist arrivals, and no total arrivals. Because of this, we gapfilled any that didn't have total arrivals with the tourist arrivals. This isn't ideal, but was the best we could do. -->
+
+<!-- ```{r, eval=FALSE} -->
+<!-- # divide the number of tourist arrivals by area of coastline and population to get the proportion -->
+<!-- tourism_props <- unwto_all_gf %>% -->
+<!--     mutate(year = as.numeric(year)) %>% -->
+<!--  # left_join(offshore_data, by = c("rgn_id", "year")) %>% -->
+<!--   left_join(coastal_pop_data_fill, by = c("rgn_id", "year")) %>% -->
+<!--   # mutate(Ap = ((tourism_arrivals_ct/total_inland_offshore_area)/popsum)) %>% -->
+<!--   mutate(total = ifelse(is.na(total), tourism_arrivals_ct, total)) %>% -->
+<!--   mutate(Ap = tourism_arrivals_ct/total) %>% -->
+<!--   filter(year >= 2008) %>% # filter to the years we are interested in for any data that isn't filtered yet -->
+<!--   filter(popsum > 0) %>% # filter out no pop regions -->
+<!--   left_join(rgns_eez) %>% -->
+<!--   mutate(Ap = ifelse(Ap > 1, 1, Ap)) # if greater than 1 make 1 -->
+
+<!-- # check out things so far -->
+<!-- summary(tourism_props) # should be 0 NAs for Ap if gapfilling worked -->
+<!-- hist(tourism_props$Ap) -->
+
+<!-- ``` -->
+
+<!-- ```{r, eval=FALSE} -->
+
+<!-- # make rescaled column the actual value column -->
+<!-- tourism_props_rescaled <- tourism_props %>% -->
+<!--   dplyr::select(rgn_id, year, arrivals_method, arrivals_gapfilled, Ap) -->
+
+<!-- ``` -->
 
 ### Removing low population / uninhabited regions
 
@@ -898,21 +945,27 @@ kable(countries_in_2021) %>%
 
 # Ts: Tourism sustainability
 
-These data are from the World Economic Forum's "Travel and Tourism Development Index" (<https://www.weforum.org/reports/travel-and-tourism-development-index-2021/downloads-510eb47e12>) See mazu: \_raw_data/WEF-Economics/ for more details and the raw data.
+These data are from the World Economic Forum's "Travel and Tourism Development Index" (<https://www.weforum.org/publications/travel-tourism-development-index-2024/>) Downloaded 08/20/2024.
 
-The TTDI was formerly the TTCI which was a similar index, but unfortunately not comparable. The TTDI only extends back to 2019.
+See mazu: \_raw_data/WEF-Economics/ for more details and the raw data.
+
+The TTDI was formerly the TTCI which was a similar index, but unfortunately not comparable. v2024's updated TTDI uses data up through 2023 to calculate their sustainability scores.
 
 These data are gapfilled using gdppcppp and UN georegion information (see next section for obtaining and preparing these data).
 
 ```{r WEF processing, eval=FALSE}
 # update to latest file name
-ttdi_file <- "WEF_TTDI_2021_data_for_download.xlsx"
+ttdi_file <- "WEF_Travel_and_Tourism_Development_Index_2024.pdf"
 
-ttdi_raw <- read_excel(paste0(dir_M, "/git-annex/globalprep/_raw_data/WEF-Economics/d", version_year, "/", ttdi_file),
-                 skip = 2) 
+ttdi_raw <- pdf_text(here::here(raw_data_dir, "WEF-Economics", data_dir_version_year, ttdi_file)) 
 
-# move up column names from first row while keeping the full country names as columns too
-names(ttdi_raw)[1:9] <- as.character(ttdi_raw[1, 1:9])
+sr_scores_table <- ttdi_raw[[11]] %>% # page number of the pdf
+  as.data.frame()
+
+sr_scores <- sr_scores_table %>% 
+  separate_rows('.', sep = "\n") %>% 
+  slice(14:55) %>% 
+  
 
 # filtering for sustainability scores, selecting needed columns, and pivoting to tidy format
 ttdi <- ttdi_raw %>%
