@@ -184,7 +184,7 @@ readr::write_csv(foragefish_list, here(current_np_dir, "int", "master_taxa_list_
 
 ```{r}
 # This was not updated in v2023 or 2024 so we call out to the v2022 year on Mazu
-file <- file.path(dir_M,'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv')
+file <- file.path(dir_M, 'git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv')
 
 # read in Sea Around Us catch data
 catch_raw <- readr::read_csv(file) 
