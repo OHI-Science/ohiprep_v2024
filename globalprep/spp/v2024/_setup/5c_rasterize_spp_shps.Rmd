@@ -142,8 +142,9 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
     filter(!(iucn_sid %in% bli_done_vec))
   
   shps <- maps_to_rasterize$shp_file %>% unique()
+  shps <- shps[3:8]
   for(i in seq_along(shps)) {
-    i <- 1
+    # i <- 1
     
     shp <- shps[i]
     
