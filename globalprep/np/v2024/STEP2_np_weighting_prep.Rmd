@@ -470,6 +470,7 @@ check_older_prep <- check_older %>%
   arrange(desc(abs(previous_diff)))
 
 
+# Create combined table with all differences
 combined_check <- check %>% 
   rename(weight_2023 = weight,
          weight_2024 = new_weight) %>% 
@@ -479,11 +480,41 @@ combined_check <- check %>%
   mutate(two_yr_diff = weight_2024 - weight_2022) %>% 
   relocate(c(previous_diff, two_yr_diff), .after = "diff")
   
-
-combined_check %>% arrange(desc(abs(diff)), desc(abs(previous_diff))) %>% 
+# Set and format diff table ----
+# sort
+diff_tbl_full <- combined_check %>% arrange(desc(abs(diff)), desc(abs(previous_diff))) %>% 
   head(n = 10)
+# style
+diff_tbl_styled <- diff_tbl_full %>% kableExtra::kbl() %>% 
+  kableExtra::kable_styling(bootstrap_options = "striped", 
+                            full_width = F,
+                            position = "left",
+                            fixed_thead = T
+                            ) %>% 
+  kableExtra::column_spec(4, color = "white",
+              background = kableExtra::spec_color(diff_tbl_full$diff[1:10], end = 0.7)) %>% 
+  kableExtra::column_spec(c(7, 8), bold = T, border_left = T, border_right = T) #%>% 
+  #kableExtra::column_spec(2, bold = T)
 
-combined_check %>% arrange(desc(abs(two_yr_diff))) %>% head(n = 10)
+
+# Set and format two yr diff table ----
+# sort
+two_yr_diff_tbl <- combined_check %>% arrange(desc(abs(two_yr_diff))) %>% head(n = 10)
+
+# style
+two_yr_diff_tbl_styled <- two_yr_diff_tbl %>% kableExtra::kbl() %>% 
+  kableExtra::kable_styling(bootstrap_options = "striped", 
+                            full_width = F,
+                            position = "left",
+                            fixed_thead = T
+                            ) %>% 
+  kableExtra::column_spec(6, color = "white",
+              background = kableExtra::spec_color(two_yr_diff_tbl$two_yr_diff[1:10], end = 0.7)) %>% 
+  kableExtra::column_spec(c(7, 9), border_left = T, border_right = T, bold = T)
+
+# view tables
+diff_tbl_styled
+two_yr_diff_tbl_styled
 ```
 
 When looking at the two-year-difference trends, the most notable differences appear to be in Belize `seaweeds` -- which went from a consistent two year streak of 0.00 to 0.98, indicating that `seaweeds` now make up 98% of Belize's Natural Products. Similarly, the `ornamentals` weight in Belize dropped from 85 in 2022 to 0 in 2023, and remains at 0 in 2024. Tonga's `ornamentals` category also saw a dramatic shift from two years of weights around 98, to 0 in 2024. The other notable change when considering the two year trends is in Tonga's `fish_oil` weight, which has increased from 0.016 in 2022 to 0.023 in 2023, to now a staggering 0.71. These variations are likely due to a range of impacts, including changes in consumer demand trends, fishery and aquaculture status, and the fact that the reference point is a moving 5-year average, rather than a fixed point. 
