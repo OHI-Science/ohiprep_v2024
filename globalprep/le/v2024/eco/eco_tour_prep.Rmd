@@ -31,7 +31,7 @@ editor_options:
 
 ### Tourism direct GDP as a proportion of total GDP 
 
-Tourism direct GDP as a proportion of total GDP (indicator 8.9.1): UNWTO Dept. of Statistics (UN Tourism)
+**Tourism direct GDP as a proportion of total GDP (indicator 8.9.1): UNWTO Dept. of Statistics (UN Tourism)**
 
 -   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG> 
 -   A big issue with this data set is that it does not have data for
@@ -39,7 +39,7 @@ mainland China. Thus, I was instructed to gapfill using another
 data source. I found tourism revenue data on the website for the
 National Bureau of Statistics for China
 
--   China Gapfilling -- °ºNational Data: National Bureau of Statistics of China (NBS) <https://data.stats.gov.cn/english/easyquery.htm?cn=C01>
+-   **China Gapfilling -- National Data: National Bureau of Statistics of China (NBS)** <https://data.stats.gov.cn/english/easyquery.htm?cn=C01>
 
 -   Made an account to download data:
 -   Email:
@@ -48,8 +48,8 @@ National Bureau of Statistics for China
 -   Security Question: who has influenced you the most?
 -   Answer: Melanie Frazier
 
--   Returned to home page, clicked “Annual”, clicked “Tourism” from options on the left, clicked “Year” dropdown menu and selected “LATEST20”, then clicked the download button and selected “csv”. File appeared as “Annual.csv”, which I then renamed to `eco_tour_china_all_metrics_2004-2023.csv` 
--   Added to new file in `_raw_data` on Mazu → NBS_China
+-   Return to home page, click “Annual”, click “Tourism” from options on the left, click “Year” dropdown menu and selected “LATEST20”, then clicked the download button and select “.csv”. File appears as “Annual.csv” -- rename this to `eco_tour_china_all_metrics_[start-year]-[end-year].csv`, e.g.,  `eco_tour_china_all_metrics_2004-2023.csv` 
+-   Add new file to `_raw_data/NBS_China` folder on Mazu
 
 -   For this tourism revenue data used for China, I wanted to discern whether or not these numbers included Macao and Hong Kong, as that can sometimes be the case (and would significantly impact my data processing methods). Thankfully, the website where I downloaded the data had information on this: 
 
@@ -92,6 +92,13 @@ Has sector-level data:
 - On Mazu in `home/shares/ohi/git-annex/globalprep/_raw_data/ENOW/d2024/ENOW_Industries/ENOW_Industries_2005_2021.csv`
 
 -   Downloaded from NOAA Office for Coastal Management; Digital Coast website: <https://coast.noaa.gov/digitalcoast/data/>.
+
+
+
+### Coastal population proportion
+
+
+
 
 ### Setup
 

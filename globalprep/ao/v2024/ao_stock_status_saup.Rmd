@@ -68,6 +68,9 @@ For v2023 and v2024 the Sea Around us Project (SAUP) data used in the ao_catch_p
 ```{r, eval = FALSE}
 library(tidyverse)
 library(here)
+library(htmlwidgets)
+library(patchwork)
+library(ggplot2)
 source(here("workflow", "R", "common.R"))
 ```
 
@@ -238,7 +241,7 @@ write_csv(gap_fill_data, here::here("globalprep","ao", version_year, "output","A
 score_data <- data_fis_gf %>%
   dplyr::select(rgn_id, stock_id, year, mean_catch, score) %>% 
   dplyr::group_by(rgn_id, year) %>%
-  dplyr::summarize(score = weighted.mean(score, mean_catch)) %>%
+  dplyr::summarize(score = weighted.mean(score, mean_catch)) %>% # use the mean_catch to get a weighted average of the scores
   dplyr::ungroup() 
 
 summary(score_data) # v2024: no NAs, yay!
@@ -285,13 +288,15 @@ compare <- new %>%
 library(plotly)
 library(ggplot2)
 
-compare_plot <- ggplot(data = compare) + geom_point(aes(x = old_score, y = score, text = rgn_id))  +
-  geom_abline(color = "red") + 
+compare_plot <- ggplot(data = compare) + geom_point(aes(x = old_score, y = score, text = rgn_id, alpha = 0.7))  +
+  geom_abline(color = "blue") + 
   labs(x = paste("score", previous_assessment_latest_data_year, previous_version_year),
        y = paste("score", previous_assessment_latest_data_year, version_year), title = paste(previous_assessment_latest_data_year, "data comparison")) +
   theme_minimal()
+compare_plotly <- ggplotly(compare_plot, tooltip = c("text", "score", "old_score"))
+compare_plotly
 
-ggplotly(compare_plot, tooltip = c("text", "score", "old_score"))
+htmlwidgets::saveWidget(compare_plotly, here::here("globalprep","ao", version_year, "figs","v2023_v2024_compare_plot.html"))
 ```
 
 ```{r}
@@ -309,5 +314,135 @@ diff_plot <- compare_diff %>%
          xaxis = list(title = "Region ID"),
          yaxis = list(title = "Percent change v2023 vs v2024"))
 diff_plot
+# saveWidget(diff_plot, here::here("globalprep","ao", version_year, "figs","ao_sust_percent_change.html"))
+
+# looking more into region 3, which had a large percent change in 2019
+compare_diff_rgn_3 <- new %>% 
+  left_join(old, by = c("year", "rgn_id")) %>%
+  filter(rgn_id %in% "3") %>% 
+  mutate(diff = ((score - old_score)/old_score)*100)
+
+# plot of region 3's percent change over time 
+rgn_3_plot <- compare_diff_rgn_3 %>%
+  plot_ly(x = ~year, y = ~diff, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "AO Sustainability Score Percent Change for Norfolk Island",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Percent change v2023 vs v2024"))
+rgn_3_plot
+# saveWidget(rgn_3_plot, here::here("globalprep","ao", version_year, "figs","rgn_3_percent_change.html"))
+
+# plot of region 3's v2024 ao_sust score over time
+rgn_3_scores_plot <- compare_diff_rgn_3 %>%
+  plot_ly(x = ~year, y = ~score, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "AO Sustainability Scores v2024 for Norfolk Island",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Scores over time v2024"))
+rgn_3_scores_plot
+
+# plot of region 3's v2023 ao_sust score over time
+rgn_3_oldscores_plot <- compare_diff_rgn_3 %>%
+  plot_ly(x = ~year, y = ~old_score, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "AO Sustainability Scores for Norfolk Island",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Scores over time v2023"))
+rgn_3_oldscores_plot
+
+# patched interactive plot of v2023 and v2024 ao_sust scores
+patch_rgn_3 <- subplot(rgn_3_scores_plot, rgn_3_oldscores_plot, nrows = 2, shareX = TRUE, titleX = TRUE, shareY = FALSE, titleY = TRUE)
+patch_rgn_3
+
+# saveWidget(patch_rgn_3, here::here("globalprep","ao", version_year, "figs","rgn_3_score_comparison.html"))
 ```
 
+```{r}
+region_data() # to have access to rgns_all and rgns_eez
+
+fis_bbmsy <- read_csv(here::here("globalprep","fis", version_year, "output","fis_bbmsy.csv")) # v2024
+
+test_rgn3 <- fis_bbmsy %>%
+  left_join(rgns_eez) %>% 
+  filter(rgn_id %in% "3")
+
+length(unique(test_rgn3$stock_id)) # 12
+length(test_rgn3$stock_id) # 228
+
+fis_bbmsy_prev <- read_csv(here::here("globalprep","fis", previous_version_year, "output","fis_bbmsy.csv")) # v2023
+
+test_rgn3_prev <- fis_bbmsy_prev %>%
+  left_join(rgns_eez) %>% 
+  filter(rgn_id %in% "3") %>% 
+  rename(old_bbmsy = bbmsy)
+
+length(unique(test_rgn3_prev$stock_id)) # 12
+length(test_rgn3_prev$stock_id) # 228
+
+
+# ======= catch =======
+catch_AO <- read_csv(here::here("globalprep","ao", version_year, "intermediate","mean_catch.csv"))
+
+catch_test_rgn3 <- catch_AO %>%
+  left_join(rgns_eez) %>% 
+  filter(rgn_id %in% "3")
+
+length(unique(catch_test_rgn3$stock_id_taxonkey)) # 8
+length(catch_test_rgn3$stock_id_taxonkey) # 152 observations
+
+catch_AO_prev <- read_csv(here::here("globalprep","ao", previous_version_year, "intermediate","mean_catch.csv")) # v2023
+
+catch_test_rgn3_prev <- catch_AO_prev %>%
+  left_join(rgns_eez) %>% 
+  filter(rgn_id %in% "3")
+
+length(unique(catch_test_rgn3_prev$stock_id_taxonkey)) # 8
+length(catch_test_rgn3_prev$stock_id_taxonkey) # 152
+
+# bbmsy
+compare_bbmsy <- test_rgn3 %>% 
+  left_join(test_rgn3_prev, by = c("year", "rgn_id", "stock_id")) %>% 
+  filter(year %in% 2019) %>%
+  mutate(diff = as.numeric(((bbmsy - old_bbmsy)/old_bbmsy)*100))
+
+ggplot(data = compare_bbmsy, aes(x = stock_id, y = diff)) +
+  geom_point(color = "darkblue",alpha = 0.7) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)
+  ) +
+  labs(
+    title = "Percent Change in B/Bmsy Estimates v2024 vs v2023",
+    x = "Stock ID",
+    y = "Percent change",
+    caption = "% change: ((new - old) / old) * 100"
+  ) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10))
+
+# it looks like Pagrus_auratus-81 has the greatest percent change, ~140%.  Kajikia_audax-81 has 50% change.
+
+# lets look and see if Pagrus_auratus-81 is in any other region.
+test_pag_aur <- fis_bbmsy %>%
+  left_join(rgns_eez) %>% 
+  filter(stock_id %in% "Pagrus_auratus-81")
+unique(test_pag_aur$rgn_id) 
+# [1]   3  16 162, however region 16 and 162 did not get very impacted by Pagrus_auratus-81: % change for 16 is ~0, % change for 162 is ~1.4
+
+# lets look and see if Kajikia_audax-91 is in any other region.
+test_kaj <- fis_bbmsy %>%
+  left_join(rgns_eez) %>% 
+  filter(stock_id %in% "Kajikia_audax-81")
+unique(test_kaj$rgn_id) 
+# [1]   3   5  16  18 146 147 153 155 162
+# of this, 162 has the highest other percent change, at ~1.4
+```
+
+v2024 data check notes: 
+
+> Looking further into Norfolk Island, it looks like the main change must have come from the changes in bbmsy score for multiple stocks found in the region due to v4.65 RAM data in v2024 vs v4.61 RAM data in v2023.
+
+> It looks like Pagrus_auratus-81 has the greatest percent change in 2019, ~140%. Kajikia_audax-81 has ~50% change between v2023 and v2024's B/Bmsy estimates.
+
+> What is weird is that Pagrus_auratus-81 was also present in regions 16 and 162, but those did not have a high % change from v2023 to v2024. My intuition is that Norfolk Island may have a greater mean catch of Pagrus_auratus (Australasian snapper), so it was weighted more than regions 16 (Australia) and 162 (New Zealand) when calculating the ao_sust score.
+
+> Since Norfolk Island is rather small, it is possible that biomass for the Pagrus_auratus-81 population was under-estimated, and newer data shows that the stock actually has more biomass than previously thought.  Therefore, the B/Bmsy is higher and the overall stock has more biomass than needed for maximum sustainable yield.

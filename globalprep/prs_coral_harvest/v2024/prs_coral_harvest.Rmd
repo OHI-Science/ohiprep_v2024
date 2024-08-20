@@ -236,11 +236,11 @@ for (f in files) {
 # [9] "Sudan"                 "Sudan (former)"        "Un. Sov. Soc. Rep."     - these are all fixed in the group by and summarise below  
   
   # v2024: removed yugoslavia sfr in both quantity and value
-  # ascension saint helena and tristan da cunha in quantity and value
+  # ascension saint helena and tristan da cunha in quantity and value -- updated in ohicore::split_regions()
   # 85,World,Europe,Northern Europe,Ascension
   # 86,World,Europe,Northern Europe,Saint Helena
   # 88,World,Europe,Northern Europe,Tristan da Cunha
-  # these do not appear in the previous year's data, and there is no coral data within this aggregation of groups. I will be updating ohicore::split_regions() to include the new case of this group so that it is properly addressed in the np goal's dataprep (the region does have some data for other commodity groups including fish_oil and ornamental fish)
+  # these do not appear in the previous year's data, and there is no coral data within this aggregation of groups. Updated ohicore::split_regions() to include the new case of this group so that it is properly addressed in the np goal's dataprep (the region does have some data for other commodity groups including fish_oil and ornamental fish)
   
   
   # v2024: had the same duplicates as v2023; all are fixed in the group by and summarize (aggregating groups by ohi rgn_id among other variables, which sums the "duplicates" above into appropriate rgn_id groups)
