@@ -52,7 +52,7 @@ dir_raw_data_anx <- file.path(dir_anx, '_raw_data')
 source(file.path(dir_setup, 'common_fxns.R'))
 
 dir_bli <- file.path(dir_M, 'git-annex/globalprep/_raw_data/birdlife_intl/d2021')
-dir_shp <- file.path(dir_M, 'git-annex/globalprep/_raw_data/iucn_spp/d2020-3')
+dir_shp <- file.path(dir_M, 'git-annex/globalprep/_raw_data/iucn_spp/d2024-1')
   ### in this folder are shapefiles at a taxonomic level, both from
   ### IUCN spatial data download (version 2020-3)
 
@@ -163,7 +163,7 @@ get_dbf <- function(x) { ###x <- shps_dbfs[1]
 shps_df <- lapply(iucn_dbfs, get_dbf) %>%
   setNames(iucn_dbfs) %>%
   bind_rows(.id = 'dbf_file') %>%
-  dplyr::select(dbf_file, iucn_sid, sciname, presence, subpop) %>%
+  dplyr::select(dbf_file, iucn_sid, sciname = sci_name, presence, subpop) %>%
   filter(iucn_sid %in% marine_spp$iucn_sid)
 
 ## now run on birdlife data here, and change column names to match
@@ -268,8 +268,9 @@ api_subpops$api_iucn_sid[!api_subpops$api_iucn_sid %in% subpops_match$api_iucn_s
 ###                                    loilo-Guimaras Subpopulation  
 ### * Doesn't look like there is a shape for this subpop... Sorry dude!
 
-### API subpop, not matched: 156206333  Delphinus delphis
-###                                    Gulf of Corinth subpopulation
+### API subpop, not matched: 156206333, 189865869  Delphinus delphis
+###                                    Gulf of Corinth subpopulation,
+###                                    Inner Mediterranean
 ### * It does look like there is a shape for this one... the medittarean sea.. but it seems like it is already accounted for in the matched subpops... so i think it is ok. 
 
 ### API subpop, not matched: 181208820 Tursiops truncatus
@@ -283,7 +284,7 @@ api_subpops$api_iucn_sid[!api_subpops$api_iucn_sid %in% subpops_match$api_iucn_s
 ### API subpop, not matched: 218582764 Dugong dugon 
 ###                                    Eastern Africa subpopulation
 ### It doesn't look like there is a shape for this subpop
-
+# 189865869
  shp_subpops[!shp_subpops$shp_subpop %in% subpops_match$shp_subpop, ]
 # all matched
  
@@ -340,7 +341,7 @@ map_files  <- c(iucn_dbfs, bli_dbfs)
 map_info_raw_iucn <- lapply(iucn_dbfs, get_dbf) %>%
   setNames(iucn_dbfs) %>%
   bind_rows(.id = 'dbf_file') %>%
-  dplyr::select(shp_iucn_sid = iucn_sid, sciname, presence, subpop, dbf_file)
+  dplyr::select(shp_iucn_sid = iucn_sid, sciname=sci_name, presence, subpop, dbf_file)
 
 ####### now map just the bli files
 ## now run on birdlife data here, and change column names to match
@@ -431,7 +432,7 @@ marine_spp_ids <- read_csv(file.path(dir_data,
 marine_map_info <- map_info_add_subpops %>%
   inner_join(marine_spp_ids, by = 'iucn_sid') %>%
   mutate(comp_assessed = iucn_sid %in% comp_spp$iucn_sid)
-
+  
 comp_assess_check <- marine_map_info %>%
   mutate(dbf_short = basename(dbf_file)) %>%
   group_by(dbf_short, comp_assessed) %>%
@@ -523,7 +524,8 @@ all_sum <- bind_rows(fish_sum, nonfish_sum, basic_sum) %>%
             subpops = sum(subpops)) %>%
   ungroup() %>%
   mutate(family = ifelse(family == 'NA', NA, family),
-         subpops = ifelse(subpops == 0, NA, subpops))
+         subpops = ifelse(subpops == 0, NA, subpops),
+         spp_gp = ifelse(spp_gp == "cone_snails", "conus", spp_gp))
 
 ## Check against last year to see if you have all of the same species. 
 ## 2024: We have the same species, but the setdiff is going to return a list of those that are not matching because the all_sum df has them grouped into "marinefish" as the spp_gp. So I went through and cross-referenced the class, order, and family to make sure that they were all present - they are present 
