@@ -171,7 +171,7 @@ harvest_tonnes_usd <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_us
 
 max_year <- max(harvest_tonnes_usd$year)
 min_year <- max_year - 4 
-years <- c(min_year:max_year)
+years <- c(min_year:max_year) # get 5 year range
 years_df <- data.frame(year = min_year:max_year) # so that we can get 5 year average
 
 # Load OHI region data
@@ -246,38 +246,40 @@ readr::write_csv(weighting_usd_values_final, here(current_np_dir, "int", "harves
 ```
 
 Now prep the tonnes data from each product to be per each region for the
-6 year average (2013-2018).
+6 year average (2013-2018). (<-- legacy note. As of v2024, this is a 5 year range (from 2018:2022), however there are data limitations from the Sea Around Us catch data, which only goes until 2019 (2001-2019). It was last downloaded in 2022, with an end data year of 2019, and hasn't been updated since. This impacts the Fish Oil/Fish Meal (FOFM) intermediate data product `mean_catch_FOFM.csv` used to create the `fofm_tonnes` object below.)
 
 ```{r}
 ## Read in FOFM tonnes data
 fofm_tonnes <- read_csv(here(current_np_dir, "int", "mean_catch_FOFM.csv")) %>%
-  dplyr::filter(year %in% years) %>%
+  dplyr::filter(year %in% years) %>% # v2024 range of 2001:2019 to 2018:2019
   mutate(product = "fish_oil") %>%
   group_by(rgn_id, year, product) %>%
-  summarise(tonnes = sum(catch)*0.3) %>% ## Note: multiply by 0.3 to account for water loss when converting fish to fish oil.. about 30% of fish are water and 70% are fish oil
+  summarise(tonnes = sum(catch) * 0.3) %>% ## Note: multiply by 0.3 to account for water loss when converting fish to fish oil.. about 30% of fish are water and 70% are fish oil
   ungroup() %>%
   group_by(rgn_id, product) %>%
-  summarise(tonnes = mean(tonnes)) %>% ##calculate 5 year mean of catch
+  summarise(tonnes = mean(tonnes)) %>% ##calculate 5 year mean of catch -- note: in v2024, there were only 2 years in the former year column: 2018 and 2019 -- could be due to data year cap of 2019 in SAUP (downloaded in 2022 with data up to year 2019, hasn't been updated since)
   ungroup() %>%
   full_join(rgns_eez) %>%
-  dplyr::select(1:3) %>%
+  dplyr::select(rgn_id, product, tonnes) %>%
   mutate(product = "fish_oil") %>%
   mutate(tonnes = ifelse(is.na(tonnes), 0, tonnes)) 
 
 
 ## Read in ornamentals tonnes data
 np_tonnes <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>% 
-  filter(rgn_id != 213)
+  filter(rgn_id != 213) # has year range of 1976:2022 in v2024
+# this object is equivalent to the harvest_tonnes_usd object created in the previous chunk
 
-orn_fill_df <- region_product %>%
+orn_fill_df <- region_product %>% # has years from 2018:2022 in v2024 (proper 5 year range)
   filter(product == "ornamentals")
   
 orn_tonnes <- np_tonnes %>%
-  dplyr::filter(year %in% years, product == "ornamentals") %>%
+  dplyr::filter(year %in% years, # filter to 5 year range defined in the beginning of the first methods chunk
+                product == "ornamentals") %>% 
   full_join(orn_fill_df, by = c("rgn_id", "year", "product")) %>% ## full join to fill in the rest of the regions with 0
   mutate(tonnes = ifelse(is.na(tonnes), 0, tonnes),
          usd = ifelse(is.na(usd), 0, usd)) %>% ## gapfill the NAs to be 0
-  select(rgn_id, year, product, tonnes) %>%
+  dplyr::select(rgn_id, year, product, tonnes) %>%
   group_by(rgn_id, product) %>%
   summarise(tonnes = mean(tonnes)) %>% ## calculate 5 year mean of catch
   ungroup()
@@ -290,9 +292,9 @@ sw_tonnes_raw <- read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weight
 
 sw_tonnes <- sw_tonnes_raw %>%
   mutate(product = "seaweeds") %>%
-  group_by(rgn_id, year, product) %>%
-  summarise(tonnes = sum(tonnes, na.rm = TRUE)) %>%
-  dplyr::filter(year %in% years) %>%
+  group_by(rgn_id, year, product) %>% # per region, year, and product,
+  summarise(tonnes = sum(tonnes, na.rm = TRUE)) %>% # sum across all species of seaweed
+  dplyr::filter(year %in% years) %>% # filter to 5 year range 
   full_join(sw_fill_df, by = c("rgn_id", "year", "product")) %>%
     mutate(tonnes = ifelse(is.na(tonnes), 0, tonnes)) %>% ## gapfill the NAs to be 0
   dplyr::select(rgn_id, year, product, tonnes) %>%
@@ -319,10 +321,11 @@ prod_weights <- orn_tonnes %>%
   bind_rows(fofm_tonnes) %>% 
   left_join(harvest_weighting_values, by = c("rgn_id", "product")) %>%
   arrange(rgn_id) %>%
-  mutate(usd_product = tonnes*value_per_tonne) %>%
+  mutate(usd_product = tonnes * value_per_tonne) %>%
   group_by(rgn_id) %>%
   mutate(total_usd = sum(usd_product)) %>%
   ungroup() %>%
+  # calculate weight: proportion that each product contributes to that region's NP
   mutate(weight = usd_product/total_usd) %>%
   dplyr::select(-3, -4, -5, -6) %>%
   mutate(year = scen_year_number) %>%
@@ -337,7 +340,7 @@ readr::write_csv(prod_weights, here(current_np_dir, "output", "np_product_weight
 
 ### Datacheck
 
-Note: we're not comparing data for a specific year, e.g., 2019, as we do in many data checks. The data processing that creates `np_product_weights.csv` fills the `year` column with the scenario year (e.g., 2024), which means that the previous year's `np_product_weights.csv` and the current year's weights cannot be compared by filtering to a specific year. 
+Note: we're not comparing data for a specific year, e.g., 2019, as we do in many data checks. The data processing that creates `np_product_weights.csv` fills the `year` column with the scenario year (e.g., 2024), which means that the previous year's `np_product_weights.csv` and the current year's weights cannot be compared by filtering to a specific year. Instead, we compare all weights for all regions and find the difference between this year's weights and last year's (called `diff`). We also plot the changes by having one year's weights as x-value and the other year's weights as y-values in a few scatterplots.
 
 
 ```{r fig.height=5, fig.width=8}
@@ -394,6 +397,9 @@ top_10_diffs %>% relocate(diff, .after = "rgn_id")
 
 # for Cook Islands and Marshall Islands, almost feels like values for `ornamentals` and `fish_oil` got flipped?
 
+test_belize <- harvest_tonnes_usd %>%
+  filter(rgn_id == 164)
+
 ## check saint martin, Niue, Bonaire, Sint Eustasius - should decrease in production
 ## check djibouti - should increase in production
 
@@ -419,10 +425,10 @@ test2 <- harvest_tonnes_usd_old %>%
 
 
 
-Old old check:
+Check more previous years:
 
 ```{r}
-# Read in previous and current years' np_product_weights to compare
+# Read in previous 2 years' np_product_weights to compare
 #old_prod_weights <- read_csv(file.path(prep, paste0("../v", prep_year-3, "/output/np_product_weights.csv")))
 #old_prod_weights <- read_csv(file.path(prep, paste0("../v", prep_year-2, "/output/np_product_weights.csv")))
 old_prod_weights <- read_csv(here(previous_np_dir, "output", "np_product_weights.csv"))
@@ -434,37 +440,111 @@ check_older <- older_prod_weights %>%
   mutate(diff = weight - older_weight) %>%
   left_join(rgns_eez)
 
-
 plot(check_older$weight, check_older$older_weight, main = "v2023 vs v2022"); abline(0,1, col="red")
 
 plot(check$new_weight, check$weight, main = "v2024 vs v2023"); abline(0,1, col="red")
 
+# show diff
+options(scipen = 999)
 
+top_10_older_diffs <- check_older %>% 
+  arrange(desc(abs(diff))) %>% 
+  relocate(diff, .after = product) %>% 
+  relocate(year.x, .before = older_weight) %>% 
+  head(n = 10)
+
+top_10_older_diffs
+
+top_10_diffs <- check %>% 
+  arrange(desc(abs(diff))) %>% 
+  head(n = 10) %>% 
+  relocate(diff, .after = "rgn_id")
+
+top_10_diffs 
+
+check_older_prep <- check_older %>% 
+  rename(previous_diff = diff,
+         weight_2023 = weight,
+         weight_2022 = older_weight) %>% 
+  select(rgn_id, rgn_name, product, previous_diff, weight_2023, weight_2022) %>% 
+  arrange(desc(abs(previous_diff)))
+
+
+# Create combined table with all differences
+combined_check <- check %>% 
+  rename(weight_2023 = weight,
+         weight_2024 = new_weight) %>% 
+  dplyr::select(rgn_id, rgn_name, product, diff, weight_2024, weight_2023) %>% 
+  left_join(check_older_prep, by = c("rgn_id", "rgn_name", "product", "weight_2023")) %>% 
+  relocate(diff, .after = "product") %>% 
+  mutate(two_yr_diff = weight_2024 - weight_2022) %>% 
+  relocate(c(previous_diff, two_yr_diff), .after = "diff")
+  
+# Set and format diff table ----
+# sort
+diff_tbl_full <- combined_check %>% arrange(desc(abs(diff)), desc(abs(previous_diff))) %>% 
+  head(n = 10)
+# style
+diff_tbl_styled <- diff_tbl_full %>% kableExtra::kbl() %>% 
+  kableExtra::kable_styling(bootstrap_options = "striped", 
+                            full_width = F,
+                            position = "left",
+                            fixed_thead = T
+                            ) %>% 
+  kableExtra::column_spec(4, color = "white",
+              background = kableExtra::spec_color(diff_tbl_full$diff[1:10], end = 0.7)) %>% 
+  kableExtra::column_spec(c(7, 8), bold = T, border_left = T, border_right = T) #%>% 
+  #kableExtra::column_spec(2, bold = T)
+
+
+# Set and format two yr diff table ----
+# sort
+two_yr_diff_tbl <- combined_check %>% arrange(desc(abs(two_yr_diff))) %>% head(n = 10)
+
+# style
+two_yr_diff_tbl_styled <- two_yr_diff_tbl %>% kableExtra::kbl() %>% 
+  kableExtra::kable_styling(bootstrap_options = "striped", 
+                            full_width = F,
+                            position = "left",
+                            fixed_thead = T
+                            ) %>% 
+  kableExtra::column_spec(6, color = "white",
+              background = kableExtra::spec_color(two_yr_diff_tbl$two_yr_diff[1:10], end = 0.7)) %>% 
+  kableExtra::column_spec(c(7, 9), border_left = T, border_right = T, bold = T)
+
+# view tables
+diff_tbl_styled
+two_yr_diff_tbl_styled
 ```
 
+When looking at the two-year-difference trends, the most notable differences appear to be in Belize `seaweeds` -- which went from a consistent two year streak of 0.00 to 0.98, indicating that `seaweeds` now make up 98% of Belize's Natural Products. Similarly, the `ornamentals` weight in Belize dropped from 85 in 2022 to 0 in 2023, and remains at 0 in 2024. Tonga's `ornamentals` category also saw a dramatic shift from two years of weights around 98, to 0 in 2024. The other notable change when considering the two year trends is in Tonga's `fish_oil` weight, which has increased from 0.016 in 2022 to 0.023 in 2023, to now a staggering 0.71. These variations are likely due to a range of impacts, including changes in consumer demand trends, fishery and aquaculture status, and the fact that the reference point is a moving 5-year average, rather than a fixed point. 
 
+
+`plotly` version of old/standard base plots:
 
 ```{r}
 library(plotly)
-library(RColorBrewer)
 
-
-test_comp <- check_older %>% plotly::plot_ly(x = ~older_weight, y = ~weight,
-                                             type = "scatter", mode = "markers") %>% 
+test_comp <- check_older %>% 
+  plotly::plot_ly(type = "scatter", mode = "markers") %>% 
+  # add points
   add_trace(
-    # text = ~paste("Region ID:", rgn_id #, "<br>Product:", product
-    #               ),
-   color = ~rgn_id,
-   # marker = list(
-   #    color = ~product,
-   #  ),
-   hoverinfo = "text+x+y",
-   hovertemplate = paste(
-     '<b>Region ID</b>: %{color}',
-     '<br><b>Old Weight</b>: %{x:.2f}',
-     '<br><b>New Weight</b>: %{y:.2f}<br>'
+    x = ~older_weight, y = ~weight,
+    text = ~paste("<b>Region ID</b>:", rgn_id), #, "<br><b>Product</b>:", product),
+    marker = list(
+      color = 'rgba(0,0,0,0.2)', # adds opacity as fourth argument
+      line = list(
+        color = 'rgba(0,0,0,1)',
+        width = 1.5)
     ),
-    #  showlegend = F
+    hovertemplate = paste(
+      '%{text}',
+      # '<b>Product</b>: %{color}',
+      '<br><b>Old Weight</b>: %{x:.2f}',
+      '<br><b>New Weight</b>: %{y:.2f}<br>'
+    ),
+    showlegend = FALSE,
+    hoverinfo = "none"
   ) %>% 
   # add AB line
   add_trace(
@@ -477,7 +557,8 @@ test_comp <- check_older %>% plotly::plot_ly(x = ~older_weight, y = ~weight,
   ) %>%
   
   layout(xaxis = list(hoverformat = '.3f'),
-         yaxis = list(hoverformat = '.3f'))
+         yaxis = list(hoverformat = '.3f')) #%>% 
+# style(hoverinfo = "none")
 
 test_comp
 ```
@@ -502,6 +583,11 @@ library(here)
 scen_year_number <- 2024 # update this!!
 scenario_year <- as.character(scen_year_number)
 v_scen_year <- paste0("v", scenario_year)
+
+prev_year_number <- scen_year_number - 1
+prev_2_year_num <- scen_year_number - 2
+v_prev_year <- paste0("v", prev_year_number)
+v_prev_2_year <- paste0("v", prev_2_year_num)
 
 current_np_dir <- here::here("globalprep", "np", v_scen_year)
 previous_np_dir <- here::here("globalprep", "np", paste0("v", scen_year_number - 1))
@@ -533,16 +619,18 @@ check_older <- older_prod_weights %>%
 
 # ---- Create ggplot object with `text` aes argument to prep for plotly ----- #
 g_new <- ggplot(check, aes(x = weight, y = new_weight, color = product,
-                             text = paste("<b>Region ID:</b>", rgn_id, "<br><b>Product:</b>", product #,
-                                          #"<br>Old weight:", older_weight, "<br>New weight:", weight
+                             text = paste("<b>Region ID:</b>", rgn_id,
+                                          "<br><b>Product:</b>", product #,
+                                          #"<br>Old weight:", older_weight,
+                                          # "<br>New weight:", weight
                                           ))) +
   geom_point(alpha = 0.8) +
   geom_abline(intercept = 0, slope = 1, alpha = 0.7,
-              color = "red", linetype = "dashed") +
+              color = "red", linetype = "solid") +
   scale_color_manual(values = c("fish_oil" = "#edae49", "seaweeds" = "#386641", "ornamentals" = "#83c5be")) +
-  labs(title = "v2024 vs v2023 Natural Product Weights by Product",
-       x = "v2023 Weight",
-       y = "v2024 Weight",
+  labs(title = paste(v_scen_year, "vs", v_prev_year, "Natural Product Weights by Product"),
+       x = paste(v_prev_year, "Weights"),
+       y = paste(v_scen_year, "Weights"),
        color = "Product") +
   theme_minimal()
 
@@ -570,7 +658,6 @@ p_new$x$data <- lapply(p_new$x$data, function(trace) {
 p_new
 
 
-
 # ========= Plot old vs. older NP weights data ================================
 # Plot previous year's NP weights data vs. year before previous year's data 
 
@@ -591,9 +678,9 @@ g_old <- ggplot(check_older, aes(
   # customize colors
   scale_color_manual(values = c("fish_oil" = "#edae49", "seaweeds" = "#386641", "ornamentals" = "#83c5be")) +
   # update labels
-  labs(title = "v2023 vs v2022 Natural Products Weights by Product",
-       x = "v2022 Weights",
-       y = "v2023 Weights",
+  labs(title = paste(v_prev_year, "vs", v_prev_2_year, "Natural Products Weights by Product"),
+       x = paste(v_prev_2_year, "Weights"),
+       y = paste(v_prev_year, "Weights"),
        color = "Product") +
   # set base theme
   theme_minimal()
