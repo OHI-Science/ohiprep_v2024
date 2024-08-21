@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 3
     toc_float: yes
-    number_sections: true
+    number_sections: false
     theme: cerulean
     highlight: haddock
     includes: 
@@ -27,37 +27,37 @@ editor_options:
 
 ## Overview
 
-    -   Tourism GDP \% 
+-   Tourism GDP \% 
     
-        -   preliminary cleaning and tidying\
-        -   filter, run `ohicore::name_2_rgn()` and make appropriate updates and subsets\
-        -   investigate data gaps\
-        -   gapfill\
-        -   exploratory plotting\
+    -   preliminary cleaning and tidying
+    -   filter, run `ohicore::name_2_rgn()` and make appropriate updates and subsets
+    -   investigate data gaps
+    -   gapfill
+    -   exploratory plotting
         
-    -   WorldBank GDP (constant 2015 US$)
+-   WorldBank GDP (constant 2015 US$)
       
-        -   clean and tidy data\
-        -   make subsets as needed\
-        -   calculate tourism value for subsets
+    -   clean and tidy data
+    -   make subsets as needed
+    -   calculate tourism value for subsets
         
-    -   NBS China Data 
+-   NBS China Data 
       
-        -   clean and tidy data\
-        -   adjust and standardize value\
+    -   clean and tidy data
+    -   adjust and standardize value
         
-    -   Coastal Tourism
+-   Coastal Population
     
-        -   clean and tidy data\
-        -   calculate coastal proportion multiplier\
+    -   clean and tidy data
+    -   calculate coastal proportion multiplier
         
-    -   USA Coastal Tourism
+-   USA Coastal Tourism
     
-        -   clean and tidy data\
-        -   subtract Great Lakes values from total values\
-        -   calculate USA true coastal tourism value, adjust to standardized 2015 US$ for joining
+    -   clean and tidy data
+    -   subtract Great Lakes values from total values
+    -   calculate USA true coastal tourism value, adjust to standardized 2015 US$ for joining
         
-    -   Combine various subsets as appropriate, get full coastal tourism dataset, standardize for exporting to `int` folder. 
+-   Combine various subsets as appropriate, get full coastal tourism dataset, standardize for exporting to `int` folder. 
 
         
         
@@ -297,7 +297,7 @@ librarian::shelf(
 # ---- Source common.R ----
 source(here::here("workflow", "R", "common.R"))
 
-# ---- Set scenario year and file paths, directories ----
+# ---- Set scenario year, reproducible file paths ----
 current_year <- 2024 # Update this!!
 
 version_year <- paste0("v",current_year)
