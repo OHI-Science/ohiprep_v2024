@@ -5,13 +5,13 @@ output:
   html_document:
     code_folding: show
     toc: true
-    toc_depth: 1
+    toc_depth: 3
     toc_float: yes
-    number_sections: true
+    number_sections: false
     theme: cerulean
     highlight: haddock
     includes: 
-      in_header: '../../../workflow/templates/ohi_hdr.html'
+      in_header: '../../../../workflow/templates/ohi_hdr.html'
 pdf_document:
   toc: true
 editor_options: 
@@ -28,7 +28,7 @@ editor_options:
 
   * Labor Force data from World Bank (downloaded June 28, 2024)
 
-      - https://data.worldbank.org/indicator/SL.TLF.TOTL.IN
+      - <https://data.worldbank.org/indicator/SL.TLF.TOTL.IN>
       
   * Jobs data from UN Tourism / UNWTO (downloaded June 26th, 2024)
   
@@ -37,13 +37,18 @@ editor_options:
       
   * Quality/Wage data from ILOSTAT (downloaded July 2, 2024) -- for tour/cf wage data
   
-      - https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A 
+      - <https://rshiny.ilo.org/dataexplorer46/?lang=en&id=EAR_4MTH_SEX_ECO_CUR_NB_A> 
 
+## Methods
 
 ### Setup
 
 ```{r}
-# load packages
+
+knitr::opts_chunk$set(eval = FALSE)
+
+# ---- Load packages ----
+
 if (!require(librarian)){
   install.packages("librarian")
   library(librarian)
@@ -67,10 +72,10 @@ librarian::shelf(
 library(threadr)
 
 
-# source 
+# ---- Source common.R ----
 source(here("workflow", "R", "common.R"))
 
-# set year and file path info
+# ---- Set scenario year, reproducible file paths ----
 current_year <- 2024 # Update this!!
 
 version_year <- paste0("v",current_year)
