@@ -9,7 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Tue Aug 13 22:55:41 2024 by ramji" />
+<meta name="author" content="Compiled on Wed Aug 21 19:25:03 2024 by ramji" />
 
 
 <title>OHI 2024: Coral Harvest Pressure</title>
@@ -1646,7 +1646,7 @@ border-radius: 0px;
 
 
 <h1 class="title toc-ignore">OHI 2024: Coral Harvest Pressure</h1>
-<h4 class="author"><em>Compiled on Tue Aug 13 22:55:41 2024 by
+<h4 class="author"><em>Compiled on Wed Aug 21 19:25:03 2024 by
 ramji</em></h4>
 
 </div>
@@ -1882,11 +1882,11 @@ data.</p>
 <span id="cb4-100"><a href="#cb4-100" tabindex="-1"></a><span class="co"># [9] &quot;Sudan&quot;                 &quot;Sudan (former)&quot;        &quot;Un. Sov. Soc. Rep.&quot;     - these are all fixed in the group by and summarise below  </span></span>
 <span id="cb4-101"><a href="#cb4-101" tabindex="-1"></a>  </span>
 <span id="cb4-102"><a href="#cb4-102" tabindex="-1"></a>  <span class="co"># v2024: removed yugoslavia sfr in both quantity and value</span></span>
-<span id="cb4-103"><a href="#cb4-103" tabindex="-1"></a>  <span class="co"># ascension saint helena and tristan da cunha in quantity and value</span></span>
+<span id="cb4-103"><a href="#cb4-103" tabindex="-1"></a>  <span class="co"># ascension saint helena and tristan da cunha in quantity and value -- updated in ohicore::split_regions()</span></span>
 <span id="cb4-104"><a href="#cb4-104" tabindex="-1"></a>  <span class="co"># 85,World,Europe,Northern Europe,Ascension</span></span>
 <span id="cb4-105"><a href="#cb4-105" tabindex="-1"></a>  <span class="co"># 86,World,Europe,Northern Europe,Saint Helena</span></span>
 <span id="cb4-106"><a href="#cb4-106" tabindex="-1"></a>  <span class="co"># 88,World,Europe,Northern Europe,Tristan da Cunha</span></span>
-<span id="cb4-107"><a href="#cb4-107" tabindex="-1"></a>  <span class="co"># these do not appear in the previous year&#39;s data, and there is no coral data within this aggregation of groups. I will be updating ohicore::split_regions() to include the new case of this group so that it is properly addressed in the np goal&#39;s dataprep (the region does have some data for other commodity groups including fish_oil and ornamental fish)</span></span>
+<span id="cb4-107"><a href="#cb4-107" tabindex="-1"></a>  <span class="co"># these do not appear in the previous year&#39;s data, and there is no coral data within this aggregation of groups. Updated ohicore::split_regions() to include the new case of this group so that it is properly addressed in the np goal&#39;s dataprep (the region does have some data for other commodity groups including fish_oil and ornamental fish)</span></span>
 <span id="cb4-108"><a href="#cb4-108" tabindex="-1"></a>  </span>
 <span id="cb4-109"><a href="#cb4-109" tabindex="-1"></a>  </span>
 <span id="cb4-110"><a href="#cb4-110" tabindex="-1"></a>  <span class="co"># v2024: had the same duplicates as v2023; all are fixed in the group by and summarize (aggregating groups by ohi rgn_id among other variables, which sums the &quot;duplicates&quot; above into appropriate rgn_id groups)</span></span>
