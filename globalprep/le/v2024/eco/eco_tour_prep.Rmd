@@ -27,6 +27,40 @@ editor_options:
 
 ## Overview
 
+    -   Tourism GDP \% 
+    
+        -   preliminary cleaning and tidying\
+        -   filter, run `ohicore::name_2_rgn()` and make appropriate updates and subsets\
+        -   investigate data gaps\
+        -   gapfill\
+        -   exploratory plotting\
+        
+    -   WorldBank GDP (constant 2015 US$)
+      
+        -   clean and tidy data\
+        -   make subsets as needed\
+        -   calculate tourism value for subsets
+        
+    -   NBS China Data 
+      
+        -   clean and tidy data\
+        -   adjust and standardize value\
+        
+    -   Coastal Tourism
+    
+        -   clean and tidy data\
+        -   calculate coastal proportion multiplier\
+        
+    -   USA Coastal Tourism
+    
+        -   clean and tidy data\
+        -   subtract Great Lakes values from total values\
+        -   calculate USA true coastal tourism value, adjust to standardized 2015 US$ for joining
+        
+    -   Combine various subsets as appropriate, get full coastal tourism dataset, standardize for exporting to `int` folder. 
+
+        
+        
 
 
 ## UNWTO: Tourism direct GDP as a proportion of total GDP 
@@ -221,11 +255,15 @@ Portal metadata:  <https://sedac.ciesin.columbia.edu/data/set/nagdc-population-l
 -   This data is not updated. Future years should consider using an updated version of PLACE, such as v4. 
 
 
+## Methods 
 
 ### Setup
 
 ```{r}
-# load packages
+knitr::opts_chunk$set(eval = FALSE)
+
+# ---- Load packages ----
+
 if (!require(librarian)){
   install.packages("librarian")
   library(librarian)
@@ -256,10 +294,10 @@ librarian::shelf(
 #library(threadr)
 
 
-# source 
+# ---- Source common.R ----
 source(here::here("workflow", "R", "common.R"))
 
-# set year and file path info
+# ---- Set scenario year and file paths, directories ----
 current_year <- 2024 # Update this!!
 
 version_year <- paste0("v",current_year)
