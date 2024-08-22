@@ -9,7 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Tue Aug 13 22:58:35 2024 by ramji" />
+<meta name="author" content="Compiled on Thu Aug 22 15:24:20 2024 by ramji" />
 
 
 <title>OHI 2024: Mariculture</title>
@@ -1646,7 +1646,7 @@ border-radius: 0px;
 
 
 <h1 class="title toc-ignore">OHI 2024: Mariculture</h1>
-<h4 class="author"><em>Compiled on Tue Aug 13 22:58:35 2024 by
+<h4 class="author"><em>Compiled on Thu Aug 22 15:24:20 2024 by
 ramji</em></h4>
 
 </div>
@@ -1902,6 +1902,22 @@ whether to exclude or not for seaweed species as proportions. For
 example, if a seaweed species is 80% used for non-human consumption, we
 would exclude 80% of the harvest (exclude = 0.8). However, for fish
 species, we only classify as 0 or 1.</p>
+<p>Some helpful resources for researching new species:</p>
+<p>FAO SPECIES IDENTIFICATION GUIDE FOR FISHERY PURPOSES – THE LIVING
+MARINE RESOURCES OF THE WESTERN CENTRAL PACIFIC;</p>
+<ul>
+<li><p><a href="https://decapoda.nhm.org/pdfs/27678/27678.pdf">Volume 2.
+Cephalopods, crustaceans, holothurians and sharks</a></p></li>
+<li><p><a href="https://openknowledge.fao.org/server/api/core/bitstreams/83754bd7-e58a-4fbe-914a-5c12f112e957/content">Volume
+3. Batoid fishes, chimaeras and Bony fishes part 1 (Elopidae to
+Linophrynidae)</a></p></li>
+<li><p><a href="https://www.fao.org/4/x2400e/x2400e00.htm">Volume 4.
+Bony fishes part 2 (Mugilidae to Carangidae)</a></p></li>
+<li><p><a href="https://www.fao.org/4/y0770e/y0770e00.htm">Volume 5.
+Bony fishes part 3 (Menidae to Pomacentridae)</a></p></li>
+</ul>
+<p><a href="https://www.sealifebase.se/search.php">SeaLifeBase search
+tool</a></p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="do">## Commented out &#39;read.csv&#39; lines are different versions of the dataset, representing the three different seaweed exclusion methods (exclude some seaweed, all seaweed, all seaweed nei (nei = not elsewhere identified)). Use at the end for data checking. The first one is the one which is saved to the &quot;output&quot; folder, and the main analysis to run. </span></span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="co"># Read in species list</span></span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>mar_sp <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(here<span class="sc">::</span><span class="fu">here</span>(current_mar_dir, <span class="st">&quot;raw&quot;</span>, <span class="st">&quot;species_list.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
