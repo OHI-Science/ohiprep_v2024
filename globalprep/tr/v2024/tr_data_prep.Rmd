@@ -90,6 +90,7 @@ library(readxl)
 library(naniar)
 library(countrycode)
 library(pdftools)
+library(tictoc)
 
 # ---- sources! ----
 source(here("workflow", "R", "common.R")) # file creates objects to process data
@@ -595,7 +596,7 @@ lm_coef_data_tourism_dom <- domestic_clean_names_agg %>%
   group_by(rgn_id) %>%
   filter(!is.na(tourism_arrivals_all)) %>%
   filter(!rgn_id %in% c("136","205")) %>% # Guatemala and Myanmar only have one value, will need to be dropped!!
-  summarize(lm_coef_tourism = lm(tourism_arrivals_all ~ year)$coefficients[2])
+  summarize(lm_coef_tourism = lm(tourism_arrivals_all ~ year)$coefficients[2]) # pull out the coeffiecient
 
 # Initialize a flag to check if there are still NAs
 na_flag <- TRUE
@@ -614,6 +615,7 @@ unwto_gapfill_lm_2019_tourism_dom <- unwto_upfill_dom %>%
 
 
 ## now lets fill in any values down with the linear model average increase per year for tourists
+tic()
 while(na_flag) {
   
   unwto_gapfill_lm_2019_tourism_dom <- unwto_gapfill_lm_2019_tourism_dom %>%
@@ -621,7 +623,7 @@ while(na_flag) {
     arrange(year) %>%
     mutate(
       tourism_arrivals_all = case_when(
-        is.na(tourism_arrivals_all) & !is.na(lag(tourism_arrivals_all)) ~ lag(tourism_arrivals_all) + lm_coef_tourism, # if there is a previous value, but now current value, gapfill using the lag plut the lm_coef_tourism
+        is.na(tourism_arrivals_all) & !is.na(dplyr::lag(tourism_arrivals_all)) ~ dplyr::lag(tourism_arrivals_all) + lm_coef_tourism, # if there is a previous value, but now current value, gapfill using the lag plus the lm_coef_tourism
         TRUE ~ tourism_arrivals_all
       )
     ) %>%
@@ -632,6 +634,7 @@ while(na_flag) {
   # Check if there are still NAs left in either column
   na_flag <- any(is.na(unwto_gapfill_lm_2019_tourism_dom$tourism_arrivals_all))
 } ######stopped here
+toc()
 
 # combine back with any regions that had all NAs
 unwto_gapfill_lm_2019_tourism_all_int <- unwto_gapfill_lm_2019_tourism_int %>%
