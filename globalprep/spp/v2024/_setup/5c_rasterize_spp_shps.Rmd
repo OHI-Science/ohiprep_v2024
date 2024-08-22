@@ -90,7 +90,7 @@ We will loop over each species in each shapefile and rasterize separately, using
 
 reload <- FALSE
 
-maps_to_rasterize <- read_csv(file.path(dir_data,
+maps_to_rasterize1 <- read_csv(file.path(dir_data,
                                         sprintf('spp_marine_maps_%s.csv', api_version)),
                               col_types = 'ddcicccl') %>%
   mutate(shp_file = str_replace(dbf_file, 'dbf$', 'shp'))
@@ -142,9 +142,9 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
     filter(!(iucn_sid %in% bli_done_vec))
   
   shps <- maps_to_rasterize$shp_file %>% unique()
-  shps <- shps[3:8]
+  # shps <- shps[1]
   for(i in seq_along(shps)) {
-    # i <- 1
+    i <- 1
     
     shp <- shps[i]
     
@@ -152,17 +152,17 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
       filter(shp_file == shp)
     
     id_fix <- maps_in_shp %>%
-      dplyr::select(shp_iucn_sid, iucn_sid, subpop, max_depth) %>%
+      dplyr::select(shp_iucn_sid, iucn_sid, subpop, max_depth) %>% 
       distinct()
     
     cat_msg(i, ' of ', length(shps), ': reading ', basename(shp), ' from: \n  ', shp)
-
-    polys_all <- read_sf(shp, type = 6) %>%
-      clean_df_names() %>% 
-      st_set_geometry(NULL)
     
     polys_all_geometry <- read_sf(shp, type = 6) %>%
       clean_df_names()
+    
+    polys_all <- polys_all_geometry %>% 
+      st_set_geometry(NULL)
+    
       ### we will check geoms and fix them inside the mclapply, 
       ### and then reproject, one species at a time
     
