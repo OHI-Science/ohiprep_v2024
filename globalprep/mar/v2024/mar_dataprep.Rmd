@@ -213,6 +213,22 @@ More information can be found in issues #8, #81, #241, #246 for reference.
 
 The species_list.csv is a master list of all the mariculture species in the FAO data. Every year there are potential changes to the FAO data, additional species may be added or names can change, etc. When a species is in the FAO data, but not the species_list.csv it will need to be added to the species_list.csv. To do this, do a quick search within the species_list.csv to make sure it wasn't some small change to the name (e.g. "long-back eel" vs. "longback eel"). Otherwise, do some research to see if any of the synonyms for the FAO species match the names in species_list.csv. If it is one of these scenarios, the information can be copied to a new row with the name modification. If it seems to be a new taxa, You need to add the species output from this (new_spp) to species_list.csv and fill out the corresponding information. Add the new taxa name, Taxon_code (categories defined in the README in the /raw folder), and family (general family from Google) to the species_list.csv. Do some research to make sure the species is being used for food and is marine/brackish. If it is not used for food or is freshwater then it is excluded from the analysis (i.e., an 1 in the exclude column). I.e. add FAO_name, exclude (whether to include in assessment or not. If they are only harvested for medicinal purposes, do not include, or not eaten by humans do not include). Because seaweeds are generally used for both human and non-human consumption, we quantify whether to exclude or not for seaweed species as proportions. For example, if a seaweed species is 80% used for non-human consumption, we would exclude 80% of the harvest (exclude = 0.8). However, for fish species, we only classify as 0 or 1.
 
+Some helpful resources for researching new species:
+
+FAO SPECIES IDENTIFICATION GUIDE FOR FISHERY PURPOSES -- THE LIVING MARINE RESOURCES OF THE
+WESTERN CENTRAL PACIFIC; 
+
+*   [Volume 2. Cephalopods, crustaceans, holothurians and sharks](https://decapoda.nhm.org/pdfs/27678/27678.pdf)
+
+*   [Volume 3. Batoid fishes, chimaeras and Bony fishes part 1 (Elopidae to Linophrynidae)](https://openknowledge.fao.org/server/api/core/bitstreams/83754bd7-e58a-4fbe-914a-5c12f112e957/content)
+
+*   [Volume 4. Bony fishes part 2 (Mugilidae to Carangidae) ](https://www.fao.org/4/x2400e/x2400e00.htm)
+
+*   [Volume 5. Bony fishes part 3 (Menidae to Pomacentridae)](https://www.fao.org/4/y0770e/y0770e00.htm)
+
+[SeaLifeBase search tool](https://www.sealifebase.se/search.php)
+
+
 ```{r update-species}
 
 ## Commented out 'read.csv' lines are different versions of the dataset, representing the three different seaweed exclusion methods (exclude some seaweed, all seaweed, all seaweed nei (nei = not elsewhere identified)). Use at the end for data checking. The first one is the one which is saved to the "output" folder, and the main analysis to run. 
