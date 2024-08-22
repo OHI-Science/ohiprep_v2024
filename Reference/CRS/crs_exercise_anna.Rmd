@@ -1,18 +1,42 @@
 ---
 title: "CRS Prep & Review"
-output: html_document
-date: "2024-08-05"
+date: "`r format(Sys.Date(), '%Y')`"
+#author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+author: "Anna Ramji"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 3
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
 ---
 
-```{r setup, include=FALSE}
+Setup
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+# ---- Load packages ----
 library(terra)
 library(here)
-
+library(tidyverse)
 ```
 
+
 Data describing commercial landings (tonnes) in 2017.
+
 ```{r}
+# Read in commercial landings data
 fish <- rast(here("Reference", "CRS", "commercial_landings_2017.tif"))
 
 ## Take a look
@@ -22,6 +46,7 @@ plot(log(fish+1))
 ```
 
 How many fish were captured?
+
 ```{r}
 global(fish, "sum", na.rm = TRUE)
 # 86.3 million tonnes
@@ -31,11 +56,14 @@ Check against Sea Around Us to make sure this seems generally reasonable.
 -   seems a little low <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10> but generally makes sense (close enough)
 -   around 100 million <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10>
 
+
 What is the area of each cell?
+
 ```{r}
 cell_area <- cellSize(fish)
 plot(cell_area, box = TRUE)
 ```
+
 Describe what the plotted image is saying?
 
 - cell size is much smaller at the poles, increases as you head in towards the equator
@@ -152,7 +180,7 @@ global(new_tonnes, "sum", na.rm = TRUE)
 
 
 ```{r}
-View(fish)
+#View(fish)
 
 summary(fish)
 
