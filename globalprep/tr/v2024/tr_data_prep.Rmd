@@ -267,7 +267,7 @@ length(unique(check_international$rgn_id)) # v2024: 161 regions present!
 # reminder: 
 # `tourism_arrivals_ct` is the tourism arrivals count from the INTERNATIONAL data, which consists of overnights, and was gapfilled with (total_arrivals - same_day).
 
-test_int_2021 <- international_clean_names_agg %>%
+test_2021_int <- international_clean_names_agg %>%
   filter(year %in% c(2020, 2021)) %>%
   filter(!is.na(tourism_arrivals_ct)) %>%
   pivot_wider(names_from = year, 
@@ -275,12 +275,12 @@ test_int_2021 <- international_clean_names_agg %>%
               names_prefix = "int_tourism_") %>%
   mutate(tourism_ct_diff = (int_tourism_2021 - int_tourism_2020)/int_tourism_2020)
 
-gf_2021_tourism_int <- mean(test_int_2021$tourism_ct_diff, na.rm = TRUE) # global average increase for 2021 tourism_arrivals_ct
+gf_2021_tourism_int <- mean(test_2021_int$tourism_ct_diff, na.rm = TRUE) # global average increase for 2021 tourism_arrivals_ct
 # v2024: 0.1290837
 
 # ok, lets use these values to gapfill 2021 if it is NA and 2020 exists. So increase by X proportion (0.129)
 
-test_int_2020 <- international_clean_names_agg %>%
+test_2020_int <- international_clean_names_agg %>%
   filter(year %in% c(2019, 2020)) %>%
   filter(!is.na(tourism_arrivals_ct)) %>%
   pivot_wider(names_from = year, 
@@ -288,7 +288,7 @@ test_int_2020 <- international_clean_names_agg %>%
               names_prefix = "int_tourism_") %>%
   mutate(tourism_ct_diff = (int_tourism_2020 - int_tourism_2019)/int_tourism_2019)
  
-gf_2020_tourism_int <- mean(test_int_2020$tourism_ct_diff, na.rm = TRUE) # global average decrease for 2020 toursism
+gf_2020_tourism_int <- mean(test_2020_int$tourism_ct_diff, na.rm = TRUE) # global average decrease for 2020 toursism
 # v2024: -0.7118338
 
 # ok, lets use these values to gapfill 2020 if it is NA and 2019 exists. So decrease by X proportion ~70%
@@ -368,7 +368,7 @@ unwto_all_gf_int <- unwto_gapfill_lm_2019_tourism_all_int %>%
   filter(year >= 2008) %>% # get only the year we need and beyond
   drop_na(tourism_arrivals_ct) # remove any remaining NAs (any remaining have all NAs for that region)
 
-length(unique(unwto_all_gf_int$rgn_name)) # now only 157 regions after gapfilling and removing regions with only NAs!
+length(unique(unwto_all_gf_int$rgn_name)) # now only 161 regions after gapfilling and removing regions with only NAs!
 ```
 
 
@@ -599,7 +599,7 @@ lm_coef_data_tourism_dom <- domestic_clean_names_agg %>%
   summarize(lm_coef_tourism = lm(tourism_arrivals_all ~ year)$coefficients[2]) # pull out the coeffiecient
 
 # Initialize a flag to check if there are still NAs
-na_flag <- TRUE
+na_flags <- TRUE
 
 # filter out any regions with all nas for each year, as these can't be gapfilled
 all_nas_tourism_dom <- unwto_upfill_dom %>%
@@ -616,7 +616,7 @@ unwto_gapfill_lm_2019_tourism_dom <- unwto_upfill_dom %>%
 
 ## now lets fill in any values down with the linear model average increase per year for tourists
 tic()
-while(na_flag) {
+while(na_flags) {
   
   unwto_gapfill_lm_2019_tourism_dom <- unwto_gapfill_lm_2019_tourism_dom %>%
     group_by(rgn_id) %>%
@@ -632,7 +632,7 @@ while(na_flag) {
     ungroup()
   
   # Check if there are still NAs left in either column
-  na_flag <- any(is.na(unwto_gapfill_lm_2019_tourism_dom$tourism_arrivals_all))
+  na_flags <- any(is.na(unwto_gapfill_lm_2019_tourism_dom$tourism_arrivals_all))
 } ######stopped here
 toc()
 
