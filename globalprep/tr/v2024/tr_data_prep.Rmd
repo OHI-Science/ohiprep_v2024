@@ -890,43 +890,43 @@ abline(0, 1) # v2024: it makes sense that this looks so different!! Not only did
 ```
 
 
-```{r, eval=FALSE}
-compare_common_data_2022 <- new_data %>%
-  left_join(old_data, by = c("rgn_id", "year")) %>%
-  drop_na() %>%
-  filter(year == 2021)
-
-plot(compare_common_data_2021$Ap, compare_common_data_2021$Ep,
-     xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion")
-abline(0, 1)
-
-compare_common_data_2020 <- new_data %>%
-  left_join(old_data, by = c("rgn_id", "year")) %>%
-  drop_na() %>%
-  filter(year == 2020)
-
-plot(compare_common_data_2020$Ap, compare_common_data_2020$Ep,
-     xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion")
-abline(0, 1)
-
-compare_common_data_2019 <- new_data %>%
-  left_join(old_data, by = c("rgn_id", "year")) %>%
-  drop_na() %>%
-  filter(year == 2019)
-
-plot(compare_common_data_2019$Ap, compare_common_data_2019$Ep,
-     xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion")
-abline(0, 1)
-
-compare_common_data_2015 <- new_data %>%
-  left_join(old_data, by = c("rgn_id", "year")) %>%
-  drop_na() %>%
-  filter(year == 2015)
-
-plot(compare_common_data_2015$Ap, compare_common_data_2015$Ep,
-     xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion")
-abline(0, 1)
-```
+<!-- # ```{r, eval=FALSE} -->
+<!-- # compare_common_data_2022 <- new_data %>% -->
+<!-- #   left_join(old_data, by = c("rgn_id", "year")) %>% -->
+<!-- #   drop_na() %>% -->
+<!-- #   filter(year == 2021) -->
+<!-- #  -->
+<!-- # plot(compare_common_data_2021$Ap, compare_common_data_2021$Ep, -->
+<!-- #      xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion") -->
+<!-- # abline(0, 1) -->
+<!-- #  -->
+<!-- # compare_common_data_2020 <- new_data %>% -->
+<!-- #   left_join(old_data, by = c("rgn_id", "year")) %>% -->
+<!-- #   drop_na() %>% -->
+<!-- #   filter(year == 2020) -->
+<!-- #  -->
+<!-- # plot(compare_common_data_2020$Ap, compare_common_data_2020$Ep, -->
+<!-- #      xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion") -->
+<!-- # abline(0, 1) -->
+<!-- #  -->
+<!-- # compare_common_data_2019 <- new_data %>% -->
+<!-- #   left_join(old_data, by = c("rgn_id", "year")) %>% -->
+<!-- #   drop_na() %>% -->
+<!-- #   filter(year == 2019) -->
+<!-- #  -->
+<!-- # plot(compare_common_data_2019$Ap, compare_common_data_2019$Ep, -->
+<!-- #      xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion") -->
+<!-- # abline(0, 1) -->
+<!-- #  -->
+<!-- # compare_common_data_2015 <- new_data %>% -->
+<!-- #   left_join(old_data, by = c("rgn_id", "year")) %>% -->
+<!-- #   drop_na() %>% -->
+<!-- #   filter(year == 2015) -->
+<!-- #  -->
+<!-- # plot(compare_common_data_2015$Ap, compare_common_data_2015$Ep, -->
+<!-- #      xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion") -->
+<!-- # abline(0, 1) -->
+<!-- # ``` -->
 
 ### Check out some specific countries (v2023) -- this was for exploring changes in methodology, can skip or use/edit parts in future years
 
@@ -1284,8 +1284,6 @@ write_csv(tr_sust, here(output_dir, "tr_sustainability.csv"))
 ```
 
 ## Compare with previous year of data
-
-# COME BACK
 
 ```{r, eval=FALSE}
 tr_sust <- read_csv(here(int_dir, "tr_sustainability.csv"))
