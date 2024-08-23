@@ -39,6 +39,12 @@ Data describing commercial landings (tonnes) in 2017.
 # Read in commercial landings data
 fish <- rast(here("Reference", "CRS", "commercial_landings_2017.tif"))
 
+# print out geospatial data info (class, dimensions, resolution, extent, CRS, etc.)
+(fish)
+
+# print out summary of value layer
+summary(fish)
+
 ## Take a look
 plot(fish)
 # lets log so we can visualize this a little better
@@ -53,7 +59,7 @@ global(fish, "sum", na.rm = TRUE)
 ```
 Check against Sea Around Us to make sure this seems generally reasonable.
 
--   seems a little low <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10> but generally makes sense (close enough)
+-   seems a little low but generally makes sense (close enough) -- [Sea Around Us](https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10) says 87 million 
 -   around 100 million <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10>
 
 
@@ -62,6 +68,8 @@ What is the area of each cell?
 ```{r}
 cell_area <- cellSize(fish)
 plot(cell_area, box = TRUE)
+
+print(cell_area)
 ```
 
 Describe what the plotted image is saying?
