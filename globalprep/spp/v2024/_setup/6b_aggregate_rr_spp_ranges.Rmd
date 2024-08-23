@@ -30,16 +30,16 @@ library(raster)
 library(sf)
 library(fasterize)
 library(dplyr)
-library(rgdal)
+# library(rgdal)
 library(here)
 library(ggplot2)
-library(rgeos)
+# library(rgeos)
 library(terra)
 
 source(here('workflow/R/common.R'))
 
 goal     <- 'spp'
-scenario <- 'v2022'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info
@@ -53,7 +53,7 @@ dir_spatial <- file.path(dir_goal, '_spatial')
 source(file.path(dir_setup, 'common_fxns.R'))
 
 dir_bli <- file.path(dir_M, 'git-annex/globalprep/_raw_data/birdlife_intl/d2021')
-dir_shp <- file.path(dir_M, 'git-annex/globalprep/_raw_data/iucn_spp/d2022-1')
+dir_shp <- file.path(dir_M, 'git-annex/globalprep/_raw_data/iucn_spp/d2024-1')
   ### in this folder are shapefiles at a taxonomic level, both from
   ### IUCN spatial data download (version 2022-1)
 
@@ -96,19 +96,98 @@ area_df <- data.frame(cell_id = 1:(nrow(area_rast)*ncol(area_rast)),
 ### load csvs of marine species range maps
 spp_maps <- read_csv(file.path(dir_data, 
                                sprintf('spp_marine_maps_%s.csv', api_version)),
-                     col_types = 'ddcicccl')
+                     col_types = 'ddcicccl') %>% 
+  dplyr::filter(!shp_iucn_sid %in% c(246014055))
+
+old_not_in_new <- spp_maps2[!spp_maps2$shp_iucn_sid %in% spp_maps1$shp_iucn_sid, ]
+
 spp_ids <- spp_maps$iucn_sid %>%
   unique() %>%
   sort()
 
 if(reload == FALSE & file.exists(spp_range_file)) {
-  ### don't redo spp already calculated...  remove those from the running
+  cat('dont redo spp already calculated...  remove those from the running')
   spp_range_list_done <- read_csv(spp_range_file, col_types = 'ddcc')
   spp_ids <- spp_ids[!spp_ids %in% spp_range_list_done$iucn_sid]
 }
 
 message('Processing ', length(spp_ids), ' species range maps.')
-  
+
+fix_this <- function(spp_nums) {
+  results <- list()
+  spp_list <- spp_nums
+  for(i in seq_along(spp_list)) { # spp_list contains species' "iucn_sid" which is what "x" becomes
+    x <- spp_list[i] # obtain iucn_sid
+    spp_file <- file.path(dir_goal_anx, 'spp_rasters',
+                         sprintf('iucn_sid_%s.csv', x)) # Create a file for each iucn_sid
+    if(file.exists(spp_file)) {
+      spp_map <- read_csv(spp_file, col_types = 'di')
+      
+      spp_map_area <- spp_map %>% 
+      inner_join(area_df, by='cell_id')
+      spp_range <- data.frame(iucn_sid = x,
+                              range_km2 = sum(spp_map_area$area_km2, na.rm=TRUE))
+    } else {
+      cat_msg("Iucn_sid:", x, "file does not exist")
+      spp_range <- data.frame(iucn_sid = x, 
+                              range_km2 = NA)
+    }
+    results[[i]] <- spp_range
+  }
+  return(results)
+}
+
+fxn_ids <- spp_ids
+
+fxn_test_results <- fix_this(fxn_ids) # according to the math, 50 items took about 20 seconds to run, wich = 0.4s/file*12240 files = 4896s/60s/m = 81.6m / 60m/h = 1.36 hrs
+## Started at 5:59pm
+## Finish(or error) at: 6:48
+
+results_df <- bind_rows(fxn_test_results)
+
+results_na <- results_df %>% 
+  filter(range_km2 %in% c(NA))
+
+maps_already_rasterized <- list.files(file.path("/home/shares/ohi/git-annex/globalprep/spp/v2022/spp_risk_dists", 'spp_rasters'),
+                                        pattern = '.csv') %>%
+    str_replace_all('iucn_sid_|.csv$', '') %>%
+    as.integer()
+
+old_map_info <- read_csv(file.path(dir_data,
+  sprintf('spp_marine_maps_%s.csv', "2022-1"))) %>%
+  dplyr::select(-presence) %>%
+  distinct()
+
+file_check_df <- old_map_info %>% 
+  filter(iucn_sid %in% results_na$iucn_sid)
+
+# results_na$iucn_sid is the vector
+rewrite_bli_raster_function <- function(vector) {
+  blis_to_rewrite <- vector
+  for(i in seq_along(blis_to_rewrite)) {
+    x <- blis_to_rewrite[i] # obtain iucn_sid
+    # Identify file 
+    spp_file_in <- file.path("/home/shares/ohi/git-annex/globalprep/spp/v2022/spp_risk_dists", 'spp_rasters',
+                         sprintf('iucn_sid_%s.csv', x))
+    if(!file.exists(spp_file_in)) {
+      cat("Iucn sid", x, "not found in 2022 folder", "\n")
+    } else {
+      cat("Success! Reading and writing iucn sid:", x, "\n")
+    # Read file in 
+    spp_file <- read_csv(spp_file_in)
+    
+    spp_file_out <- file.path(dir_goal_anx, 'spp_rasters',
+                         sprintf('iucn_sid_%s.csv', x)) # Create a file for each iucn_sid
+    
+  write_csv(spp_file, spp_file_out)
+    }
+  }
+}
+
+
+rewrite_bli_raster_function(results_na$iucn_sid)
+
+
 if(length(spp_ids) > 0) { ### any more spp to calculate?
   system.time({
   spp_range_list <- parallel::mclapply(seq_along(spp_ids), mc.cores = 12,
@@ -123,7 +202,7 @@ if(length(spp_ids) > 0) { ### any more spp to calculate?
       # filter(presence != 5) %>% ### exclude extinct areas
       inner_join(area_df, by = 'cell_id')
     
-    spp_range <- data.frame(iucn_sid  = x,
+    spp_range <- data.frame(iucn_sid = x,
                             range_km2 = sum(spp_map_area$area_km2, na.rm = TRUE))
     # spp_range_list[[i]] <- spp_range
     return(spp_range)
@@ -147,6 +226,7 @@ if(reload == FALSE & exists('spp_range_list_done')) {
 }
 
 write_csv(spp_range_df, spp_range_file)
+# **ENDED HERE**
 
 ```
 
