@@ -41,38 +41,38 @@ The general calculation is: tr = Ap \* Sr and Xtr = tr/90th quantile across regi
 
 -   Proportion of tourist arrivals to area of coastline to population - UNWTO data on thousands of tourist arrivals, reported until 2021 (downloaded [here](https://www.unwto.org/tourism-statistics/key-tourism-statistics) (dataset: "Total arrivals" under Inbound Tourism; we use the "Overnights visitors (tourists)" categorization as arrivals where possible) on 8/10/2023.
 
-
 # v2024 updates
 
 Building upon updates made in v2023 for Tourism & Recreation.
 
 ### Layers
 
-- tr_arrivals_props_tourism (arrivals to a country, staying overnight)
-- tr_sustainability (Tourism sustainability index)
+-   tr_arrivals_props_tourism (arrivals to a country, staying overnight)
+-   tr_sustainability (Tourism sustainability index)
 
 ### Data Sources
+
 Using Erika and Gage's methodology (v2023):
 
-- UNWTO data on thousands of tourist arrivals, reported until 2021 (downloaded here (dataset: "Total arrivals" under Inbound Tourism; we use the "Overnights visitors (tourists)" categorization as arrivals where possible) on 8/10/2023. Use Overnights from this, and gapfill Overnights with Total minus Same-day if possible.
-- Sum of inland (1 km) and offshore (3 nm) area (calculated from the csvs used in LSP)
-- Population data
-  - primarily from the WDI() function which retrieves data from World Bank and gapfill missing populations that also have arrivals data (I do not gapfill all missing populations, just ones that match with regions that don't have NAs in the arrivals data)
-  - secondarily with Our World in Data data; in this data, Saba, Sint Eustatius, and Bonaire are not broken up, so I found broken up values separately for them from Statista. These only go back to 2011 instead of the earliest data year for this layer which is 2008, so I gapfill 2008-2010 with each of their respective 2011 data. This causes all OHI regions with arrivals data to now have both inland + offshore data and population data.
-- v2024: The (tourism sustainability index dataset)[https://www3.weforum.org/docs/WEF_Travel_and_Tourism_Development_Index_2024.pdf] (TTDI) has been updated! 
+-   UNWTO data on thousands of tourist arrivals, reported until 2021 (downloaded here (dataset: "Total arrivals" under Inbound Tourism; we use the "Overnights visitors (tourists)" categorization as arrivals where possible) on 8/10/2023. Use Overnights from this, and gapfill Overnights with Total minus Same-day if possible.
+-   Sum of inland (1 km) and offshore (3 nm) area (calculated from the csvs used in LSP)
+-   Population data
+    -   primarily from the WDI() function which retrieves data from World Bank and gapfill missing populations that also have arrivals data (I do not gapfill all missing populations, just ones that match with regions that don't have NAs in the arrivals data)
+    -   secondarily with Our World in Data data; in this data, Saba, Sint Eustatius, and Bonaire are not broken up, so I found broken up values separately for them from Statista. These only go back to 2011 instead of the earliest data year for this layer which is 2008, so I gapfill 2008-2010 with each of their respective 2011 data. This causes all OHI regions with arrivals data to now have both inland + offshore data and population data.
+-   v2024: The (tourism sustainability index dataset)[<https://www3.weforum.org/docs/WEF_Travel_and_Tourism_Development_Index_2024.pdf>] (TTDI) has been updated!
 
 ### Next Steps
 
-- Explore updated UNWTO data. Determine if Inbound Tourism Arrivals Overnight stays can be aggregated with Domestic Arrivals Overnight stays. - See where there are gaps, what would need to be filled.
-- If there are too many gaps, look at employment data instead.
-- Integrate the fixed (globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv) coastal population data for a new method of calculating "Ap" (Arrival proportion):
+-   Explore updated UNWTO data. Determine if Inbound Tourism Arrivals Overnight stays can be aggregated with Domestic Arrivals Overnight stays. - See where there are gaps, what would need to be filled.
+-   If there are too many gaps, look at employment data instead.
+-   Integrate the fixed (globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv) coastal population data for a new method of calculating "Ap" (Arrival proportion):
 
 > Ap = multiply arrivals by coastal population/total population, then divide by coastal area (sum of inland (1 km) and offshore (3 nm) area)
 
-- Rescale using the 90th quartile as the reference point, or 80th (reevaluate when we get to this step)
-- Consider dropping low population areas, like they did in v2023
-- Calculate `Sr = (S-1)/5`; Sustainability of tourism
-- Finally, use the equation: `tr = Ap * Sr` for final scores before updating ohi-global
+-   Rescale using the 90th quartile as the reference point, or 80th (reevaluate when we get to this step)
+-   Consider dropping low population areas, like they did in v2023
+-   Calculate `Sr = (S-1)/5`; Sustainability of tourism
+-   Finally, use the equation: `tr = Ap * Sr` for final scores before updating ohi-global
 
 ## Initial set-up code
 
@@ -127,11 +127,11 @@ figs_dir <- here("globalprep","tr", version_year, "figs")
 
 # Ap: Proportion of tourist arrivals, multiplied by coastal/total population, to area of coastline to population
 
-We use international arrivals data from the [United Nations World Tourism Organization (UNWTO)](https://www.unwto.org/). Up through v2022, we accessed data from the [World Travel & Tourism Council (WTTC)](http://www.wttc.org/), but this was no longer a viable option in v2023. In v2024, we added Domestic Tourism Arrivals.  International and Domestic were downloaded [here](<https://www.unwto.org/tourism-statistics/key-tourism-statistics>) August 16th and 19th, 2024, respectively.
+We use international arrivals data from the [United Nations World Tourism Organization (UNWTO)](https://www.unwto.org/). Up through v2022, we accessed data from the [World Travel & Tourism Council (WTTC)](http://www.wttc.org/), but this was no longer a viable option in v2023. In v2024, we added Domestic Tourism Arrivals. International and Domestic were downloaded [here](https://www.unwto.org/tourism-statistics/key-tourism-statistics) August 16th and 19th, 2024, respectively.
 
 *International data:* Click Inbound Arrivals, scroll down to "Total arrivals", click download data.
 
-*Domestic data:* Click Domestic Tourism, scroll down to "Total trips", click download.  Then download from "Accommodations".
+*Domestic data:* Click Domestic Tourism, scroll down to "Total trips", click download. Then download from "Accommodations".
 
 **Gapfilling:**
 
@@ -373,7 +373,6 @@ unwto_all_gf_int <- unwto_gapfill_lm_2019_tourism_all_int %>%
 
 length(unique(unwto_all_gf_int$rgn_name)) # now only 161 regions after gapfilling and removing regions with only NAs!
 ```
-
 
 ## Domestic UNWTO Inbound Tourism Arrivals
 
@@ -667,10 +666,9 @@ unwto_all_gf_dom <- unwto_gapfill_lm_2019_tourism_all_dom %>%
 length(unique(unwto_all_gf_dom$rgn_name)) # now only 99 regions after gapfilling and removing regions with only NAs! Which makes sense, since Guatemala and Myanmar had to be dropped from the original 101 
 ```
 
-
 ## Aggregating International and Domestic Values
 
-Let's use `setdiff()` and see which regions that have values overlap between the international and domestic data.  If it is a reasonable amount, I am considering aggregating international and domestic and then for regions that have one or the other, leaving it as such.
+Let's use `setdiff()` and see which regions that have values overlap between the international and domestic data. If it is a reasonable amount, I am considering aggregating international and domestic and then for regions that have one or the other, leaving it as such.
 
 ```{r}
 domestic_rgns <- unique(unwto_all_gf_dom$rgn_id) # domestic OHI regions with data: 99
@@ -701,7 +699,7 @@ cat("Regions in both datasets:", length(in_both), "\n") # Regions in both datase
 cat("Total unique regions:", length(union(domestic_rgns, international_rgns)), "\n") # Total unique regions: 167
 ```
 
-Let's move on, as we decided that it makes sense to aggregate the international and domestic data! This is because we are creating a score for each region, and only comparing across regions once that score has been calculated (versus ranking regions and comparing them to each other based on tourism density, not the rescaled score). 
+Let's move on, as we decided that it makes sense to aggregate the international and domestic data! This is because we are creating a score for each region, and only comparing across regions once that score has been calculated (versus ranking regions and comparing them to each other based on tourism density, not the rescaled score).
 
 ```{r}
 # aggregating international and domestic data by region and year
@@ -733,7 +731,7 @@ unique(is.na(arrivals_aggregated$tourism_arrivals_ag)) #v2024: FALSE! this means
 length(unique(arrivals_aggregated$rgn_name)) # v2024: 161 regions that have data!
 ```
 
-Now, lets bring in our tourism data and calculate the coastal proportion! The coastal proportion will then be multiplied by the arrivals value per region and year. Finally, the coastal area will be 
+Now, lets bring in our tourism data and calculate the coastal proportion! The coastal proportion will then be multiplied by the arrivals value per region and year. Finally, the coastal area will be
 
 ```{r, eval=FALSE}
 # ------- coastal population data -----------
@@ -747,7 +745,6 @@ coastal_pop_data_fill <- coastal_pop_data %>%
 
 length(unique(coastal_pop_data_fill$rgn_id)) # v2024: 220 regions available! Any region without data is uninhabited.
 ```
-
 
 ```{r, eval=FALSE}
 # ------- total global population data -----------
@@ -817,10 +814,16 @@ ap_final <- arrivals_prop_df %>%
 
 # save the Ap proportions dataframe
 write_csv(ap_final, here::here(int_dir, "ap.csv"))
+
+# save which observations were gapfilled and how into output
+tr_arrivals_props_tourism_gf <- arrivals_prop_df %>% 
+  select(rgn_id, rgn_name, year, data_source, arrivals_gf)
+
+write_csv(tr_arrivals_props_tourism_gf, here::here(output_dir, "tr_arrivals_props_tourism_gf.csv"))
 ```
 
 ```{r}
-# interactive plot of the arrival proportions
+# interactive plot of the arrival proportions before rescaling
 ap_plot <- ap_final %>%
   plot_ly(x = ~year, y = ~ap, color = ~rgn_name, 
           type = "scatter", mode = "lines") %>%
@@ -832,146 +835,63 @@ ap_plot
 # htmlwidgets::saveWidget(ap_plot, here::here(figs_dir, "ap_interactive_plot.html")) # save plot
 ```
 
+## Rescale Ap proportion using the 90th quartile
 
-<!-- ### Divide tourist arrival count by total arrival count -->
+As according to the [OHI methods](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#tourism-and-recreation), the Ap values for each year and region is rescaled using the 90th quartile for each region.
 
-<!-- -   In 2023, we considered rescaling by coastal area and/or coastal population, however, we decided to scrap this, as it was unduly harming scores for larger regions. We will just use the tourist arrival/total arrivals metric. -->
-<!-- -   Because of some gapfilling and uncertainty in the data, some regions reported higher tourist arrivals than total arrivals. Due to this, we sometimes have ratios \>1. To deal with this, we just give those regions a ratio of 1. -->
-<!-- -   Some regions reported only tourist arrivals, and no total arrivals. Because of this, we gapfilled any that didn't have total arrivals with the tourist arrivals. This isn't ideal, but was the best we could do. -->
+$$\frac{T_r}{T_{90th}}$$
 
-<!-- ```{r, eval=FALSE} -->
-<!-- # divide the number of tourist arrivals by area of coastline and population to get the proportion -->
-<!-- tourism_props <- unwto_all_gf %>% -->
-<!--     mutate(year = as.numeric(year)) %>% -->
-<!--  # left_join(offshore_data, by = c("rgn_id", "year")) %>% -->
-<!--   left_join(coastal_pop_data_fill, by = c("rgn_id", "year")) %>% -->
-<!--   # mutate(Ap = ((tourism_arrivals_ct/total_inland_offshore_area)/popsum)) %>% -->
-<!--   mutate(total = ifelse(is.na(total), tourism_arrivals_ct, total)) %>% -->
-<!--   mutate(Ap = tourism_arrivals_ct/total) %>% -->
-<!--   filter(year >= 2008) %>% # filter to the years we are interested in for any data that isn't filtered yet -->
-<!--   filter(popsum > 0) %>% # filter out no pop regions -->
-<!--   left_join(rgns_eez) %>% -->
-<!--   mutate(Ap = ifelse(Ap > 1, 1, Ap)) # if greater than 1 make 1 -->
+```{r}
+# to make the Ap scaled between 0 and 1, we can divide the current Ap by the 90th quartile values by region.
+ap_rescaled <- ap_final %>% 
+  group_by(rgn_id, rgn_name) %>% 
+  summarize(value_90th_percentile = quantile(ap, 0.9, na.rm = TRUE))
 
-<!-- # check out things so far -->
-<!-- summary(tourism_props) # should be 0 NAs for Ap if gapfilling worked -->
-<!-- hist(tourism_props$Ap) -->
+tr_arrivals_props_tourism <- left_join(ap_final, ap_rescaled, by = c("rgn_id", "rgn_name")) %>% 
+  mutate(
+    Ap = ap/value_90th_percentile,
+    Ap = if_else(Ap < 0, 0, Ap), # if less than 1, that is due to gapfilling where linear models drew the tourism arrival values less than 0.  
+    Ap = if_else(Ap > 1, 1, Ap) # if more than 1, then the Ap value for that year was above the 90th percentile.  So the value is adjusted to 1
+         ) %>% 
+  select(rgn_id, year, Ap) # keep in rgn_name when you want to plot!!!
 
-<!-- ``` -->
+# interactive plot of the arrival proportions
+ap_final_plot <- tr_arrivals_props_tourism %>%
+  plot_ly(x = ~year, y = ~Ap, color = ~rgn_name, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "Global Arrival proportions (Ap) by Region, Rescaled",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Arrival proportion (Ap)"))
+ap_final_plot
 
-<!-- ```{r, eval=FALSE} -->
-
-<!-- # make rescaled column the actual value column -->
-<!-- tourism_props_rescaled <- tourism_props %>% -->
-<!--   dplyr::select(rgn_id, year, arrivals_method, arrivals_gapfilled, Ap) -->
-
-<!-- ``` -->
-
-<!-- ### Removing low population / uninhabited regions -->
-
-<!-- ```{r, eval=FALSE} -->
-<!-- ### after gap-filling, make sure low/uninhabited regions are NA -->
-<!-- # create df for unpopulated/low populated regions -->
-<!-- low_pop() -->
-<!-- low_pop <- low_pop %>% -->
-<!--   filter(est_population < 3000 | is.na(est_population)) %>%  # filter out regions that have populations > or equal to 3000 and keep NA values -->
-<!--   rename(rgn_label = rgn_nam) -->
-
-<!-- summary(tourism_props_rescaled) -->
-<!-- # v2020 371 NAs -->
-<!-- # v2022 114 NAs -->
-<!-- # v2023 0 NAs (because of gapfilling) -->
-
-<!-- # make sure all the NAs are uninhabited regions -->
-<!-- tourism_props_nas <- tourism_props_rescaled %>% -->
-<!--   filter(is.na(Ap)) %>% -->
-<!--   select(rgn_id, year) %>% # v2023: was rgn_id, year, r1_label, r2_label, rgn_label but we did not gapfill by georegion so did not have the last 3 -->
-<!--   left_join(low_pop, by = "rgn_id") # v2023: was by = c("rgn_id", "rgn_label") but we did not gapfill by georegion so did not have rgn_label -->
-
-<!-- tourism_props_nas %>% -->
-<!--   filter(Inhabited == 0 & !is.na(est_population)) %>% -->
-<!--   nrow() # 0 ✓ -->
-
-<!-- max(tourism_props_nas$est_population, na.rm=TRUE) < 3000 # should be true -->
-
-<!-- # make sure all the uninhabited regions are NA and then drop them (all NA regions get added back as a last step just in case its relevant) -->
-<!-- tourism_props_rescaled <- tourism_props_rescaled %>% -->
-<!--   mutate(Ap = ifelse(rgn_id %in% low_pop$rgn_id, NA, Ap)) -->
-
-
-<!-- # check NAs once more -->
-<!-- summary(tourism_props_rescaled) -->
-<!-- # v2019: Adding the low pop df identifies 13 additional regions that should be NA instead of gapfilled, taking the total number of NAs in the data set from 245 to 700 -->
-<!-- # v2020: Adding the low pop df takes the total number of NAs in the data set from 371 to 832 -->
-<!-- # v2022: Adding the low pop df takes the total number of NAs in the data set from 14 to 40 -->
-<!-- # v2023: Adding the low pop df takes the total number of NAs in the data set from 0 to 14 -->
-
-<!-- # after checking NAs, get rid of them -->
-<!-- tourism_props_rescaled <- tourism_props_rescaled %>% -->
-<!--   drop_na(Ap) -->
-<!-- ``` -->
-
-<!-- ### Write output files -->
-
-<!-- ```{r, eval=FALSE} -->
-<!-- # we want to make sure all OHI regions are present in the data, even if could not calculate Ap (this will add back in what we removed above as well as any region not present in the data) -->
-<!-- year_range <- unique(tourism_props_rescaled$year) # get the year range of Ap -->
-<!-- year_range_df <- data.frame(year = year_range) # make it a dataframe -->
-
-<!-- # save gapfill info -->
-<!-- tourism_props_gf_to_write <- tourism_props_rescaled %>% -->
-<!--   select(-Ap) # don't need actual values for the gapfill information -->
-
-<!-- write_csv(tourism_props_gf_to_write, here(paste0("globalprep/tr/v", version_year, "/output/tr_arrivals_props_tourism_gf.csv"))) -->
-
-<!-- # save gap-filled data -->
-<!-- tourism_props_to_write <- tourism_props_rescaled %>% -->
-<!--   select(rgn_id, year, Ap) # don't need gf info here, just the values -->
-
-<!-- write_csv(tourism_props_to_write, here(paste0("globalprep/tr/v", version_year, "/output/tr_arrivals_props_tourism.csv"))) -->
-<!-- ``` -->
-
-<!-- ### Look at changes in recent years -->
-
-<!-- We would expect for tourism jobs to decrease across the board from 2019 and 2020 given the pandemic, and likely see a rebound to some extent between 2020 and 2021 — let's make sure that's reflected in our results. -->
-
-<!-- ```{r, eval=FALSE} -->
-<!-- tourism_props_compare <- tourism_props_to_write %>% -->
-<!--   mutate(year = as.numeric(as.character(year))) %>% -->
-<!--   filter(year >= 2019) %>% -->
-<!--   pivot_wider(names_from = year, values_from = Ap) -->
-
-<!-- # compare 2019 and 2020 -->
-<!-- plot(tourism_props_compare$"2019", tourism_props_compare$"2020", -->
-<!--      xlab = "v2023 2019 Arrivals Proportion", ylab = "v2023 2020 Arrivals Proportion") -->
-<!-- abline(0, 1) # more data below the line -->
-
-<!-- # compare 2020 and 2021 -->
-<!-- plot(tourism_props_compare$"2020", tourism_props_compare$"2021", -->
-<!--      xlab = "v2023 2020 Arrivals Proportion", ylab = "v2023 2021 Arrivals Proportion") -->
-<!-- abline(0, 1) # more data above the line -->
-<!-- ``` -->
-
-<!-- Everything looks reasonable. -->
+# save the final tourism arrivals csv
+write_csv(tr_arrivals_props_tourism, here::here(output_dir, "tr_arrivals_props_tourism.csv"))
+```
 
 ### Look at changes vs. previous data source (v2023)
 
 ```{r, eval=FALSE}
-new_data <- read_csv(paste0("globalprep/tr/v", version_year, "/output/tr_arrivals_props_tourism.csv"))
-old_data <- read_csv(paste0("globalprep/tr/v", prev_ver_yr, "/output/tr_jobs_pct_tourism.csv"))
+previous_version_year <- "v2023"
+new_data <- read_csv(here::here("globalprep","tr", version_year, "output","tr_arrivals_props_tourism.csv"))
+old_data <- read_csv(here::here("globalprep","tr", previous_version_year, "output","tr_arrivals_props_tourism.csv"))
 
 compare_common_data <- new_data %>%
   left_join(old_data, by = c("rgn_id", "year")) %>%
-  drop_na()
+  drop_na() %>% 
+  rename(
+    new_Ap = Ap.x,
+    old_Ap = Ap.y
+  )  
+  # filter(year %in% 2019)
 
-plot(compare_common_data$Ep, compare_common_data$Ap,
-     xlab = "v2022 Employment Proportion", ylab = "v2023 Arrivals Proportion")
-abline(0, 1)
+plot(compare_common_data$old_Ap, compare_common_data$new_Ap,
+     xlab = "v2023 Arrivals Proportion", ylab = "v2024 Arrivals Proportion")
+abline(0, 1) # v2024: it makes sense that this looks so different!! Not only did we aggregate with domestic tourism data this year, we also had a completely different method of calculating Ap (multiplying by the coastal pop/tourism pop, then dividing by coastal area) rather than v2023 (which took the coastal tourism/total tourism for each region).  This makes sense.
+```
 
 
-
-
-compare_common_data_2021 <- new_data %>%
+```{r, eval=FALSE}
+compare_common_data_2022 <- new_data %>%
   left_join(old_data, by = c("rgn_id", "year")) %>%
   drop_na() %>%
   filter(year == 2021)
@@ -1139,7 +1059,7 @@ CIA data are used to fill in missing gaps in the gdppcppp data (<https://www.cia
 
 Downloaded: 09/22/2024
 
-See README on the raw folder for instructions on how to download this data.  Place in Mazu.
+See README on the raw folder for instructions on how to download this data. Place in Mazu.
 
 The following code is used to prepare these data for OHI:
 
@@ -1251,8 +1171,7 @@ The final step is gapfilling the Sustainability data using a linear model with g
 
 ```{r, eval=FALSE}
 
-sust <- read_csv(here(int_dir, "wef_ttdi.csv")) %>% 
-  mutate(year = as.numeric(year))
+sust <- read_csv(here(int_dir, "wef_ttdi.csv"))
 
 ### don't need to gapfill data without tourism data:
 ## Most recent tourism data is 2019.  
@@ -1288,8 +1207,7 @@ tr_sust_gf <- tr_sust %>%
   mutate(method = ifelse(is.na(s_score) & !is.na(ap) & !is.na(pcgdp2), "lm georegion + gdppcppp", method)) %>%
   select(rgn_id, gapfilled, method, year)
 
-write_csv(tr_sust_gf, here(int_dir, "tr_sustainability_gf.csv"))
-
+write_csv(tr_sust_gf, here(output_dir, "tr_sustainability_gf.csv"))
 ```
 
 ### Gapfilling
@@ -1362,10 +1280,11 @@ tr_sust <- tr_sust %>%
 
 summary(tr_sust)
 
-write_csv(tr_sust, here(int_dir, "tr_sustainability.csv"))
+write_csv(tr_sust, here(output_dir, "tr_sustainability.csv"))
 ```
 
 ## Compare with previous year of data
+
 # COME BACK
 
 ```{r, eval=FALSE}
@@ -1381,6 +1300,17 @@ plot(compare$"2021", compare$"2019")
 abline(0, 1, col="red")
 # looks good
 
+# v2024: comparison plot
+comparison_plot <- ggplot(compare, aes(x = "2021", y = "2019")) +
+  geom_point(alpha = 0.5) + 
+  geom_abline(color = "darkred", linetype = "dashed") +  # reference line
+  labs(
+    title = "",
+    x = "",
+    y = ""
+  ) +
+  theme_minimal() 
+comparison_plot
 ```
 
 # Tw: Travel warnings
