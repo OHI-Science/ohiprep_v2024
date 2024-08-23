@@ -1,6 +1,7 @@
 ---
 title: "CRS Prep & Review"
-date: "`r format(Sys.Date(), '%Y')`"
+date: "2024-08-01"
+#date: "`r format(Sys.Date(), '%Y')`"
 #author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 author: "Anna Ramji"
 output: 
@@ -17,7 +18,7 @@ output:
 pdf_document:
   toc: true
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
   markdown: 
     wrap: 72
 ---
@@ -40,16 +41,85 @@ Data describing commercial landings (tonnes) in 2017.
 fish <- rast(here("Reference", "CRS", "commercial_landings_2017.tif"))
 
 # print out geospatial data info (class, dimensions, resolution, extent, CRS, etc.)
-(fish)
+fish # equivalent to (fish)
 
 # print out summary of value layer
 summary(fish)
 
 ## Take a look
-plot(fish)
+terra::plot(fish)
+terra::plot(fish, mar = c(0, 1.5, 0, 5))
+
+
 # lets log so we can visualize this a little better
-plot(log(fish+1))
+terra::plot(log(fish+1), mar=c(0,1.5,0,3.5))
 ```
+
+
+Trying to save image
+
+```{r}
+fish_log_plot <- terra::plot(log(fish+1))
+
+fish_log <- log(fish$commercial_landings_2017 + 1)
+
+# png('file.png', height=nrow(r), width=ncol(r)) 
+# plot(r, maxpixels=ncell(r))
+# dev.off()
+#terra::writeRaster(fish_log, here::here("Reference/CRS/figs/fish_log_plot.png"), overwrite=TRUE)
+```
+
+
+```{r}
+# fish_df <- as.data.frame(fish)
+# fish_log_plot <- ggplot2::ggplot() +
+#   geom_raster(data = log(fish_df + 1), aes(x = commercial_landings_2017))
+# fish_log_plot
+```
+
+
+```{r}
+# # Set the output file name and path
+# output_file <- here::here("Reference", "CRS", "figs", "commercial_landings_2017_log.png")
+# 
+# # Open a PNG device
+# png(filename = output_file, 
+#     width = 800, height = 600, 
+#     units = "px", res = 100)
+# 
+# # Create your plot
+# plot(log(fish+1), 
+#      main="Log-transformed Commercial Landings (2017)", 
+#      col=hcl.colors(100, "viridis"),
+#      legend.args=list(text="Log(landings + 1)", side=4, line=2.5, cex=0.8))
+# 
+# # Close the PNG device
+# dev.off()
+```
+
+
+```{r}
+library(terra)
+
+# Set the output file name and path
+output_file <- here::here("Reference", "CRS", "figs", "commercial_landings_2017_log.png")
+
+# Ensure the directory exists
+dir.create((output_file), showWarnings = TRUE, recursive = TRUE)
+
+# Open a PNG device
+png(filename = output_file, width = 800, height = 600, units = "px", res = 100)
+
+# Create your plot
+plot(log(fish+1), 
+     main="Log-transformed Commercial Landings (2017)", 
+     col=hcl.colors(100, "viridis"),
+     legend.args=list(text="Log(landings + 1)", side=4, line=2.5, cex=0.8))
+
+# Close the PNG device
+dev.off()
+```
+
 
 How many fish were captured?
 
