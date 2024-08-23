@@ -9,10 +9,10 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Fri Aug 23 17:34:29 2024 by sujeet" />
+<meta name="author" content="Compiled on Fri Aug 23 17:41:54 2024 by sujeet" />
 
 
-<title>OHI 2021 - Clean Water - Pathogen Pollution: Preparing Sanitation data</title>
+<title>OHI 2024 - Targeted harvest pressure</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1645,665 +1645,333 @@ border-radius: 0px;
 
 
 
-<h1 class="title toc-ignore">OHI 2021 - Clean Water - Pathogen
-Pollution: Preparing Sanitation data</h1>
-<h4 class="author"><em>Compiled on Fri Aug 23 17:34:29 2024 by
+<h1 class="title toc-ignore">OHI 2024 - Targeted harvest pressure</h1>
+<h4 class="author"><em>Compiled on Fri Aug 23 17:41:54 2024 by
 sujeet</em></h4>
 
 </div>
 
 
+<p><a href="http://ohi-science.org/ohiprep_v2022/globalprep/prs_targetedharvest/v2022/targetharvest_dataprep.html">REFERENCE
+RMD FILE</a></p>
 <div id="summary" class="section level1" number="1">
 <h1><span class="header-section-number">1</span> Summary</h1>
-<p>This document describes the steps for preparing the pathogen
-pollution and pathogen pollution trend data layers for the 2023 global
-assessment.</p>
-<p>The percentage of the population with access to improved sanitation
-facilities (World Health Organization and United Nations Children’s
-Fund, Joint Monitoring Programme, 2011) was used in combination with
-measurements of coastal population as a proxy for pathogens in coastal
-waters. Access to improved sanitation facilities is defined as the
-percentage of the population in a country with at least adequate access
-to disposal facilities that can effectively prevent human, animal, and
-insect contact with excreta. These data are a country-wide average (not
-specific to the coastal region).</p>
+<p>This analysis converts FAO capture production data into the OHI 2022
+targeted harvest pressure data.</p>
 </div>
 <div id="updates-from-previous-assessment" class="section level1" number="2">
 <h1><span class="header-section-number">2</span> Updates from previous
 assessment</h1>
-</div>
-<div id="v2023" class="section level1" number="3">
-<h1><span class="header-section-number">3</span> v2023?</h1>
-<ol style="list-style-type: decimal">
-<li>Updated data download through the SDMX REST API to programmatically
-access data, instead of downloading an Excel file. We are using the
-wash_households data flow. This resulted in small changes to the data:
-for example in the previous data some values for the at least basic
-sanitation proportion were denoted as &gt;99, which we previously set as
-99.5. The total at least basic indicator for these countries (and some
-others) were often not available from the API, but we were able to
-calculate the at least basic indicator by summing the limited,
-unimproved, and open defecation proportions for a given country and
-subtracting them from 100. The values were previously rounded to the
-nearest whole percentage, use of the API resulted in more precise
-values.The previous data set included a population column, which was not
-available from the API. We instead accessed the total population for
-each region from the WDI package (World Bank World Development
-Indicators). Other changes involved updating data wrangling to get the
-data from the API into the same format as the previous data. #v2024</li>
-<li>Updated mar_prs_pop_dataprep.Rmd which is pulled into this script
-for coastal population estimate calculations</li>
-</ol>
-<p><strong>Consider for future assessments:</strong> make the “Safely
-managed” data more complete, and reconsider whether these data would be
-better to use.</p>
-<p>Definition of each variable according to the data source: “At least
-basic”: Use of improved facilities that are not shared with other
-households. Missing values are calculated by doing 100 - (the proportion
-of the population using limited sanitation services + the proportion of
-the population using unimproved sanitation services + the proportion of
-the population using open defecation).</p>
-<p>“Safely managed”: Use of improved facilities that are not shared with
-other households and where excreta are safely disposed of in situ or
-transported and treated offsite- drinking water from an improved source
-that is accessible on premises, available when needed and free from
-faecal and priority chemical contamination.</p>
+<p>2023 - One more year of data, 2021 Small fixes to how N data is
+handled in fao_fxn.R Delete unused/not relevant code</p>
+<p>2024- Data until 2022 so one more year of data. Changes: removed more
+columns when making fao_clean in the ‘Clean the FAO Data’ chunk that
+were interfering with the merge.</p>
 <hr />
 </div>
-<div id="data-source" class="section level1" number="4">
-<h1><span class="header-section-number">4</span> Data Source</h1>
-<p><strong>Reference</strong>: WHO-UNICEF. 2023. “Joint Monitoring
-Programme (JMP) for Water Supply and Sanitation - Household Data.” Joint
-Monitoring Programme (JMP) for Water Supply and Sanitation - Household
-Data. 2023. <a href="https://washdata.org/data/household#!/" class="uri">https://washdata.org/data/household#!/</a>.</p>
-<p><strong>Data Download</strong> As of v2023 the data is now downloaded
-through the SDMX REST API which allows programmatic access to data that
-is available in UNICEF’s Data Warehouse Explorer. The API can be found
-at: <a href="https://sdmx.data.unicef.org/webservice/data.html" class="uri">https://sdmx.data.unicef.org/webservice/data.html</a></p>
-<p>For information on querying the api visit: <a href="https://data.unicef.org/sdmx-api-documentation/#understanding" class="uri">https://data.unicef.org/sdmx-api-documentation/#understanding</a>.
-To download data manually in Excel format use this site: <a href="https://washdata.org/data" class="uri">https://washdata.org/data</a>.</p>
-<p><strong>Download Date</strong>: Downloaded 7/18/2023</p>
-<p><strong>Description</strong>: Percentage of the national population
-that has access to at improved sanitation facilities that are not shared
-with other households.</p>
-<p>Access to improved sanitation facilities is defined as the percentage
-of the population within a country with at least basic access to excreta
-disposal facilities that can effectively prevent human, animal, and
-insect contact with excreta.</p>
-<p>Further information: <a href="https://washdata.org/monitoring/sanitation" class="uri">https://washdata.org/monitoring/sanitation</a></p>
-<p><strong>Native data resolution</strong>: country-wide average (not
-specific to the coastal region)</p>
-<p><strong>Time range</strong>: 2000 - 2022</p>
-<p><strong>Format</strong>: SDMX</p>
+<div id="data-source" class="section level1" number="3">
+<h1><span class="header-section-number">3</span> Data Source</h1>
+<pre><code>https://www.fao.org/fishery/statistics-query/en/capture/capture_quantity
+https://www.fao.org/fishery/en/statistics/software/fishstatj
+  Release date: March 2024</code></pre>
+<p>FAO Global Capture Production Quantity 1950_2019<br />
+Information: <a href="https://www.fao.org/fishery/en/collection/capture?lang=en" class="uri">https://www.fao.org/fishery/en/collection/capture?lang=en</a></p>
+<p><strong>Reference</strong>:</p>
+<p>© FAO 2024. Global Capture Production. In: Fisheries and Aquaculture.
+Rome. [Cited Wednesday, August 14th 2024]. <a href="https://www.fao.org/fishery/en/collection/capture?lang=en" class="uri">https://www.fao.org/fishery/en/collection/capture?lang=en</a></p>
+<p><strong>Downloaded</strong>: July 10, 2024</p>
+<p><strong>Description</strong>: Quantity (tonnes) of fisheries capture
+for each county, species, year.</p>
+<p><strong>Time range</strong>: 1950-2022</p>
 <hr />
 </div>
-<div id="setup" class="section level1" number="5">
-<h1><span class="header-section-number">5</span> Setup</h1>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(ohicore)  <span class="co">#devtools::install_github(&#39;ohi-science/ohicore@dev&#39;)</span></span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">library</span>(zoo)     <span class="co"># for na.locf: Last Observation Carried Forward</span></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="fu">library</span>(here)</span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="fu">library</span>(plotly)</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">library</span>(rsdmx)</span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="fu">library</span>(countrycode)</span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="fu">library</span>(WDI) <span class="co">#reinstall to access new years of population data</span></span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a></span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a></span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&#39;https://raw.githubusercontent.com/OHI-Science/ohiprep_v2021/gh-pages/workflow/R/common.R&#39;</span>)</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co">#update these each year</span></span>
-<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>version_year <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;v&quot;</span>, <span class="dv">2024</span>) </span>
-<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>previous_version_year <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;v&quot;</span>, <span class="dv">2023</span>)</span>
-<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>data_start <span class="ot">&lt;-</span> <span class="dv">2000</span></span>
-<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>data_end <span class="ot">&lt;-</span> <span class="dv">2022</span></span></code></pre></div>
+<div id="methods" class="section level1" number="4">
+<h1><span class="header-section-number">4</span> Methods</h1>
+<div id="setup" class="section level2" number="4.1">
+<h2><span class="header-section-number">4.1</span> Setup</h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># load libraries, set directories</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">library</span>(ohicore)  <span class="co">#devtools::install_github(&#39;ohi-science/ohicore@dev&#39;)</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">library</span>(plotly)</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">library</span>(here)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">library</span>(janitor)</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="do">### Load FAO-specific user-defined functions</span></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">here</span>(<span class="st">&#39;workflow/R/fao_fxn.R&#39;</span>)) <span class="co"># function for cleaning FAO files (not combined into common.R like most other functions have been at this point)</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">here</span>(<span class="st">&#39;workflow/R/common.R&#39;</span>)) <span class="co"># directory locations</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>version_year <span class="ot">&lt;-</span> <span class="dv">2024</span></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>latest_data_yr <span class="ot">&lt;-</span> version_year <span class="sc">-</span> <span class="dv">2</span></span></code></pre></div>
 </div>
-<div id="methods" class="section level1" number="6">
-<h1><span class="header-section-number">6</span> Methods</h1>
-<p>Percentage of people without sanitation was multiplied by the coastal
-population (within 25 miles of the coast) to estimate the number of
-people located along the coast without sanitation. This value was
-rescaled between 0 and 1 by dividing by the 99th quantile across all
-regions from years 2000 to 2009.</p>
-<div id="download-the-data" class="section level2" number="6.1">
-<h2><span class="header-section-number">6.1</span> Download the
+<div id="read-in-the-raw-data" class="section level2" number="4.2">
+<h2><span class="header-section-number">4.2</span> Read in the raw
 data</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co">#data download url</span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>url <span class="ot">&lt;-</span> <span class="st">&quot;https://sdmx.data.unicef.org/ws/public/sdmxapi/rest/data/UNICEF,WASH_HOUSEHOLDS,1.0/.WS_PPL_S-ALB+WS_PPL_S-L+WS_PPL_S-OD+WS_PPL_S-UI.SAN.._T?format=sdmx-compact-2.1&quot;</span></span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co">#read in data from the api and save as a tibble</span></span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>sanitation <span class="ot">&lt;-</span> <span class="fu">readSDMX</span>(url) <span class="sc">%&gt;%</span> <span class="fu">as_tibble</span>()</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#save to the raw data folder for reproduceability in case the data changes</span></span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="fu">write_csv</span>(sanitation,  <span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, version_year, <span class="st">&quot;raw/2024_WASH.csv&quot;</span>))</span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#fill in data_end in the previous chunk by checking this</span></span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="fu">unique</span>(sanitation<span class="sc">$</span>TIME_PERIOD)</span></code></pre></div>
+<p>This includes the FAO capture production data and a list of the
+“target” species.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="do">## FAO capture production data - all columns being parsed as characters and producing error in one column, but not sure which? (read.csv might help avoid this error?)</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co"># The last row is not relevant to the data and is removed which is what the warning is referring to</span></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>fis_fao_raw <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="fu">file.path</span>(dir_M, <span class="st">&#39;git-annex/globalprep/_raw_data/FAO_capture&#39;</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>            <span class="fu">paste0</span>(<span class="st">&#39;d&#39;</span>, version_year),</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>            <span class="fu">paste0</span>(<span class="st">&#39;global_capture_production_quantity_1950-&#39;</span>, latest_data_yr,<span class="st">&#39;.csv&#39;</span>))</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="co"># , na = &quot;...&quot;</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>)</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co"># List of species included as cetaceans or marine turtles (this probably won&#39;t change at all)</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>sp2grp <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&#39;globalprep&#39;</span>, <span class="st">&#39;prs_targetedharvest&#39;</span>, <span class="fu">paste0</span>(<span class="st">&#39;v&#39;</span>, version_year), <span class="st">&#39;raw&#39;</span>, <span class="st">&#39;species2group.csv&#39;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(incl_excl <span class="sc">==</span> <span class="st">&#39;include&#39;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(target, species); <span class="fu">head</span>(sp2grp)</span></code></pre></div>
 </div>
-<div id="data-wrangling" class="section level2" number="6.2">
-<h2><span class="header-section-number">6.2</span> Data wrangling</h2>
-<p>Some countries are missing a value for the at least basic category
-indicator (ws_ppl_s_alb). This can be calculated by adding the
-proportion of the population using limited sanitation services, the
-proportion of population using unimproved sanitation services, and the
-proportion of the population using open defecation, and subtractring
-that sum from 100 to get the value if it doesn’t exist.</p>
-<p>Scale the percentage of population with access to improved sanitation
-to proportion (from 0-1). Transform population and percentage into a
-numeric variable.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">unique</span>(sanitation<span class="sc">$</span>INDICATOR) <span class="do">## ALB-at least basic, L-limited, OD-open defecation, and UI-unimproved </span></span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#pivot so that each indicator has its own column</span></span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>sanitation_wider <span class="ot">&lt;-</span> sanitation <span class="sc">%&gt;%</span> </span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> INDICATOR, <span class="at">values_from =</span> OBS_VALUE) <span class="sc">%&gt;%</span> </span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  janitor<span class="sc">::</span><span class="fu">clean_names</span>() <span class="sc">%&gt;%</span> </span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">country_code =</span> ref_area, <span class="at">year =</span> time_period, <span class="at">basic =</span> ws_ppl_s_alb, ws_ppl_s_l, ws_ppl_s_ui, ws_ppl_s_od)</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a></span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="do">##creates new column with limited, open defecation, and unimproved sanitation all in one column called not_basic</span></span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>sanitation_clean <span class="ot">&lt;-</span> sanitation_wider <span class="sc">%&gt;%</span></span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>  <span class="fu">group_by</span>(country_code,year) <span class="sc">%&gt;%</span> </span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">not_basic =</span> <span class="fu">sum</span>(<span class="fu">as.numeric</span>(ws_ppl_s_l), <span class="fu">as.numeric</span>(ws_ppl_s_ui), <span class="fu">as.numeric</span>(ws_ppl_s_od), <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>         <span class="at">basic =</span> <span class="fu">as.numeric</span>(basic), <span class="at">year =</span> <span class="fu">as.numeric</span>(year)) <span class="sc">%&gt;%</span> </span>
-<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">alb =</span> <span class="dv">100</span> <span class="sc">-</span> not_basic) <span class="sc">%&gt;%</span> <span class="co">#calculate at least basic from the other 3 indicators</span></span>
-<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">basic =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(basic), alb, basic)) <span class="sc">%&gt;%</span> <span class="co">#replace na values with the calculated value</span></span>
-<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span> </span>
-<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">basic_prop =</span> basic<span class="sc">/</span><span class="dv">100</span>) <span class="sc">%&gt;%</span> <span class="co">#calculate proportion</span></span>
-<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(year)) <span class="sc">%&gt;%</span> </span>
-<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a>  tidyr<span class="sc">::</span><span class="fu">complete</span>(country_code, year) <span class="co">#make implicit NA values explicit</span></span>
-<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a></span>
-<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a></span>
-<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="co">#add in the name for each country</span></span>
-<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="co">#receive some warnings because some of the codes included in the data are not actually country codes</span></span>
-<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a>sanitation_clean<span class="sc">$</span>country <span class="ot">&lt;-</span> <span class="fu">countrycode</span>(sanitation_clean<span class="sc">$</span>country_code, <span class="st">&quot;iso3c&quot;</span>, <span class="st">&quot;country.name&quot;</span>)</span>
-<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a></span>
-<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a><span class="co">#add in channel islands because country code not recognized by the function</span></span>
-<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a>sanitation_clean <span class="ot">&lt;-</span> sanitation_clean <span class="sc">%&gt;%</span> </span>
-<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">country =</span> <span class="fu">case_when</span>(country_code <span class="sc">==</span> <span class="st">&quot;CHI&quot;</span> <span class="sc">~</span> <span class="st">&quot;Channel Islands&quot;</span>, <span class="cn">TRUE</span> <span class="sc">~</span> country))</span>
-<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a></span>
-<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a><span class="co">#add the population data from World Development indicators package from World Bank</span></span>
-<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a>population_weights <span class="ot">&lt;-</span> <span class="fu">WDI</span>(</span>
-<span id="cb3-32"><a href="#cb3-32" tabindex="-1"></a>  <span class="at">country =</span> <span class="st">&quot;all&quot;</span>,</span>
-<span id="cb3-33"><a href="#cb3-33" tabindex="-1"></a>  <span class="at">indicator =</span> <span class="st">&quot;SP.POP.TOTL&quot;</span>, </span>
-<span id="cb3-34"><a href="#cb3-34" tabindex="-1"></a>  <span class="at">start =</span> data_start, <span class="at">end =</span> data_end) <span class="sc">%&gt;%</span></span>
-<span id="cb3-35"><a href="#cb3-35" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">country_code =</span> iso3c, <span class="at">population =</span> SP.POP.TOTL, year)</span>
-<span id="cb3-36"><a href="#cb3-36" tabindex="-1"></a></span>
-<span id="cb3-37"><a href="#cb3-37" tabindex="-1"></a></span>
-<span id="cb3-38"><a href="#cb3-38" tabindex="-1"></a><span class="co">#add population data to sanitation clean by country code and year</span></span>
-<span id="cb3-39"><a href="#cb3-39" tabindex="-1"></a>sanitation_clean <span class="ot">&lt;-</span> sanitation_clean <span class="sc">%&gt;%</span> </span>
-<span id="cb3-40"><a href="#cb3-40" tabindex="-1"></a>  <span class="fu">left_join</span>(population_weights, <span class="at">by=</span> <span class="fu">c</span>(<span class="st">&quot;country_code&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb3-41"><a href="#cb3-41" tabindex="-1"></a>  <span class="fu">select</span>(country_code, country, year, basic, basic_prop, population) <span class="sc">%&gt;%</span> </span>
-<span id="cb3-42"><a href="#cb3-42" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">population =</span> <span class="fu">case_when</span>(<span class="fu">str_detect</span>(country, <span class="st">&quot;Martinique&quot;</span>) <span class="sc">~</span><span class="dv">368000</span>,</span>
-<span id="cb3-43"><a href="#cb3-43" tabindex="-1"></a>         <span class="fu">str_detect</span>(country, <span class="st">&quot;Guadeloupe&quot;</span>) <span class="sc">~</span> <span class="dv">396000</span>,</span>
-<span id="cb3-44"><a href="#cb3-44" tabindex="-1"></a>         <span class="fu">is.na</span>(population) <span class="sc">~</span> <span class="dv">1</span>,</span>
-<span id="cb3-45"><a href="#cb3-45" tabindex="-1"></a>         <span class="cn">TRUE</span> <span class="sc">~</span> population)) <span class="co">#add static value for Guadeloupe and Martinique since these are not reported, found through online search</span></span></code></pre></div>
-<p>Change names of regions to match names in ohicore and filter out
-regions that are not part of the OHI assesment or do not have data.</p>
-<p>If after running ‘name_2_rgn’ (see next r chunk), there are some
-coastal regions that are not identified by <code>name_2rgn</code>
-function. They must be checked to determine how to best include them (or
-not include them).</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co">#manually clean country names </span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>sanitation_clean <span class="ot">&lt;-</span> sanitation_clean <span class="sc">%&gt;%</span></span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>   <span class="fu">mutate</span>(<span class="at">country =</span> <span class="fu">str_replace</span>(country, <span class="st">&quot;&amp;&quot;</span>, <span class="st">&quot;and&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">country =</span> <span class="fu">case_when</span>(</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>                           <span class="fu">str_detect</span>(country, <span class="st">&quot;Helena&quot;</span>) <span class="sc">~</span><span class="st">&quot;Saint Helena&quot;</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>                           <span class="fu">str_detect</span>(country, <span class="st">&quot;São Tomé and Príncipe&quot;</span>)<span class="sc">~</span> <span class="st">&quot;Sao Tome and Principe&quot;</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>                          <span class="cn">TRUE</span> <span class="sc">~</span> country</span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>                           )) </span>
+<div id="clean-the-fao-data" class="section level2" number="4.3">
+<h2><span class="header-section-number">4.3</span> Clean the FAO
+data</h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># Rename columns and remove unit column</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>fao_clean <span class="ot">&lt;-</span> fis_fao_raw <span class="sc">%&gt;%</span> </span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">country =</span> <span class="st">&quot;Country Name En&quot;</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>                <span class="at">species =</span> <span class="st">&quot;ASFIS species Name En&quot;</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>                <span class="at">area =</span> <span class="st">&quot;FAO major fishing area Name En&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(<span class="st">&quot;Unit Name&quot;</span>, <span class="st">&quot;ISSCAAP group Name En&quot;</span>, <span class="st">&quot;Family Scientific name&quot;</span>, <span class="st">&quot;Inland/Marine areas Name En&quot;</span>)) <span class="sc">%&gt;%</span> <span class="co">#  added removing Unit also</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename_with</span>(<span class="sc">~</span> base<span class="sc">::</span><span class="fu">gsub</span>(<span class="st">&quot;</span><span class="sc">\\</span><span class="st">[&quot;</span>, <span class="st">&quot;&quot;</span>, .)) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename_with</span>(<span class="sc">~</span> base<span class="sc">::</span><span class="fu">gsub</span>(<span class="st">&quot;</span><span class="sc">\\</span><span class="st">]&quot;</span>, <span class="st">&quot;&quot;</span>, .))</span>
 <span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="do">## v2021: Reporting Caribbean Netherlands regions (Bonaire, Sint Eustatius, and Saba) at a higher resolution:</span></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a></span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>CN <span class="ot">&lt;-</span> <span class="fu">filter</span>(sanitation_clean, country<span class="sc">==</span><span class="st">&quot;Caribbean Netherlands&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>   <span class="fu">rename</span>(<span class="at">country_old =</span> country)</span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a></span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>CN_subregions <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">country_old =</span> <span class="st">&quot;Caribbean Netherlands&quot;</span>,</span>
-<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>                            <span class="at">country =</span> <span class="fu">c</span>(<span class="st">&quot;Bonaire&quot;</span>, <span class="st">&quot;Sint Eustatius&quot;</span>, <span class="st">&quot;Saba&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>  <span class="fu">left_join</span>(CN) <span class="sc">%&gt;%</span></span>
-<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>country_old)</span>
-<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a></span>
-<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>sanitation_clean <span class="ot">&lt;-</span> sanitation_clean <span class="sc">%&gt;%</span></span>
-<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>   <span class="fu">filter</span>(country <span class="sc">!=</span> <span class="st">&quot;Caribbean Netherlands&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a>   <span class="fu">rbind</span>(CN_subregions)  </span>
-<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a></span>
-<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="co"># Channel Islands correspond to OHI regions of Guernsey and Jersey. Here the data reported for Channel Islands is used for these two regions.</span></span>
-<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a></span>
-<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a>CI <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(sanitation_clean, country<span class="sc">==</span><span class="st">&quot;Channel Islands&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">country_old =</span> country)</span>
-<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a>CI_subregions <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">country_old =</span> <span class="st">&quot;Channel Islands&quot;</span>,</span>
-<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a>                            <span class="at">country =</span> <span class="fu">c</span>(<span class="st">&quot;Guernsey&quot;</span>, <span class="st">&quot;Jersey&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(CI) <span class="sc">%&gt;%</span></span>
-<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>country_old)</span>
-<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a></span>
-<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a>sanitation_clean <span class="ot">&lt;-</span> sanitation_clean <span class="sc">%&gt;%</span></span>
-<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(country <span class="sc">!=</span> <span class="st">&quot;Channel Islands&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a>  <span class="fu">rbind</span>(CI_subregions) </span></code></pre></div>
-<p>Add rgn_id and merge duplicate regions using a mean weighted by
-population.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>rgn_sani <span class="ot">&lt;-</span> <span class="fu">name_2_rgn</span>(sanitation_clean, </span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>                        <span class="at">fld_name     =</span> <span class="st">&#39;country&#39;</span>,</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>                        <span class="at">flds_unique  =</span> <span class="fu">c</span>(<span class="st">&#39;year&#39;</span>))</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>fao_clean<span class="ot">&lt;-</span> fao_clean <span class="sc">%&gt;%</span> </span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(<span class="fu">contains</span>(<span class="st">&quot;Flag&quot;</span>)))</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co"># Pivot_longer by year and value to expand and make each line a single observation for country, species and year (tidy data!)</span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>fao_clean <span class="ot">&lt;-</span> fao_clean <span class="sc">%&gt;%</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>  tidyr<span class="sc">::</span><span class="fu">pivot_longer</span>(<span class="at">cols =</span> <span class="sc">-</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>), <span class="at">names_to =</span> <span class="st">&#39;year&#39;</span>, <span class="at">values_to =</span> <span class="st">&#39;value&#39;</span>, <span class="at">values_drop_na =</span> T) <span class="sc">%&gt;%</span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>    <span class="fu">fao_clean_data_new</span>() </span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a></span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="co">#not sure if this is necessary still but I ran it and kept it in just in case-v2024</span></span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>fao_clean <span class="ot">&lt;-</span> fao_clean <span class="sc">%&gt;%</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>    <span class="at">species =</span> <span class="fu">as.character</span>(species),</span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a>    <span class="at">species =</span> stringr<span class="sc">::</span><span class="fu">str_replace_all</span>(</span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a>      <span class="at">string =</span> species, </span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a>      <span class="at">pattern =</span> <span class="st">&quot;Henslow.*s swimming crab&quot;</span>, </span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a>      <span class="at">replacement =</span> <span class="st">&quot;Henslow&#39;s swimming crab&quot;</span>)</span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a>    )</span></code></pre></div>
+</div>
+<div id="identify-the-target-species" class="section level2" number="4.4">
+<h2><span class="header-section-number">4.4</span> Identify the target
+species</h2>
+<p>This analysis only includes target species. The warning messages need
+to be checked and, if necessary, changes should be made to the
+raw/species2group.csv</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># check for discrepancies in species list</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>spgroups <span class="ot">&lt;-</span>  <span class="fu">sort</span>(<span class="fu">as.character</span>(<span class="fu">unique</span>(fao_clean<span class="sc">$</span>species))) <span class="co"># species groups in FAO data </span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>groups <span class="ot">&lt;-</span>  <span class="fu">c</span>(<span class="st">&#39;turtle&#39;</span>, <span class="st">&#39;whale&#39;</span>, <span class="st">&#39;dolphin&#39;</span>, <span class="st">&#39;porpoise&#39;</span>) <span class="co"># seals and sea lions removed from vector (pinnipeds no longer included) </span></span>
 <span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a></span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#Check list in warning to make sure all countries removed are not of interest for the OHI global assesment. </span></span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co"># v2023 non-matched regions: Eswatini (landlocked), Isle of Man (not reported in OHI), North Macedonia (landlocked), Palestinian Territories (disputed), Saint Barthelemy (not reported in OHI)</span></span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#Check for duplicate regions.</span></span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a></span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="do">##v2024 Non matched regions were similar(Isle of man, Palestinian territories, St Barthelemy) but not proper region type and mismatched region names was about 45 countries but these all look landlocked. The duplicate countries were~China, Guadeloupe, Guam, Hong Kong SAR, Macao SAR Northern Mariana islands, Martinique, Puerto Rico and US Virgin Islands. </span></span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a></span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a> rgn_sani <span class="sc">%&gt;%</span></span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(rgn_id) <span class="sc">%&gt;%</span></span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarise</span>(<span class="at">n=</span> dplyr<span class="sc">::</span><span class="fu">n</span>()) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>  <span class="fu">filter</span>(n <span class="sc">&gt;</span> (data_end <span class="sc">-</span> data_start <span class="sc">+</span><span class="dv">1</span>)) </span>
-<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a> </span>
-<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a> <span class="fu">unique</span>(rgn_sani<span class="sc">$</span>year)</span>
-<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a></span>
-<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co">#Each region has 23 years of data in this case. </span></span>
-<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co">#If there are regions with more than 23 values it is because in this database they are reported in a higher resolution than the OHI global assessment (eg: China, Hong Kong and Macao are just one region for the OHI global). For these regions a weighted average will be calculated as its final score.</span></span>
-<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a> <span class="co">#v2023 regions 13, 116, 140 and 2009 had duplicates</span></span>
-<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a> <span class="do">##v2024 same regions had duplicates</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co"># Going through FAO data species and seeing if they&#39;re in our master list of species</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="do">## Looking to see if we need to add species that have changed name</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="cf">for</span> (group <span class="cf">in</span> groups) {<span class="co"># group=&#39;dolphin&#39;</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  possibles <span class="ot">&lt;-</span> spgroups[<span class="fu">grep</span>(group, spgroups)]</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>  d_missing_l <span class="ot">&lt;-</span>  <span class="fu">setdiff</span>(possibles, sp2grp<span class="sc">$</span>species)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(d_missing_l) <span class="sc">&gt;</span> <span class="dv">0</span>){</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>    <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">&quot;</span><span class="sc">\n</span><span class="st">MISSING in the lookup the following species in target=&#39;%s&#39;.</span><span class="sc">\n</span><span class="st">    %s</span><span class="sc">\n</span><span class="st">&quot;</span>, </span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>                group, <span class="fu">paste</span>(d_missing_l, <span class="at">collapse=</span><span class="st">&#39;</span><span class="sc">\n</span><span class="st">    &#39;</span>)))</span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>  }</span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>}</span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co"># check for species in lookup not found in data</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a>l_missing_d <span class="ot">&lt;-</span>  <span class="fu">setdiff</span>(sp2grp<span class="sc">$</span>species, spgroups)</span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(l_missing_d) <span class="sc">&gt;</span> <span class="dv">0</span>){</span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">&#39;</span><span class="sc">\n</span><span class="st">MISSING: These species in the lookup are not found in the FAO data </span><span class="sc">\n</span><span class="st">&#39;</span>))</span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a>  <span class="fu">print</span>(l_missing_d)</span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a>}</span>
 <span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a></span>
-<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="co"># Calculating weighted means for the duplicated regions.</span></span>
-<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a></span>
-<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a>sani_final <span class="ot">&lt;-</span> rgn_sani <span class="sc">%&gt;%</span> </span>
-<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(rgn_id, rgn_name, year) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarise</span>(<span class="at">basic_sani_prop=</span> </span>
-<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a>                     <span class="fu">ifelse</span>(<span class="fu">n</span>() <span class="sc">&gt;</span><span class="dv">1</span>, <span class="fu">weighted.mean</span>(basic_prop, population, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), basic_prop)) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a>   <span class="fu">mutate</span>(<span class="at">basic_sani_prop =</span> <span class="fu">ifelse</span>(<span class="fu">is.nan</span>(basic_sani_prop), <span class="cn">NA</span>, basic_sani_prop))</span>
-<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a></span>
-<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a></span>
-<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a><span class="co">#Check for duplicate regions. At this point, all regions should have the same sample size.</span></span>
-<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a>year_check <span class="ot">&lt;-</span> sani_final <span class="sc">%&gt;%</span></span>
-<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(rgn_id) <span class="sc">%&gt;%</span></span>
-<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarise</span>(<span class="at">n=</span> dplyr<span class="sc">::</span><span class="fu">n</span>())</span>
-<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a></span>
-<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a><span class="fu">unique</span>(year_check<span class="sc">$</span>n)</span>
-<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a><span class="co">#v2024- 23</span></span></code></pre></div>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="do">#### v2024</span></span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="co"># MISSING in the lookup the following species in target=&#39;turtle&#39;.</span></span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="co">#     Chinese softshell turtle - not a marine turtle</span></span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="co">#     River and lake turtles nei - not a marine turtle</span></span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a><span class="co"># MISSING in the lookup the following species in target=&#39;whale&#39;.</span></span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="co">#     Creek whaler - shark, not a whale</span></span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a><span class="co">#     Velvet whalefish - fish, not a whale</span></span>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a><span class="co"># MISSING in the lookup the following species in target=&#39;dolphin&#39;.</span></span>
+<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a><span class="co">#     Common dolphinfish - fish not a cetacean</span></span>
+<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a><span class="co">#     Pompano dolphinfish - fish not a cetacean</span></span>
+<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a></span>
+<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a><span class="do">## filter data to include only target species ----</span></span>
+<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a>target_spp <span class="ot">&lt;-</span> fao_clean <span class="sc">%&gt;%</span></span>
+<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(species <span class="sc">%in%</span> sp2grp<span class="sc">$</span>species) <span class="co"># this goes from 2384 spp in FAO list to just 72</span></span>
+<span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a></span>
+<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a><span class="fu">unique</span>(target_spp<span class="sc">$</span>area) <span class="co"># confirm these are all marine regions</span></span>
+<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a><span class="fu">unique</span>(fao_clean<span class="sc">$</span>species) <span class="co"># 3398 species</span></span>
+<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a><span class="fu">unique</span>(target_spp<span class="sc">$</span>species) <span class="co"># 72 species</span></span></code></pre></div>
 </div>
-<div id="gapfilling" class="section level2" number="6.3">
-<h2><span class="header-section-number">6.3</span> Gapfilling</h2>
-<p>First step is to get an idea of what needs to be gapfilled.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>sani_gf <span class="ot">&lt;-</span> sani_final <span class="sc">%&gt;%</span> </span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(rgn_id, rgn_name) <span class="sc">%&gt;%</span></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gf_count =</span> <span class="fu">sum</span>(<span class="fu">is.na</span>(basic_sani_prop))) <span class="sc">%&gt;%</span> <span class="co"># create column to count # of NAs (# of data points to gapfill)</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
+<div id="summarize-data" class="section level2" number="4.5">
+<h2><span class="header-section-number">4.5</span> Summarize data</h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># pivot wider to expand years</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>wide <span class="ot">&lt;-</span> target_spp <span class="sc">%&gt;%</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  tidyr<span class="sc">::</span><span class="fu">pivot_wider</span>(<span class="at">names_from =</span> year, <span class="at">values_from =</span> value) <span class="sc">%&gt;%</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(sp2grp, <span class="at">by=</span><span class="st">&#39;species&#39;</span>); <span class="fu">head</span>(wide) </span>
 <span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a></span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="fu">summary</span>(sani_gf) </span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co"># 161 NAs in v2019</span></span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co"># 212 NAs in v2021; makes sense, there are more years of data</span></span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co"># 191 NAS in v2023</span></span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co"># 188 NAs in v2024</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a></span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a></span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#list of regions that need gapfilling</span></span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">filter</span>(sani_gf, gf_count<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, rgn_name, gf_count) <span class="sc">%&gt;%</span> </span>
-<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a>  <span class="fu">unique</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>  <span class="fu">data.frame</span>()</span>
-<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a></span>
-<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="do">##v2024 40 need gapfilling</span></span>
-<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a></span>
-<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a><span class="co">#Some regions have no data - we will filter them out to be gapfilled later.</span></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co"># pivot longer long by target</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>long <span class="ot">&lt;-</span> wide <span class="sc">%&gt;%</span></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>area) <span class="sc">%&gt;%</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>  tidyr<span class="sc">::</span><span class="fu">pivot_longer</span>(<span class="at">cols =</span> <span class="fu">c</span>(<span class="sc">-</span>country, <span class="sc">-</span>species, <span class="sc">-</span>target),</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>                      <span class="at">names_to =</span> <span class="st">&#39;year&#39;</span>,</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>                      <span class="at">values_to =</span> <span class="st">&#39;value&#39;</span>,</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>                      <span class="at">values_drop_na =</span> T) <span class="sc">%&gt;%</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">as.integer</span>(<span class="fu">as.character</span>(year))) <span class="sc">%&gt;%</span></span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(country, target, year); <span class="fu">head</span>(long)</span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co"># explore Japan[210] as an example</span></span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>japan <span class="ot">&lt;-</span> long <span class="sc">%&gt;%</span> </span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(country, target, year) <span class="sc">%&gt;%</span></span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarize</span>(<span class="at">value =</span> <span class="fu">sum</span>(value)) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(country <span class="sc">==</span> <span class="st">&#39;Japan&#39;</span>, target <span class="sc">==</span> <span class="st">&#39;cetacean&#39;</span>, year <span class="sc">&gt;=</span> <span class="dv">2000</span>) </span>
 <span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a></span>
-<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a><span class="co">#Define number of years of data</span></span>
-<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>years_data <span class="ot">&lt;-</span> <span class="fu">mean</span>(<span class="fu">table</span>(sani_gf<span class="sc">$</span>rgn_id))</span>
-<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a></span>
-<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a>sani_gf <span class="ot">&lt;-</span> sani_gf <span class="sc">%&gt;%</span></span>
-<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(gf_count <span class="sc">!=</span> years_data)</span></code></pre></div>
-<div id="gapfilling-1-linear-model" class="section level3" number="6.3.1">
-<h3><span class="header-section-number">6.3.1</span> Gapfilling 1:
-Linear model</h3>
-<p>Use a linear model within country data to estimate missing years.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>sani_gf_lm <span class="ot">&lt;-</span> sani_gf <span class="sc">%&gt;%</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(rgn_id, rgn_name) <span class="sc">%&gt;%</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">do</span>({</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>    mod <span class="ot">&lt;-</span> <span class="fu">lm</span>(basic_sani_prop <span class="sc">~</span> year, <span class="at">data =</span> .)</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>    gf_lm <span class="ot">&lt;-</span> <span class="fu">predict</span>(mod, <span class="at">newdata =</span> .[<span class="fu">c</span>(<span class="st">&#39;year&#39;</span>)])</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    <span class="fu">data.frame</span>(., gf_lm)</span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  }) <span class="sc">%&gt;%</span></span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>()</span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a></span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a><span class="co"># summarize totals per region per year - number of individual animals from each spp group? </span></span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>sum <span class="ot">&lt;-</span> long <span class="sc">%&gt;%</span></span>
+<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(country, year) <span class="sc">%&gt;%</span></span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarize</span>(<span class="at">value =</span> <span class="fu">sum</span>(value, <span class="at">na.rm=</span><span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(value <span class="sc">!=</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>(); <span class="fu">head</span>(sum) </span></code></pre></div>
+</div>
+<div id="assign-country-names-to-ohi-regions" class="section level2" number="4.6">
+<h2><span class="header-section-number">4.6</span> Assign country names
+to OHI regions</h2>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>sum <span class="ot">&lt;-</span> sum <span class="sc">%&gt;%</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  ohicore<span class="sc">::</span><span class="fu">split_regions</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">country =</span> <span class="fu">as.character</span>(country)) <span class="sc">%&gt;%</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">country =</span> <span class="fu">ifelse</span>(stringr<span class="sc">::</span><span class="fu">str_detect</span>(country, <span class="st">&quot;C.*te d&#39;Ivoire&quot;</span>), <span class="st">&quot;Ivory Coast&quot;</span>, country))</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="do">### Function to convert to OHI region ID</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>m_sum_rgn <span class="ot">&lt;-</span> <span class="fu">name_2_rgn</span>(<span class="at">df_in =</span> sum, </span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>                       <span class="at">fld_name=</span><span class="st">&#39;country&#39;</span>, </span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>                       <span class="at">flds_unique=</span><span class="fu">c</span>(<span class="st">&#39;year&#39;</span>))</span>
 <span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a></span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>sani_gf_lm <span class="ot">&lt;-</span> sani_gf_lm <span class="sc">%&gt;%</span></span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">gf_lm =</span> <span class="fu">ifelse</span>(gf_lm <span class="sc">&gt;</span> <span class="dv">1</span>, <span class="dv">1</span>, gf_lm)) <span class="sc">%&gt;%</span> <span class="co"># constrain predictions to &lt;=1 </span></span>
-<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">method =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(basic_sani_prop), <span class="st">&quot;lm prediction based on year&quot;</span>, <span class="cn">NA</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">basic_sani_prop =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(basic_sani_prop), gf_lm, basic_sani_prop))</span></code></pre></div>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="co"># Check out duplicates based on error message from previous step</span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">filter</span>(m_sum_rgn, country <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;Guadeloupe&quot;</span>, <span class="st">&quot;Martinique&quot;</span>)) </span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="co"># this is ok, we report these two together, so this will be fixed with the summarize in the next step </span></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a></span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="co"># They will be summed:</span></span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>m_sum_rgn <span class="ot">&lt;-</span> m_sum_rgn <span class="sc">%&gt;%</span></span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(rgn_id, rgn_name, year) <span class="sc">%&gt;%</span></span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarize</span>(<span class="at">value =</span> <span class="fu">sum</span>(value)) <span class="sc">%&gt;%</span></span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>()</span></code></pre></div>
 </div>
-<div id="gapfilling-2-georegional-averages" class="section level3" number="6.3.2">
-<h3><span class="header-section-number">6.3.2</span> Gapfilling 2:
-Georegional averages</h3>
-<p>Georegional gapfilling for regions that do not have data.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="do">##function to bring in gapfilling data</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">UNgeorgn</span>()</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>UNgeorgn <span class="ot">&lt;-</span> UNgeorgn <span class="sc">%&gt;%</span></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, rgn_label, <span class="at">r1=</span>r1_label, <span class="at">r2=</span>r2_label)</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>year <span class="ot">&lt;-</span> <span class="fu">min</span>(sani_gf_lm<span class="sc">$</span>year)<span class="sc">:</span><span class="fu">max</span>(sani_gf_lm<span class="sc">$</span>year) <span class="co">#defines the year range</span></span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a></span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>sani_georgn_gf <span class="ot">&lt;-</span> UNgeorgn <span class="sc">%&gt;%</span></span>
-<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  <span class="fu">expand</span>(year, UNgeorgn) <span class="sc">%&gt;%</span></span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(sani_gf_lm, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&#39;rgn_id&#39;</span>, <span class="st">&#39;year&#39;</span>))</span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a></span>
-<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a></span>
-<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a><span class="co">#Calculate two different gapfill columns using r2 and r1 UN geopolitical classification</span></span>
-<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>sani_georgn_gf <span class="ot">&lt;-</span> sani_georgn_gf <span class="sc">%&gt;%</span></span>
-<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(year, r2) <span class="sc">%&gt;%</span></span>
-<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">basic_sani_r2 =</span> <span class="fu">mean</span>(basic_sani_prop, <span class="at">na.rm=</span><span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(year, r1) <span class="sc">%&gt;%</span></span>
-<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">basic_sani_r1 =</span> <span class="fu">mean</span>(basic_sani_prop, <span class="at">na.rm=</span><span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>()<span class="sc">%&gt;%</span></span>
-<span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(rgn_id, year)</span>
+<div id="scale-the-data-and-save-files" class="section level2" number="4.7">
+<h2><span class="header-section-number">4.7</span> Scale the data and
+save files</h2>
+<p>Data is rescaled by dividing by the 95th quantile of values across
+all regions from 2011 to 2022 (most recent year of FAO data).</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>target_harvest <span class="ot">&lt;-</span> m_sum_rgn <span class="sc">%&gt;%</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>    <span class="at">quant_95 =</span> <span class="fu">quantile</span>(value[year <span class="sc">%in%</span> <span class="dv">2011</span><span class="sc">:</span>latest_data_yr], <span class="fl">0.95</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>    <span class="at">score =</span> value <span class="sc">/</span> quant_95,</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>    <span class="at">score =</span> <span class="fu">ifelse</span>(score <span class="sc">&gt;</span> <span class="dv">1</span>, <span class="dv">1</span>, score)) <span class="sc">%&gt;%</span></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, <span class="at">pressure_score =</span> score) <span class="sc">%&gt;%</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(rgn_id, year); <span class="fu">head</span>(target_harvest); <span class="fu">summary</span>(target_harvest)</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  </span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co"># v2021 quant_95 = 3409.4</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co"># v2022 quant_95 = 3450.05</span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="co"># v2023 quant_95 = 3572</span></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="co"># v2024 quant_95 = 3422.55</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a></span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a><span class="co"># any regions that did not have a catch should have score = 0 </span></span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a></span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a>rgns <span class="ot">&lt;-</span>  rgn_master <span class="sc">%&gt;%</span></span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(rgn_typ <span class="sc">==</span> <span class="st">&quot;eez&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">rgn_id =</span> rgn_id_2013) <span class="sc">%&gt;%</span></span>
+<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(rgn_id <span class="sc">&lt;</span> <span class="dv">255</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a>  base<span class="sc">::</span><span class="fu">unique</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(rgn_id)</span>
 <span id="cb8-23"><a href="#cb8-23" tabindex="-1"></a></span>
-<span id="cb8-24"><a href="#cb8-24" tabindex="-1"></a></span>
-<span id="cb8-25"><a href="#cb8-25" tabindex="-1"></a><span class="co">#First gapfill with r2, if no value available use r1; create column indicating whether value was gapfilled and if so, by what method. Give NA to inhabited regions</span></span>
-<span id="cb8-26"><a href="#cb8-26" tabindex="-1"></a>sani_georgn_gf <span class="ot">&lt;-</span> sani_georgn_gf <span class="sc">%&gt;%</span></span>
-<span id="cb8-27"><a href="#cb8-27" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">method =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(basic_sani_prop) <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(basic_sani_r2), <span class="st">&quot;UN georegion avg. (r2)&quot;</span>, method)) <span class="sc">%&gt;%</span></span>
-<span id="cb8-28"><a href="#cb8-28" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">method =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(basic_sani_prop) <span class="sc">&amp;</span> <span class="fu">is.na</span>(basic_sani_r2) <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(basic_sani_r1), <span class="st">&quot;UN georegion avg (r1)&quot;</span>, method))<span class="sc">%&gt;%</span></span>
-<span id="cb8-29"><a href="#cb8-29" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">basic_sani_prop =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(basic_sani_prop) <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(basic_sani_r2), basic_sani_r2, basic_sani_prop)) <span class="sc">%&gt;%</span></span>
-<span id="cb8-30"><a href="#cb8-30" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">basic_sani_prop =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(basic_sani_prop) <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(basic_sani_r1), basic_sani_r1, basic_sani_prop)) <span class="sc">%&gt;%</span></span>
-<span id="cb8-31"><a href="#cb8-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, rgn_label, year, basic_sani_prop, method)</span>
+<span id="cb8-24"><a href="#cb8-24" tabindex="-1"></a><span class="co"># Add year; for v2024, min year is 1950, and max year is 2022</span></span>
+<span id="cb8-25"><a href="#cb8-25" tabindex="-1"></a>rgns <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">rgn_id =</span> rgns<span class="sc">$</span>rgn_id, <span class="at">year =</span> <span class="fu">min</span>(target_harvest<span class="sc">$</span>year)<span class="sc">:</span><span class="fu">max</span>(target_harvest<span class="sc">$</span>year))</span>
+<span id="cb8-26"><a href="#cb8-26" tabindex="-1"></a></span>
+<span id="cb8-27"><a href="#cb8-27" tabindex="-1"></a><span class="co"># Change NAs in pressure_score column to 0s</span></span>
+<span id="cb8-28"><a href="#cb8-28" tabindex="-1"></a>target_harvest<span class="ot">&lt;-</span>  rgns <span class="sc">%&gt;%</span></span>
+<span id="cb8-29"><a href="#cb8-29" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(target_harvest) <span class="sc">%&gt;%</span></span>
+<span id="cb8-30"><a href="#cb8-30" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">pressure_score =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(pressure_score), <span class="dv">0</span>, pressure_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb8-31"><a href="#cb8-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(rgn_id); <span class="fu">head</span>(target_harvest); <span class="fu">summary</span>(target_harvest)</span>
 <span id="cb8-32"><a href="#cb8-32" tabindex="-1"></a></span>
-<span id="cb8-33"><a href="#cb8-33" tabindex="-1"></a><span class="co">#See regions that have not been gapfilled. </span></span>
-<span id="cb8-34"><a href="#cb8-34" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">filter</span>(sani_georgn_gf, <span class="fu">is.na</span>(basic_sani_prop)) <span class="sc">%&gt;%</span> </span>
-<span id="cb8-35"><a href="#cb8-35" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, basic_sani_prop) <span class="sc">%&gt;%</span> </span>
-<span id="cb8-36"><a href="#cb8-36" tabindex="-1"></a>  <span class="fu">unique</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb8-37"><a href="#cb8-37" tabindex="-1"></a>  <span class="fu">data.frame</span>() <span class="co">#NA values for uninhabitated regions. </span></span>
+<span id="cb8-33"><a href="#cb8-33" tabindex="-1"></a><span class="co"># Write target_harvest to &quot;fao_targeted.csv&quot; in output folder</span></span>
+<span id="cb8-34"><a href="#cb8-34" tabindex="-1"></a><span class="fu">write_csv</span>(</span>
+<span id="cb8-35"><a href="#cb8-35" tabindex="-1"></a>  target_harvest, </span>
+<span id="cb8-36"><a href="#cb8-36" tabindex="-1"></a>  <span class="fu">here</span>(<span class="st">&#39;globalprep&#39;</span>, <span class="st">&#39;prs_targetedharvest&#39;</span>, <span class="fu">paste0</span>(<span class="st">&#39;v&#39;</span>, version_year), <span class="st">&#39;output&#39;</span>, <span class="st">&#39;fao_targeted.csv&#39;</span>)</span>
+<span id="cb8-37"><a href="#cb8-37" tabindex="-1"></a>)</span>
 <span id="cb8-38"><a href="#cb8-38" tabindex="-1"></a></span>
-<span id="cb8-39"><a href="#cb8-39" tabindex="-1"></a><span class="do">## rgn_id that are NA: 89, 90, 91, 92, 93, 94, 105</span></span></code></pre></div>
+<span id="cb8-39"><a href="#cb8-39" tabindex="-1"></a><span class="co"># Create gapfill dataframe</span></span>
+<span id="cb8-40"><a href="#cb8-40" tabindex="-1"></a>target_harvest_gf <span class="ot">&lt;-</span> target_harvest <span class="sc">%&gt;%</span></span>
+<span id="cb8-41"><a href="#cb8-41" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfill =</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb8-42"><a href="#cb8-42" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, gapfill)</span>
+<span id="cb8-43"><a href="#cb8-43" tabindex="-1"></a><span class="co"># all zeroes for gapfill column; nothing being gapfilled but need to have a record </span></span>
+<span id="cb8-44"><a href="#cb8-44" tabindex="-1"></a></span>
+<span id="cb8-45"><a href="#cb8-45" tabindex="-1"></a><span class="co"># Write target_harvest_gf to &quot;fao_targeted_gf.csv&quot; in output folder</span></span>
+<span id="cb8-46"><a href="#cb8-46" tabindex="-1"></a><span class="fu">write_csv</span>(</span>
+<span id="cb8-47"><a href="#cb8-47" tabindex="-1"></a>  target_harvest_gf,</span>
+<span id="cb8-48"><a href="#cb8-48" tabindex="-1"></a>  <span class="fu">here</span>(<span class="st">&#39;globalprep&#39;</span>, <span class="st">&#39;prs_targetedharvest&#39;</span>, <span class="fu">paste0</span>(<span class="st">&#39;v&#39;</span>, version_year), <span class="st">&#39;output&#39;</span>, <span class="st">&#39;fao_targeted_gf.csv&#39;</span>)</span>
+<span id="cb8-49"><a href="#cb8-49" tabindex="-1"></a>)</span></code></pre></div>
 </div>
-<div id="gapfilling-3-replace-scores-for-uninhabited-regions" class="section level3" number="6.3.3">
-<h3><span class="header-section-number">6.3.3</span> Gapfilling 3:
-Replace scores for uninhabited regions</h3>
-<p>Uninhabited regions get a perfect score.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co">#Identify uninhabited regions </span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a></span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="fu">low_pop</span>() <span class="co"># requires common.R to be loaded </span></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>low_pop <span class="ot">&lt;-</span> low_pop <span class="sc">%&gt;%</span></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(est_population <span class="sc">&lt;</span> <span class="dv">100</span> <span class="sc">|</span> <span class="fu">is.na</span>(est_population)) </span>
+<div id="data-check" class="section level2" number="4.8">
+<h2><span class="header-section-number">4.8</span> Data check</h2>
+<p>The data from last year and this year should be the same unless there
+were changes to underlying FAO data or the master species list.</p>
+<p>In this case, all of the regions looked very similar.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># pull just 2021 data from target_harvest df, since its the most recent year in common</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>common_year <span class="ot">&lt;-</span> <span class="dv">2021</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>new <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;prs_targetedharvest&quot;</span>, <span class="fu">paste0</span>(<span class="st">&#39;v&#39;</span>, version_year), <span class="st">&quot;output&quot;</span>, <span class="st">&quot;fao_targeted.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> common_year)</span>
 <span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a></span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a></span>
-<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co">#Fill in all inhabited in rgn_inhab with perfect sanitation prop</span></span>
-<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>sani_complete <span class="ot">&lt;-</span> sani_georgn_gf <span class="sc">%&gt;%</span> </span>
-<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">basic_sani_prop =</span> <span class="fu">ifelse</span>(rgn_id <span class="sc">%in%</span> low_pop<span class="sc">$</span>rgn_id, <span class="dv">1</span>, basic_sani_prop)) <span class="sc">%&gt;%</span> </span>
-<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfill =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(method), <span class="dv">0</span>, <span class="dv">1</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfill =</span> <span class="fu">ifelse</span>(rgn_id <span class="sc">%in%</span> low_pop<span class="sc">$</span>rgn_id, <span class="dv">0</span>, gapfill)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">method =</span> <span class="fu">ifelse</span>(rgn_id <span class="sc">%in%</span> low_pop<span class="sc">$</span>rgn_id, <span class="st">&quot;No est. human population&quot;</span>, method)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, <span class="at">rgn_name =</span> rgn_label, year, basic_sani_prop, gapfill, method)</span>
-<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a></span>
-<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a><span class="do">##added this to check NAs</span></span>
-<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">is.na</span>(sani_complete<span class="sc">$</span>basic_sani_prop))</span>
-<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a></span>
-<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a><span class="fu">summary</span>(sani_complete) <span class="co"># should be no more NAs </span></span>
-<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a><span class="fu">table</span>(sani_complete<span class="sc">$</span>gapfill, sani_complete<span class="sc">$</span>method) <span class="co"># no pop is not considered gapfilled, should be N years * 20 regions</span></span></code></pre></div>
-</div>
-<div id="save-gapfilled-data-records" class="section level3" number="6.3.4">
-<h3><span class="header-section-number">6.3.4</span> Save gapfilled data
-records</h3>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">write_csv</span>(sani_complete, <span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen/&quot;</span>,version_year, <span class="st">&quot;/intermediate/sani_complete.csv&quot;</span>))</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co"># Quick check with previous year of data</span></span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>sani_complete_old <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>,previous_version_year, <span class="st">&quot;intermediate/sani_complete.csv&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">basic_sani_prop_2021 =</span> basic_sani_prop) <span class="sc">%&gt;%</span></span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">gapfill_2021 =</span> gapfill) <span class="sc">%&gt;%</span> </span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">method_2021 =</span> method) <span class="sc">%&gt;%</span> </span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>  <span class="fu">left_join</span>(sani_complete, <span class="at">by=</span><span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;year&quot;</span>, <span class="st">&quot;rgn_name&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2020</span>)</span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a></span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a></span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="fu">ggplotly</span>(<span class="fu">ggplot</span>(sani_complete_old, <span class="fu">aes</span>(<span class="at">y =</span> basic_sani_prop, <span class="at">x =</span> basic_sani_prop_2021, <span class="at">labels =</span> rgn_id)) <span class="sc">+</span></span>
-<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>           <span class="fu">labs</span>(<span class="at">x=</span> <span class="fu">paste</span>(previous_version_year, <span class="st">&quot;basic_sani_prop&quot;</span>),</span>
-<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a>                <span class="at">y =</span> <span class="fu">paste</span>(version_year, <span class="st">&quot;basic_sani_prop&quot;</span>), <span class="at">title =</span> <span class="st">&quot;2024 and 2023 Data Comparison&quot;</span>) <span class="sc">+</span></span>
-<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
-<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">color =</span> <span class="st">&quot;red&quot;</span>))</span>
-<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a><span class="do">##lines up!!</span></span>
-<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a></span>
-<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a><span class="co"># save gapfilling info</span></span>
-<span id="cb10-21"><a href="#cb10-21" tabindex="-1"></a>gf_data <span class="ot">&lt;-</span> sani_complete <span class="sc">%&gt;%</span></span>
-<span id="cb10-22"><a href="#cb10-22" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, gapfill, method)</span>
-<span id="cb10-23"><a href="#cb10-23" tabindex="-1"></a></span>
-<span id="cb10-24"><a href="#cb10-24" tabindex="-1"></a><span class="fu">write_csv</span>(gf_data, <span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, version_year, <span class="st">&quot;output/po_pathogen_popdensity25mi_gf.csv&quot;</span>))</span>
-<span id="cb10-25"><a href="#cb10-25" tabindex="-1"></a></span>
-<span id="cb10-26"><a href="#cb10-26" tabindex="-1"></a>gf_data_trend <span class="ot">&lt;-</span> sani_complete <span class="sc">%&gt;%</span></span>
-<span id="cb10-27"><a href="#cb10-27" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(rgn_id, year) <span class="sc">%&gt;%</span></span>
-<span id="cb10-28"><a href="#cb10-28" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(rgn_id) <span class="sc">%&gt;%</span></span>
-<span id="cb10-29"><a href="#cb10-29" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfill_5year =</span> <span class="fu">rollsum</span>(gapfill, <span class="dv">5</span>, <span class="at">align=</span><span class="st">&quot;right&quot;</span>, <span class="at">fill=</span><span class="cn">NA</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-30"><a href="#cb10-30" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">method =</span> <span class="fu">paste</span>(<span class="fu">na.exclude</span>(<span class="fu">unique</span>(method)), <span class="at">collapse =</span> <span class="st">&quot;, &quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-31"><a href="#cb10-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfill =</span> gapfill_5year<span class="sc">/</span><span class="dv">5</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb10-32"><a href="#cb10-32" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, gapfill, method)</span>
-<span id="cb10-33"><a href="#cb10-33" tabindex="-1"></a></span>
-<span id="cb10-34"><a href="#cb10-34" tabindex="-1"></a><span class="fu">write_csv</span>(gf_data, <span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, version_year, <span class="st">&quot;output/po_pathogen_popdensity25mi_trend_gf.csv&quot;</span>))</span></code></pre></div>
-</div>
-</div>
-<div id="standarizing-sanitation-data-by-population-density" class="section level2" number="6.4">
-<h2><span class="header-section-number">6.4</span> Standarizing
-sanitation data by population density</h2>
-<p>First calculate coastal population density (people/km<sup>2</sup>) is
-calculated by dividing the population within 25 miles of the coast by
-km<sup>2</sup> within the 25 mile inland coastal area (yes! This is
-confusing because area is in km^2, despite the boundary being 25 miles
-inland).</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># Population within 25 miles of coastline - v2021; last updated in 2021</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="do">## Population within 25 miles of coastline - v2024; last updated in 2024 data last uploaded in 2024</span></span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>population <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(rgn_id, year)</span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="do">##file updated for v2024</span></span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a></span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>unique_regions <span class="ot">&lt;-</span> <span class="fu">unique</span>(population<span class="sc">$</span>rgn_id)</span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a></span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="co"># Step 2: Create a new DataFrame with two rows for each region, one for 2021 and one for 2022</span></span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>new_years <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">2021</span>, <span class="dv">2022</span>)</span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>new_data <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">rgn_id =</span> unique_regions, <span class="at">year =</span> new_years) <span class="sc">%&gt;%</span> </span>
-<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">popsum =</span> <span class="cn">NA</span>)</span>
-<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a></span>
-<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>population <span class="ot">&lt;-</span> population <span class="sc">%&gt;%</span> </span>
-<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>  <span class="fu">rbind</span>(new_data) <span class="sc">%&gt;%</span> </span>
-<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id) <span class="sc">%&gt;%</span> </span>
-<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a>  <span class="fu">fill</span>(popsum, <span class="at">.direction =</span> <span class="st">&quot;down&quot;</span>)</span>
-<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a></span>
-<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a></span>
-<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a></span>
-<span id="cb11-21"><a href="#cb11-21" tabindex="-1"></a><span class="co">#Read area 25mi inland to calculate population density</span></span>
-<span id="cb11-22"><a href="#cb11-22" tabindex="-1"></a><span class="co"># (</span><span class="al">NOTE</span><span class="co">: this is confusing because it calculates the area in km2 for the 25 mile inland area)</span></span>
-<span id="cb11-23"><a href="#cb11-23" tabindex="-1"></a>area <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/mar_prs_population/v2021/int/area_km2_25mi.csv&quot;</span>))</span>
-<span id="cb11-24"><a href="#cb11-24" tabindex="-1"></a></span>
-<span id="cb11-25"><a href="#cb11-25" tabindex="-1"></a></span>
-<span id="cb11-26"><a href="#cb11-26" tabindex="-1"></a><span class="co"># People per km2 (for the 25 mile inland area)</span></span>
-<span id="cb11-27"><a href="#cb11-27" tabindex="-1"></a>pop_density <span class="ot">&lt;-</span> population <span class="sc">%&gt;%</span> </span>
-<span id="cb11-28"><a href="#cb11-28" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(area, <span class="at">by =</span> <span class="st">&#39;rgn_id&#39;</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb11-29"><a href="#cb11-29" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">pop_per_km2 =</span> popsum<span class="sc">/</span>area_km2) <span class="sc">%&gt;%</span> </span>
-<span id="cb11-30"><a href="#cb11-30" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, pop_per_km2)</span>
-<span id="cb11-31"><a href="#cb11-31" tabindex="-1"></a></span>
-<span id="cb11-32"><a href="#cb11-32" tabindex="-1"></a><span class="co">#Save population density data</span></span>
-<span id="cb11-33"><a href="#cb11-33" tabindex="-1"></a><span class="fu">write_csv</span>(pop_density, <span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, version_year, <span class="st">&quot;/intermediate/pathogen_pop_density_25mi.csv&quot;</span>))</span></code></pre></div>
-<p>These data are transformed to a pressure, with a zero score
-indicating no pressure and 1 indicating the highest possible pressure.
-Given this we want to determine the number of people <em>without</em>
-access.</p>
-<p>The number of people per km^2 without access to sanitation is
-calculated by:</p>
-<ol style="list-style-type: decimal">
-<li>converting proportion with access to sanitation to proportion
-without access to sanitation (i.e., 1 - proportion_with_access).</li>
-<li>The proportion without access is multiplied by the coastal
-population density.</li>
-<li>Number of people without access are log transformed (ln(x+1))</li>
-</ol>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>unsani_pop <span class="ot">&lt;-</span> sani_complete <span class="sc">%&gt;%</span>  </span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, rgn_name, year, basic_sani_prop) <span class="sc">%&gt;%</span></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">left_join</span>(pop_density, </span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>              <span class="at">by=</span><span class="fu">c</span>(<span class="st">&#39;rgn_id&#39;</span>, <span class="st">&#39;year&#39;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">propWO_x_pop =</span> (<span class="dv">1</span> <span class="sc">-</span> basic_sani_prop) <span class="sc">*</span> pop_per_km2, <span class="co"># this calculates the population density of people without access (WO)</span></span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>           <span class="at">propWO_x_pop_log =</span> <span class="fu">log</span>(propWO_x_pop <span class="sc">+</span> <span class="dv">1</span>)) <span class="co"># log is important because the skew was high otherwise</span></span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a></span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a><span class="fu">hist</span>(unsani_pop<span class="sc">$</span>propWO_x_pop, <span class="at">main =</span> <span class="st">&quot;people without access&quot;</span>)</span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a></span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="fu">hist</span>(unsani_pop<span class="sc">$</span>propWO_x_pop_log, <span class="at">main =</span> <span class="st">&quot;log of people without access&quot;</span>)</span></code></pre></div>
-</div>
-<div id="pressure-score" class="section level2" number="6.5">
-<h2><span class="header-section-number">6.5</span> Pressure Score</h2>
-<p>The reference point is the 99th quantile across all countries and
-years 2000-2009 as a reference point.</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co">#Calculate reference point</span></span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>ref_calc <span class="ot">&lt;-</span> unsani_pop <span class="sc">%&gt;%</span> </span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">%in%</span> <span class="dv">2000</span><span class="sc">:</span><span class="dv">2009</span>) <span class="sc">%&gt;%</span> <span class="co">#years of reference</span></span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>  <span class="do">##summarise(ref= max(propWO_x_pop_log, na.rm = TRUE)*1.1) %&gt;%  # old method</span></span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarise</span>(<span class="at">ref=</span> <span class="fu">quantile</span>(propWO_x_pop_log, <span class="at">probs=</span><span class="fu">c</span>(<span class="fl">0.99</span>), <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>  .<span class="sc">$</span>ref</span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a></span>
-<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>ref_calc</span>
-<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a><span class="co">#save to the master reference point list - new folder might need to be created for assessment year if this file does not already exist.</span></span>
-<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>master_refs <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/supplementary_information&quot;</span>, version_year, <span class="st">&quot;/reference_points_pressures.csv&quot;</span>), <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a></span>
-<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a><span class="co">#create a row for sanitation if it doesn&#39;t exist yet, uncomment if it does not ei</span></span>
-<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a><span class="co">#row &lt;- tibble(pressure = &quot;Sanitation&quot;, data_years = paste0(data_start, &quot;-&quot;, data_end), data_description = &quot;Estimated coastal population with inadequate sanitation&quot;, method = &quot;99th quantile across regions/years&quot;, ref_year = &quot;2000-2009&quot;, ref_point = ref_calc, min= NA, max = NA, units = &quot;number of people&quot;, notes = &quot;Reference point is log value&quot;)</span></span>
-<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a></span>
-<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a><span class="co">#master_refs &lt;- master_refs %&gt;% rbind(row)</span></span>
-<span id="cb13-16"><a href="#cb13-16" tabindex="-1"></a></span>
-<span id="cb13-17"><a href="#cb13-17" tabindex="-1"></a>master_refs<span class="sc">$</span>ref_point[master_refs<span class="sc">$</span>pressure <span class="sc">==</span> <span class="st">&quot;Sanitation&quot;</span>] <span class="ot">&lt;-</span> ref_calc</span>
-<span id="cb13-18"><a href="#cb13-18" tabindex="-1"></a></span>
-<span id="cb13-19"><a href="#cb13-19" tabindex="-1"></a><span class="fu">write.csv</span>(master_refs, <span class="fu">here</span>(<span class="st">&quot;globalprep/supplementary_information&quot;</span>, version_year, <span class="st">&quot;/reference_points_pressures.csv&quot;</span>), <span class="at">row.names=</span><span class="cn">FALSE</span>)</span>
-<span id="cb13-20"><a href="#cb13-20" tabindex="-1"></a></span>
-<span id="cb13-21"><a href="#cb13-21" tabindex="-1"></a>master_refs <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/supplementary_information&quot;</span>, version_year, <span class="st">&quot;/reference_points_pressures.csv&quot;</span>)) </span>
-<span id="cb13-22"><a href="#cb13-22" tabindex="-1"></a>ref_value <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(master_refs<span class="sc">$</span>ref_point[master_refs<span class="sc">$</span>pressure <span class="sc">==</span> <span class="st">&quot;Sanitation&quot;</span>])) </span>
-<span id="cb13-23"><a href="#cb13-23" tabindex="-1"></a>ref_value <span class="co">#7.10</span></span>
-<span id="cb13-24"><a href="#cb13-24" tabindex="-1"></a></span>
-<span id="cb13-25"><a href="#cb13-25" tabindex="-1"></a>unsani_prs <span class="ot">&lt;-</span> unsani_pop <span class="sc">%&gt;%</span></span>
-<span id="cb13-26"><a href="#cb13-26" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">pressure_score =</span> propWO_x_pop_log <span class="sc">/</span> ref_value) <span class="sc">%&gt;%</span> </span>
-<span id="cb13-27"><a href="#cb13-27" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">pressure_score =</span> <span class="fu">ifelse</span>(pressure_score<span class="sc">&gt;</span><span class="dv">1</span>, <span class="dv">1</span>, pressure_score)) <span class="sc">%&gt;%</span> <span class="co">#limits pressure scores not to be higher than 1</span></span>
-<span id="cb13-28"><a href="#cb13-28" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, pressure_score) </span>
-<span id="cb13-29"><a href="#cb13-29" tabindex="-1"></a></span>
-<span id="cb13-30"><a href="#cb13-30" tabindex="-1"></a><span class="fu">summary</span>(unsani_prs)</span>
-<span id="cb13-31"><a href="#cb13-31" tabindex="-1"></a></span>
-<span id="cb13-32"><a href="#cb13-32" tabindex="-1"></a><span class="co">#Save data pressure scores </span></span>
-<span id="cb13-33"><a href="#cb13-33" tabindex="-1"></a><span class="fu">write_csv</span>(unsani_prs, <span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, version_year, <span class="st">&quot;output/po_pathogen_popdensity25mi.csv&quot;</span>))</span>
-<span id="cb13-34"><a href="#cb13-34" tabindex="-1"></a></span>
-<span id="cb13-35"><a href="#cb13-35" tabindex="-1"></a><span class="co"># Compare to v22021 data</span></span>
-<span id="cb13-36"><a href="#cb13-36" tabindex="-1"></a>unsani_prs_old <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, previous_version_year,<span class="st">&quot;output/po_pathogen_popdensity25mi.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb13-37"><a href="#cb13-37" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">pressure_score_2021 =</span> pressure_score) <span class="sc">%&gt;%</span> </span>
-<span id="cb13-38"><a href="#cb13-38" tabindex="-1"></a>  <span class="fu">left_join</span>(unsani_prs, <span class="at">by=</span><span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb13-39"><a href="#cb13-39" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2020</span>)</span>
-<span id="cb13-40"><a href="#cb13-40" tabindex="-1"></a></span>
-<span id="cb13-41"><a href="#cb13-41" tabindex="-1"></a><span class="fu">filter</span>(unsani_prs_old, rgn_id <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">185</span>, <span class="dv">208</span>))</span>
-<span id="cb13-42"><a href="#cb13-42" tabindex="-1"></a></span>
-<span id="cb13-43"><a href="#cb13-43" tabindex="-1"></a>  <span class="fu">ggplotly</span>(<span class="fu">ggplot</span>(unsani_prs_old, <span class="fu">aes</span>(<span class="at">y =</span> pressure_score, <span class="at">x =</span> pressure_score_2021, <span class="at">labels =</span> rgn_id)) <span class="sc">+</span></span>
-<span id="cb13-44"><a href="#cb13-44" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
-<span id="cb13-45"><a href="#cb13-45" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">x =</span> <span class="fu">paste</span>(<span class="st">&quot;pressure score&quot;</span>, previous_version_year),</span>
-<span id="cb13-46"><a href="#cb13-46" tabindex="-1"></a>         <span class="at">y =</span> <span class="fu">paste</span>(<span class="st">&quot;pressure score&quot;</span>, version_year), <span class="at">title =</span> <span class="st">&quot;2020 Pressure Comparison&quot;</span>) <span class="sc">+</span></span>
-<span id="cb13-47"><a href="#cb13-47" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">color =</span> <span class="st">&quot;red&quot;</span>))</span></code></pre></div>
-</div>
-<div id="model-trend" class="section level2" number="6.6">
-<h2><span class="header-section-number">6.6</span> Model Trend</h2>
-<p>Using <code>CalculateTrend</code> function form the
-<code>ohicore</code>, trend is calculated by applying a linear
-regression model to the pressuere scores using a window of 5 years of
-data. The slope of the linear regression (annual change in pressure) is
-then divided by the earliest year to get proportional change and then
-multiplied by 5 to get estimate trend on pressure in the next five
-years.</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co">#Calculate trend using CalculateTrend()</span></span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a></span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="co">#Define relevant years: Min and max year of data to calculate trend</span></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>first_assess_year <span class="ot">&lt;-</span> <span class="dv">2012</span> </span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>current_assess_year <span class="ot">&lt;-</span> <span class="dv">2022</span></span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>current_data_year <span class="ot">&lt;-</span> <span class="fu">max</span>(unsani_prs<span class="sc">$</span>year) <span class="do">##max year of data</span></span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>first_data_year <span class="ot">&lt;-</span> first_assess_year <span class="sc">-</span> (current_assess_year <span class="sc">-</span> current_data_year)</span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a></span>
-<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>trend_data <span class="ot">&lt;-</span> <span class="fu">data.frame</span>() <span class="co">#create a data.frame to save trend socores</span></span>
-<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a></span>
-<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a></span>
-<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a><span class="co">#For loop: calculates trend for all assess years within the corresponding 5 year window.</span></span>
-<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a><span class="co">#focal_year is the year for which the trend is being calculated.</span></span>
-<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a><span class="cf">for</span>(focal_year <span class="cf">in</span> first_data_year<span class="sc">:</span>current_data_year){ <span class="co">#focal_year = 2017 </span></span>
-<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a></span>
-<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a>  trend_years <span class="ot">&lt;-</span> (focal_year<span class="dv">-4</span>)<span class="sc">:</span>focal_year <span class="co">#defines the 5 years window to calculate trend</span></span>
-<span id="cb14-17"><a href="#cb14-17" tabindex="-1"></a>  </span>
-<span id="cb14-18"><a href="#cb14-18" tabindex="-1"></a>  data_new <span class="ot">&lt;-</span> unsani_prs <span class="sc">%&gt;%</span> <span class="co">#format data to work in CalculateTrend()</span></span>
-<span id="cb14-19"><a href="#cb14-19" tabindex="-1"></a>    <span class="fu">select</span>(rgn_id, year, <span class="at">status=</span>pressure_score)</span>
-<span id="cb14-20"><a href="#cb14-20" tabindex="-1"></a>  </span>
-<span id="cb14-21"><a href="#cb14-21" tabindex="-1"></a>trend_data_focal_year <span class="ot">&lt;-</span> <span class="fu">CalculateTrend</span>(data_new, trend_years)</span>
-<span id="cb14-22"><a href="#cb14-22" tabindex="-1"></a></span>
-<span id="cb14-23"><a href="#cb14-23" tabindex="-1"></a>trend_data_focal_year <span class="ot">&lt;-</span> trend_data_focal_year <span class="sc">%&gt;%</span></span>
-<span id="cb14-24"><a href="#cb14-24" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">year =</span> focal_year) <span class="sc">%&gt;%</span></span>
-<span id="cb14-25"><a href="#cb14-25" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">rgn_id =</span> region_id, year, <span class="at">trend=</span>score) <span class="sc">%&gt;%</span></span>
-<span id="cb14-26"><a href="#cb14-26" tabindex="-1"></a>  <span class="fu">data.frame</span>()</span>
-<span id="cb14-27"><a href="#cb14-27" tabindex="-1"></a></span>
-<span id="cb14-28"><a href="#cb14-28" tabindex="-1"></a>trend_data <span class="ot">&lt;-</span> <span class="fu">rbind</span>(trend_data, trend_data_focal_year) <span class="co">#add trend calculation to data-frame created outside the loop</span></span>
-<span id="cb14-29"><a href="#cb14-29" tabindex="-1"></a>}</span>
-<span id="cb14-30"><a href="#cb14-30" tabindex="-1"></a><span class="fu">summary</span>(trend_data)</span>
-<span id="cb14-31"><a href="#cb14-31" tabindex="-1"></a></span>
-<span id="cb14-32"><a href="#cb14-32" tabindex="-1"></a><span class="co">#Save trend data</span></span>
-<span id="cb14-33"><a href="#cb14-33" tabindex="-1"></a><span class="fu">write_csv</span>(trend_data, <span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, version_year, <span class="st">&quot;output/po_pathogen_popdensity25mi_trend.csv&quot;</span>))</span></code></pre></div>
-</div>
-<div id="compare-to-previous-years" class="section level2" number="6.7">
-<h2><span class="header-section-number">6.7</span> Compare to previous
-years</h2>
-<div id="trend-data" class="section level3" number="6.7.1">
-<h3><span class="header-section-number">6.7.1</span> Trend data</h3>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>new <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, version_year, <span class="st">&quot;output/po_pathogen_popdensity25mi_trend.csv&quot;</span>))</span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a></span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>compare <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, previous_version_year, <span class="st">&quot;output/po_pathogen_popdensity25mi_trend.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, year, <span class="at">trend_2021 =</span> trend) <span class="sc">%&gt;%</span></span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>  <span class="fu">left_join</span>(new, <span class="at">by=</span><span class="fu">c</span>(<span class="st">&#39;rgn_id&#39;</span>, <span class="st">&#39;year&#39;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2020</span>)</span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a></span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a></span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a><span class="fu">ggplotly</span>(<span class="fu">ggplot</span>(compare, <span class="fu">aes</span>(<span class="at">y =</span> trend, <span class="at">x =</span> trend_2021, <span class="at">labels =</span> rgn_id)) <span class="sc">+</span></span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">x =</span> <span class="fu">paste</span>(<span class="st">&quot;Trend&quot;</span>,previous_version_year),</span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>         <span class="at">y =</span> <span class="fu">paste</span>(<span class="st">&quot;Trend&quot;</span>, version_year), <span class="at">title =</span> <span class="st">&quot;Data year 2020 Trend Comparison&quot;</span>) <span class="sc">+</span></span>
-<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">color =</span> <span class="st">&quot;red&quot;</span>))</span>
-<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a></span>
-<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a><span class="co"># A few regions have large variation in trend between v2021 and v2019</span></span>
-<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a><span class="co"># positive outliers: rgn_id 161, rgn_id 154</span></span>
-<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a><span class="co"># negative outliers: 48, 8 </span></span>
-<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="co"># A few regions have large variation in trend between v2024 and v20123</span></span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="co"># negative outliers: 118(-0.56), 39(-0.48)</span></span>
-<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a></span>
-<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a></span>
-<span id="cb15-22"><a href="#cb15-22" tabindex="-1"></a><span class="co"># Outlier investigation </span></span>
-<span id="cb15-23"><a href="#cb15-23" tabindex="-1"></a></span>
-<span id="cb15-24"><a href="#cb15-24" tabindex="-1"></a>data_old <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, previous_version_year, <span class="st">&quot;output/po_pathogen_popdensity25mi.csv&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb15-25"><a href="#cb15-25" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">old_pressure_score=</span>pressure_score)</span>
-<span id="cb15-26"><a href="#cb15-26" tabindex="-1"></a></span>
-<span id="cb15-27"><a href="#cb15-27" tabindex="-1"></a>data_new <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, version_year, <span class="st">&quot;output/po_pathogen_popdensity25mi.csv&quot;</span>))</span>
-<span id="cb15-28"><a href="#cb15-28" tabindex="-1"></a></span>
-<span id="cb15-29"><a href="#cb15-29" tabindex="-1"></a>outlier <span class="ot">&lt;-</span> data_new <span class="sc">%&gt;%</span> </span>
-<span id="cb15-30"><a href="#cb15-30" tabindex="-1"></a>  <span class="fu">left_join</span>(data_old, <span class="at">by=</span><span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb15-31"><a href="#cb15-31" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">224</span>)</span>
-<span id="cb15-32"><a href="#cb15-32" tabindex="-1"></a></span>
-<span id="cb15-33"><a href="#cb15-33" tabindex="-1"></a><span class="fu">plot</span>(outlier<span class="sc">$</span>pressure_score, outlier<span class="sc">$</span>old_pressure_score)</span>
-<span id="cb15-34"><a href="#cb15-34" tabindex="-1"></a><span class="fu">abline</span>(<span class="dv">0</span>,<span class="dv">1</span>, <span class="at">col=</span><span class="st">&quot;red&quot;</span>)</span></code></pre></div>
-</div>
-<div id="compare-results" class="section level3" number="6.7.2">
-<h3><span class="header-section-number">6.7.2</span> Compare
-results</h3>
-<p>2023? We checked the main discrepancies and these were due to changes
-in source data. Fairly small changes in access can lead to fairly large
-changes in pressure scores, depending on the population. There are
-slightly higher pressure scores this year (indicated by points tending
-to be above the 1-1 red line) due to modifications of reference point
-calculations.</p>
-<p>2024: a lot of points were below the line due to the coastal
-population estimate rmd being updated to higher values.</p>
-</div>
-<div id="outlier-exploration" class="section level3" number="6.7.3">
-<h3><span class="header-section-number">6.7.3</span> Outlier
-exploration</h3>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="co">#Comparison of pressure scores</span></span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a></span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>unsani_prs_old <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, previous_version_year, <span class="st">&quot;output/po_pathogen_popdensity25mi.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">pressure_score_2019 =</span> pressure_score) <span class="sc">%&gt;%</span> </span>
-<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>  <span class="fu">left_join</span>(unsani_prs, <span class="at">by=</span><span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">95</span>, <span class="dv">16</span>, <span class="dv">54</span>, <span class="dv">29</span>))</span>
-<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a></span>
-<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>unsani_prs_old_all <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/prs_cw_pathogen&quot;</span>, previous_version_year, <span class="st">&quot;output/po_pathogen_popdensity25mi.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">pressure_score_2019 =</span> pressure_score) <span class="sc">%&gt;%</span> </span>
-<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a>  <span class="fu">left_join</span>(unsani_prs, <span class="at">by=</span><span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">diff =</span> pressure_score<span class="sc">-</span>pressure_score_2019)</span>
-<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a></span>
-<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a><span class="fu">summary</span>(unsani_prs_old_all)</span>
-<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a><span class="co">#v2024 min difference is -0.4228 max is 0.0893</span></span></code></pre></div>
-</div>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>old <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;prs_targetedharvest&quot;</span>, <span class="fu">paste0</span>(<span class="st">&#39;v&#39;</span>, version_year <span class="sc">-</span> <span class="dv">1</span>), <span class="st">&quot;output&quot;</span>, <span class="st">&quot;fao_targeted.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> common_year) <span class="sc">%&gt;%</span></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, <span class="at">pressure_score_old =</span> pressure_score) <span class="sc">%&gt;%</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(new, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;year&quot;</span>))</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a><span class="co"># Compare pressure_score between last year and this year&#39;s assessments</span></span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>compare_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(<span class="at">data =</span> old, <span class="fu">aes</span>(<span class="at">x =</span> pressure_score_old, <span class="at">y =</span> pressure_score, <span class="at">label =</span> rgn_id)) <span class="sc">+</span></span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">color =</span> <span class="st">&quot;red&quot;</span>)</span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="fu">plot</span>(compare_plot)</span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a><span class="fu">ggplotly</span>(compare_plot)</span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a></span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a><span class="do">### v2022: Explore outliers</span></span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a></span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a><span class="do">### explore United States [163]</span></span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a><span class="co"># out_country &lt;- &quot;United States of America&quot;</span></span>
+<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a><span class="do">### explore Indonesia [216]</span></span>
+<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a><span class="co"># out_country &lt;- &quot;Indonesia&quot;</span></span>
+<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a></span>
+<span id="cb9-27"><a href="#cb9-27" tabindex="-1"></a><span class="do">### v2024 outliers: Russia[73]</span></span>
+<span id="cb9-28"><a href="#cb9-28" tabindex="-1"></a><span class="co">#out_country &lt;- &quot;Russian Federation&quot;</span></span>
+<span id="cb9-29"><a href="#cb9-29" tabindex="-1"></a></span>
+<span id="cb9-30"><a href="#cb9-30" tabindex="-1"></a>outlier_country <span class="ot">&lt;-</span> long <span class="sc">%&gt;%</span> </span>
+<span id="cb9-31"><a href="#cb9-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(country, target, year) <span class="sc">%&gt;%</span></span>
+<span id="cb9-32"><a href="#cb9-32" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarize</span>(<span class="at">value =</span> <span class="fu">sum</span>(value)) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-33"><a href="#cb9-33" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(country <span class="sc">==</span> out_country, year <span class="sc">&gt;=</span> <span class="dv">2000</span>) </span>
+<span id="cb9-34"><a href="#cb9-34" tabindex="-1"></a></span>
+<span id="cb9-35"><a href="#cb9-35" tabindex="-1"></a><span class="fu">region_data</span>() <span class="do">## read in regions </span></span>
+<span id="cb9-36"><a href="#cb9-36" tabindex="-1"></a></span>
+<span id="cb9-37"><a href="#cb9-37" tabindex="-1"></a></span>
+<span id="cb9-38"><a href="#cb9-38" tabindex="-1"></a>new <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;prs_targetedharvest&quot;</span>, <span class="fu">paste0</span>(<span class="st">&#39;v&#39;</span>, version_year), <span class="st">&quot;output&quot;</span>, <span class="st">&quot;fao_targeted.csv&quot;</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-39"><a href="#cb9-39" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2022</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-40"><a href="#cb9-40" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>year)</span>
+<span id="cb9-41"><a href="#cb9-41" tabindex="-1"></a></span>
+<span id="cb9-42"><a href="#cb9-42" tabindex="-1"></a>old <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;prs_targetedharvest&quot;</span>, <span class="fu">paste0</span>(<span class="st">&#39;v&#39;</span>, version_year <span class="sc">-</span> <span class="dv">1</span>), <span class="st">&quot;output&quot;</span>, <span class="st">&quot;fao_targeted.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-43"><a href="#cb9-43" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> common_year) <span class="sc">%&gt;%</span></span>
+<span id="cb9-44"><a href="#cb9-44" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>year) <span class="sc">%&gt;%</span></span>
+<span id="cb9-45"><a href="#cb9-45" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, <span class="at">pressure_score_2021 =</span> pressure_score) <span class="sc">%&gt;%</span></span>
+<span id="cb9-46"><a href="#cb9-46" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(new, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-47"><a href="#cb9-47" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">pressure_score_2022 =</span> pressure_score) <span class="sc">%&gt;%</span></span>
+<span id="cb9-48"><a href="#cb9-48" tabindex="-1"></a>  <span class="fu">left_join</span>(rgns_eez)</span>
+<span id="cb9-49"><a href="#cb9-49" tabindex="-1"></a>  </span>
+<span id="cb9-50"><a href="#cb9-50" tabindex="-1"></a></span>
+<span id="cb9-51"><a href="#cb9-51" tabindex="-1"></a><span class="co"># Compare pressure_score between last year and this year&#39;s assessments</span></span>
+<span id="cb9-52"><a href="#cb9-52" tabindex="-1"></a>compare_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(<span class="at">data =</span> old, <span class="fu">aes</span>(<span class="at">x =</span> pressure_score_2021, <span class="at">y =</span> pressure_score_2022, <span class="at">label =</span> rgn_name)) <span class="sc">+</span></span>
+<span id="cb9-53"><a href="#cb9-53" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb9-54"><a href="#cb9-54" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">color =</span> <span class="st">&quot;red&quot;</span>)</span>
+<span id="cb9-55"><a href="#cb9-55" tabindex="-1"></a></span>
+<span id="cb9-56"><a href="#cb9-56" tabindex="-1"></a><span class="fu">plot</span>(compare_plot)</span>
+<span id="cb9-57"><a href="#cb9-57" tabindex="-1"></a><span class="fu">ggplotly</span>(compare_plot)</span></code></pre></div>
 </div>
 </div>
 
