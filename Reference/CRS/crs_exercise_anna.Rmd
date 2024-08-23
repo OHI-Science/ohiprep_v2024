@@ -99,25 +99,25 @@ fish_log <- log(fish$commercial_landings_2017 + 1)
 
 
 ```{r}
-library(terra)
-
-# Set the output file name and path
-output_file <- here::here("Reference", "CRS", "figs", "commercial_landings_2017_log.png")
-
-# Ensure the directory exists
-dir.create((output_file), showWarnings = TRUE, recursive = TRUE)
-
-# Open a PNG device
-png(filename = output_file, width = 800, height = 600, units = "px", res = 100)
-
-# Create your plot
-plot(log(fish+1), 
-     main="Log-transformed Commercial Landings (2017)", 
-     col=hcl.colors(100, "viridis"),
-     legend.args=list(text="Log(landings + 1)", side=4, line=2.5, cex=0.8))
-
-# Close the PNG device
-dev.off()
+# library(terra)
+# 
+# # Set the output file name and path
+# output_file <- here::here("Reference", "CRS", "figs", "commercial_landings_2017_log.png")
+# 
+# # Ensure the directory exists
+# dir.create((output_file), showWarnings = TRUE, recursive = TRUE)
+# 
+# # Open a PNG device
+# png(filename = output_file, width = 800, height = 600, units = "px", res = 100)
+# 
+# # Create your plot
+# plot(log(fish+1), 
+#      main="Log-transformed Commercial Landings (2017)", 
+#      col=hcl.colors(100, "viridis"),
+#      legend.args=list(text="Log(landings + 1)", side=4, line=2.5, cex=0.8))
+# 
+# # Close the PNG device
+# dev.off()
 ```
 
 
@@ -137,7 +137,7 @@ What is the area of each cell?
 
 ```{r}
 cell_area <- cellSize(fish)
-plot(cell_area, box = TRUE)
+plot(cell_area, box = TRUE, mar = c(1.5, 0, 0, 3))
 
 print(cell_area)
 ```
