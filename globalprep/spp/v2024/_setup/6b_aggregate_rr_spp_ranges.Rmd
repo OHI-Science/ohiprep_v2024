@@ -226,7 +226,7 @@ if(reload == FALSE & exists('spp_range_list_done')) {
 }
 
 write_csv(spp_range_df, spp_range_file)
-# **ENDED HERE**
+
 
 ```
 
@@ -238,14 +238,15 @@ due to polygon buffering.  This can be used to sanity-check the raster-calculate
 ``` {r calculate range from polygons, eval = FALSE}
 
 spp_maps <- read_csv(file.path(dir_data, sprintf('spp_marine_maps_%s.csv', api_version)),
-                     col_types = 'ddcicccl')
+                     col_types = 'ddcicccl') %>% 
+  dplyr::filter(!shp_iucn_sid %in% c(246014055))
 
 spp_dbfs <- spp_maps$dbf_file %>%
   unique() 
 spp_shps <- spp_dbfs %>%
   str_replace('\\.dbf$', '.shp')
 
-polygon_areas_file <- file.path(dir_setup, 'int/polygon_areas.csv')
+polygon_areas_file <- file.path(dir_setup, 'int/polygon_areas2024-1.csv')
 
 reload <- FALSE
 if(!file.exists(polygon_areas_file) | reload) {
@@ -271,7 +272,21 @@ if(!file.exists(polygon_areas_file) | reload) {
                             shp <- shp %>%
                               filter(iucn_sid %in% spp_maps$iucn_sid)
                                 ### NOTE: this will miss subpops
-
+                            ## Checking and attempting to fix invalid geometries
+                            if(any(!st_is_valid(shp))) {
+                              invalid <- which(!st_is_valid(shp))
+                              
+                              shp[invalid,] <- st_make_valid(shp[invalid,])
+                            }
+                            ## If any are still invalid after using st_make_valid, don't use s2 and
+                            ## hopefully it will work
+                            if(any(!st_is_valid(shp))) {
+                              sf_use_s2(FALSE)
+                              invalid <- which(!st_is_valid(shp))
+                              
+                              shp[invalid,] <- st_make_valid(shp[invalid,])
+                            }
+                            
                             range_df <- data.frame(iucn_sid = shp$iucn_sid,
                                                    poly_range_km2 = st_area(shp)) %>%
                               mutate(poly_range_km2 = as.numeric(poly_range_km2 / 1e6))
@@ -280,6 +295,7 @@ if(!file.exists(polygon_areas_file) | reload) {
                       poly_range_list[[length(poly_range_list)+1]] = range_df     
     
   }
+  
   
   poly_range_df <- poly_range_list %>%
     setNames(basename(spp_shps)) %>%
@@ -302,6 +318,13 @@ range_df <- read_csv(polygon_areas_file, col_types = 'dd') %>%
             by = 'iucn_sid') %>%
   mutate(birds = str_detect(shp_file, 'bli'))
 
+raster_zeros <- range_df %>% 
+  filter(range_km2 %in% c(0))
+
+zeros_ids <- data.frame(iucn_sid = raster_zeros$iucn_sid, poly_range_km2 = raster_zeros$poly_range_km2, rast_range_km2 = raster_zeros$range_km2)
+
+######## Here I left off with adding my polygon range estimates to a dataframe for the species that had '0' ranges when calculated as rasters. I am going to use the polygon range estimates for the raster range estimates and potentially write that out or see how the scores change when it is added versus not added back to the original raster dataframe. Fuck this is honestly a difficult layer to get through
+
 range_compare_scatter <- ggplot(range_df, aes(x = range_km2, y = poly_range_km2)) +
   ggtheme_plot() +
   geom_abline(slope = 1, intercept = 0, color = 'green4') + 
@@ -322,15 +345,19 @@ Since most of these values will be tiny (since range rarity is generally a tiny 
 
 ### Read in lots of data
 spp_maps <- read_csv(file.path(dir_data, sprintf('spp_marine_maps_%s.csv', api_version)),
-                     col_types = 'ddcicccl')
+                     col_types = 'ddcicccl') %>% 
+  dplyr::filter(!shp_iucn_sid %in% c(246014055))
 
 spp_risk <- read_csv(file.path(dir_data, sprintf('iucn_risk_current_%s.csv', api_version)),
-                     col_types = 'dccicccdc')
+                     col_types = 'dccicccdc') %>% 
+  dplyr::filter(!iucn_sid %in% c(246014055))
+
 spp_risk_rgn <- read_csv(file.path(dir_data, sprintf('iucn_risk_rgn_current_%s.csv', api_version)),
                          col_types = 'dcccdc')
 
 spp_trend <- read_csv(file.path(dir_data, sprintf('iucn_trend_by_spp_%s.csv', api_version)),
-                      col_types = 'dc_d_')
+                      col_types = 'dc_d_') %>% 
+  dplyr::filter(!iucn_sid %in% c(246014055))
 
 ### load range info and ocean area info
 spp_range <- read_csv(file.path(dir_data,
@@ -413,7 +440,7 @@ for(taxon in taxa) {
     ### this takes about 30-40 seconds
     taxon_cells_list <- parallel::mclapply(taxon_ids, mc.cores = 12,
                                         FUN = function(x) {
-       x <- taxon_ids[1]
+       # x <- taxon_ids[1]
         ### x <- 4131                            
         csv_file <- file.path(dir_goal_anx, 'spp_rasters', 
                               sprintf('iucn_sid_%s.csv', x))
@@ -520,11 +547,11 @@ taxa <- spp_maps %>%
   .$dbf_file %>%
   basename() %>% unique() %>%
   str_replace('\\.dbf$', '')
-# taxa <- taxa[c(5, 22, 13, 25)]
+# taxa <- taxa[]
 
 for(taxon in taxa) {
   ### taxon <- 'SEAGRASSES'
-  ### taxon <- taxa[1]
+  # taxon <- taxa[5]
   
   taxon_risk_sum_file <- file.path(dir_goal_anx, 'taxa_summaries',
                                    sprintf('%s_cell_sum_noncomp_rrweight_%s.csv', 
@@ -566,7 +593,7 @@ for(taxon in taxa) {
       ### this takes about 30-40 seconds
       taxon_cells_list <- parallel::mclapply(taxon_ids, mc.cores = 24,
                                           FUN = function(x) {
-          ### x <- taxon_ids[11]
+          # x <- taxon_ids[1]
           ### x <- 6336                            
           csv_file <- file.path(dir_goal_anx, 'spp_rasters', 
                                 sprintf('iucn_sid_%s.csv', x))

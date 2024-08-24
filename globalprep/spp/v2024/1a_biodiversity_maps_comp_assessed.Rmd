@@ -37,7 +37,7 @@ library(terra)
 source(here('workflow/R/common.R'))
 
 goal     <- 'spp'
-scenario <- 'v2022'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info
