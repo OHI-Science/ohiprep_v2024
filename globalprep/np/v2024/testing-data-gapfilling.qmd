@@ -83,10 +83,13 @@ f <- files[1] # un-comment and update to test individual files
 
 
 
-```{r check-new-quant-data}
+```{r check-quant-data}
 # singapore_raw <- d %>% filter(`Reporting country (Name)` %in% c("Singapore")) %>% 
 #   janitor::clean_names()
 
+# check new quantity data ----
+
+# filter, clean, tidy new quantity data
 singapore_raw <- d %>% 
   janitor::clean_names() %>% 
   filter(reporting_country_name %in% c("Singapore"),
@@ -96,20 +99,36 @@ singapore_raw <- d %>%
            commodity = commodity_name,
            trade = trade_flow_name) 
 
-
+# filter to saltwater ornamentals 
 singapore_ornamental_raw <- singapore_raw %>% 
   filter(str_detect(commodity, pattern = "Ornamental saltwater fish"))
+
+
+
+# pivot year columns
+singapore_orn_new_pivot <- singapore_ornamental_raw %>% 
+   rename_with(~ gsub("x", "", .)) %>% # tidy up year column names (clean_names() added "x"s)
+    pivot_longer(cols = -c(country, commodity, trade, unit),
+                   names_to = "year", values_to = "value") %>% 
+  mutate(year = as.numeric(year))
+# view pivoted table
+singapore_orn_new_pivot %>% filter(year %in% c(2017:2022)) %>%  arrange(desc(year))
 # all 0s for all years...
-```
+
+# prep for joining
+singapore_quant_new <- singapore_orn_new_pivot %>% 
+  filter(year %in% c(2017:2022)) %>%  
+  arrange(desc(year)) %>% 
+  rename(new_quantity = value)
 
 
-
-```{r check-old-quant-data}
+# check old quantity data ----
 f_old <- files_old[1]
 units <- c("tonnes", "usd")[str_detect(f_old, c("quant", "value"))]
 
 d_old <- readr::read_csv(f_old)
 
+# filter, clean, tidy old quantity data
 singapore_old_raw <- d_old %>% 
   janitor::clean_names() %>% 
   filter(reporting_country_name %in% c("Singapore"),
@@ -119,14 +138,50 @@ singapore_old_raw <- d_old %>%
            commodity = commodity_name,
            trade = trade_flow_name) 
 
-
+# filter to ornamentals
 singapore_ornamental_old_raw <- singapore_old_raw %>% 
   filter(str_detect(commodity, pattern = "Ornamental saltwater fish"))
+
+# pivot year columns
+singapore_orn_old_pivot <- singapore_ornamental_old_raw %>% 
+   rename_with(~ gsub("x", "", .)) %>% # tidy up year column names (clean_names() added "x"s)
+    pivot_longer(cols = -c(country, commodity, trade, unit),
+                   names_to = "year", values_to = "value") %>% 
+  mutate(year = as.numeric(year))
+# view pivoted table
+singapore_orn_old_pivot %>% filter(year %in% c(2017:2022)) %>%  arrange(desc(year))
+
 # also all 0s for all years...
 
+# prep for joining
+singapore_quant_old <- singapore_orn_old_pivot %>% 
+  filter(year %in% c(2017:2022)) %>%  
+  arrange(desc(year)) %>% 
+  rename(old_quantity = value)
+
+
+# join to compare 
+singapore_quant_comp <- full_join(singapore_quant_new, singapore_quant_old, 
+                                  by = join_by(country, commodity, trade, unit, year))
+
+singapore_quant_comp
 
 ```
 
+data is consistent across the two years' data... consistent 0s
+
+---
+Figured this out after running all of the code after this :,,,)
+
+- I might have figured something out...
+
+in `fao_fxn.R`, line 54 shows:
+
+value = ifelse(value == '...', NA, value), # FAO's code for NA
+
+this basically won't work on our "0 ..." cases... we need to use str_detect(value, "...") instead...?
+
+---
 
 
 ```{r check-value-data}
@@ -213,8 +268,18 @@ sing_orn_value_comp
 ```
 data is consistent across years between the two years' datasets
 
+notable -- 2018 values are not 0... why are they near 0 in the np_tonnes object created in step 2?
+
 so... why do we see such a discrepancy in how gapfilling etc. worked to result in the final quantity column? 
 
+
+
+```{r}
+# commodity table
+
+com2prod <- readr::read_csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na = '')
+
+```
 
 
 
