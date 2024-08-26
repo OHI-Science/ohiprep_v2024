@@ -38,7 +38,7 @@ Data describing commercial landings (tonnes) in 2017.
 
 ```{r}
 # Read in commercial landings data
-fish <- rast(here("Reference", "CRS", "commercial_landings_2017.tif"))
+fish <- terra::rast(here("Reference", "CRS", "commercial_landings_2017.tif"))
 
 # print out geospatial data info (class, dimensions, resolution, extent, CRS, etc.)
 fish # equivalent to (fish)
@@ -59,9 +59,9 @@ terra::plot(log(fish+1), mar=c(0,1.5,0,3.5))
 Trying to save image
 
 ```{r}
-fish_log_plot <- terra::plot(log(fish+1))
-
-fish_log <- log(fish$commercial_landings_2017 + 1)
+# fish_log_plot <- terra::plot(log(fish+1))
+# 
+# fish_log <- log(fish$commercial_landings_2017 + 1)
 
 # png('file.png', height=nrow(r), width=ncol(r)) 
 # plot(r, maxpixels=ncell(r))
@@ -136,7 +136,7 @@ Check against Sea Around Us to make sure this seems generally reasonable.
 What is the area of each cell?
 
 ```{r}
-cell_area <- cellSize(fish)
+cell_area <- terra::cellSize(fish)
 plot(cell_area, box = TRUE, mar = c(1.5, 0, 0, 3))
 
 print(cell_area)
