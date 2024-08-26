@@ -96,8 +96,8 @@ area_df <- data.frame(cell_id = 1:(nrow(area_rast)*ncol(area_rast)),
 ### load csvs of marine species range maps
 spp_maps <- read_csv(file.path(dir_data, 
                                sprintf('spp_marine_maps_%s.csv', api_version)),
-                     col_types = 'ddcicccl') %>% 
-  dplyr::filter(!shp_iucn_sid %in% c(246014055))
+                     col_types = 'ddcicccl') 
+# %>% dplyr::filter(!shp_iucn_sid %in% c(246014055))
 
 old_not_in_new <- spp_maps2[!spp_maps2$shp_iucn_sid %in% spp_maps1$shp_iucn_sid, ]
 
@@ -238,8 +238,8 @@ due to polygon buffering.  This can be used to sanity-check the raster-calculate
 ``` {r calculate range from polygons, eval = FALSE}
 
 spp_maps <- read_csv(file.path(dir_data, sprintf('spp_marine_maps_%s.csv', api_version)),
-                     col_types = 'ddcicccl') %>% 
-  dplyr::filter(!shp_iucn_sid %in% c(246014055))
+                     col_types = 'ddcicccl') 
+# %>% dplyr::filter(!shp_iucn_sid %in% c(246014055))
 
 spp_dbfs <- spp_maps$dbf_file %>%
   unique() 
@@ -345,19 +345,19 @@ Since most of these values will be tiny (since range rarity is generally a tiny 
 
 ### Read in lots of data
 spp_maps <- read_csv(file.path(dir_data, sprintf('spp_marine_maps_%s.csv', api_version)),
-                     col_types = 'ddcicccl') %>% 
-  dplyr::filter(!shp_iucn_sid %in% c(246014055))
+                     col_types = 'ddcicccl') 
+# %>% dplyr::filter(!shp_iucn_sid %in% c(246014055))
 
 spp_risk <- read_csv(file.path(dir_data, sprintf('iucn_risk_current_%s.csv', api_version)),
-                     col_types = 'dccicccdc') %>% 
-  dplyr::filter(!iucn_sid %in% c(246014055))
+                     col_types = 'dccicccdc') 
+# %>% dplyr::filter(!iucn_sid %in% c(246014055))
 
 spp_risk_rgn <- read_csv(file.path(dir_data, sprintf('iucn_risk_rgn_current_%s.csv', api_version)),
                          col_types = 'dcccdc')
 
 spp_trend <- read_csv(file.path(dir_data, sprintf('iucn_trend_by_spp_%s.csv', api_version)),
-                      col_types = 'dc_d_') %>% 
-  dplyr::filter(!iucn_sid %in% c(246014055))
+                      col_types = 'dc_d_') 
+# %>% dplyr::filter(!iucn_sid %in% c(246014055))
 
 ### load range info and ocean area info
 spp_range <- read_csv(file.path(dir_data,

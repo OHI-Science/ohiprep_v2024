@@ -9,12 +9,12 @@ Here is an overview of the organization of files and data:
 
 ### Data
 
-Most of the data used in this comes from the IUCN API, which is called on in the scripts. However, you will need to download the new species range maps from these datasources for step 5: 
+Most of the data used in this comes from the IUCN API, which is called on in the scripts. **However, you will need to download the new species range maps from these datasources for step 5:** 
 
 * __Reference__: 
-    * IUCN 2020. The IUCN Red List of Threatened Species. Version 2020-3. <http://www.iucnredlist.org>.
+    * IUCN 2024. The IUCN Red List of Threatened Species. Version 2024-1. <http://www.iucnredlist.org>.
         * Shapefiles available from: https://www.iucnredlist.org/resources/spatial-data-download
-        * __Downloaded__: Feb 1, 2021
+        * __Downloaded__: Aug 18, 2024
         * Mazu locaton: *: /home/shares/ohi/git-annex/globalprep/_raw_data/iucn_spp
  
     *BirdLife International and Handbook of the Birds of the World (2020) Bird species distribution maps of the world. Version 2020.1. BirdLife International, Cambridge, UK and NatureServe, Arlington, USA. http://datazone.birdlife.org/species/requestdis.
