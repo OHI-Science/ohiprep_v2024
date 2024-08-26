@@ -181,7 +181,32 @@ value = ifelse(value == '...', NA, value), # FAO's code for NA
 
 this basically won't work on our "0 ..." cases... we need to use str_detect(value, "...") instead...?
 
+
+also possible that they had selected more or fewer numbers after the decimal point compared to the modern default current: (max = 2 after, min = 1 before...)
 ---
+
+```{r}
+sing_pattern_check <- singapore_orn_new_pivot %>% 
+  filter(year %in% c(2017:2022)) %>% 
+  filter(str_detect(value, pattern = "..."))
+
+sing_pattern_check
+# this works, while the "== '...'" would not!
+
+
+singapore_quant_comp %>% 
+  filter(str_detect(new_quantity, pattern = "..."),
+         str_detect(old_quantity, pattern = "..."))
+
+singapore_quant_comp %>% 
+  filter(old_quantity == "..." # worked before since they didn't also have "0" 
+         )
+
+singapore_quant_comp %>% 
+  filter(new_quantity == "...") # doesn't work!!
+```
+
+
 
 
 ```{r check-value-data}
@@ -273,6 +298,128 @@ notable -- 2018 values are not 0... why are they near 0 in the np_tonnes object 
 so... why do we see such a discrepancy in how gapfilling etc. worked to result in the final quantity column? 
 
 
+
+
+
+
+---
+
+Reran STEP1a_np_ornamentals_prep.Rmd with updated `fao_fxn.R`, seems that 2017 and 2018 values for tonnes were properly replaced with NAs!
+
+```{r}
+# Read in quant dataset from intermediate folder
+h_tonnes <- read_csv(here(current_np_dir, "int", "tonnes.csv"))
+
+# Read in value dataset from intermediate folder
+h_usd <- read_csv(here(current_np_dir, "int", "usd.csv"))
+
+h_tonnes %>% filter(rgn_name == "Singapore", year %in% c(2017:2022), commodity == "Ornamental saltwater fish")
+```
+
+
+more gapfilling check:
+
+```{r}
+## h includes rgn_name, rgn_id, commodity, product, year, tonnes, usd.
+h <- h_usd %>%
+    full_join(h_tonnes, by = c('rgn_name', 'rgn_id', 'commodity', 'product', 'year')) %>%
+    mutate(commodity = as.character(commodity)) %>%
+    arrange(rgn_id, product, commodity, year) 
+
+# clip out years prior to first reporting year, for each commodity per region
+h <- h %>% np_harvest_preclip()
+
+
+# save a file to use in our methods document 
+readr::write_csv(h, here(current_np_dir, "int", "h_methods_sum.csv"))
+
+# test <- h %>%
+#   group_by(product) %>%
+#   summarise(sum_tonnes = sum(tonnes, na.rm = TRUE),
+#             sum_usd = sum(usd, na.rm = TRUE)) ## we will show this table in the methods doc
+
+# ---- filter for our commodities of interest ----
+h <- h %>%
+    dplyr::filter(product %in% c("fish_oil", "ornamentals", "seaweeds")) 
+
+
+# gapfilling ----
+
+h <- h %>% np_harvest_gapflag()
+## Adds flag for required gap-filling, based upon NAs in data. 
+## NOTE: Does not perform any gap-filling.
+## At this point, h includes: 
+##    rgn_name   rgn_id   commodity   product   year   tonnes   usd   gapfill
+## 'gapfill' will be in (zerofill, endfill, tbd, none)
+
+sing_gfill_flags <- h %>% filter(rgn_name == "Singapore", 
+                         year %in% c(2017:2022)) %>% 
+  arrange(desc(year))
+sing_gfill_flags
+# so many are marked with tbd
+
+
+data_check <- h %>% np_datacheck()
+## for each commodity within each region, creates (but doesn't save...) summary info:
+##   num_years:        the length of the data series for this commodity in this region
+##   usd_unique_nz:    (or 'tns') number of unique non-zero values for usd or tonnes 
+##   usd_na & tns_na:  number of NA occurrences
+##   paired_obs:       number of non-zero paired observations
+##   usd_unique_pairs: (or 'tns') within set of paired observations, count of unique usd and tonnes
+##   unique_pairs:     lesser of usd_unique_pairs and tns_unique_pairs
+##   count_no_data:    number of paired NAs - years with no value reported
+
+h_zerofill <- h %>% np_zerofill()
+## for post-reporting years with NA for both tonnes and USD, fill zero - 
+##    assumes that non-reporting indicates zero harvest to report.
+## Also cross-fills zeros where one side is 0, other is NA (not flagged as gapfill)
+
+h_lowdata_filter <- h_zerofill %>% np_lowdata_filter()
+## Exclude commodities (within a region) that have few non-zero data points.
+## Optional parameter with default: nonzero_h_yr_min = 4
+## NOTE: This filter has consequences for the regression, but also has meaning in terms of 
+##    not inflicting a penalty on regions trying, and then stopping, an experimental harvest.
+
+## Melanie's script to add a georegional ID tag based on country keys and IDs.
+h_georegion_id <- h_lowdata_filter %>%
+  add_georegion_id()
+
+h_regr_fill_1 <- h_georegion_id %>% np_regr_fill(years_back = 10, vars = 'td', scope = 'rgn_id')
+
+# check singapore
+h_regr_fill_1 %>% filter(rgn_name == "Singapore", 
+                         year %in% c(2017:2022)) %>% 
+  arrange(desc(year))
+
+# so many are marked with tbd
+
+h <- h %>% np_regr_fill(vars = 'tdy', scope = 'georgn_id')
+h <- h %>% np_regr_fill(vars = 'tdy', scope = 'global')
+## np_regr_fill() is a generalized regression gapfill function. Parameters (with defaults):
+## * years_back=50 (int):     This determines how far back in the time series to include within the regression.
+## * min_paired_obs=4 (int):  This determines how many paired observations are required to attempt a regression.
+## * scope = 'rgn_id' (str):  ('rgn_id', 'georgn_id', 'global') Determines grouping scale for regression.
+## * vars = 'tdy' (str):      ('td', 'tdy') Determines model: (tonnes ~ usd) or (tonnes ~ usd + year) [and vice versa]
+
+h <- h %>% np_end_fill()
+## For final year of data, if both usd and tonnes originally reported as NA, pull forward
+##    values for usd and tonnes from the previous year.  This should happen after regression fill.
+
+h_comm <- h
+## Store commodity-level data, before moving on to the product-level smoothing.
+
+## Output gapfilling report to .csv files.
+## Very few usd gapfilling, and none in recent years (data used to weight contributions), so will ignore this: gapfill=="r2_u_gr"
+h_gap <- h %>%
+  mutate(gapfill = ifelse(gapfill == "r2_u_gr", "none", gapfill)) %>%   # focusing only on tonnes gapfilling
+  dplyr::select(rgn_id, commodity, product, year, gapfill)
+
+h_gap_ornamentals <- h_gap %>%
+  filter(product == "ornamentals")
+```
+
+
+---
 
 ```{r}
 # commodity table
