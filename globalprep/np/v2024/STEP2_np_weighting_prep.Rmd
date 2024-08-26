@@ -178,7 +178,7 @@ min_year <- max_year - 4
 years <- c(min_year:max_year) # get 5 year range
 years_df <- data.frame(year = min_year:max_year) # so that we can get 5 year average
 
-# Load OHI region data
+# Load OHI region data from common.R
 region_data()
 
 # Define subset of OHI EEZ regions
@@ -353,7 +353,7 @@ readr::write_csv(prod_weights, here(current_np_dir, "output", "np_product_weight
 ```
 
 
-### Datacheck
+## Datacheck
 
 Note: we're not comparing data for a specific year, e.g., 2019, as we do in many data checks. The data processing that creates `np_product_weights.csv` fills the `year` column with the scenario year (e.g., 2024), which means that the previous year's `np_product_weights.csv` and the current year's weights cannot be compared by filtering to a specific year. Instead, we compare all weights for all regions and find the difference between this year's weights and last year's (called `diff`). We also plot the changes by having one year's weights as x-value and the other year's weights as y-values in a few scatterplots.
 
@@ -548,6 +548,7 @@ library(here)
 harvest_tonnes_usd_old <- read_csv(here(previous_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>%
   filter(rgn_id != 213)
 
+View(np_tonnes %>% filter(rgn_id == 208, year %in% years))
 
 # ---- Belize ----
 # current
