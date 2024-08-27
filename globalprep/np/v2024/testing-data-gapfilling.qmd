@@ -208,14 +208,25 @@ singapore_quant_comp %>%
 
 
 ```{r}
+singapore_orn_new_pivot %>% 
+  filter(year %in% c(2017:2022)) %>% 
+  arrange(desc(year))
+
 test_sing_cond <- singapore_orn_new_pivot %>% 
   filter(year %in% c(2017:2022)) %>% 
   mutate(value = case_when(
-    str_detect(value, "...") ~ NA,
+    str_detect(value, "0  ...") ~ NA,
     TRUE ~ value
-    ))
+    )) %>% 
+  arrange(desc(year))
 
 test_sing_cond
+
+
+singapore_orn_new_pivot %>% 
+  filter(year %in% c(2017:2022)) %>%
+  fao_clean_data_new() %>% 
+  arrange(desc(year))
 ```
 
 
