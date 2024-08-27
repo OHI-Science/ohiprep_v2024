@@ -37,7 +37,7 @@ library(terra)
 source(here('workflow/R/common.R'))
 
 goal     <- 'spp'
-scenario <- 'v2022'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info
@@ -127,7 +127,7 @@ if(!file.exists(cell_summary_file) | reload == TRUE) {
                                             }) %>%
       bind_rows()
   }) ### end of system.time
-  message('... processing time ', ptm[3], ' sec') # ... processing time 11.7670000000071  sec
+  message('... processing time ', ptm[3], ' sec') # ... processing time 31.2920000000158 sec
     
   ### chunk into smaller bits for mclapply usage in the summarizing step.  Use mclapply to chunk,
   ### then pass result to mclapply to calculate weighted average values
@@ -137,7 +137,7 @@ if(!file.exists(cell_summary_file) | reload == TRUE) {
   
   message('going into the second mclapply...')
   # system.time({ 
-    ### mclapply: 59.2379999999976 secs
+    ### mclapply: 28.0570000000007
   ptm <- system.time({
     cell_vals_list <- parallel::mclapply(1:n_chunks, mc.cores = 12,
         FUN = function(x) { ### x <- 1
@@ -153,7 +153,7 @@ if(!file.exists(cell_summary_file) | reload == TRUE) {
   
   message('going into the third mclapply...')
   
-  ptm <- system.time({ #processing time 19.4599999999919 sec
+  ptm <- system.time({ #processing time 18.1529999999912 sec
     cell_summary_list <- parallel::mclapply(cell_vals_list, mc.cores = 12,
                                        FUN = function(x) {
       ### x <- cell_vals_list[[250]]

@@ -472,6 +472,7 @@ marine_map_info <- read_csv(file.path(dir_data,
   dplyr::select(-presence) %>%
   distinct()
 
+## Change these date values 
 taxa_info <- read_csv(file.path(dir_goal_anx, 'iucn', 
                                 'spp_info_from_api_2024-1.csv')) %>%
   dplyr::select(iucn_sid, kingdom:family)
@@ -528,6 +529,7 @@ all_sum <- bind_rows(fish_sum, nonfish_sum, basic_sum) %>%
          spp_gp = ifelse(spp_gp == "cone_snails", "conus", spp_gp))
 
 ## Check against last year to see if you have all of the same species. 
+
 ## 2024: We have the same species, but the setdiff is going to return a list of those that are not matching because the all_sum df has them grouped into "marinefish" as the spp_gp. So I went through and cross-referenced the class, order, and family to make sure that they were all present - they are present 
 
 old_sum <- read_csv(file.path(dir_goal, '_output', 

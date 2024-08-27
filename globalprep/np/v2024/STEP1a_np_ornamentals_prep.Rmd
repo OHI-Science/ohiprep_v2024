@@ -116,7 +116,7 @@ files_old <- list.files(dir_fao_data_old, pattern = glob2rx('*.csv'), full.names
 
 # ===== loop ================
 for (f in files) {
-  #f <- files[2] # un-comment and update to test individual files
+  # f <- files[1] # un-comment and update to test individual files
   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
   
   #d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
@@ -356,8 +356,8 @@ readr::write_csv(h_gap, here(current_np_dir, "output", "np_ornamentals_harvest_t
 Summarize each product per country per year, e.g., all corals in Albania in 2011. And, do some error checking.
 
 ```{r}
-
-h_prod <- h_comm %>%
+# summarize product values per country per year
+h_prod <- h_comm %>% # copy-on-modify triggered for h_comm (defined earlier)
   group_by(rgn_name, rgn_id, product, year) %>%
   summarize(tonnes = sum(tonnes, na.rm = TRUE), 
             usd = sum(usd, na.rm = TRUE))
