@@ -37,6 +37,8 @@ in ohi global.
 
 -   updated file paths to be more reproducible, used `here()` package and updated syntax to reduce system-dependent file paths
 
+-   updated `full_join(by = character())` superseded method to `cross_join()` when creating rgn_id x products x years dataframe
+
 -   added optional code to write out `tonnes` objects created in weight calculation prep (`fofm_tonnes.csv`, `sw_tonnes.csv`, and `orn_tonnes.csv`) to the `int` folder
 
 -   added extensive datacheck section, plotting
@@ -171,36 +173,46 @@ UN geopolitical region/global values.
 ```{r}
 # Read in the prepped FAO commodities data set 
 harvest_tonnes_usd <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>% # created on line 453 in step 1a
-  filter(rgn_id != 213)
+  filter(rgn_id != 213) # filter out Antarctica
 
+# Make a data frame with every region and every product ----
+# Define years
 max_year <- max(harvest_tonnes_usd$year)
 min_year <- max_year - 4 
 years <- c(min_year:max_year) # get 5 year range
 years_df <- data.frame(year = min_year:max_year) # so that we can get 5 year average
 
 # Load OHI region data from common.R
-region_data()
+region_data() # gets rgns_eez
 
 # Define subset of OHI EEZ regions
 rgns_eez <- rgns_eez %>%
   dplyr::select(rgn_id) %>%
-  filter(rgn_id != 213) # filter out antarctica
+  filter(rgn_id != 213) # filter out Antarctica
 
-# Make a data frame with every region and every product
+# Define products dataframe
 products <- data.frame(product = c("seaweeds", "ornamentals", "fish_oil"))
 
-region_product <- full_join(rgns_eez, products, by = character()) %>%
-  full_join(years_df, by = character())
+# Create full rgn x product x years dataframe
+region_product_test <- rgns_eez %>% 
+  dplyr::select(rgn_id) %>%  # select rgn_id from rgns_eez
+  cross_join(products) %>% # cross join with products (match every row in x with every row in y)
+  cross_join(years_df) # cross join with years
+
+# Archived method for joining rgns, products, and years dfs
+# region_product <- full_join(rgns_eez, products, by = character()) %>%
+#   full_join(years_df, by = character())
 
 
-# Calculate $/tonne for each OHI region and product and gapfill based on UN geopolitical region 
+# Calculate $/tonne for each OHI region and product and gapfill based on UN geopolitical region ----
 
 harvest_tonnes_usd_geo_rgn <- harvest_tonnes_usd %>%
-    full_join(region_product, by = c("rgn_id", "product", "year")) %>%
+  full_join(region_product, by = join_by("rgn_id", "product", "year")) %>%
   add_georegion_id() %>%
   dplyr::filter(year %in% years) %>%
   arrange(rgn_id)
-  
+
+
 # calculate georgn values (for each region, year, and product)
 geo_rgn_values_df <- harvest_tonnes_usd_geo_rgn %>%
   dplyr::group_by(georgn_id, year, product) %>%
@@ -219,8 +231,8 @@ global_values_df <- harvest_tonnes_usd_geo_rgn %>%
 
 # Create final gapfilled data frame
 harvest_tonnes_usd_values_gf <- harvest_tonnes_usd_geo_rgn %>%
-  left_join(geo_rgn_values_df, by = c("georgn_id", "product", "year")) %>%
-  left_join(global_values_df, by = c("product", "year")) %>%
+  left_join(geo_rgn_values_df, by = join_by("georgn_id", "product", "year")) %>%
+  left_join(global_values_df, by = join_by("product", "year")) %>%
   mutate(values = usd/tonnes) %>%
   mutate(values = ifelse(values == "Inf", NA, 
                          ifelse(values == "NaN", NA, values))) %>% ## assign Inf (n/0) and NaNs (0/0) as NA
@@ -482,7 +494,7 @@ check_older_prep <- check_older %>%
   rename(previous_diff = diff,
          weight_2023 = weight,
          weight_2022 = older_weight) %>% 
-  select(rgn_id, rgn_name, product, previous_diff, weight_2023, weight_2022) %>% 
+  dplyr::select(rgn_id, rgn_name, product, previous_diff, weight_2023, weight_2022) %>% 
   arrange(desc(abs(previous_diff)))
 
 
