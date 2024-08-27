@@ -207,6 +207,17 @@ singapore_quant_comp %>%
 ```
 
 
+```{r}
+test_sing_cond <- singapore_orn_new_pivot %>% 
+  filter(year %in% c(2017:2022)) %>% 
+  mutate(value = case_when(
+    str_detect(value, "...") ~ NA,
+    TRUE ~ value
+    ))
+
+test_sing_cond
+```
+
 
 
 ```{r check-value-data}
@@ -240,6 +251,8 @@ sing_orn_value_pivot <- singapore_ornamental_value %>%
     pivot_longer(cols = -c(country, commodity, trade, unit),
                    names_to = "year", values_to = "value") %>% 
   mutate(year = as.numeric(year))
+
+
 
 # define year range ----
 max_year <- max(sing_orn_value_pivot$year)
@@ -298,6 +311,28 @@ notable -- 2018 values are not 0... why are they near 0 in the np_tonnes object 
 so... why do we see such a discrepancy in how gapfilling etc. worked to result in the final quantity column? 
 
 
+```{r}
+sing_orn_value_pivot %>% arrange(desc(year))
+#sing_orn_value_pivot %>% fao_clean_data_new() %>% arrange(desc(year))
+
+sing_orn_value_pivot %>% 
+#filter(year %in% c(2017:2022)) %>% 
+  mutate(value = case_when(
+    str_detect(value, "0  ...") ~ NA,
+    TRUE ~ value
+    )) %>% 
+  arrange(desc(year))
+
+
+singapore_orn_new_pivot %>% mutate(value = case_when(
+    str_detect(value, "0  ...") ~ NA,
+    TRUE ~ value
+    )) %>% arrange(desc(year))
+
+
+sing_orn_value_pivot %>% fao_clean_data_new()  %>% arrange(desc(year))
+
+```
 
 
 

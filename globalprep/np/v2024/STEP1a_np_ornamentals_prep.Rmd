@@ -117,7 +117,7 @@ files_old <- list.files(dir_fao_data_old, pattern = glob2rx('*.csv'), full.names
 
 # ===== loop ================
 for (f in files) {
-  # f <- files[1] # un-comment and update to test individual files
+  f <- files[2] # un-comment and update to test individual files # 1 = quant, 2 = usd
   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
   
   #d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
