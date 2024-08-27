@@ -276,6 +276,26 @@ h <- h %>%
     dplyr::filter(product %in% c("fish_oil", "ornamentals", "seaweeds")) 
 ```
 
+
+### Add FAO-zero-correction 
+
+```{r}
+h_zero_na <- h %>% 
+  mutate(tonnes = ifelse(tonnes == 0 & !is.na(usd) & usd > 0, NA, tonnes)) %>% 
+  mutate(usd = ifelse(usd == 0 & !is.na(tonnes) & tonnes > 0, NA, usd))
+
+
+
+# check Singapore
+h %>% filter(rgn_id == 208, year %in% (2017:2022), product %in% c("ornamentals")) %>% arrange(desc(year))
+
+h_zero_na %>% filter(rgn_id == 208, year %in% (2017:2022), product %in% c("ornamentals")) %>% arrange(desc(year))
+
+# nice!
+```
+
+
+
 # Gapfilling
 
 Summary of gapfilling that is performed:
@@ -288,7 +308,7 @@ Summary of gapfilling that is performed:
 
 ```{r}
 
-h <- h %>% np_harvest_gapflag()
+h <- h_zero_na %>% np_harvest_gapflag()
 ## Adds flag for required gap-filling, based upon NAs in data. 
 ## NOTE: Does not perform any gap-filling.
 ## At this point, h includes: 
