@@ -635,7 +635,6 @@ np_old <- readr::read_csv(here("globalprep", "np", paste0("v", prev_scen_year), 
 # read in current year's harvest data 
 np_new <- readr::read_csv(here(current_np_dir, "output", "np_seaweed_harvest_tonnes.csv"))
 
-
 # Compare yield data for Saint Lucia
 np_old_sl <- np_old %>% 
   dplyr::filter(rgn_id == 122, year == (as.integer(data_years[2]) - 1)) %>% 

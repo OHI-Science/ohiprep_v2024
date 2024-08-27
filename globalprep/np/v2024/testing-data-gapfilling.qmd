@@ -103,7 +103,12 @@ singapore_raw <- d %>%
 singapore_ornamental_raw <- singapore_raw %>% 
   filter(str_detect(commodity, pattern = "Ornamental saltwater fish"))
 
-
+singapore_ornamental_test <- singapore_raw %>% 
+  filter(commodity %in% c("Ornamental saltwater fish", "Ornamental fish nei")) %>% 
+  rename_with(~ gsub("x", "", .)) %>% # tidy up year column names (clean_names() added "x"s)
+    pivot_longer(cols = -c(country, commodity, trade, unit),
+                   names_to = "year", values_to = "value") %>% 
+  mutate(year = as.numeric(year))
 
 # pivot year columns
 singapore_orn_new_pivot <- singapore_ornamental_raw %>% 
