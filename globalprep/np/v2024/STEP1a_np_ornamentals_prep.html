@@ -9,7 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Mon Aug 19 17:19:06 2024 by ramji" />
+<meta name="author" content="Compiled on Wed Aug 28 19:43:47 2024 by ramji" />
 
 
 <title>OHI 2024: Natural Products: Ornamentals data prep</title>
@@ -1550,15 +1550,15 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">OHI 2024: Natural Products: Ornamentals
 data prep</h1>
-<h4 class="author"><em>Compiled on Mon Aug 19 17:19:06 2024 by
+<h4 class="author"><em>Compiled on Wed Aug 28 19:43:47 2024 by
 ramji</em></h4>
 
 </div>
 
 
 <p>[REFERENCE RMD FILE: <a href="http://ohi-science.org/ohiprep_v2021/globalprep/np/v2021/STEP1a_np_ornamentals_prep.html" class="uri">http://ohi-science.org/ohiprep_v2021/globalprep/np/v2021/STEP1a_np_ornamentals_prep.html</a>]</p>
-<div id="summary" class="section level1" number="1">
-<h1><span class="header-section-number">1</span> Summary</h1>
+<div id="summary" class="section level1">
+<h1>Summary</h1>
 <p>This analysis converts FAO commodities data into data layers used to
 calculate OHI 2024 global natural products scores. We will conduct this
 data prep on the commodities seaweed, fish oil, and ornamentals, so that
@@ -1567,11 +1567,10 @@ we can produce $ values for weighting later on, however, our final layer
 ornamental fish. This will also calculate a sustainability layer based
 off of risk and exposure for ornamental fishing.</p>
 </div>
-<div id="updates-from-previous-assessment" class="section level1" number="2">
-<h1><span class="header-section-number">2</span> Updates from previous
-assessment</h1>
-<div id="v2024" class="section level3" number="2.0.1">
-<h3><span class="header-section-number">2.0.1</span> v2024</h3>
+<div id="updates-from-previous-assessment" class="section level1">
+<h1>Updates from previous assessment</h1>
+<div id="v2024" class="section level3">
+<h3>v2024</h3>
 <ul>
 <li>New year of FAO data (2022)<br />
 </li>
@@ -1583,18 +1582,24 @@ capability (not dependent on direction of directory separator)</li>
 <code>janitor::clean_names()</code></li>
 <li>Updated <code>read.csv</code> and <code>write.csv</code> to
 <code>read_csv</code> and <code>write_csv</code></li>
+<li>Updated <code>fao_fxn.R</code> to use <code>str_detect(&quot;...&quot;)</code>
+instead of <code>value == &quot;...&quot;</code> to properly replace FAO “missing
+value” codes with <code>NA</code>s.</li>
+<li>Added extra <code>0 --&gt; NA</code> correction for specific
+conditions where this is appropriate (before gapfilling). See section:
+<a href="#add-fao-zero-correction">Add FAO-zero-correction</a></li>
 </ul>
 </div>
-<div id="v2023" class="section level3" number="2.0.2">
-<h3><span class="header-section-number">2.0.2</span> v2023</h3>
+<div id="v2023" class="section level3">
+<h3>v2023</h3>
 <p>New year of FAO data (2021). Replaced deprecated functions
 (<code>replace_at()</code>, <code>spread()</code>,
 <code>gather()</code>)</p>
 <hr />
 </div>
 </div>
-<div id="data-source" class="section level1" number="3">
-<h1><span class="header-section-number">3</span> Data Source</h1>
+<div id="data-source" class="section level1">
+<h1>Data Source</h1>
 <p><strong>Reference</strong>:<br />
 <a href="https://www.fao.org/fishery/en/statistics/software/fishstatj" class="uri">https://www.fao.org/fishery/en/statistics/software/fishstatj</a>
 App release date: March 2024 FAO raw commodities quantity 1976_2021 FAO
@@ -1604,17 +1609,20 @@ metadata</a></p>
 <li>Global aquatic trade - All partners aggregated - Quantities and
 Values - 1976-2022 (Release date: July 2024)</li>
 </ul>
-<p><strong>Downloaded</strong>: July, 26, 2024</p>
+<p><strong>Downloaded</strong>: 2024-08-07</p>
 <p><strong>Description</strong>: Quantity (tonnes) and value (USD) of
 raw commodities (Exports only) for each country, taxa, year. The FAO
 data is subset to include commodities in these categories: ornamental
 fish, fish oil, seaweed and plants (see:
 raw/commodities2products_weighting.csv for details).</p>
 <p><strong>Time range</strong>: 1976-2022</p>
+<p>Files can be found on Mazu:
+<code>home/shares/ohi/git-annex/globalprep/_raw_data/FAO_commodities/d2024</code>
+accompanied by README.md with detailed download instructions.</p>
 <hr />
 </div>
-<div id="methods" class="section level1" number="4">
-<h1><span class="header-section-number">4</span> Methods</h1>
+<div id="methods" class="section level1">
+<h1>Methods</h1>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>knitr<span class="sc">::</span>opts_chunk<span class="sc">$</span><span class="fu">set</span>(<span class="at">eval =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
 <span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="co"># ======= Load packages ============</span></span>
@@ -1663,9 +1671,8 @@ raw/commodities2products_weighting.csv for details).</p>
 ##  * UNgeorgn = function to load dataframe of UN geopolitical designations used to gapfill missing data</code></pre>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(current_np_dir, <span class="st">&quot;R&quot;</span>, <span class="st">&quot;np_fxn.R&quot;</span>)) <span class="co"># function for handling FAO commodity data specific to NP</span></span></code></pre></div>
 </div>
-<div id="import-raw-data-fao-commodities" class="section level1" number="5">
-<h1><span class="header-section-number">5</span> Import Raw Data: FAO
-Commodities</h1>
+<div id="import-raw-data-fao-commodities" class="section level1">
+<h1>Import Raw Data: FAO Commodities</h1>
 <p>Simultaneously read and process FAO commodities value and quantity
 data.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="do">## </span><span class="al">NOTE</span><span class="do">: This can be run as a loop, but the &quot;value&quot; and &quot;quant&quot; datasets need to be run individually to make sure</span></span>
@@ -1686,7 +1693,7 @@ data.</p>
 <span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a></span>
 <span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="co"># ===== loop ================</span></span>
 <span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="cf">for</span> (f <span class="cf">in</span> files) {</span>
-<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>  <span class="co">#f &lt;- files[2] # un-comment and update to test individual files</span></span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>  <span class="co">#f &lt;- files[2] # un-comment and update to test individual files # 1 = quant, 2 = usd</span></span>
 <span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">&#39;</span><span class="sc">\n\n\n</span><span class="st">====</span><span class="sc">\n</span><span class="st">file: %s</span><span class="sc">\n</span><span class="st">&#39;</span>, <span class="fu">basename</span>(f)))</span>
 <span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>  </span>
 <span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a>  <span class="co">#d &lt;- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T</span></span>
@@ -1806,8 +1813,8 @@ data.</p>
 <span id="cb4-136"><a href="#cb4-136" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(m_rgn, harvest_out, <span class="at">na =</span> <span class="st">&#39;&#39;</span>)</span>
 <span id="cb4-137"><a href="#cb4-137" tabindex="-1"></a>}</span></code></pre></div>
 </div>
-<div id="data-wrangle" class="section level1" number="6">
-<h1><span class="header-section-number">6</span> Data Wrangle</h1>
+<div id="data-wrangle" class="section level1">
+<h1>Data Wrangle</h1>
 <p>Combining the quantity and value data and a bit of cleaning to remove
 data prior to first reporting year for each commodity and region.</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Read in quant dataset from intermediate folder</span></span>
@@ -1838,9 +1845,37 @@ data prior to first reporting year for each commodity and region.</p>
 <span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="co"># ---- filter for our commodities of interest ----</span></span>
 <span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span></span>
 <span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">filter</span>(product <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;fish_oil&quot;</span>, <span class="st">&quot;ornamentals&quot;</span>, <span class="st">&quot;seaweeds&quot;</span>)) </span></code></pre></div>
+<div id="add-fao-zero-correction" class="section level3">
+<h3>Add FAO-zero-correction</h3>
+<p>Some regions had 0 E and 0.00 (no “…” missing data flag) recorded for
+tonnes, but simultaneously had non-zero data for USD. Before
+gap-filling, we need to replace zeros with NAs in two cases:</p>
+<pre><code>1.    When `tonnes` is equal to 0 and `usd` is not `NA` and `usd` is greater than 0
+
+2.    When `usd` is equal to 0 and `tonnes` is not `NA` and `tonnes` is greater than 0</code></pre>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># replace certain zeros with NA to flag for gapfilling</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>h_zero_na <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> </span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">tonnes =</span> <span class="fu">ifelse</span>(tonnes <span class="sc">==</span> <span class="dv">0</span> <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(usd) <span class="sc">&amp;</span> usd <span class="sc">&gt;</span> <span class="dv">0</span>, <span class="cn">NA</span>, tonnes)) <span class="sc">%&gt;%</span> </span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">usd =</span> <span class="fu">ifelse</span>(usd <span class="sc">==</span> <span class="dv">0</span> <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(tonnes) <span class="sc">&amp;</span> tonnes <span class="sc">&gt;</span> <span class="dv">0</span>, <span class="cn">NA</span>, usd))</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>check_start <span class="ot">&lt;-</span> <span class="fu">max</span>(h<span class="sc">$</span>year) <span class="sc">-</span> <span class="dv">5</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>check_stop <span class="ot">&lt;-</span> <span class="fu">max</span>(h<span class="sc">$</span>year)</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co"># check Singapore</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>h <span class="sc">%&gt;%</span> <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">208</span>,</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>             year <span class="sc">%in%</span> (check_start<span class="sc">:</span>check_stop), <span class="co"># feel free to update dates</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>             product <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;ornamentals&quot;</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(year))</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>h_zero_na <span class="sc">%&gt;%</span> <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">208</span>,</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>                     year <span class="sc">%in%</span> (check_start<span class="sc">:</span>check_stop),</span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>                     product <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;ornamentals&quot;</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(year))</span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a></span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a><span class="co"># nice!</span></span></code></pre></div>
 </div>
-<div id="gapfilling" class="section level1" number="7">
-<h1><span class="header-section-number">7</span> Gapfilling</h1>
+</div>
+<div id="gapfilling" class="section level1">
+<h1>Gapfilling</h1>
 <p>Summary of gapfilling that is performed:</p>
 <ul>
 <li>Zero-fill: for observations with NAs for both values (tonnes &amp;
@@ -1860,288 +1895,285 @@ vice versa) for gapfilling. 100% success.</li>
 <li>End-fill: For years where NAs still exist in final year, carry
 forward data from prior year (after other gapfilling techniques).</li>
 </ul>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_harvest_gapflag</span>()</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="do">## Adds flag for required gap-filling, based upon NAs in data. </span></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="do">## </span><span class="al">NOTE</span><span class="do">: Does not perform any gap-filling.</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="do">## At this point, h includes: </span></span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="do">##    rgn_name   rgn_id   commodity   product   year   tonnes   usd   gapfill</span></span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="do">## &#39;gapfill&#39; will be in (zerofill, endfill, tbd, none)</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>data_check <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_datacheck</span>()</span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="do">## for each commodity within each region, creates (but doesn&#39;t save...) summary info:</span></span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="do">##   num_years:        the length of the data series for this commodity in this region</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="do">##   usd_unique_nz:    (or &#39;tns&#39;) number of unique non-zero values for usd or tonnes </span></span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="do">##   usd_na &amp; tns_na:  number of NA occurrences</span></span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="do">##   paired_obs:       number of non-zero paired observations</span></span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="do">##   usd_unique_pairs: (or &#39;tns&#39;) within set of paired observations, count of unique usd and tonnes</span></span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="do">##   unique_pairs:     lesser of usd_unique_pairs and tns_unique_pairs</span></span>
-<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="do">##   count_no_data:    number of paired NAs - years with no value reported</span></span>
-<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a></span>
-<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_zerofill</span>()</span>
-<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="do">## for post-reporting years with NA for both tonnes and USD, fill zero - </span></span>
-<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a><span class="do">##    assumes that non-reporting indicates zero harvest to report.</span></span>
-<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a><span class="do">## Also cross-fills zeros where one side is 0, other is NA (not flagged as gapfill)</span></span>
-<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a></span>
-<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_lowdata_filter</span>()</span>
-<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a><span class="do">## Exclude commodities (within a region) that have few non-zero data points.</span></span>
-<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a><span class="do">## Optional parameter with default: nonzero_h_yr_min = 4</span></span>
-<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a><span class="do">## </span><span class="al">NOTE</span><span class="do">: This filter has consequences for the regression, but also has meaning in terms of </span></span>
-<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a><span class="do">##    not inflicting a penalty on regions trying, and then stopping, an experimental harvest.</span></span>
-<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a></span>
-<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a><span class="do">## Melanie&#39;s script to add a georegional ID tag based on country keys and IDs.</span></span>
-<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span></span>
-<span id="cb6-31"><a href="#cb6-31" tabindex="-1"></a>  <span class="fu">add_georegion_id</span>()</span>
-<span id="cb6-32"><a href="#cb6-32" tabindex="-1"></a></span>
-<span id="cb6-33"><a href="#cb6-33" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_regr_fill</span>(<span class="at">years_back =</span> <span class="dv">10</span>, <span class="at">vars =</span> <span class="st">&#39;td&#39;</span>, <span class="at">scope =</span> <span class="st">&#39;rgn_id&#39;</span>)</span>
-<span id="cb6-34"><a href="#cb6-34" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_regr_fill</span>(<span class="at">vars =</span> <span class="st">&#39;tdy&#39;</span>, <span class="at">scope =</span> <span class="st">&#39;georgn_id&#39;</span>)</span>
-<span id="cb6-35"><a href="#cb6-35" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_regr_fill</span>(<span class="at">vars =</span> <span class="st">&#39;tdy&#39;</span>, <span class="at">scope =</span> <span class="st">&#39;global&#39;</span>)</span>
-<span id="cb6-36"><a href="#cb6-36" tabindex="-1"></a><span class="do">## np_regr_fill() is a generalized regression gapfill function. Parameters (with defaults):</span></span>
-<span id="cb6-37"><a href="#cb6-37" tabindex="-1"></a><span class="do">## * years_back=50 (int):     This determines how far back in the time series to include within the regression.</span></span>
-<span id="cb6-38"><a href="#cb6-38" tabindex="-1"></a><span class="do">## * min_paired_obs=4 (int):  This determines how many paired observations are required to attempt a regression.</span></span>
-<span id="cb6-39"><a href="#cb6-39" tabindex="-1"></a><span class="do">## * scope = &#39;rgn_id&#39; (str):  (&#39;rgn_id&#39;, &#39;georgn_id&#39;, &#39;global&#39;) Determines grouping scale for regression.</span></span>
-<span id="cb6-40"><a href="#cb6-40" tabindex="-1"></a><span class="do">## * vars = &#39;tdy&#39; (str):      (&#39;td&#39;, &#39;tdy&#39;) Determines model: (tonnes ~ usd) or (tonnes ~ usd + year) [and vice versa]</span></span>
-<span id="cb6-41"><a href="#cb6-41" tabindex="-1"></a></span>
-<span id="cb6-42"><a href="#cb6-42" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_end_fill</span>()</span>
-<span id="cb6-43"><a href="#cb6-43" tabindex="-1"></a><span class="do">## For final year of data, if both usd and tonnes originally reported as NA, pull forward</span></span>
-<span id="cb6-44"><a href="#cb6-44" tabindex="-1"></a><span class="do">##    values for usd and tonnes from the previous year.  This should happen after regression fill.</span></span>
-<span id="cb6-45"><a href="#cb6-45" tabindex="-1"></a></span>
-<span id="cb6-46"><a href="#cb6-46" tabindex="-1"></a>h_comm <span class="ot">&lt;-</span> h</span>
-<span id="cb6-47"><a href="#cb6-47" tabindex="-1"></a><span class="do">## Store commodity-level data, before moving on to the product-level smoothing.</span></span>
-<span id="cb6-48"><a href="#cb6-48" tabindex="-1"></a></span>
-<span id="cb6-49"><a href="#cb6-49" tabindex="-1"></a><span class="do">## Output gapfilling report to .csv files.</span></span>
-<span id="cb6-50"><a href="#cb6-50" tabindex="-1"></a><span class="do">## Very few usd gapfilling, and none in recent years (data used to weight contributions), so will ignore this: gapfill==&quot;r2_u_gr&quot;</span></span>
-<span id="cb6-51"><a href="#cb6-51" tabindex="-1"></a>h_gap <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span></span>
-<span id="cb6-52"><a href="#cb6-52" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">gapfill =</span> <span class="fu">ifelse</span>(gapfill <span class="sc">==</span> <span class="st">&quot;r2_u_gr&quot;</span>, <span class="st">&quot;none&quot;</span>, gapfill)) <span class="sc">%&gt;%</span>   <span class="co"># focusing only on tonnes gapfilling</span></span>
-<span id="cb6-53"><a href="#cb6-53" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, commodity, product, year, gapfill)</span>
-<span id="cb6-54"><a href="#cb6-54" tabindex="-1"></a></span>
-<span id="cb6-55"><a href="#cb6-55" tabindex="-1"></a>h_gap_ornamentals <span class="ot">&lt;-</span> h_gap <span class="sc">%&gt;%</span></span>
-<span id="cb6-56"><a href="#cb6-56" tabindex="-1"></a>  <span class="fu">filter</span>(product <span class="sc">==</span> <span class="st">&quot;ornamentals&quot;</span>)</span>
-<span id="cb6-57"><a href="#cb6-57" tabindex="-1"></a></span>
-<span id="cb6-58"><a href="#cb6-58" tabindex="-1"></a></span>
-<span id="cb6-59"><a href="#cb6-59" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(h_gap, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_ornamentals_harvest_tonnes_gf.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;&#39;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>h <span class="ot">&lt;-</span> h_zero_na <span class="sc">%&gt;%</span> <span class="fu">np_harvest_gapflag</span>()</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="do">## Adds flag for required gap-filling, based upon NAs in data. </span></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="do">## </span><span class="al">NOTE</span><span class="do">: Does not perform any gap-filling.</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="do">## At this point, h includes: </span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="do">##    rgn_name   rgn_id   commodity   product   year   tonnes   usd   gapfill</span></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="do">## &#39;gapfill&#39; will be in (zerofill, endfill, tbd, none)</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>data_check <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_datacheck</span>()</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="do">## for each commodity within each region, creates (but doesn&#39;t save...) summary info:</span></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="do">##   num_years:        the length of the data series for this commodity in this region</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="do">##   usd_unique_nz:    (or &#39;tns&#39;) number of unique non-zero values for usd or tonnes </span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="do">##   usd_na &amp; tns_na:  number of NA occurrences</span></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="do">##   paired_obs:       number of non-zero paired observations</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a><span class="do">##   usd_unique_pairs: (or &#39;tns&#39;) within set of paired observations, count of unique usd and tonnes</span></span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a><span class="do">##   unique_pairs:     lesser of usd_unique_pairs and tns_unique_pairs</span></span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a><span class="do">##   count_no_data:    number of paired NAs - years with no value reported</span></span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a></span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_zerofill</span>()</span>
+<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a><span class="do">## for post-reporting years with NA for both tonnes and USD, fill zero - </span></span>
+<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a><span class="do">##    assumes that non-reporting indicates zero harvest to report.</span></span>
+<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a><span class="do">## Also cross-fills zeros where one side is 0, other is NA (not flagged as gapfill)</span></span>
+<span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a></span>
+<span id="cb8-23"><a href="#cb8-23" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_lowdata_filter</span>()</span>
+<span id="cb8-24"><a href="#cb8-24" tabindex="-1"></a><span class="do">## Exclude commodities (within a region) that have few non-zero data points.</span></span>
+<span id="cb8-25"><a href="#cb8-25" tabindex="-1"></a><span class="do">## Optional parameter with default: nonzero_h_yr_min = 4</span></span>
+<span id="cb8-26"><a href="#cb8-26" tabindex="-1"></a><span class="do">## </span><span class="al">NOTE</span><span class="do">: This filter has consequences for the regression, but also has meaning in terms of </span></span>
+<span id="cb8-27"><a href="#cb8-27" tabindex="-1"></a><span class="do">##    not inflicting a penalty on regions trying, and then stopping, an experimental harvest.</span></span>
+<span id="cb8-28"><a href="#cb8-28" tabindex="-1"></a></span>
+<span id="cb8-29"><a href="#cb8-29" tabindex="-1"></a><span class="do">## Melanie&#39;s script to add a georegional ID tag based on country keys and IDs.</span></span>
+<span id="cb8-30"><a href="#cb8-30" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span></span>
+<span id="cb8-31"><a href="#cb8-31" tabindex="-1"></a>  <span class="fu">add_georegion_id</span>()</span>
+<span id="cb8-32"><a href="#cb8-32" tabindex="-1"></a></span>
+<span id="cb8-33"><a href="#cb8-33" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_regr_fill</span>(<span class="at">years_back =</span> <span class="dv">10</span>, <span class="at">vars =</span> <span class="st">&#39;td&#39;</span>, <span class="at">scope =</span> <span class="st">&#39;rgn_id&#39;</span>)</span>
+<span id="cb8-34"><a href="#cb8-34" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_regr_fill</span>(<span class="at">vars =</span> <span class="st">&#39;tdy&#39;</span>, <span class="at">scope =</span> <span class="st">&#39;georgn_id&#39;</span>)</span>
+<span id="cb8-35"><a href="#cb8-35" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_regr_fill</span>(<span class="at">vars =</span> <span class="st">&#39;tdy&#39;</span>, <span class="at">scope =</span> <span class="st">&#39;global&#39;</span>)</span>
+<span id="cb8-36"><a href="#cb8-36" tabindex="-1"></a><span class="do">## np_regr_fill() is a generalized regression gapfill function. Parameters (with defaults):</span></span>
+<span id="cb8-37"><a href="#cb8-37" tabindex="-1"></a><span class="do">## * years_back=50 (int):     This determines how far back in the time series to include within the regression.</span></span>
+<span id="cb8-38"><a href="#cb8-38" tabindex="-1"></a><span class="do">## * min_paired_obs=4 (int):  This determines how many paired observations are required to attempt a regression.</span></span>
+<span id="cb8-39"><a href="#cb8-39" tabindex="-1"></a><span class="do">## * scope = &#39;rgn_id&#39; (str):  (&#39;rgn_id&#39;, &#39;georgn_id&#39;, &#39;global&#39;) Determines grouping scale for regression.</span></span>
+<span id="cb8-40"><a href="#cb8-40" tabindex="-1"></a><span class="do">## * vars = &#39;tdy&#39; (str):      (&#39;td&#39;, &#39;tdy&#39;) Determines model: (tonnes ~ usd) or (tonnes ~ usd + year) [and vice versa]</span></span>
+<span id="cb8-41"><a href="#cb8-41" tabindex="-1"></a></span>
+<span id="cb8-42"><a href="#cb8-42" tabindex="-1"></a>h <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span> <span class="fu">np_end_fill</span>()</span>
+<span id="cb8-43"><a href="#cb8-43" tabindex="-1"></a><span class="do">## For final year of data, if both usd and tonnes originally reported as NA, pull forward</span></span>
+<span id="cb8-44"><a href="#cb8-44" tabindex="-1"></a><span class="do">##    values for usd and tonnes from the previous year.  This should happen after regression fill.</span></span>
+<span id="cb8-45"><a href="#cb8-45" tabindex="-1"></a></span>
+<span id="cb8-46"><a href="#cb8-46" tabindex="-1"></a>h_comm <span class="ot">&lt;-</span> h</span>
+<span id="cb8-47"><a href="#cb8-47" tabindex="-1"></a><span class="do">## Store commodity-level data, before moving on to the product-level smoothing.</span></span>
+<span id="cb8-48"><a href="#cb8-48" tabindex="-1"></a></span>
+<span id="cb8-49"><a href="#cb8-49" tabindex="-1"></a><span class="do">## Output gapfilling report to .csv files.</span></span>
+<span id="cb8-50"><a href="#cb8-50" tabindex="-1"></a><span class="do">## Very few usd gapfilling, and none in recent years (data used to weight contributions), so will ignore this: gapfill==&quot;r2_u_gr&quot;</span></span>
+<span id="cb8-51"><a href="#cb8-51" tabindex="-1"></a>h_gap <span class="ot">&lt;-</span> h <span class="sc">%&gt;%</span></span>
+<span id="cb8-52"><a href="#cb8-52" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">gapfill =</span> <span class="fu">ifelse</span>(gapfill <span class="sc">==</span> <span class="st">&quot;r2_u_gr&quot;</span>, <span class="st">&quot;none&quot;</span>, gapfill)) <span class="sc">%&gt;%</span>   <span class="co"># focusing only on tonnes gapfilling</span></span>
+<span id="cb8-53"><a href="#cb8-53" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, commodity, product, year, gapfill)</span>
+<span id="cb8-54"><a href="#cb8-54" tabindex="-1"></a></span>
+<span id="cb8-55"><a href="#cb8-55" tabindex="-1"></a>h_gap_ornamentals <span class="ot">&lt;-</span> h_gap <span class="sc">%&gt;%</span></span>
+<span id="cb8-56"><a href="#cb8-56" tabindex="-1"></a>  <span class="fu">filter</span>(product <span class="sc">==</span> <span class="st">&quot;ornamentals&quot;</span>)</span>
+<span id="cb8-57"><a href="#cb8-57" tabindex="-1"></a></span>
+<span id="cb8-58"><a href="#cb8-58" tabindex="-1"></a></span>
+<span id="cb8-59"><a href="#cb8-59" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(h_gap, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_ornamentals_harvest_tonnes_gf.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;&#39;</span>)</span></code></pre></div>
 </div>
-<div id="final-data-wranglng" class="section level1" number="8">
-<h1><span class="header-section-number">8</span> Final Data
-Wranglng</h1>
-<div id="summarize-values" class="section level2" number="8.1">
-<h2><span class="header-section-number">8.1</span> Summarize values</h2>
+<div id="final-data-wranglng" class="section level1">
+<h1>Final Data Wranglng</h1>
+<div id="summarize-values" class="section level2">
+<h2>Summarize values</h2>
 <p>Summarize each product per country per year, e.g., all corals in
 Albania in 2011. And, do some error checking.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>h_prod <span class="ot">&lt;-</span> h_comm <span class="sc">%&gt;%</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_name, rgn_id, product, year) <span class="sc">%&gt;%</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">tonnes =</span> <span class="fu">sum</span>(tonnes, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), </span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>            <span class="at">usd =</span> <span class="fu">sum</span>(usd, <span class="at">na.rm =</span> <span class="cn">TRUE</span>))</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>          </span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="do">## Error-checking and table exports to see if there are duplicates</span></span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">sum</span>(<span class="fu">duplicated</span>(h_prod[ , <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;product&quot;</span>, <span class="st">&quot;year&quot;</span>)])) <span class="sc">==</span> <span class="dv">0</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># summarize product values per country per year</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>h_prod <span class="ot">&lt;-</span> h_comm <span class="sc">%&gt;%</span> <span class="co"># copy-on-modify triggered for h_comm (defined earlier)</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_name, rgn_id, product, year) <span class="sc">%&gt;%</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">tonnes =</span> <span class="fu">sum</span>(tonnes, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), </span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>            <span class="at">usd =</span> <span class="fu">sum</span>(usd, <span class="at">na.rm =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>          </span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="do">## Error-checking and table exports to see if there are duplicates</span></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">sum</span>(<span class="fu">duplicated</span>(h_prod[ , <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;product&quot;</span>, <span class="st">&quot;year&quot;</span>)])) <span class="sc">==</span> <span class="dv">0</span>)</span></code></pre></div>
 </div>
-<div id="quick-data-check" class="section level2" number="8.2">
-<h2><span class="header-section-number">8.2</span> Quick Data Check</h2>
+<div id="quick-data-check" class="section level2">
+<h2>Quick Data Check</h2>
 <p>Look at wide format with all commodities and product subtotal (where
 commodity column value is “Z_TOTAL”), compared with the input data prior
 to summing.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>h_x_tonnes <span class="ot">&lt;-</span> h_comm <span class="sc">%&gt;%</span> </span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="fu">mutate</span>(h_prod, <span class="at">commodity =</span> <span class="st">&quot;Z_TOTAL&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_name, rgn_id, commodity, product, year, tonnes) <span class="sc">%&gt;%</span></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="fu">arrange</span>(rgn_name, product, commodity, year) <span class="sc">%&gt;%</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="fu">spread</span>(year, tonnes)</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>h_x_usd <span class="ot">&lt;-</span> h_comm <span class="sc">%&gt;%</span> </span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="fu">mutate</span>(h_prod, <span class="at">commodity =</span> <span class="st">&quot;Z_TOTAL&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_name, rgn_id, commodity, product, year, usd) <span class="sc">%&gt;%</span></span>
-<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  <span class="fu">arrange</span>(rgn_name, product, commodity, year) <span class="sc">%&gt;%</span></span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>  <span class="fu">spread</span>(year, usd)</span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a></span>
-<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="do">## Check a random country and commodity</span></span>
-<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>australia <span class="ot">&lt;-</span> h_x_usd <span class="sc">%&gt;%</span> <span class="fu">filter</span>(product <span class="sc">==</span> <span class="st">&quot;ornamentals&quot;</span>, rgn_name <span class="sc">==</span> <span class="st">&quot;Australia&quot;</span>) </span>
-<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>australia</span>
-<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a><span class="do">## Can open up in Excel to compare subtotals per country-product-year</span></span>
-<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(h_x_tonnes, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;int&quot;</span>, <span class="st">&quot;np_harvest_tonnes_wide.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;NA&#39;</span>)</span>
-<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a></span>
-<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(h_x_usd, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;int&quot;</span>, <span class="st">&quot;np_harvest_usd_wide.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;NA&#39;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>h_x_tonnes <span class="ot">&lt;-</span> h_comm <span class="sc">%&gt;%</span> </span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="fu">mutate</span>(h_prod, <span class="at">commodity =</span> <span class="st">&quot;Z_TOTAL&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_name, rgn_id, commodity, product, year, tonnes) <span class="sc">%&gt;%</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="fu">arrange</span>(rgn_name, product, commodity, year) <span class="sc">%&gt;%</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  <span class="fu">spread</span>(year, tonnes)</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>h_x_usd <span class="ot">&lt;-</span> h_comm <span class="sc">%&gt;%</span> </span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="fu">mutate</span>(h_prod, <span class="at">commodity =</span> <span class="st">&quot;Z_TOTAL&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_name, rgn_id, commodity, product, year, usd) <span class="sc">%&gt;%</span></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>  <span class="fu">arrange</span>(rgn_name, product, commodity, year) <span class="sc">%&gt;%</span></span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>  <span class="fu">spread</span>(year, usd)</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="do">## Check a random country and commodity</span></span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>australia <span class="ot">&lt;-</span> h_x_usd <span class="sc">%&gt;%</span> <span class="fu">filter</span>(product <span class="sc">==</span> <span class="st">&quot;ornamentals&quot;</span>, rgn_name <span class="sc">==</span> <span class="st">&quot;Australia&quot;</span>) </span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a>australia</span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a></span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a><span class="do">## Can open up in Excel to compare subtotals per country-product-year</span></span>
+<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(h_x_tonnes, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;int&quot;</span>, <span class="st">&quot;np_harvest_tonnes_wide.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;NA&#39;</span>)</span>
+<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a></span>
+<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(h_x_usd, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;int&quot;</span>, <span class="st">&quot;np_harvest_usd_wide.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;NA&#39;</span>)</span></code></pre></div>
 </div>
-<div id="calculate-rolling-averages" class="section level2" number="8.3">
-<h2><span class="header-section-number">8.3</span> Calculate Rolling
-Averages</h2>
+<div id="calculate-rolling-averages" class="section level2">
+<h2>Calculate Rolling Averages</h2>
 <p>Determine rolling averages for tonnes and USD in order to determine
 peak values. This is based upon total harvests by product group, not
 individual commodity.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># Find max year in the summarized data table</span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>year_max <span class="ot">&lt;-</span> <span class="fu">max</span>(h_prod<span class="sc">$</span>year)</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>roll_prod <span class="ot">&lt;-</span> h_prod <span class="sc">%&gt;%</span></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  <span class="fu">arrange</span>(rgn_id, product, year) <span class="sc">%&gt;%</span></span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, product) <span class="sc">%&gt;%</span></span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>      <span class="at">tonnes_rollmean =</span> <span class="fu">rollapply</span>(tonnes, <span class="at">width =</span> <span class="dv">4</span>, <span class="at">FUN =</span> mean, <span class="at">align =</span> <span class="st">&#39;right&#39;</span>, <span class="at">partial =</span> <span class="cn">TRUE</span>, <span class="at">na.rm =</span> <span class="cn">FALSE</span>),</span>
-<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>      <span class="at">usd_rollmean    =</span> <span class="fu">rollapply</span>(   usd, <span class="at">width =</span> <span class="dv">4</span>, <span class="at">FUN =</span> mean, <span class="at">align =</span> <span class="st">&#39;right&#39;</span>, <span class="at">partial =</span> <span class="cn">TRUE</span>, <span class="at">na.rm =</span> <span class="cn">FALSE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>  <span class="fu">rename</span>(</span>
-<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>      <span class="at">tonnes_orig =</span> tonnes, <span class="co"># prevent overwriting of reported and gapfilled values</span></span>
-<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>      <span class="at">usd_orig    =</span> usd) <span class="sc">%&gt;%</span> <span class="co"># prevent overwriting of reported and gapfilled values</span></span>
-<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>      <span class="at">tonnes =</span> <span class="fu">ifelse</span>(<span class="sc">!</span><span class="fu">is.na</span>(tonnes_rollmean), tonnes_rollmean, tonnes_orig),</span>
-<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>      <span class="at">usd    =</span> <span class="fu">ifelse</span>(<span class="sc">!</span><span class="fu">is.na</span>(usd_rollmean),    usd_rollmean,    usd_orig)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># Find max year in the summarized data table</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>year_max <span class="ot">&lt;-</span> <span class="fu">max</span>(h_prod<span class="sc">$</span>year)</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>roll_prod <span class="ot">&lt;-</span> h_prod <span class="sc">%&gt;%</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="fu">arrange</span>(rgn_id, product, year) <span class="sc">%&gt;%</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, product) <span class="sc">%&gt;%</span></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>      <span class="at">tonnes_rollmean =</span> <span class="fu">rollapply</span>(tonnes, <span class="at">width =</span> <span class="dv">4</span>, <span class="at">FUN =</span> mean, <span class="at">align =</span> <span class="st">&#39;right&#39;</span>, <span class="at">partial =</span> <span class="cn">TRUE</span>, <span class="at">na.rm =</span> <span class="cn">FALSE</span>),</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>      <span class="at">usd_rollmean    =</span> <span class="fu">rollapply</span>(   usd, <span class="at">width =</span> <span class="dv">4</span>, <span class="at">FUN =</span> mean, <span class="at">align =</span> <span class="st">&#39;right&#39;</span>, <span class="at">partial =</span> <span class="cn">TRUE</span>, <span class="at">na.rm =</span> <span class="cn">FALSE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="fu">rename</span>(</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>      <span class="at">tonnes_orig =</span> tonnes, <span class="co"># prevent overwriting of reported and gapfilled values</span></span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>      <span class="at">usd_orig    =</span> usd) <span class="sc">%&gt;%</span> <span class="co"># prevent overwriting of reported and gapfilled values</span></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>      <span class="at">tonnes =</span> <span class="fu">ifelse</span>(<span class="sc">!</span><span class="fu">is.na</span>(tonnes_rollmean), tonnes_rollmean, tonnes_orig),</span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>      <span class="at">usd    =</span> <span class="fu">ifelse</span>(<span class="sc">!</span><span class="fu">is.na</span>(usd_rollmean),    usd_rollmean,    usd_orig)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)</span></code></pre></div>
 </div>
-<div id="score-harvest-relative-to-peaks" class="section level2" number="8.4">
-<h2><span class="header-section-number">8.4</span> Score Harvest
-Relative to Peaks</h2>
+<div id="score-harvest-relative-to-peaks" class="section level2">
+<h2>Score Harvest Relative to Peaks</h2>
 <p>Score harvest (tonnes and usd) relative to peaks. Output values as
 .csvs. Perform this for all given scenarios, using a for loop.</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co"># Find peak harvest per region-product and apply conservative buffer (scale down)</span></span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="do">## Find max USD value over the last 10 years </span></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>peak_prod <span class="ot">&lt;-</span> roll_prod <span class="sc">%&gt;%</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    <span class="fu">group_by</span>(rgn_id, product) <span class="sc">%&gt;%</span></span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">tonnes_peak =</span> <span class="fu">max</span>(tonnes, <span class="at">na.rm =</span> T)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>    <span class="fu">ungroup</span>() </span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a></span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="do">## Determine relative status:</span></span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>smooth_prod <span class="ot">&lt;-</span> peak_prod <span class="sc">%&gt;%</span> </span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">tonnes_rel =</span> <span class="fu">ifelse</span>(tonnes <span class="sc">&gt;=</span> tonnes_peak, <span class="dv">1</span>, tonnes <span class="sc">/</span> tonnes_peak))</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># Find peak harvest per region-product and apply conservative buffer (scale down)</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="do">## Find max USD value over the last 10 years </span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>peak_prod <span class="ot">&lt;-</span> roll_prod <span class="sc">%&gt;%</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>    <span class="fu">group_by</span>(rgn_id, product) <span class="sc">%&gt;%</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">tonnes_peak =</span> <span class="fu">max</span>(tonnes, <span class="at">na.rm =</span> T)) <span class="sc">%&gt;%</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>    <span class="fu">ungroup</span>() </span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a><span class="do">## Determine relative status:</span></span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>smooth_prod <span class="ot">&lt;-</span> peak_prod <span class="sc">%&gt;%</span> </span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">tonnes_rel =</span> <span class="fu">ifelse</span>(tonnes <span class="sc">&gt;=</span> tonnes_peak, <span class="dv">1</span>, tonnes <span class="sc">/</span> tonnes_peak))</span></code></pre></div>
 </div>
-<div id="save-data-layer" class="section level2" number="8.5">
-<h2><span class="header-section-number">8.5</span> Save data layer</h2>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="do">## Write entire data frame to .csv:</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(smooth_prod, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;int&quot;</span>, <span class="st">&quot;np_harvest_smoothed_data.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;&#39;</span>)</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a></span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="do">## Save tonnes/usd data for weighting purposes </span></span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>tonnes <span class="ot">&lt;-</span> smooth_prod <span class="sc">%&gt;%</span></span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, product, year, tonnes, usd) </span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a></span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(tonnes, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;int&quot;</span>, <span class="st">&quot;np_harvest_tonnes_usd.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;&#39;</span>)</span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a></span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a><span class="do">## Save relative tonnes data for the ornamentals layer </span></span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>tonnes_ornamentals_rel <span class="ot">&lt;-</span> smooth_prod <span class="sc">%&gt;%</span></span>
-<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(product <span class="sc">==</span> <span class="st">&quot;ornamentals&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, product, year, tonnes_rel)</span>
-<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a></span>
-<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(tonnes_ornamentals_rel, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_ornamentals_harvest_tonnes_rel.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;&#39;</span>)</span></code></pre></div>
+<div id="save-data-layer" class="section level2">
+<h2>Save data layer</h2>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="do">## Write entire data frame to .csv:</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(smooth_prod, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;int&quot;</span>, <span class="st">&quot;np_harvest_smoothed_data.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;&#39;</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="do">## Save tonnes/usd data for weighting purposes </span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>tonnes <span class="ot">&lt;-</span> smooth_prod <span class="sc">%&gt;%</span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, product, year, tonnes, usd) </span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a></span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(tonnes, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;int&quot;</span>, <span class="st">&quot;np_harvest_tonnes_usd.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;&#39;</span>)</span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a></span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a><span class="do">## Save relative tonnes data for the ornamentals layer </span></span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a>tonnes_ornamentals_rel <span class="ot">&lt;-</span> smooth_prod <span class="sc">%&gt;%</span></span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(product <span class="sc">==</span> <span class="st">&quot;ornamentals&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, product, year, tonnes_rel)</span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a></span>
+<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(tonnes_ornamentals_rel, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_ornamentals_harvest_tonnes_rel.csv&quot;</span>), <span class="at">na =</span> <span class="st">&#39;&#39;</span>)</span></code></pre></div>
 </div>
-<div id="save-exposure-and-risk-layers-to-ornamentals-so-that-we-can-calculate-sustainability-in-ohi-global-functions.r" class="section level2" number="8.6">
-<h2><span class="header-section-number">8.6</span> Save exposure and
-risk layers to ornamentals (so that we can calculate sustainability in
-ohi-global functions.R)</h2>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># ==== calculates NP exposure based on habitats (ornamentals) =============</span></span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>    <span class="do">### Returns the first input data frame with a new column for exposure:</span></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>    <span class="do">### [rgn_id rgn_name product year tonnes tonnes_rel prod_weight exposure]</span></span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>    <span class="do">#########################################.</span></span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>    </span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>np_harvest_orn <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(current_np_dir, <span class="st">&quot;int&quot;</span>, <span class="st">&quot;np_harvest_tonnes_usd.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(year, rgn_id, product, tonnes) <span class="sc">%&gt;%</span></span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  <span class="fu">filter</span>(product <span class="sc">==</span> <span class="st">&quot;ornamentals&quot;</span>) </span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a></span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="do">### Determine Habitat Areas for Exposure</span></span>
-<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a></span>
-<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>hab_rocky <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;hab_rockyreef&quot;</span>, <span class="st">&quot;v2012&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;habitat_extent_rocky_reef_updated.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, km2) <span class="sc">%&gt;%</span></span>
-<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(km2 <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
-<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a></span>
-<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a></span>
-<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>hab_coral <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;hab_coral&quot;</span>, <span class="st">&quot;v2021&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;habitat_extent_coral_updated.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, km2) <span class="sc">%&gt;%</span></span>
-<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(km2 <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
-<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a></span>
-<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a><span class="do">### area for products in both coral and rocky reef habitats: shells, ornamentals, sponges</span></span>
-<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a>area_dual_hab <span class="ot">&lt;-</span> np_harvest_orn <span class="sc">%&gt;%</span></span>
-<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(hab_coral <span class="sc">%&gt;%</span></span>
-<span id="cb12-24"><a href="#cb12-24" tabindex="-1"></a>                     dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">coral_km2 =</span> km2),</span>
-<span id="cb12-25"><a href="#cb12-25" tabindex="-1"></a>                   <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&#39;rgn_id&#39;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-26"><a href="#cb12-26" tabindex="-1"></a>  <span class="fu">left_join</span>(hab_rocky <span class="sc">%&gt;%</span></span>
-<span id="cb12-27"><a href="#cb12-27" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">rocky_km2 =</span> km2),</span>
-<span id="cb12-28"><a href="#cb12-28" tabindex="-1"></a>            <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&#39;rgn_id&#39;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-29"><a href="#cb12-29" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rowwise</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb12-30"><a href="#cb12-30" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">km2 =</span> <span class="fu">sum</span>(<span class="fu">c</span>(rocky_km2, coral_km2), <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-31"><a href="#cb12-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(km2 <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-32"><a href="#cb12-32" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>coral_km2, <span class="sc">-</span>rocky_km2)</span>
-<span id="cb12-33"><a href="#cb12-33" tabindex="-1"></a></span>
-<span id="cb12-34"><a href="#cb12-34" tabindex="-1"></a><span class="do">### Determine Exposure</span></span>
-<span id="cb12-35"><a href="#cb12-35" tabindex="-1"></a><span class="do">### exposure: combine areas, get tonnes / area, and rescale with log transform</span></span>
-<span id="cb12-36"><a href="#cb12-36" tabindex="-1"></a>np_exp_orn <span class="ot">&lt;-</span> area_dual_hab <span class="sc">%&gt;%</span></span>
-<span id="cb12-37"><a href="#cb12-37" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">expos_raw =</span> <span class="fu">ifelse</span>(tonnes <span class="sc">&gt;</span> <span class="dv">0</span> <span class="sc">&amp;</span></span>
-<span id="cb12-38"><a href="#cb12-38" tabindex="-1"></a>                                     km2 <span class="sc">&gt;</span> <span class="dv">0</span>, (tonnes <span class="sc">/</span> km2), <span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-39"><a href="#cb12-39" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(product) <span class="sc">%&gt;%</span></span>
-<span id="cb12-40"><a href="#cb12-40" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">expos_prod_max =</span> <span class="fu">max</span>(expos_raw, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-41"><a href="#cb12-41" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb12-42"><a href="#cb12-42" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">exposure =</span> (<span class="fu">log</span>(expos_raw <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">/</span> <span class="fu">log</span>(expos_prod_max <span class="sc">+</span> <span class="dv">1</span>)),</span>
-<span id="cb12-43"><a href="#cb12-43" tabindex="-1"></a>                <span class="at">exposure =</span> <span class="fu">ifelse</span>(exposure <span class="sc">&gt;</span> <span class="dv">1</span>, <span class="dv">1</span>, exposure)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-44"><a href="#cb12-44" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>km2, <span class="sc">-</span>expos_raw, <span class="sc">-</span>expos_prod_max)</span>
-<span id="cb12-45"><a href="#cb12-45" tabindex="-1"></a></span>
-<span id="cb12-46"><a href="#cb12-46" tabindex="-1"></a><span class="do">### clean up columns</span></span>
-<span id="cb12-47"><a href="#cb12-47" tabindex="-1"></a>gap_fill <span class="ot">&lt;-</span> np_exp_orn <span class="sc">%&gt;%</span></span>
-<span id="cb12-48"><a href="#cb12-48" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfilled =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(exposure), <span class="dv">1</span>, <span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-49"><a href="#cb12-49" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">method =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(exposure), <span class="st">&quot;prod_average&quot;</span>, <span class="cn">NA</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-50"><a href="#cb12-50" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">rgn_id =</span> rgn_id, product, year, gapfilled, method)</span>
-<span id="cb12-51"><a href="#cb12-51" tabindex="-1"></a></span>
-<span id="cb12-52"><a href="#cb12-52" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(gap_fill, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_exposure_ornamentals_gf.csv&quot;</span>))</span>
-<span id="cb12-53"><a href="#cb12-53" tabindex="-1"></a></span>
-<span id="cb12-54"><a href="#cb12-54" tabindex="-1"></a><span class="do">### add exposure for countries with (habitat extent == NA)</span></span>
-<span id="cb12-55"><a href="#cb12-55" tabindex="-1"></a>np_exp_orn <span class="ot">&lt;-</span> np_exp_orn <span class="sc">%&gt;%</span></span>
-<span id="cb12-56"><a href="#cb12-56" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(product) <span class="sc">%&gt;%</span></span>
-<span id="cb12-57"><a href="#cb12-57" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">mean_exp =</span> <span class="fu">mean</span>(exposure, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-58"><a href="#cb12-58" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">exposure =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(exposure), mean_exp, exposure)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-59"><a href="#cb12-59" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>mean_exp) <span class="sc">%&gt;%</span></span>
-<span id="cb12-60"><a href="#cb12-60" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb12-61"><a href="#cb12-61" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">product =</span> <span class="fu">as.character</span>(product)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-62"><a href="#cb12-62" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, product, exposure)</span>
-<span id="cb12-63"><a href="#cb12-63" tabindex="-1"></a></span>
-<span id="cb12-64"><a href="#cb12-64" tabindex="-1"></a><span class="do">##save exposure as a layer</span></span>
-<span id="cb12-65"><a href="#cb12-65" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(np_exp_orn, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_exposure_ornamentals.csv&quot;</span>))</span>
-<span id="cb12-66"><a href="#cb12-66" tabindex="-1"></a></span>
-<span id="cb12-67"><a href="#cb12-67" tabindex="-1"></a></span>
-<span id="cb12-68"><a href="#cb12-68" tabindex="-1"></a><span class="do">### calculates NP risk based on:</span></span>
-<span id="cb12-69"><a href="#cb12-69" tabindex="-1"></a><span class="do">###   ornamentals:      risk = 1 if blast or cyanide fishing</span></span>
-<span id="cb12-70"><a href="#cb12-70" tabindex="-1"></a><span class="do">### Returns a data frame of risk, by product, by region:</span></span>
-<span id="cb12-71"><a href="#cb12-71" tabindex="-1"></a><span class="do">###</span></span>
-<span id="cb12-72"><a href="#cb12-72" tabindex="-1"></a><span class="do">#########################################.</span></span>
-<span id="cb12-73"><a href="#cb12-73" tabindex="-1"></a></span>
-<span id="cb12-74"><a href="#cb12-74" tabindex="-1"></a></span>
-<span id="cb12-75"><a href="#cb12-75" tabindex="-1"></a><span class="do">### Determine Risk</span></span>
-<span id="cb12-76"><a href="#cb12-76" tabindex="-1"></a></span>
-<span id="cb12-77"><a href="#cb12-77" tabindex="-1"></a>r_cyanide <span class="ot">&lt;-</span> </span>
-<span id="cb12-78"><a href="#cb12-78" tabindex="-1"></a>  <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;np_prs_poison_blast_fishing&quot;</span>, <span class="st">&quot;v2013&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;gl_thr_poison_3nm_rgn2013.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-79"><a href="#cb12-79" tabindex="-1"></a>  <span class="co">#AlignDataYears(layer_nm = &quot;np_cyanide&quot;, layers_obj = layers) %&gt;%</span></span>
-<span id="cb12-80"><a href="#cb12-80" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(score) <span class="sc">&amp;</span> score <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-81"><a href="#cb12-81" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id,</span>
-<span id="cb12-82"><a href="#cb12-82" tabindex="-1"></a>                <span class="co">#year = scenario_year,</span></span>
-<span id="cb12-83"><a href="#cb12-83" tabindex="-1"></a>                <span class="at">cyanide =</span> score)</span>
-<span id="cb12-84"><a href="#cb12-84" tabindex="-1"></a></span>
-<span id="cb12-85"><a href="#cb12-85" tabindex="-1"></a>r_blast <span class="ot">&lt;-</span></span>
-<span id="cb12-86"><a href="#cb12-86" tabindex="-1"></a>  <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;np_prs_poison_blast_fishing&quot;</span>, <span class="st">&quot;v2013&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;gl_thr_blast_3nm_rgn2013.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-87"><a href="#cb12-87" tabindex="-1"></a>  <span class="co">#AlignDataYears(layer_nm = &quot;np_blast&quot;, layers_obj = layers)  %&gt;%</span></span>
-<span id="cb12-88"><a href="#cb12-88" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(score) <span class="sc">&amp;</span> score <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-89"><a href="#cb12-89" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id,</span>
-<span id="cb12-90"><a href="#cb12-90" tabindex="-1"></a>         <span class="co">#year = scenario_year,</span></span>
-<span id="cb12-91"><a href="#cb12-91" tabindex="-1"></a>         <span class="at">blast =</span> score)</span>
-<span id="cb12-92"><a href="#cb12-92" tabindex="-1"></a></span>
-<span id="cb12-93"><a href="#cb12-93" tabindex="-1"></a></span>
-<span id="cb12-94"><a href="#cb12-94" tabindex="-1"></a><span class="do">### risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code</span></span>
-<span id="cb12-95"><a href="#cb12-95" tabindex="-1"></a><span class="do">###  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the &quot;relative intensity of cyanide fishing&quot;</span></span>
-<span id="cb12-96"><a href="#cb12-96" tabindex="-1"></a>risk_orn <span class="ot">&lt;-</span> r_cyanide <span class="sc">%&gt;%</span></span>
-<span id="cb12-97"><a href="#cb12-97" tabindex="-1"></a>  <span class="fu">full_join</span>(r_blast, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-98"><a href="#cb12-98" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ornamentals =</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-99"><a href="#cb12-99" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, ornamentals)</span>
-<span id="cb12-100"><a href="#cb12-100" tabindex="-1"></a></span>
-<span id="cb12-101"><a href="#cb12-101" tabindex="-1"></a><span class="do">### risk as binary</span></span>
-<span id="cb12-102"><a href="#cb12-102" tabindex="-1"></a>np_risk_orn <span class="ot">&lt;-</span></span>
-<span id="cb12-103"><a href="#cb12-103" tabindex="-1"></a>  <span class="fu">expand.grid</span>(</span>
-<span id="cb12-104"><a href="#cb12-104" tabindex="-1"></a>    <span class="at">rgn_id  =</span> <span class="fu">unique</span>(np_harvest_orn<span class="sc">$</span>rgn_id),</span>
-<span id="cb12-105"><a href="#cb12-105" tabindex="-1"></a>    <span class="at">year =</span> <span class="fu">unique</span>(np_harvest_orn<span class="sc">$</span>year)</span>
-<span id="cb12-106"><a href="#cb12-106" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb12-107"><a href="#cb12-107" tabindex="-1"></a>  <span class="do">### ornamentals</span></span>
-<span id="cb12-108"><a href="#cb12-108" tabindex="-1"></a>  <span class="fu">left_join</span>(risk_orn, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>))  <span class="sc">%&gt;%</span></span>
-<span id="cb12-109"><a href="#cb12-109" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ornamentals =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(ornamentals), <span class="dv">0</span>, ornamentals)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-110"><a href="#cb12-110" tabindex="-1"></a>  <span class="fu">gather</span>(product, risk, <span class="sc">-</span>rgn_id, <span class="sc">-</span>year) <span class="sc">%&gt;%</span></span>
-<span id="cb12-111"><a href="#cb12-111" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">product =</span> <span class="fu">as.character</span>(product))</span>
-<span id="cb12-112"><a href="#cb12-112" tabindex="-1"></a></span>
-<span id="cb12-113"><a href="#cb12-113" tabindex="-1"></a>np_risk_gf <span class="ot">&lt;-</span> np_risk_orn <span class="sc">%&gt;%</span></span>
-<span id="cb12-114"><a href="#cb12-114" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">gapfilled =</span> <span class="dv">0</span>, <span class="at">method =</span> <span class="cn">NA</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-115"><a href="#cb12-115" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>risk)</span>
-<span id="cb12-116"><a href="#cb12-116" tabindex="-1"></a></span>
-<span id="cb12-117"><a href="#cb12-117" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(np_risk_gf, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_risk_ornamentals_gf.csv&quot;</span>))</span>
-<span id="cb12-118"><a href="#cb12-118" tabindex="-1"></a></span>
-<span id="cb12-119"><a href="#cb12-119" tabindex="-1"></a><span class="do">## write this as a risk layer </span></span>
-<span id="cb12-120"><a href="#cb12-120" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(np_risk_orn, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_risk_ornamentals.csv&quot;</span>))</span></code></pre></div>
+<div id="save-exposure-and-risk-layers-to-ornamentals-so-that-we-can-calculate-sustainability-in-ohi-global-functions.r" class="section level2">
+<h2>Save exposure and risk layers to ornamentals (so that we can
+calculate sustainability in ohi-global functions.R)</h2>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># ==== calculates NP exposure based on habitats (ornamentals) =============</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>    <span class="do">### Returns the first input data frame with a new column for exposure:</span></span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>    <span class="do">### [rgn_id rgn_name product year tonnes tonnes_rel prod_weight exposure]</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>    <span class="do">#########################################.</span></span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>    </span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>np_harvest_orn <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(current_np_dir, <span class="st">&quot;int&quot;</span>, <span class="st">&quot;np_harvest_tonnes_usd.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(year, rgn_id, product, tonnes) <span class="sc">%&gt;%</span></span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>  <span class="fu">filter</span>(product <span class="sc">==</span> <span class="st">&quot;ornamentals&quot;</span>) </span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a></span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a><span class="do">### Determine Habitat Areas for Exposure</span></span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a></span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a>hab_rocky <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;hab_rockyreef&quot;</span>, <span class="st">&quot;v2012&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;habitat_extent_rocky_reef_updated.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, km2) <span class="sc">%&gt;%</span></span>
+<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(km2 <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a></span>
+<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a></span>
+<span id="cb14-17"><a href="#cb14-17" tabindex="-1"></a>hab_coral <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;hab_coral&quot;</span>, <span class="st">&quot;v2021&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;habitat_extent_coral_updated.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-18"><a href="#cb14-18" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, km2) <span class="sc">%&gt;%</span></span>
+<span id="cb14-19"><a href="#cb14-19" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(km2 <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb14-20"><a href="#cb14-20" tabindex="-1"></a></span>
+<span id="cb14-21"><a href="#cb14-21" tabindex="-1"></a><span class="do">### area for products in both coral and rocky reef habitats: shells, ornamentals, sponges</span></span>
+<span id="cb14-22"><a href="#cb14-22" tabindex="-1"></a>area_dual_hab <span class="ot">&lt;-</span> np_harvest_orn <span class="sc">%&gt;%</span></span>
+<span id="cb14-23"><a href="#cb14-23" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(hab_coral <span class="sc">%&gt;%</span></span>
+<span id="cb14-24"><a href="#cb14-24" tabindex="-1"></a>                     dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">coral_km2 =</span> km2),</span>
+<span id="cb14-25"><a href="#cb14-25" tabindex="-1"></a>                   <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&#39;rgn_id&#39;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-26"><a href="#cb14-26" tabindex="-1"></a>  <span class="fu">left_join</span>(hab_rocky <span class="sc">%&gt;%</span></span>
+<span id="cb14-27"><a href="#cb14-27" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">rocky_km2 =</span> km2),</span>
+<span id="cb14-28"><a href="#cb14-28" tabindex="-1"></a>            <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&#39;rgn_id&#39;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-29"><a href="#cb14-29" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rowwise</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb14-30"><a href="#cb14-30" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">km2 =</span> <span class="fu">sum</span>(<span class="fu">c</span>(rocky_km2, coral_km2), <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-31"><a href="#cb14-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(km2 <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-32"><a href="#cb14-32" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>coral_km2, <span class="sc">-</span>rocky_km2)</span>
+<span id="cb14-33"><a href="#cb14-33" tabindex="-1"></a></span>
+<span id="cb14-34"><a href="#cb14-34" tabindex="-1"></a><span class="do">### Determine Exposure</span></span>
+<span id="cb14-35"><a href="#cb14-35" tabindex="-1"></a><span class="do">### exposure: combine areas, get tonnes / area, and rescale with log transform</span></span>
+<span id="cb14-36"><a href="#cb14-36" tabindex="-1"></a>np_exp_orn <span class="ot">&lt;-</span> area_dual_hab <span class="sc">%&gt;%</span></span>
+<span id="cb14-37"><a href="#cb14-37" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">expos_raw =</span> <span class="fu">ifelse</span>(tonnes <span class="sc">&gt;</span> <span class="dv">0</span> <span class="sc">&amp;</span></span>
+<span id="cb14-38"><a href="#cb14-38" tabindex="-1"></a>                                     km2 <span class="sc">&gt;</span> <span class="dv">0</span>, (tonnes <span class="sc">/</span> km2), <span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-39"><a href="#cb14-39" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(product) <span class="sc">%&gt;%</span></span>
+<span id="cb14-40"><a href="#cb14-40" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">expos_prod_max =</span> <span class="fu">max</span>(expos_raw, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-41"><a href="#cb14-41" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb14-42"><a href="#cb14-42" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">exposure =</span> (<span class="fu">log</span>(expos_raw <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">/</span> <span class="fu">log</span>(expos_prod_max <span class="sc">+</span> <span class="dv">1</span>)),</span>
+<span id="cb14-43"><a href="#cb14-43" tabindex="-1"></a>                <span class="at">exposure =</span> <span class="fu">ifelse</span>(exposure <span class="sc">&gt;</span> <span class="dv">1</span>, <span class="dv">1</span>, exposure)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-44"><a href="#cb14-44" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>km2, <span class="sc">-</span>expos_raw, <span class="sc">-</span>expos_prod_max)</span>
+<span id="cb14-45"><a href="#cb14-45" tabindex="-1"></a></span>
+<span id="cb14-46"><a href="#cb14-46" tabindex="-1"></a><span class="do">### clean up columns</span></span>
+<span id="cb14-47"><a href="#cb14-47" tabindex="-1"></a>gap_fill <span class="ot">&lt;-</span> np_exp_orn <span class="sc">%&gt;%</span></span>
+<span id="cb14-48"><a href="#cb14-48" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfilled =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(exposure), <span class="dv">1</span>, <span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-49"><a href="#cb14-49" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">method =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(exposure), <span class="st">&quot;prod_average&quot;</span>, <span class="cn">NA</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-50"><a href="#cb14-50" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">rgn_id =</span> rgn_id, product, year, gapfilled, method)</span>
+<span id="cb14-51"><a href="#cb14-51" tabindex="-1"></a></span>
+<span id="cb14-52"><a href="#cb14-52" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(gap_fill, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_exposure_ornamentals_gf.csv&quot;</span>))</span>
+<span id="cb14-53"><a href="#cb14-53" tabindex="-1"></a></span>
+<span id="cb14-54"><a href="#cb14-54" tabindex="-1"></a><span class="do">### add exposure for countries with (habitat extent == NA)</span></span>
+<span id="cb14-55"><a href="#cb14-55" tabindex="-1"></a>np_exp_orn <span class="ot">&lt;-</span> np_exp_orn <span class="sc">%&gt;%</span></span>
+<span id="cb14-56"><a href="#cb14-56" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(product) <span class="sc">%&gt;%</span></span>
+<span id="cb14-57"><a href="#cb14-57" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">mean_exp =</span> <span class="fu">mean</span>(exposure, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-58"><a href="#cb14-58" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">exposure =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(exposure), mean_exp, exposure)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-59"><a href="#cb14-59" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>mean_exp) <span class="sc">%&gt;%</span></span>
+<span id="cb14-60"><a href="#cb14-60" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb14-61"><a href="#cb14-61" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">product =</span> <span class="fu">as.character</span>(product)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-62"><a href="#cb14-62" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, product, exposure)</span>
+<span id="cb14-63"><a href="#cb14-63" tabindex="-1"></a></span>
+<span id="cb14-64"><a href="#cb14-64" tabindex="-1"></a><span class="do">##save exposure as a layer</span></span>
+<span id="cb14-65"><a href="#cb14-65" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(np_exp_orn, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_exposure_ornamentals.csv&quot;</span>))</span>
+<span id="cb14-66"><a href="#cb14-66" tabindex="-1"></a></span>
+<span id="cb14-67"><a href="#cb14-67" tabindex="-1"></a></span>
+<span id="cb14-68"><a href="#cb14-68" tabindex="-1"></a><span class="do">### calculates NP risk based on:</span></span>
+<span id="cb14-69"><a href="#cb14-69" tabindex="-1"></a><span class="do">###   ornamentals:      risk = 1 if blast or cyanide fishing</span></span>
+<span id="cb14-70"><a href="#cb14-70" tabindex="-1"></a><span class="do">### Returns a data frame of risk, by product, by region:</span></span>
+<span id="cb14-71"><a href="#cb14-71" tabindex="-1"></a><span class="do">###</span></span>
+<span id="cb14-72"><a href="#cb14-72" tabindex="-1"></a><span class="do">#########################################.</span></span>
+<span id="cb14-73"><a href="#cb14-73" tabindex="-1"></a></span>
+<span id="cb14-74"><a href="#cb14-74" tabindex="-1"></a></span>
+<span id="cb14-75"><a href="#cb14-75" tabindex="-1"></a><span class="do">### Determine Risk</span></span>
+<span id="cb14-76"><a href="#cb14-76" tabindex="-1"></a></span>
+<span id="cb14-77"><a href="#cb14-77" tabindex="-1"></a>r_cyanide <span class="ot">&lt;-</span> </span>
+<span id="cb14-78"><a href="#cb14-78" tabindex="-1"></a>  <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;np_prs_poison_blast_fishing&quot;</span>, <span class="st">&quot;v2013&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;gl_thr_poison_3nm_rgn2013.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-79"><a href="#cb14-79" tabindex="-1"></a>  <span class="co">#AlignDataYears(layer_nm = &quot;np_cyanide&quot;, layers_obj = layers) %&gt;%</span></span>
+<span id="cb14-80"><a href="#cb14-80" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(score) <span class="sc">&amp;</span> score <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-81"><a href="#cb14-81" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id,</span>
+<span id="cb14-82"><a href="#cb14-82" tabindex="-1"></a>                <span class="co">#year = scenario_year,</span></span>
+<span id="cb14-83"><a href="#cb14-83" tabindex="-1"></a>                <span class="at">cyanide =</span> score)</span>
+<span id="cb14-84"><a href="#cb14-84" tabindex="-1"></a></span>
+<span id="cb14-85"><a href="#cb14-85" tabindex="-1"></a>r_blast <span class="ot">&lt;-</span></span>
+<span id="cb14-86"><a href="#cb14-86" tabindex="-1"></a>  <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;np_prs_poison_blast_fishing&quot;</span>, <span class="st">&quot;v2013&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;gl_thr_blast_3nm_rgn2013.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-87"><a href="#cb14-87" tabindex="-1"></a>  <span class="co">#AlignDataYears(layer_nm = &quot;np_blast&quot;, layers_obj = layers)  %&gt;%</span></span>
+<span id="cb14-88"><a href="#cb14-88" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(score) <span class="sc">&amp;</span> score <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-89"><a href="#cb14-89" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id,</span>
+<span id="cb14-90"><a href="#cb14-90" tabindex="-1"></a>         <span class="co">#year = scenario_year,</span></span>
+<span id="cb14-91"><a href="#cb14-91" tabindex="-1"></a>         <span class="at">blast =</span> score)</span>
+<span id="cb14-92"><a href="#cb14-92" tabindex="-1"></a></span>
+<span id="cb14-93"><a href="#cb14-93" tabindex="-1"></a></span>
+<span id="cb14-94"><a href="#cb14-94" tabindex="-1"></a><span class="do">### risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code</span></span>
+<span id="cb14-95"><a href="#cb14-95" tabindex="-1"></a><span class="do">###  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the &quot;relative intensity of cyanide fishing&quot;</span></span>
+<span id="cb14-96"><a href="#cb14-96" tabindex="-1"></a>risk_orn <span class="ot">&lt;-</span> r_cyanide <span class="sc">%&gt;%</span></span>
+<span id="cb14-97"><a href="#cb14-97" tabindex="-1"></a>  <span class="fu">full_join</span>(r_blast, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-98"><a href="#cb14-98" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ornamentals =</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-99"><a href="#cb14-99" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, ornamentals)</span>
+<span id="cb14-100"><a href="#cb14-100" tabindex="-1"></a></span>
+<span id="cb14-101"><a href="#cb14-101" tabindex="-1"></a><span class="do">### risk as binary</span></span>
+<span id="cb14-102"><a href="#cb14-102" tabindex="-1"></a>np_risk_orn <span class="ot">&lt;-</span></span>
+<span id="cb14-103"><a href="#cb14-103" tabindex="-1"></a>  <span class="fu">expand.grid</span>(</span>
+<span id="cb14-104"><a href="#cb14-104" tabindex="-1"></a>    <span class="at">rgn_id  =</span> <span class="fu">unique</span>(np_harvest_orn<span class="sc">$</span>rgn_id),</span>
+<span id="cb14-105"><a href="#cb14-105" tabindex="-1"></a>    <span class="at">year =</span> <span class="fu">unique</span>(np_harvest_orn<span class="sc">$</span>year)</span>
+<span id="cb14-106"><a href="#cb14-106" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb14-107"><a href="#cb14-107" tabindex="-1"></a>  <span class="do">### ornamentals</span></span>
+<span id="cb14-108"><a href="#cb14-108" tabindex="-1"></a>  <span class="fu">left_join</span>(risk_orn, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>))  <span class="sc">%&gt;%</span></span>
+<span id="cb14-109"><a href="#cb14-109" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ornamentals =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(ornamentals), <span class="dv">0</span>, ornamentals)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-110"><a href="#cb14-110" tabindex="-1"></a>  <span class="fu">gather</span>(product, risk, <span class="sc">-</span>rgn_id, <span class="sc">-</span>year) <span class="sc">%&gt;%</span></span>
+<span id="cb14-111"><a href="#cb14-111" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">product =</span> <span class="fu">as.character</span>(product))</span>
+<span id="cb14-112"><a href="#cb14-112" tabindex="-1"></a></span>
+<span id="cb14-113"><a href="#cb14-113" tabindex="-1"></a>np_risk_gf <span class="ot">&lt;-</span> np_risk_orn <span class="sc">%&gt;%</span></span>
+<span id="cb14-114"><a href="#cb14-114" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">gapfilled =</span> <span class="dv">0</span>, <span class="at">method =</span> <span class="cn">NA</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-115"><a href="#cb14-115" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>risk)</span>
+<span id="cb14-116"><a href="#cb14-116" tabindex="-1"></a></span>
+<span id="cb14-117"><a href="#cb14-117" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(np_risk_gf, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_risk_ornamentals_gf.csv&quot;</span>))</span>
+<span id="cb14-118"><a href="#cb14-118" tabindex="-1"></a></span>
+<span id="cb14-119"><a href="#cb14-119" tabindex="-1"></a><span class="do">## write this as a risk layer </span></span>
+<span id="cb14-120"><a href="#cb14-120" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(np_risk_orn, <span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_risk_ornamentals.csv&quot;</span>))</span></code></pre></div>
 </div>
 </div>
 

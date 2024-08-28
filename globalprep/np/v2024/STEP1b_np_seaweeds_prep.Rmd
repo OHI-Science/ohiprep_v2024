@@ -103,6 +103,7 @@ source(here("globalprep", "np", v_scen_year, "R", "np_fxn.R"))
 source(here("globalprep", "mar", v_scen_year, "mar_fxs.R")) # functions specific to mariculture dealing with compound countries
 ```
 
+
 # Import Raw Data: FAO Mariculture data
 
 Mariculture production in tonnes.
@@ -285,7 +286,7 @@ seaweed_np <- seaweed_np %>% rename(species = FAO_name)
 # Bonaire/S.Eustatius/Saba
 # Yugoslavia SFR: no longer a country after 1992
 seaweed_np <- seaweed_np %>%
-  mutate(country = ifelse(country=="Réunion", "Reunion", country)) %>%  # this one is hard to get right; v2020: last year it was "R\xe9union", but this year it was "Réunion" - not present in v2021 data, not present in v2024 data
+  mutate(country = ifelse(country == "Réunion", "Reunion", country)) %>%  # this one is hard to get right; v2020: last year it was "R\xe9union", but this year it was "Réunion" - not present in v2021 data, not present in v2024 data
   ohicore::split_regions()  # function in mar_fxs.R
 
 mar_rgn_all <- name_2_rgn(df_in = seaweed_np, 
@@ -368,8 +369,8 @@ Remove species-region-environment time series with less than four years of seawe
 ```{r}
 mar_rgn_gf <- mar_rgn_gf %>% 
   group_by(rgn_id, species, fao, environment) %>%
-  mutate(not_0 = length(value[value>0])) %>% # length of vector of years greater than 0
-  filter(not_0>3) %>% # filter for groups that have at least four years of seaweed mariculture production 
+  mutate(not_0 = length(value[value > 0])) %>% # length of vector of years greater than 0
+  filter(not_0 > 3) %>% # filter for groups that have at least four years of seaweed mariculture production 
   ungroup() %>% 
   dplyr::select(rgn_id, species, fao, environment, year, include, value, Taxon_code, gap_0_fill) 
 ```
@@ -384,7 +385,7 @@ identifier <- mar_rgn_gf %>%
   mutate(species_code = 1:n())
 # 93 unique identifiers - v2021
 
-mar_rgn_gf = left_join(mar_rgn_gf, identifier)
+mar_rgn_gf <- left_join(mar_rgn_gf, identifier)
 maric <- mar_rgn_gf
 ```
 
@@ -402,6 +403,10 @@ maric <- maric %>%
 # Save for weighting purposes later on
 write_csv(maric, here(current_np_dir, "int", "np_seaweeds_tonnes_weighting.csv"))
 ```
+
+
+
+
 
 # Sustainability Scores from Seafood Watch Data
 
@@ -500,7 +505,7 @@ maric <- readr::read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weighti
 
 maric <- maric %>%
   group_by(environment, species, year, Taxon_code, rgn_id) %>% 
-  summarize(value = sum(value), gap_0_fill =first(gap_0_fill)) %>%
+  summarize(value = sum(value), gap_0_fill = first(gap_0_fill)) %>%
   ungroup()
 
 # run this code to check that there are no duplicates for any species, year, rgn_id combinations. If there are they will be unintentionally deleted later, so you may need to change family or taxon codes to match and rerun the above group by
@@ -570,7 +575,7 @@ mar_sw_sus <- mar_sw_sus_avg %>%
   dplyr::distinct(rgn_id, species, year,
                   .keep_all = TRUE) %>% # keep all variables in .data. If a combination of the variables (rgn_id, species, year) is not distinct, this keeps the first row of values.
   dplyr::select(-sust, sust_coeff = sust_avg, taxon_group = Taxon_code) %>%
-  dplyr::mutate(taxa_code = paste(species, species_code, sep="_"))
+  dplyr::mutate(taxa_code = paste(species, species_code, sep = "_"))
 ```
 
 **Now look at a summary after appending all the Seafood Watch data**
@@ -634,7 +639,6 @@ np_old <- readr::read_csv(here("globalprep", "np", paste0("v", prev_scen_year), 
 
 # read in current year's harvest data 
 np_new <- readr::read_csv(here(current_np_dir, "output", "np_seaweed_harvest_tonnes.csv"))
-
 
 # Compare yield data for Saint Lucia
 np_old_sl <- np_old %>% 

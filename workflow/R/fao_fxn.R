@@ -47,9 +47,18 @@ fao_clean_data_new <- function(m, sub_N = 0.1) {
       value = str_replace(value, fixed(' E'), ''),
       ### FAO denotes with E when they have estimated the value using best available data,
       ###   sometimes comes at start (commodities), sometimes at end (mariculture)...?
-      # Replace '...' with NA ----
-      value = ifelse(value == '...', NA, value), # FAO's code for NA
+      # Remove "X" from values (X = value from "int  organization) (added in v2024)
+      value = str_replace(value, fixed('X '), ''), 
+      value = str_replace(value, fixed(' X'), ''),
+      # Replace '...' (... = missing value) with NA ----
+      #value = ifelse(value == '...', NA, value), # FAO's code for NA
+      # value = ifelse(str_detect(value, pattern = "..."), NA, value),
+      # value = case_when(str_detect(value, pattern = "...") ~ NA,
+      #                   TRUE ~ value),
+      value = case_when(str_detect(value, "0  ...") ~ NA,
+                        TRUE ~ value),
       #value = str_replace(value, fixed(' N'), sub_N),
+      # Replace N (N = not significant, < 0.5) with substitution
       value = case_when(str_detect(value, "0  N") ~ as.character(sub_N), # if 0 N, replace with sub_N
                         str_detect(value, " N") ~ str_remove(value, " N"), # if number precedes N, remove N
                         TRUE ~ value),
