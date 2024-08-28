@@ -9,7 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Mon Aug 19 17:20:31 2024 by ramji" />
+<meta name="author" content="Compiled on Wed Aug 28 18:53:27 2024 by ramji" />
 
 
 <title>OHI 2024: Natural Products: Seaweeds data prep</title>
@@ -1550,7 +1550,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">OHI 2024: Natural Products: Seaweeds data
 prep</h1>
-<h4 class="author"><em>Compiled on Mon Aug 19 17:20:31 2024 by
+<h4 class="author"><em>Compiled on Wed Aug 28 18:53:27 2024 by
 ramji</em></h4>
 
 </div>
@@ -1831,7 +1831,7 @@ to OHI regions</h2>
 <span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co"># Bonaire/S.Eustatius/Saba</span></span>
 <span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co"># Yugoslavia SFR: no longer a country after 1992</span></span>
 <span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>seaweed_np <span class="ot">&lt;-</span> seaweed_np <span class="sc">%&gt;%</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">country =</span> <span class="fu">ifelse</span>(country<span class="sc">==</span><span class="st">&quot;Réunion&quot;</span>, <span class="st">&quot;Reunion&quot;</span>, country)) <span class="sc">%&gt;%</span>  <span class="co"># this one is hard to get right; v2020: last year it was &quot;R\xe9union&quot;, but this year it was &quot;Réunion&quot; - not present in v2021 data, not present in v2024 data</span></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">country =</span> <span class="fu">ifelse</span>(country <span class="sc">==</span> <span class="st">&quot;Réunion&quot;</span>, <span class="st">&quot;Reunion&quot;</span>, country)) <span class="sc">%&gt;%</span>  <span class="co"># this one is hard to get right; v2020: last year it was &quot;R\xe9union&quot;, but this year it was &quot;Réunion&quot; - not present in v2021 data, not present in v2024 data</span></span>
 <span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>  ohicore<span class="sc">::</span><span class="fu">split_regions</span>()  <span class="co"># function in mar_fxs.R</span></span>
 <span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a></span>
 <span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>mar_rgn_all <span class="ot">&lt;-</span> <span class="fu">name_2_rgn</span>(<span class="at">df_in =</span> seaweed_np, </span>
@@ -1906,8 +1906,8 @@ years of seaweeed mariculture production &gt; 0 tonnes (assume these are
 not established seaweed mariculture programs).</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>mar_rgn_gf <span class="ot">&lt;-</span> mar_rgn_gf <span class="sc">%&gt;%</span> </span>
 <span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, species, fao, environment) <span class="sc">%&gt;%</span></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">not_0 =</span> <span class="fu">length</span>(value[value<span class="sc">&gt;</span><span class="dv">0</span>])) <span class="sc">%&gt;%</span> <span class="co"># length of vector of years greater than 0</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="fu">filter</span>(not_0<span class="sc">&gt;</span><span class="dv">3</span>) <span class="sc">%&gt;%</span> <span class="co"># filter for groups that have at least four years of seaweed mariculture production </span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">not_0 =</span> <span class="fu">length</span>(value[value <span class="sc">&gt;</span> <span class="dv">0</span>])) <span class="sc">%&gt;%</span> <span class="co"># length of vector of years greater than 0</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="fu">filter</span>(not_0 <span class="sc">&gt;</span> <span class="dv">3</span>) <span class="sc">%&gt;%</span> <span class="co"># filter for groups that have at least four years of seaweed mariculture production </span></span>
 <span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span> </span>
 <span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, species, fao, environment, year, include, value, Taxon_code, gap_0_fill) </span></code></pre></div>
 <p>Add a unique identifier per cultivated stock that describes each
@@ -1919,7 +1919,7 @@ species, fao region, and environment grouping.</p>
 <span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">species_code =</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">n</span>())</span>
 <span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="co"># 93 unique identifiers - v2021</span></span>
 <span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a></span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>mar_rgn_gf <span class="ot">=</span> <span class="fu">left_join</span>(mar_rgn_gf, identifier)</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>mar_rgn_gf <span class="ot">&lt;-</span> <span class="fu">left_join</span>(mar_rgn_gf, identifier)</span>
 <span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>maric <span class="ot">&lt;-</span> mar_rgn_gf</span></code></pre></div>
 </div>
 </div>
@@ -2028,7 +2028,7 @@ data</strong></p>
 <span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a></span>
 <span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>maric <span class="ot">&lt;-</span> maric <span class="sc">%&gt;%</span></span>
 <span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>  <span class="fu">group_by</span>(environment, species, year, Taxon_code, rgn_id) <span class="sc">%&gt;%</span> </span>
-<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">value =</span> <span class="fu">sum</span>(value), <span class="at">gap_0_fill =</span><span class="fu">first</span>(gap_0_fill)) <span class="sc">%&gt;%</span></span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">value =</span> <span class="fu">sum</span>(value), <span class="at">gap_0_fill =</span> <span class="fu">first</span>(gap_0_fill)) <span class="sc">%&gt;%</span></span>
 <span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
 <span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a></span>
 <span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a><span class="co"># run this code to check that there are no duplicates for any species, year, rgn_id combinations. If there are they will be unintentionally deleted later, so you may need to change family or taxon codes to match and rerun the above group by</span></span>
@@ -2090,7 +2090,7 @@ sustainability scores in these instances.</p>
 <span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">distinct</span>(rgn_id, species, year,</span>
 <span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>                  <span class="at">.keep_all =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span> <span class="co"># keep all variables in .data. If a combination of the variables (rgn_id, species, year) is not distinct, this keeps the first row of values.</span></span>
 <span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>sust, <span class="at">sust_coeff =</span> sust_avg, <span class="at">taxon_group =</span> Taxon_code) <span class="sc">%&gt;%</span></span>
-<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">taxa_code =</span> <span class="fu">paste</span>(species, species_code, <span class="at">sep=</span><span class="st">&quot;_&quot;</span>))</span></code></pre></div>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">taxa_code =</span> <span class="fu">paste</span>(species, species_code, <span class="at">sep =</span> <span class="st">&quot;_&quot;</span>))</span></code></pre></div>
 <p><strong>Now look at a summary after appending all the Seafood Watch
 data</strong></p>
 <div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="fu">summary</span>(mar_sw_sus)</span>
@@ -2147,70 +2147,69 @@ datasets</h2>
 <span id="cb24-10"><a href="#cb24-10" tabindex="-1"></a><span class="co"># read in current year&#39;s harvest data </span></span>
 <span id="cb24-11"><a href="#cb24-11" tabindex="-1"></a>np_new <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">here</span>(current_np_dir, <span class="st">&quot;output&quot;</span>, <span class="st">&quot;np_seaweed_harvest_tonnes.csv&quot;</span>))</span>
 <span id="cb24-12"><a href="#cb24-12" tabindex="-1"></a></span>
-<span id="cb24-13"><a href="#cb24-13" tabindex="-1"></a></span>
-<span id="cb24-14"><a href="#cb24-14" tabindex="-1"></a><span class="co"># Compare yield data for Saint Lucia</span></span>
-<span id="cb24-15"><a href="#cb24-15" tabindex="-1"></a>np_old_sl <span class="ot">&lt;-</span> np_old <span class="sc">%&gt;%</span> </span>
-<span id="cb24-16"><a href="#cb24-16" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">122</span>, year <span class="sc">==</span> (<span class="fu">as.integer</span>(data_years[<span class="dv">2</span>]) <span class="sc">-</span> <span class="dv">1</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-17"><a href="#cb24-17" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, taxa_code, tonnes)</span>
-<span id="cb24-18"><a href="#cb24-18" tabindex="-1"></a></span>
-<span id="cb24-19"><a href="#cb24-19" tabindex="-1"></a>np_new_sl <span class="ot">&lt;-</span> np_new <span class="sc">%&gt;%</span> </span>
-<span id="cb24-20"><a href="#cb24-20" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">122</span>, year <span class="sc">==</span> <span class="fu">as.integer</span>(data_years[<span class="dv">2</span>])) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-21"><a href="#cb24-21" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, tonnes)</span>
-<span id="cb24-22"><a href="#cb24-22" tabindex="-1"></a></span>
-<span id="cb24-23"><a href="#cb24-23" tabindex="-1"></a>yield_sl <span class="ot">&lt;-</span> np_old_sl <span class="sc">%&gt;%</span> </span>
-<span id="cb24-24"><a href="#cb24-24" tabindex="-1"></a>  <span class="fu">full_join</span>(np_new_sl, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>,<span class="st">&quot;taxa_code&quot;</span>)); <span class="fu">View</span>(yield_sl) </span>
-<span id="cb24-25"><a href="#cb24-25" tabindex="-1"></a><span class="co"># taxa_code names changed by _+2</span></span>
-<span id="cb24-26"><a href="#cb24-26" tabindex="-1"></a><span class="co"># this is reasonable because of this earlier step:</span></span>
-<span id="cb24-27"><a href="#cb24-27" tabindex="-1"></a><span class="do">## Add a unique identifier per cultivated stock</span></span>
-<span id="cb24-28"><a href="#cb24-28" tabindex="-1"></a><span class="co"># identifier &lt;- maric %&gt;% </span></span>
-<span id="cb24-29"><a href="#cb24-29" tabindex="-1"></a><span class="co">#   dplyr::select(rgn_id, species, environment) %&gt;% </span></span>
-<span id="cb24-30"><a href="#cb24-30" tabindex="-1"></a><span class="co">#   unique() %&gt;% </span></span>
-<span id="cb24-31"><a href="#cb24-31" tabindex="-1"></a><span class="co">#   mutate(species_code = 1:n())</span></span>
-<span id="cb24-32"><a href="#cb24-32" tabindex="-1"></a><span class="co"># # 93 unique identifiers - v2021</span></span>
-<span id="cb24-33"><a href="#cb24-33" tabindex="-1"></a><span class="co"># # 96 unique identifiers - v2023</span></span>
-<span id="cb24-34"><a href="#cb24-34" tabindex="-1"></a><span class="co"># # 105 unique identifiers - v2024</span></span>
-<span id="cb24-35"><a href="#cb24-35" tabindex="-1"></a></span>
-<span id="cb24-36"><a href="#cb24-36" tabindex="-1"></a><span class="co"># v????: the production increased by ~22 tonnes (v2022? 2023?)</span></span>
-<span id="cb24-37"><a href="#cb24-37" tabindex="-1"></a><span class="co"># v2024: production decreased by 3 for Eucheuma seaweeds nei, same (0.0) for Gracilaria seaweeds</span></span>
-<span id="cb24-38"><a href="#cb24-38" tabindex="-1"></a></span>
-<span id="cb24-39"><a href="#cb24-39" tabindex="-1"></a><span class="co"># Compare yield data for Vietnam - Vietnam score decreased</span></span>
-<span id="cb24-40"><a href="#cb24-40" tabindex="-1"></a>np_old_vietnam <span class="ot">&lt;-</span> np_old <span class="sc">%&gt;%</span> </span>
-<span id="cb24-41"><a href="#cb24-41" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">206</span>, year <span class="sc">==</span> (<span class="fu">as.integer</span>(data_years[<span class="dv">2</span>]) <span class="sc">-</span> <span class="dv">1</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-42"><a href="#cb24-42" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, year, tonnes)</span>
-<span id="cb24-43"><a href="#cb24-43" tabindex="-1"></a></span>
-<span id="cb24-44"><a href="#cb24-44" tabindex="-1"></a>np_new_vietnam <span class="ot">&lt;-</span> np_new <span class="sc">%&gt;%</span> </span>
-<span id="cb24-45"><a href="#cb24-45" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">206</span>, year <span class="sc">==</span> <span class="fu">as.integer</span>(data_years[<span class="dv">2</span>])) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-46"><a href="#cb24-46" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, year, tonnes)</span>
-<span id="cb24-47"><a href="#cb24-47" tabindex="-1"></a></span>
-<span id="cb24-48"><a href="#cb24-48" tabindex="-1"></a>yield_vietnam <span class="ot">&lt;-</span> np_old_vietnam <span class="sc">%&gt;%</span> </span>
-<span id="cb24-49"><a href="#cb24-49" tabindex="-1"></a>  <span class="fu">full_join</span>(np_new_vietnam, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>,<span class="st">&quot;taxa_code&quot;</span>)); <span class="fu">View</span>(yield_vietnam) </span>
-<span id="cb24-50"><a href="#cb24-50" tabindex="-1"></a></span>
-<span id="cb24-51"><a href="#cb24-51" tabindex="-1"></a><span class="co"># v2024: huge increase in Elkhorn seamoss: +129091.7 from 2021 to 2022 </span></span>
+<span id="cb24-13"><a href="#cb24-13" tabindex="-1"></a><span class="co"># Compare yield data for Saint Lucia</span></span>
+<span id="cb24-14"><a href="#cb24-14" tabindex="-1"></a>np_old_sl <span class="ot">&lt;-</span> np_old <span class="sc">%&gt;%</span> </span>
+<span id="cb24-15"><a href="#cb24-15" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">122</span>, year <span class="sc">==</span> (<span class="fu">as.integer</span>(data_years[<span class="dv">2</span>]) <span class="sc">-</span> <span class="dv">1</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-16"><a href="#cb24-16" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, taxa_code, tonnes)</span>
+<span id="cb24-17"><a href="#cb24-17" tabindex="-1"></a></span>
+<span id="cb24-18"><a href="#cb24-18" tabindex="-1"></a>np_new_sl <span class="ot">&lt;-</span> np_new <span class="sc">%&gt;%</span> </span>
+<span id="cb24-19"><a href="#cb24-19" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">122</span>, year <span class="sc">==</span> <span class="fu">as.integer</span>(data_years[<span class="dv">2</span>])) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-20"><a href="#cb24-20" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, tonnes)</span>
+<span id="cb24-21"><a href="#cb24-21" tabindex="-1"></a></span>
+<span id="cb24-22"><a href="#cb24-22" tabindex="-1"></a>yield_sl <span class="ot">&lt;-</span> np_old_sl <span class="sc">%&gt;%</span> </span>
+<span id="cb24-23"><a href="#cb24-23" tabindex="-1"></a>  <span class="fu">full_join</span>(np_new_sl, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>,<span class="st">&quot;taxa_code&quot;</span>)); <span class="fu">View</span>(yield_sl) </span>
+<span id="cb24-24"><a href="#cb24-24" tabindex="-1"></a><span class="co"># taxa_code names changed by _+2</span></span>
+<span id="cb24-25"><a href="#cb24-25" tabindex="-1"></a><span class="co"># this is reasonable because of this earlier step:</span></span>
+<span id="cb24-26"><a href="#cb24-26" tabindex="-1"></a><span class="do">## Add a unique identifier per cultivated stock</span></span>
+<span id="cb24-27"><a href="#cb24-27" tabindex="-1"></a><span class="co"># identifier &lt;- maric %&gt;% </span></span>
+<span id="cb24-28"><a href="#cb24-28" tabindex="-1"></a><span class="co">#   dplyr::select(rgn_id, species, environment) %&gt;% </span></span>
+<span id="cb24-29"><a href="#cb24-29" tabindex="-1"></a><span class="co">#   unique() %&gt;% </span></span>
+<span id="cb24-30"><a href="#cb24-30" tabindex="-1"></a><span class="co">#   mutate(species_code = 1:n())</span></span>
+<span id="cb24-31"><a href="#cb24-31" tabindex="-1"></a><span class="co"># # 93 unique identifiers - v2021</span></span>
+<span id="cb24-32"><a href="#cb24-32" tabindex="-1"></a><span class="co"># # 96 unique identifiers - v2023</span></span>
+<span id="cb24-33"><a href="#cb24-33" tabindex="-1"></a><span class="co"># # 105 unique identifiers - v2024</span></span>
+<span id="cb24-34"><a href="#cb24-34" tabindex="-1"></a></span>
+<span id="cb24-35"><a href="#cb24-35" tabindex="-1"></a><span class="co"># v????: the production increased by ~22 tonnes (v2022? 2023?)</span></span>
+<span id="cb24-36"><a href="#cb24-36" tabindex="-1"></a><span class="co"># v2024: production decreased by 3 for Eucheuma seaweeds nei, same (0.0) for Gracilaria seaweeds</span></span>
+<span id="cb24-37"><a href="#cb24-37" tabindex="-1"></a></span>
+<span id="cb24-38"><a href="#cb24-38" tabindex="-1"></a><span class="co"># Compare yield data for Vietnam - Vietnam score decreased</span></span>
+<span id="cb24-39"><a href="#cb24-39" tabindex="-1"></a>np_old_vietnam <span class="ot">&lt;-</span> np_old <span class="sc">%&gt;%</span> </span>
+<span id="cb24-40"><a href="#cb24-40" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">206</span>, year <span class="sc">==</span> (<span class="fu">as.integer</span>(data_years[<span class="dv">2</span>]) <span class="sc">-</span> <span class="dv">1</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-41"><a href="#cb24-41" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, year, tonnes)</span>
+<span id="cb24-42"><a href="#cb24-42" tabindex="-1"></a></span>
+<span id="cb24-43"><a href="#cb24-43" tabindex="-1"></a>np_new_vietnam <span class="ot">&lt;-</span> np_new <span class="sc">%&gt;%</span> </span>
+<span id="cb24-44"><a href="#cb24-44" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">206</span>, year <span class="sc">==</span> <span class="fu">as.integer</span>(data_years[<span class="dv">2</span>])) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-45"><a href="#cb24-45" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, year, tonnes)</span>
+<span id="cb24-46"><a href="#cb24-46" tabindex="-1"></a></span>
+<span id="cb24-47"><a href="#cb24-47" tabindex="-1"></a>yield_vietnam <span class="ot">&lt;-</span> np_old_vietnam <span class="sc">%&gt;%</span> </span>
+<span id="cb24-48"><a href="#cb24-48" tabindex="-1"></a>  <span class="fu">full_join</span>(np_new_vietnam, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>,<span class="st">&quot;taxa_code&quot;</span>)); <span class="fu">View</span>(yield_vietnam) </span>
+<span id="cb24-49"><a href="#cb24-49" tabindex="-1"></a></span>
+<span id="cb24-50"><a href="#cb24-50" tabindex="-1"></a><span class="co"># v2024: huge increase in Elkhorn seamoss: +129091.7 from 2021 to 2022 </span></span>
+<span id="cb24-51"><a href="#cb24-51" tabindex="-1"></a></span>
 <span id="cb24-52"><a href="#cb24-52" tabindex="-1"></a></span>
-<span id="cb24-53"><a href="#cb24-53" tabindex="-1"></a></span>
-<span id="cb24-54"><a href="#cb24-54" tabindex="-1"></a><span class="co"># ================= v2022 and v2023 code: =====================================</span></span>
-<span id="cb24-55"><a href="#cb24-55" tabindex="-1"></a><span class="co"># Compare yield data for Saint Lucia</span></span>
-<span id="cb24-56"><a href="#cb24-56" tabindex="-1"></a>np_old <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;../v2022/output/np_seaweed_harvest_tonnes.csv&quot;</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-57"><a href="#cb24-57" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">122</span>, year <span class="sc">==</span> <span class="dv">2020</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-58"><a href="#cb24-58" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, tonnes)</span>
-<span id="cb24-59"><a href="#cb24-59" tabindex="-1"></a>np_new <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/np_seaweed_harvest_tonnes.csv&quot;</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-60"><a href="#cb24-60" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">122</span>, year <span class="sc">==</span> <span class="dv">2021</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-61"><a href="#cb24-61" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, tonnes)</span>
-<span id="cb24-62"><a href="#cb24-62" tabindex="-1"></a></span>
-<span id="cb24-63"><a href="#cb24-63" tabindex="-1"></a>yield <span class="ot">&lt;-</span> np_old <span class="sc">%&gt;%</span> </span>
-<span id="cb24-64"><a href="#cb24-64" tabindex="-1"></a>  <span class="fu">full_join</span>(np_new, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>,<span class="st">&quot;taxa_code&quot;</span>)); <span class="fu">View</span>(yield) <span class="co"># the production increased by ~22 tonnes </span></span>
+<span id="cb24-53"><a href="#cb24-53" tabindex="-1"></a><span class="co"># ================= v2022 and v2023 code: =====================================</span></span>
+<span id="cb24-54"><a href="#cb24-54" tabindex="-1"></a><span class="co"># Compare yield data for Saint Lucia</span></span>
+<span id="cb24-55"><a href="#cb24-55" tabindex="-1"></a>np_old <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;../v2022/output/np_seaweed_harvest_tonnes.csv&quot;</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-56"><a href="#cb24-56" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">122</span>, year <span class="sc">==</span> <span class="dv">2020</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-57"><a href="#cb24-57" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, tonnes)</span>
+<span id="cb24-58"><a href="#cb24-58" tabindex="-1"></a>np_new <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/np_seaweed_harvest_tonnes.csv&quot;</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-59"><a href="#cb24-59" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">122</span>, year <span class="sc">==</span> <span class="dv">2021</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-60"><a href="#cb24-60" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, tonnes)</span>
+<span id="cb24-61"><a href="#cb24-61" tabindex="-1"></a></span>
+<span id="cb24-62"><a href="#cb24-62" tabindex="-1"></a>yield <span class="ot">&lt;-</span> np_old <span class="sc">%&gt;%</span> </span>
+<span id="cb24-63"><a href="#cb24-63" tabindex="-1"></a>  <span class="fu">full_join</span>(np_new, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>,<span class="st">&quot;taxa_code&quot;</span>)); <span class="fu">View</span>(yield) <span class="co"># the production increased by ~22 tonnes </span></span>
+<span id="cb24-64"><a href="#cb24-64" tabindex="-1"></a></span>
 <span id="cb24-65"><a href="#cb24-65" tabindex="-1"></a></span>
-<span id="cb24-66"><a href="#cb24-66" tabindex="-1"></a></span>
-<span id="cb24-67"><a href="#cb24-67" tabindex="-1"></a><span class="co"># Compare yield data for Vietnam - Vietnam score decreased</span></span>
-<span id="cb24-68"><a href="#cb24-68" tabindex="-1"></a>np_old <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;../v2022/output/np_seaweed_harvest_tonnes.csv&quot;</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-69"><a href="#cb24-69" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">206</span>, year <span class="sc">==</span> <span class="dv">2020</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-70"><a href="#cb24-70" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, year, tonnes)</span>
-<span id="cb24-71"><a href="#cb24-71" tabindex="-1"></a>np_new <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/np_seaweed_harvest_tonnes.csv&quot;</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-72"><a href="#cb24-72" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">206</span>, year <span class="sc">==</span> <span class="dv">2021</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-73"><a href="#cb24-73" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, year, tonnes)</span>
-<span id="cb24-74"><a href="#cb24-74" tabindex="-1"></a></span>
-<span id="cb24-75"><a href="#cb24-75" tabindex="-1"></a>yield <span class="ot">&lt;-</span> np_old <span class="sc">%&gt;%</span> </span>
-<span id="cb24-76"><a href="#cb24-76" tabindex="-1"></a>  <span class="fu">full_join</span>(np_new, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>,<span class="st">&quot;taxa_code&quot;</span>)); <span class="fu">View</span>(yield) </span></code></pre></div>
+<span id="cb24-66"><a href="#cb24-66" tabindex="-1"></a><span class="co"># Compare yield data for Vietnam - Vietnam score decreased</span></span>
+<span id="cb24-67"><a href="#cb24-67" tabindex="-1"></a>np_old <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;../v2022/output/np_seaweed_harvest_tonnes.csv&quot;</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-68"><a href="#cb24-68" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">206</span>, year <span class="sc">==</span> <span class="dv">2020</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-69"><a href="#cb24-69" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, year, tonnes)</span>
+<span id="cb24-70"><a href="#cb24-70" tabindex="-1"></a>np_new <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/np_seaweed_harvest_tonnes.csv&quot;</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-71"><a href="#cb24-71" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">206</span>, year <span class="sc">==</span> <span class="dv">2021</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-72"><a href="#cb24-72" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, taxa_code, year, tonnes)</span>
+<span id="cb24-73"><a href="#cb24-73" tabindex="-1"></a></span>
+<span id="cb24-74"><a href="#cb24-74" tabindex="-1"></a>yield <span class="ot">&lt;-</span> np_old <span class="sc">%&gt;%</span> </span>
+<span id="cb24-75"><a href="#cb24-75" tabindex="-1"></a>  <span class="fu">full_join</span>(np_new, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>,<span class="st">&quot;taxa_code&quot;</span>)); <span class="fu">View</span>(yield) </span></code></pre></div>
 </div>
 </div>
 </div>
