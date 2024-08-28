@@ -40,7 +40,7 @@ where:
 
 # Updates from previous assessment
 
-v2022 Using updated June 2022 data Switched `raster` functions over to their `terra` equivalents.
+v2024 Using updated June 2024 data. Switched `raster` functions over to their `terra` equivalents.
 
 v2021 Using updated February 2021 data
 
@@ -54,7 +54,7 @@ v2021 Using updated February 2021 data
 
 **Description**: Shapefile of World Database on Protected Areas
 
-**Time range**: 1800 - 2021; some protected areas do not have an associated "status year" and are reported as year 0.
+**Time range**: 1800 - 2023; some protected areas do not have an associated "status year" and are reported as year 0.
 
 **Format**: Shapefile
 
@@ -173,7 +173,8 @@ all(paste(dest_dir, basename(files), sep="/") %in% files_t)
 
   lsp_crosstab <- function(rgn_rast_file, rast_values) { # rgn_rast_file <- rgn_rast_list[1]
     rgn_rast <- terra::rast(rgn_rast_file)
-    rgn_rast = rgn_rast+0 ## Adding this in to ensure rgn_id values are correct 
+    rgn_rast <- terra::as.factor(rgn_rast)
+    # rgn_rast = rgn_rast+0 ## Adding this in to ensure rgn_id values are correct. If as.factor(rgn_rast) doesn't work, then can try commenting out the as.factor() line and including this line instead.
     message('Cross tabulating ', rgn_rast_file)
     rast_df <- terra::crosstab(c(rast_values, rgn_rast), useNA = TRUE) %>%
       as.data.frame() %>%

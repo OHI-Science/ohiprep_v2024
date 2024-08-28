@@ -99,8 +99,6 @@ spp_maps <- read_csv(file.path(dir_data,
                      col_types = 'ddcicccl') 
 # %>% dplyr::filter(!shp_iucn_sid %in% c(246014055))
 
-old_not_in_new <- spp_maps2[!spp_maps2$shp_iucn_sid %in% spp_maps1$shp_iucn_sid, ]
-
 spp_ids <- spp_maps$iucn_sid %>%
   unique() %>%
   sort()
@@ -113,81 +111,9 @@ if(reload == FALSE & file.exists(spp_range_file)) {
 
 message('Processing ', length(spp_ids), ' species range maps.')
 
-fix_this <- function(spp_nums) {
-  results <- list()
-  spp_list <- spp_nums
-  for(i in seq_along(spp_list)) { # spp_list contains species' "iucn_sid" which is what "x" becomes
-    x <- spp_list[i] # obtain iucn_sid
-    spp_file <- file.path(dir_goal_anx, 'spp_rasters',
-                         sprintf('iucn_sid_%s.csv', x)) # Create a file for each iucn_sid
-    if(file.exists(spp_file)) {
-      spp_map <- read_csv(spp_file, col_types = 'di')
-      
-      spp_map_area <- spp_map %>% 
-      inner_join(area_df, by='cell_id')
-      spp_range <- data.frame(iucn_sid = x,
-                              range_km2 = sum(spp_map_area$area_km2, na.rm=TRUE))
-    } else {
-      cat_msg("Iucn_sid:", x, "file does not exist")
-      spp_range <- data.frame(iucn_sid = x, 
-                              range_km2 = NA)
-    }
-    results[[i]] <- spp_range
-  }
-  return(results)
-}
+## Note: if the birdlife international data is not updated (and stored in mazu under the name iucn_sid_xxxxxxxxx), this function will not work properly. 
 
-fxn_ids <- spp_ids
-
-fxn_test_results <- fix_this(fxn_ids) # according to the math, 50 items took about 20 seconds to run, wich = 0.4s/file*12240 files = 4896s/60s/m = 81.6m / 60m/h = 1.36 hrs
-## Started at 5:59pm
-## Finish(or error) at: 6:48
-
-results_df <- bind_rows(fxn_test_results)
-
-results_na <- results_df %>% 
-  filter(range_km2 %in% c(NA))
-
-maps_already_rasterized <- list.files(file.path("/home/shares/ohi/git-annex/globalprep/spp/v2022/spp_risk_dists", 'spp_rasters'),
-                                        pattern = '.csv') %>%
-    str_replace_all('iucn_sid_|.csv$', '') %>%
-    as.integer()
-
-old_map_info <- read_csv(file.path(dir_data,
-  sprintf('spp_marine_maps_%s.csv', "2022-1"))) %>%
-  dplyr::select(-presence) %>%
-  distinct()
-
-file_check_df <- old_map_info %>% 
-  filter(iucn_sid %in% results_na$iucn_sid)
-
-# results_na$iucn_sid is the vector
-rewrite_bli_raster_function <- function(vector) {
-  blis_to_rewrite <- vector
-  for(i in seq_along(blis_to_rewrite)) {
-    x <- blis_to_rewrite[i] # obtain iucn_sid
-    # Identify file 
-    spp_file_in <- file.path("/home/shares/ohi/git-annex/globalprep/spp/v2022/spp_risk_dists", 'spp_rasters',
-                         sprintf('iucn_sid_%s.csv', x))
-    if(!file.exists(spp_file_in)) {
-      cat("Iucn sid", x, "not found in 2022 folder", "\n")
-    } else {
-      cat("Success! Reading and writing iucn sid:", x, "\n")
-    # Read file in 
-    spp_file <- read_csv(spp_file_in)
-    
-    spp_file_out <- file.path(dir_goal_anx, 'spp_rasters',
-                         sprintf('iucn_sid_%s.csv', x)) # Create a file for each iucn_sid
-    
-  write_csv(spp_file, spp_file_out)
-    }
-  }
-}
-
-
-rewrite_bli_raster_function(results_na$iucn_sid)
-
-
+## If the if() statement is not working properly (getting Error: file iucn_sid_x.csv does not exist), see the below chunk for troubleshooting which files are causing issues. 
 if(length(spp_ids) > 0) { ### any more spp to calculate?
   system.time({
   spp_range_list <- parallel::mclapply(seq_along(spp_ids), mc.cores = 12,
@@ -230,9 +156,105 @@ write_csv(spp_range_df, spp_range_file)
 
 ```
 
+### Chunk for Troubleshooting and Identifying file issues from Chunk 3 
+
+```{r}
+# This function determines which iucn_sids exist in spp_maps (from API) but not in v202X/spp_risk_dists/spp_rasters (from raw data download. It does virtually the same thing as the above function but will store the ID's that don't exist to identify which polygon download they come from (IUCN Red List)
+fix_this <- function(spp_nums) { # spp_nums are the spp_ids from the above chunk
+  results <- list() # Create empty list
+  spp_list <- spp_nums # Define variable
+  for(i in seq_along(spp_list)) { # spp_list contains species' "iucn_sid" which is what "x" becomes
+    # obtain iucn_sid
+    x <- spp_list[i] 
+    # Set file path to spp_rasters for above iucn_sid
+    spp_file <- file.path(dir_goal_anx, 'spp_rasters',
+                         sprintf('iucn_sid_%s.csv', x)) # Create a file for each iucn_sid
+    # Check if file exists and attempt to read it if it does
+    if(file.exists(spp_file)) {
+      spp_map <- read_csv(spp_file, col_types = 'di')
+      
+      spp_map_area <- spp_map %>% 
+        # filter(presence != 5) %>% ### exclude extinct areas
+        inner_join(area_df, by='cell_id')
+      
+      spp_range <- data.frame(iucn_sid = x,
+                              range_km2 = sum(spp_map_area$area_km2, na.rm=TRUE))
+    } else { # If it doesn't exist, still include it so that we can identify where it should come from
+      cat_msg("Iucn_sid:", x, "file does not exist")
+      spp_range <- data.frame(iucn_sid = x, 
+                              range_km2 = NA)
+    }
+    # Store output in results list 
+    results[[i]] <- spp_range
+  }
+  return(results)
+}
+
+fxn_test_results <- fix_this(spp_ids) # according to the math, 50 items took about 20 seconds to run, wich = 0.4s/file*12240 files = 4896s/60s/m = 81.6m / 60m/h = 1.36 hrs
+## Started at 5:59pm
+## Finish at 6:48
+
+# Following above chunk and creating a dataframe of the bound list from above
+results_df <- bind_rows(fxn_test_results)
+
+# Identify which iucn_sid's files did not exist in current v202X/spp_risk_dists/spp_rasters
+results_na <- results_df %>% 
+  filter(range_km2 %in% c(NA))
+
+# Define old spp_maps data to see if these iucn_sids are present in previous year 
+old_map_info <- read_csv(file.path(dir_data,
+  sprintf('spp_marine_maps_%s.csv', "2022-1"))) %>%
+  dplyr::select(-presence) %>%
+  distinct()
+
+# Filter down old map information to determine the files from which the missing iucn_sids came from (for 2024 these missing iucn_sids came from the birdlife international 2021 which makes sense because we didn't update that data for this assessment).
+# For future reference, you can use this dataframe to see which taxa names iucn_sids came from that are not present in your data. If you don't recognize them then you should go back to the IUCN Redlist website and download them, then go back to `5c_rasterize_sppp_shps.Rmd`
+file_check_df <- old_map_info %>% 
+  filter(iucn_sid %in% results_na$iucn_sid)
+
+
+
+# This function was used for for rewriting birdlife international files from v2022 spp_rasters to v2024 spp_rasters. It can be used for future years by utilizing the prev_year variable
+
+
+prev_year = paste0("v", 2022) # Year that you're referencing spp_rasters for 
+vector = results_na$iucn_sid # Vector of iucn_sids that you've identified need to be rewritten from prev_year
+
+rewrite_raster_function <- function(vector, prev_year) {
+  files_to_rewrite <- vector
+  for(i in seq_along(files_to_rewrite)) {
+    x <- files_to_rewrite[i] # obtain iucn_sid
+    # Identify file 
+    spp_file_in <- file.path(sprintf("/home/shares/ohi/git-annex/globalprep/spp/%s/spp_risk_dists/spp_rasters/iucn_sid_%s.csv", prev_year, x))
+    
+    if(!file.exists(spp_file_in)) { # Send message if it doesn't exist
+      
+      cat("Iucn sid", x, "not found in", prev_year, "folder", "\n")
+      
+    } else { # otherwise read it in and rewrite it to current year directory 
+      
+      cat("Success! Reading and writing iucn sid:", x, "\n")
+    # Read file in 
+    spp_file <- read_csv(spp_file_in)
+    
+    spp_file_out <- file.path(dir_goal_anx, 'spp_rasters',
+                         sprintf('iucn_sid_%s.csv', x)) # Create a file for each iucn_sid
+    
+  write_csv(spp_file, spp_file_out)
+    }
+  }
+}
+
+# Run! 
+rewrite_raster_function(vector = vector, prev_year = prev_year)
+
+# Once this is done, you can go back up and rerun the above function
+```
+
+
 ### calculate range from polygons
 
-This may *over*predict range for many species whose range is limited by depth,
+This may *over* predict range for many species whose range is limited by depth,
 due to polygon buffering.  This can be used to sanity-check the raster-calculated ranges.
 
 ``` {r calculate range from polygons, eval = FALSE}
