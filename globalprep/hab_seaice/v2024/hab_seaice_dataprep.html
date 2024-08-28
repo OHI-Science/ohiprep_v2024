@@ -9,10 +9,10 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Thu Sep 7 15:05:42 2023 by arobinson" />
+<meta name="author" content="Compiled on Wed Aug 28 16:25:40 2024 by dduncan" />
 
 
-<title>OHI 2023 - Sea ice habitat (coastal protection goal and habitat subgoal)</title>
+<title>OHI 2024 - Sea ice habitat (coastal protection goal and habitat subgoal)</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -233,7 +233,7 @@ overflow: visible;
 </style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -419,10 +419,10 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">OHI 2023 - Sea ice habitat (coastal
+<h1 class="title toc-ignore">OHI 2024 - Sea ice habitat (coastal
 protection goal and habitat subgoal)</h1>
-<h4 class="author"><em>Compiled on Thu Sep 7 15:05:42 2023 by
-arobinson</em></h4>
+<h4 class="author"><em>Compiled on Wed Aug 28 16:25:40 2024 by
+dduncan</em></h4>
 
 </div>
 
@@ -476,7 +476,7 @@ SSM/I-SSMIS Passive Microwave Data, Version 2 [Data Set]. Boulder,
 Colorado USA. NASA National Snow and Ice Data Center Distributed Active
 Archive Center. <a href="https://doi.org/10.5067/MPYG15WAA4WX" class="uri">https://doi.org/10.5067/MPYG15WAA4WX</a> Date Accessed
 06-05-2023.</p>
-<p><strong>Downloaded</strong>: June 5th 2023</p>
+<p><strong>Downloaded</strong>: July 12, 2024</p>
 <p><strong>Description</strong>: Monthly sea ice extent data.</p>
 <p>Data can be downloaded here: <a href="https://nsidc.org/data/nsidc-0051" class="uri">https://nsidc.org/data/nsidc-0051</a>. The user guide for
 the data is located <a href="https://nsidc.org/sites/default/files/documents/user-guide/nsidc-0051-v002-userguide.pdf"><code>here</code></a>.</p>
@@ -576,7 +576,7 @@ to do this.</p>
 <p>Now move all of the xml files to the xml folder that your have
 created:</p>
 <ul>
-<li><code>mv **/*.xml</code></li>
+<li><code>mv **/*.xml ../xml</code></li>
 </ul>
 <p>And do the same with the North files and South files:</p>
 <ul>
@@ -612,7 +612,7 @@ your name, e-mail address, postal address, and telephone number.</p>
 <p>CONTACT INFORMATION: User Services National Snow and Ice Data Center
 CIRES, 449 UCB University of Colorado Boulder, CO USA 80309-0449 Phone:
 +1 303-492-6199 Fax: +1 303-492-2468 E-mail: <a href="mailto:nsidc@nsidc.org" class="email">nsidc@nsidc.org</a></p>
-<p><strong>Time range</strong>: 1979-2022</p>
+<p><strong>Time range</strong>: 1979-2023</p>
 <hr />
 </div>
 </div>
@@ -625,7 +625,7 @@ used pathnames. Manually change scenario and data years in file
 pathnames code chunk to reflect the most recent data (d) and current
 assessment year (v) in setup code chunk.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="do">## Install R packages where necessary</span></span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>pkg <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;raster&quot;</span>, <span class="st">&quot;fasterize&quot;</span>, <span class="st">&quot;sf&quot;</span>, <span class="st">&quot;sp&quot;</span>, <span class="st">&quot;rgdal&quot;</span>, <span class="st">&quot;fields&quot;</span>, <span class="st">&quot;here&quot;</span>, <span class="st">&quot;tictoc&quot;</span>, <span class="st">&quot;dplyr&quot;</span>, <span class="st">&quot;ggplot2&quot;</span>) <span class="co"># &quot;fields&quot; for colors in Status_Trend.R</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>pkg <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;raster&quot;</span>, <span class="st">&quot;fasterize&quot;</span>, <span class="st">&quot;sf&quot;</span>, <span class="st">&quot;sp&quot;</span>, <span class="st">&quot;rgdal&quot;</span>, <span class="st">&quot;fields&quot;</span>, <span class="st">&quot;here&quot;</span>, <span class="st">&quot;tictoc&quot;</span>, <span class="st">&quot;dplyr&quot;</span>, <span class="st">&quot;ggplot2&quot;</span>, <span class="st">&quot;foreach&quot;</span>, <span class="st">&quot;parallel&quot;</span>, <span class="st">&quot;doParallel&quot;</span>) <span class="co"># &quot;fields&quot; for colors in Status_Trend.R</span></span>
 <span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>new.pkg <span class="ot">&lt;-</span> pkg[<span class="sc">!</span>(pkg <span class="sc">%in%</span> <span class="fu">installed.packages</span>())]</span>
 <span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(new.pkg)){<span class="fu">install.packages</span>(new.pkg)}</span>
 <span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span>(<span class="st">&quot;ohicore&quot;</span> <span class="sc">%in%</span> <span class="fu">installed.packages</span>())){devtools<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">&quot;ohi-science/ohicore&quot;</span>)}</span>
@@ -634,12 +634,12 @@ assessment year (v) in setup code chunk.</p>
 <span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="fu">lapply</span>(<span class="fu">c</span>(pkg, <span class="st">&quot;ohicore&quot;</span>), require, <span class="at">character.only =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a></span>
 <span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="do">## UPDATE THESE!</span></span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>current_year <span class="ot">&lt;-</span> <span class="dv">2023</span></span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>last_year <span class="ot">&lt;-</span> <span class="dv">2022</span> <span class="co"># final year of data (all months)</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>current_year <span class="ot">&lt;-</span> <span class="dv">2024</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>last_year <span class="ot">&lt;-</span> <span class="dv">2023</span> <span class="co"># final year of data (all months)</span></span>
 <span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a></span>
 <span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>assess_year <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;v&quot;</span>, current_year) <span class="co"># assessment year for file paths</span></span>
 <span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>previous_year <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;v&quot;</span>, last_year)  <span class="co"># previous assessment year</span></span></code></pre></div>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;../../../workflow/R/common.R&quot;</span>) <span class="co"># directory locations</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;workflow/R/common.R&quot;</span>))</span></code></pre></div>
 <pre><code>## This file makes it easier to process data for the OHI global assessment
 ##  by creating the following objects:
 ## 
@@ -686,11 +686,12 @@ data from MAZU in ObtainingData script.</p>
 <span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>fp.n <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_M, <span class="st">&quot;git-annex/globalprep/_raw_data/NSIDC_SeaIce&quot;</span>, assess_year, <span class="st">&quot;north&quot;</span>)</span>
 <span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>fp.s <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_M, <span class="st">&quot;git-annex/globalprep/_raw_data/NSIDC_SeaIce&quot;</span>, assess_year, <span class="st">&quot;south&quot;</span>)</span>
 <span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a></span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>poles <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;n&quot;</span>,<span class="st">&quot;s&quot;</span>)</span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>years <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">1979</span><span class="sc">:</span>last_year) <span class="co"># full range of data</span></span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>months <span class="ot">=</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">12</span></span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>n.pym <span class="ot">=</span> <span class="fu">length</span>(poles)<span class="sc">*</span><span class="fu">length</span>(years)<span class="sc">*</span><span class="fu">length</span>(months)</span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>i.pym <span class="ot">=</span> <span class="dv">0</span></span></code></pre></div>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="do">## Potential for the need to modify this if there are not data available for all 12 months of the most recent year. For example, the ObtainingData.R and ObtainingData_Parallel.R scripts rely on a 12 month interval when looping, so this will introduce problems if the &quot;last_year&quot; of data only has data through September (9).</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>poles <span class="ot">=</span> <span class="fu">c</span>(<span class="st">&quot;n&quot;</span>,<span class="st">&quot;s&quot;</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>years <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">1979</span><span class="sc">:</span>last_year) <span class="co"># full range of data</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>months <span class="ot">=</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">12</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>n.pym <span class="ot">=</span> <span class="fu">length</span>(poles)<span class="sc">*</span><span class="fu">length</span>(years)<span class="sc">*</span><span class="fu">length</span>(months)</span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>i.pym <span class="ot">=</span> <span class="dv">0</span></span></code></pre></div>
 </div>
 <div id="function-1" class="section level2" number="4.4">
 <h2><span class="header-section-number">4.4</span> Function 1</h2>
@@ -700,19 +701,24 @@ stack that is saved in tmp folder as:
 <code>s_rasters_points.rdata</code>. And, if it doesn’t already exist,
 it converts the region shapefile into a raster points file. See
 <code>ObtainingData.R</code> script for more details.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">tic</span>()</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="do">## Previously (&lt;2022) update to some file paths with the correct assessment year in ObtainingData.R was needed</span></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="do">## Currently (2023) this is automatic from this script with `assess_year` variable</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;ObtainingData.R&quot;</span>)</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="fu">toc</span>()</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="do">## should take ~30 minutes to completely run </span></span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="do">## Soft limit to running 5 cores per dataprep script. For this process running additional cores did not decrease the runtime. </span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="do">## Previously (&lt;2022) update to some file paths with the correct assessment year in ObtainingData.R was needed</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="do">## Currently (&gt;2023) this is automatic from this script with `assess_year` variable</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="do">## Attention: Because this is now done in parallel using the  &quot;ObtainingData_Parallel.R&quot; script rather than in sequence using the &quot;ObtainingData.R&quot; script (saving ~2hrs of processing time), this function will not display the progress as it does when its sequentially run. That is okay as long as you check mazu and ensure that the tmp folder is updated about 2 minutes into run-time, and the v202X folder should have n_rasters_points.rdata and s_rasters_points.rdata populated in about 1.25-1.5 hours.</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/ObtainingData_Parallel.R&quot;</span>)) </span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="fu">toc</span>()</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="do">## should take ~1.5 hrs to completely run with ObtainingData_Parallel.R </span></span></code></pre></div>
 </div>
 <div id="function-2" class="section level2" number="4.5">
 <h2><span class="header-section-number">4.5</span> Function 2</h2>
 <p>Using the data from the .rdata files created from Function 1 with the
-<code>ObtainingData.R</code> script, this function calculates status and
-trend for shoreline ice and ice edge habitat. Data is saved in
-intermediate (<code>int</code>) folder:</p>
+<code>ObtainingData_Parallel.R</code> script, this function calculates
+status and trend for shoreline ice and ice edge habitat. Data is saved
+in intermediate (<code>int</code>) folder:</p>
 <ul>
 <li>Habitat: <code>n_IceEdgeHabitat.csv</code>,
 <code>s_IceEdgeHabitat.csv</code></li>
@@ -721,18 +727,18 @@ intermediate (<code>int</code>) folder:</p>
 </ul>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">tic</span>()</span>
 <span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>ref.years <span class="ot">&lt;-</span> <span class="dv">1979</span><span class="sc">:</span><span class="dv">2000</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;Status_Trend.R&quot;</span>) <span class="co"># calculates status and trend for shoreline ice and ice edge habitat</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/Status_Trend.R&quot;</span>)) <span class="co"># calculates status and trend for shoreline ice and ice edge habitat</span></span>
 <span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="fu">toc</span>()</span></code></pre></div>
 </div>
 <div id="final-calculations-and-organization" class="section level2" number="4.6">
 <h2><span class="header-section-number">4.6</span> Final calculations
 and organization</h2>
 <p>Read in ice edge habitat and ice shore protection csv-format
-datasets, remove anamolous eez regions with minimal ice cover, remove
+datasets, remove anomalous eez regions with minimal ice cover, remove
 disputed regions. Bind these datasets and convert to units of km^2. Save
 seaice health, extent, trend, and extent data.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>n_edge <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;int/n_IceEdgeHabitat_ref1979to2000.csv&quot;</span>)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>s_edge <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;int/s_IceEdgeHabitat_ref1979to2000.csv&quot;</span>)</span>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>n_edge <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/int/n_IceEdgeHabitat_ref1979to2000.csv&quot;</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>s_edge <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/int/s_IceEdgeHabitat_ref1979to2000.csv&quot;</span>)</span>
 <span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>edge <span class="ot">&lt;-</span> <span class="fu">rbind</span>(n_edge, s_edge)</span>
 <span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>edge  <span class="ot">&lt;-</span> edge <span class="sc">%&gt;%</span></span>
 <span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(Reference_avg1979to2000monthlypixels <span class="sc">!=</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
@@ -741,8 +747,8 @@ seaice health, extent, trend, and extent data.</p>
 <span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(rgn_nam <span class="sc">!=</span> <span class="st">&quot;DISPUTED&quot;</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">habitat=</span><span class="st">&quot;seaice_edge&quot;</span>)</span>
 <span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a></span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>n_shore <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;int/n_IceShoreProtection_ref1979to2000.csv&quot;</span>)</span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>s_shore <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;int/s_IceShoreProtection_ref1979to2000.csv&quot;</span>)</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>n_shore <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/int/n_IceShoreProtection_ref1979to2000.csv&quot;</span>)</span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>s_shore <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/int/s_IceShoreProtection_ref1979to2000.csv&quot;</span>)</span>
 <span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>shore <span class="ot">&lt;-</span> <span class="fu">rbind</span>(n_shore, s_shore)</span>
 <span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>shore <span class="ot">&lt;-</span> shore <span class="sc">%&gt;%</span></span>
 <span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(Reference_avg1979to2000monthlypixels <span class="sc">!=</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
@@ -754,7 +760,7 @@ seaice health, extent, trend, and extent data.</p>
 <span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a>data  <span class="ot">&lt;-</span> data <span class="sc">%&gt;%</span></span>
 <span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">km2 =</span> Reference_avg1979to2000monthlypixels<span class="sc">/</span><span class="dv">12</span> <span class="sc">*</span> (pixel<span class="sc">/</span><span class="dv">1000</span>)<span class="sc">^</span><span class="dv">2</span>)</span>
 <span id="cb8-23"><a href="#cb8-23" tabindex="-1"></a></span>
-<span id="cb8-24"><a href="#cb8-24" tabindex="-1"></a><span class="fu">write.csv</span>(data, <span class="st">&quot;int/sea_ice.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb8-24"><a href="#cb8-24" tabindex="-1"></a><span class="fu">write.csv</span>(data, <span class="st">&quot;globalprep/hab_seaice/v2024/int/sea_ice.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb8-25"><a href="#cb8-25" tabindex="-1"></a></span>
 <span id="cb8-26"><a href="#cb8-26" tabindex="-1"></a><span class="do">## Health data</span></span>
 <span id="cb8-27"><a href="#cb8-27" tabindex="-1"></a>health <span class="ot">&lt;-</span> data <span class="sc">%&gt;%</span></span>
@@ -765,7 +771,7 @@ seaice health, extent, trend, and extent data.</p>
 <span id="cb8-32"><a href="#cb8-32" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">as.numeric</span>(year)) <span class="sc">%&gt;%</span></span>
 <span id="cb8-33"><a href="#cb8-33" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">health =</span> <span class="fu">ifelse</span>(health <span class="sc">&gt;</span> <span class="dv">1</span>, <span class="dv">1</span>, health))</span>
 <span id="cb8-34"><a href="#cb8-34" tabindex="-1"></a></span>
-<span id="cb8-35"><a href="#cb8-35" tabindex="-1"></a><span class="fu">write.csv</span>(health, <span class="st">&quot;output/hab_ice_health_eez.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>) <span class="co"># save sea ice health data</span></span>
+<span id="cb8-35"><a href="#cb8-35" tabindex="-1"></a><span class="fu">write.csv</span>(health, <span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_health_eez.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>) <span class="co"># save sea ice health data</span></span>
 <span id="cb8-36"><a href="#cb8-36" tabindex="-1"></a></span>
 <span id="cb8-37"><a href="#cb8-37" tabindex="-1"></a><span class="do">## Trend data</span></span>
 <span id="cb8-38"><a href="#cb8-38" tabindex="-1"></a>trend <span class="ot">&lt;-</span> data <span class="sc">%&gt;%</span></span>
@@ -778,7 +784,7 @@ seaice health, extent, trend, and extent data.</p>
 <span id="cb8-45"><a href="#cb8-45" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">trend =</span> <span class="fu">ifelse</span>(trend <span class="sc">&gt;</span> <span class="dv">1</span>, <span class="dv">1</span>, trend)) <span class="sc">%&gt;%</span></span>
 <span id="cb8-46"><a href="#cb8-46" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">trend =</span> <span class="fu">ifelse</span>(trend <span class="sc">&lt;</span> (<span class="sc">-</span><span class="dv">1</span>), <span class="sc">-</span><span class="dv">1</span>, trend))</span>
 <span id="cb8-47"><a href="#cb8-47" tabindex="-1"></a></span>
-<span id="cb8-48"><a href="#cb8-48" tabindex="-1"></a><span class="fu">write.csv</span>(trend, <span class="st">&quot;output/hab_ice_trend_eez.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>) <span class="co"># save sea ice trend data</span></span>
+<span id="cb8-48"><a href="#cb8-48" tabindex="-1"></a><span class="fu">write.csv</span>(trend, <span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_trend_eez.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>) <span class="co"># save sea ice trend data</span></span>
 <span id="cb8-49"><a href="#cb8-49" tabindex="-1"></a></span>
 <span id="cb8-50"><a href="#cb8-50" tabindex="-1"></a><span class="do">## Sea ice extent data</span></span>
 <span id="cb8-51"><a href="#cb8-51" tabindex="-1"></a>extent <span class="ot">&lt;-</span> data <span class="sc">%&gt;%</span></span>
@@ -786,7 +792,7 @@ seaice health, extent, trend, and extent data.</p>
 <span id="cb8-53"><a href="#cb8-53" tabindex="-1"></a>   dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">year =</span> <span class="dv">2016</span>) <span class="sc">%&gt;%</span> <span class="co"># extent not updated each year (historic extent of the sea ice habitat); updated last 2016 bc of source methods</span></span>
 <span id="cb8-54"><a href="#cb8-54" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, habitat, year, km2)</span>
 <span id="cb8-55"><a href="#cb8-55" tabindex="-1"></a></span>
-<span id="cb8-56"><a href="#cb8-56" tabindex="-1"></a><span class="fu">write.csv</span>(extent, <span class="st">&quot;output/hab_ice_extent_eez.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>) <span class="co"># save sea ice extent data</span></span></code></pre></div>
+<span id="cb8-56"><a href="#cb8-56" tabindex="-1"></a><span class="fu">write.csv</span>(extent, <span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_extent_eez.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>) <span class="co"># save sea ice extent data</span></span></code></pre></div>
 </div>
 <div id="data-checks" class="section level2" number="4.7">
 <h2><span class="header-section-number">4.7</span> Data Checks</h2>
@@ -798,118 +804,128 @@ between these data.<br />
 </ol>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="do">## Health comparison</span></span>
 <span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a></span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co">#compare same years with different version year </span></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>health <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/hab_ice_health_eez.csv&quot;</span>)</span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>ice_health_eez <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">sprintf</span>(<span class="st">&quot;../%s/output/hab_ice_health_eez.csv&quot;</span>, previous_year)) <span class="sc">%&gt;%</span> <span class="co"># compare to last year&#39;s data</span></span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">health_prev_assess =</span> health) <span class="sc">%&gt;%</span></span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(health, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;habitat&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>  <span class="fu">na.omit</span>(<span class="st">&quot;health&quot;</span>)</span>
-<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a></span>
-<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>comp_plot <span class="ot">&lt;-</span><span class="fu">ggplot</span>() <span class="sc">+</span> <span class="fu">geom_point</span>(<span class="at">data =</span> ice_health_eez, <span class="fu">aes</span>(<span class="at">x =</span> health_prev_assess, <span class="at">y =</span> health)) <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;previous health (2012-2021)&quot;</span>, <span class="at">y =</span> <span class="st">&quot;health (2012-2021)&quot;</span>) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
-<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="fu">ggplotly</span>(comp_plot)</span>
-<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a></span>
-<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a></span>
-<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a><span class="do">### let&#39;s compare the data year 2022 to data year 2021 (current data year vs the year before)</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="do">## v2024: Because the last full year of data is 2022, &#39;previous_year&#39; reflects 2022 instead of 2023. Changing the variable to that of previous assessment rather than previous year of full data. This wont change anything for 2024 because 2023 uses 2022 data year (last full data year) instead of 2023 data.</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>previous_assessment_full_data <span class="ot">&lt;-</span> <span class="dv">2023</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>previous_year <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;v&quot;</span>, previous_assessment_full_data)</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co">#compare same years with different version year </span></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>health <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_health_eez.csv&quot;</span>) <span class="co"># Current year</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>ice_health_eez <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">sprintf</span>(<span class="st">&quot;globalprep/hab_seaice/%s/output/hab_ice_health_eez.csv&quot;</span>, previous_year)) <span class="sc">%&gt;%</span> <span class="co"># compare to last year&#39;s data</span></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">health_prev_assess =</span> health) <span class="sc">%&gt;%</span></span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(health, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;habitat&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>  <span class="fu">na.omit</span>(<span class="st">&quot;health&quot;</span>) </span>
 <span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a></span>
-<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a><span class="do">## Pair with region names</span></span>
-<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a>regions <span class="ot">&lt;-</span> rgn_master <span class="sc">%&gt;%</span></span>
-<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">rgn_id =</span> rgn_id_2013, <span class="at">rgn_name =</span> rgn_nam_2013) <span class="sc">%&gt;%</span></span>
-<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a>  <span class="fu">unique</span>()</span>
-<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a></span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>comp_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>() <span class="sc">+</span> <span class="fu">geom_point</span>(<span class="at">data =</span> ice_health_eez, <span class="fu">aes</span>(<span class="at">x =</span> health_prev_assess, <span class="at">y =</span> health)) <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;previous health (2012-2022)&quot;</span>, <span class="at">y =</span> <span class="st">&quot;health (2012-2023)&quot;</span>) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a>plotly<span class="sc">::</span><span class="fu">ggplotly</span>(comp_plot)</span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a></span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a><span class="do">### let&#39;s compare the data year 2023 to data year 2022 (current data year vs the year before)</span></span>
 <span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a></span>
-<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a>health_2022 <span class="ot">&lt;-</span> health <span class="sc">%&gt;%</span></span>
-<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> current_year<span class="dv">-1</span>)</span>
-<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a></span>
-<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a>health_2021 <span class="ot">&lt;-</span> ice_health_eez <span class="sc">%&gt;%</span></span>
-<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> last_year<span class="dv">-1</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-27"><a href="#cb9-27" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>year, <span class="sc">-</span>health)</span>
-<span id="cb9-28"><a href="#cb9-28" tabindex="-1"></a></span>
-<span id="cb9-29"><a href="#cb9-29" tabindex="-1"></a>health_old_new <span class="ot">&lt;-</span>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(health_2022, health_2021) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">difference =</span> (health <span class="sc">-</span> health_prev_assess)) <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(regions)</span>
-<span id="cb9-30"><a href="#cb9-30" tabindex="-1"></a></span>
-<span id="cb9-31"><a href="#cb9-31" tabindex="-1"></a></span>
-<span id="cb9-32"><a href="#cb9-32" tabindex="-1"></a>year_change_plot <span class="ot">&lt;-</span><span class="fu">ggplot</span>() <span class="sc">+</span></span>
-<span id="cb9-33"><a href="#cb9-33" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">data =</span> health_old_new,</span>
-<span id="cb9-34"><a href="#cb9-34" tabindex="-1"></a>             <span class="fu">aes</span>(<span class="at">x =</span> health_prev_assess,</span>
-<span id="cb9-35"><a href="#cb9-35" tabindex="-1"></a>                 <span class="at">y =</span> health, <span class="at">text =</span> <span class="fu">paste</span>(<span class="st">&quot;Region ID:&quot;</span>, rgn_id, <span class="st">&quot;&lt;br&gt;Habitat:&quot;</span>, habitat))) <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;previous assessment health&quot;</span>, <span class="at">y =</span> <span class="st">&quot;current health&quot;</span>) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
-<span id="cb9-36"><a href="#cb9-36" tabindex="-1"></a></span>
-<span id="cb9-37"><a href="#cb9-37" tabindex="-1"></a><span class="fu">ggplotly</span>(year_change_plot, <span class="at">tooltip =</span> <span class="st">&quot;text&quot;</span>)</span>
-<span id="cb9-38"><a href="#cb9-38" tabindex="-1"></a><span class="do">## Trend comparison</span></span>
-<span id="cb9-39"><a href="#cb9-39" tabindex="-1"></a>trend <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/hab_ice_trend_eez.csv&quot;</span>)</span>
-<span id="cb9-40"><a href="#cb9-40" tabindex="-1"></a>ice_trend_eez <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">sprintf</span>(<span class="st">&quot;../%s/output/hab_ice_trend_eez.csv&quot;</span>, previous_year)) <span class="sc">%&gt;%</span> <span class="co"># compare to last year&#39;s data</span></span>
-<span id="cb9-41"><a href="#cb9-41" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">trend_prev_assess =</span> trend) <span class="sc">%&gt;%</span></span>
-<span id="cb9-42"><a href="#cb9-42" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(trend, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;habitat&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb9-43"><a href="#cb9-43" tabindex="-1"></a>  <span class="fu">na.omit</span>(<span class="st">&quot;trend&quot;</span>)</span>
-<span id="cb9-44"><a href="#cb9-44" tabindex="-1"></a></span>
-<span id="cb9-45"><a href="#cb9-45" tabindex="-1"></a><span class="co">#update label years </span></span>
-<span id="cb9-46"><a href="#cb9-46" tabindex="-1"></a>trend_comp <span class="ot">&lt;-</span> <span class="fu">ggplot</span>() <span class="sc">+</span> <span class="fu">geom_point</span>(<span class="at">data =</span> ice_trend_eez, <span class="fu">aes</span>(<span class="at">x =</span> trend_prev_assess, <span class="at">y =</span> trend)) <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;previous assessment trend (2016-2021)&quot;</span>, <span class="at">y=</span> <span class="st">&quot;current assessment trend (2016-2021)&quot;</span>) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a><span class="do">## Pair with region names</span></span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a>regions <span class="ot">&lt;-</span> rgn_master <span class="sc">%&gt;%</span></span>
+<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">rgn_id =</span> rgn_id_2013, <span class="at">rgn_name =</span> rgn_nam_2013) <span class="sc">%&gt;%</span></span>
+<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a>  <span class="fu">unique</span>()</span>
+<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a></span>
+<span id="cb9-27"><a href="#cb9-27" tabindex="-1"></a><span class="do">## Current full year of data</span></span>
+<span id="cb9-28"><a href="#cb9-28" tabindex="-1"></a>current_year <span class="ot">=</span> <span class="dv">2023</span></span>
+<span id="cb9-29"><a href="#cb9-29" tabindex="-1"></a></span>
+<span id="cb9-30"><a href="#cb9-30" tabindex="-1"></a>health_2023 <span class="ot">&lt;-</span> health <span class="sc">%&gt;%</span></span>
+<span id="cb9-31"><a href="#cb9-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> current_year)</span>
+<span id="cb9-32"><a href="#cb9-32" tabindex="-1"></a></span>
+<span id="cb9-33"><a href="#cb9-33" tabindex="-1"></a><span class="do">## Last full year of data</span></span>
+<span id="cb9-34"><a href="#cb9-34" tabindex="-1"></a>last_year <span class="ot">=</span> <span class="dv">2022</span></span>
+<span id="cb9-35"><a href="#cb9-35" tabindex="-1"></a></span>
+<span id="cb9-36"><a href="#cb9-36" tabindex="-1"></a>health_2022 <span class="ot">&lt;-</span> ice_health_eez <span class="sc">%&gt;%</span></span>
+<span id="cb9-37"><a href="#cb9-37" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> last_year) <span class="sc">%&gt;%</span></span>
+<span id="cb9-38"><a href="#cb9-38" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>year, <span class="sc">-</span>health)</span>
+<span id="cb9-39"><a href="#cb9-39" tabindex="-1"></a></span>
+<span id="cb9-40"><a href="#cb9-40" tabindex="-1"></a>health_old_new <span class="ot">&lt;-</span>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(health_2023, health_2022) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">difference =</span> (health <span class="sc">-</span> health_prev_assess)) <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(regions)</span>
+<span id="cb9-41"><a href="#cb9-41" tabindex="-1"></a></span>
+<span id="cb9-42"><a href="#cb9-42" tabindex="-1"></a></span>
+<span id="cb9-43"><a href="#cb9-43" tabindex="-1"></a>year_change_plot <span class="ot">&lt;-</span><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb9-44"><a href="#cb9-44" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">data =</span> health_old_new,</span>
+<span id="cb9-45"><a href="#cb9-45" tabindex="-1"></a>             <span class="fu">aes</span>(<span class="at">x =</span> health_prev_assess,</span>
+<span id="cb9-46"><a href="#cb9-46" tabindex="-1"></a>                 <span class="at">y =</span> health, <span class="at">text =</span> <span class="fu">paste</span>(<span class="st">&quot;Region ID:&quot;</span>, rgn_id, <span class="st">&quot;&lt;br&gt;Habitat:&quot;</span>, habitat))) <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;previous assessment health&quot;</span>, <span class="at">y =</span> <span class="st">&quot;current health&quot;</span>) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
 <span id="cb9-47"><a href="#cb9-47" tabindex="-1"></a></span>
-<span id="cb9-48"><a href="#cb9-48" tabindex="-1"></a><span class="fu">ggplotly</span>(trend_comp)</span>
+<span id="cb9-48"><a href="#cb9-48" tabindex="-1"></a>plotly<span class="sc">::</span><span class="fu">ggplotly</span>(year_change_plot, <span class="at">tooltip =</span> <span class="st">&quot;text&quot;</span>)</span>
 <span id="cb9-49"><a href="#cb9-49" tabindex="-1"></a></span>
-<span id="cb9-50"><a href="#cb9-50" tabindex="-1"></a><span class="do">### let&#39;s compare the data year 2022 to data year 2021 (current data year vs the year before)</span></span>
-<span id="cb9-51"><a href="#cb9-51" tabindex="-1"></a></span>
-<span id="cb9-52"><a href="#cb9-52" tabindex="-1"></a>trend_2022 <span class="ot">&lt;-</span> trend <span class="sc">%&gt;%</span></span>
-<span id="cb9-53"><a href="#cb9-53" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> (current_year <span class="sc">-</span> <span class="dv">1</span>))</span>
-<span id="cb9-54"><a href="#cb9-54" tabindex="-1"></a></span>
-<span id="cb9-55"><a href="#cb9-55" tabindex="-1"></a>trend_2021 <span class="ot">&lt;-</span> ice_trend_eez <span class="sc">%&gt;%</span></span>
-<span id="cb9-56"><a href="#cb9-56" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> last_year <span class="sc">-</span><span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-57"><a href="#cb9-57" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>year, <span class="sc">-</span>trend)</span>
-<span id="cb9-58"><a href="#cb9-58" tabindex="-1"></a></span>
-<span id="cb9-59"><a href="#cb9-59" tabindex="-1"></a>trend_old_new <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">left_join</span>(trend_2022, trend_2021) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">difference =</span> (trend <span class="sc">-</span> trend_prev_assess)) <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(regions)</span>
-<span id="cb9-60"><a href="#cb9-60" tabindex="-1"></a></span>
-<span id="cb9-61"><a href="#cb9-61" tabindex="-1"></a>year_trend_change_plot <span class="ot">&lt;-</span><span class="fu">ggplot</span>() <span class="sc">+</span> <span class="fu">geom_point</span>(<span class="at">data =</span> trend_old_new, <span class="fu">aes</span>(<span class="at">x =</span> trend_prev_assess, <span class="at">y =</span> trend, <span class="at">text =</span> <span class="fu">paste</span>(<span class="st">&quot;Region ID:&quot;</span>, rgn_id, <span class="st">&quot;&lt;br&gt;Habitat:&quot;</span>, habitat))) <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;previous year trend&quot;</span>, <span class="at">y =</span> <span class="st">&quot;current trend&quot;</span>) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
-<span id="cb9-62"><a href="#cb9-62" tabindex="-1"></a></span>
-<span id="cb9-63"><a href="#cb9-63" tabindex="-1"></a><span class="fu">ggplotly</span>(year_trend_change_plot, <span class="at">tooltip =</span> <span class="st">&quot;text&quot;</span>)</span>
-<span id="cb9-64"><a href="#cb9-64" tabindex="-1"></a></span>
-<span id="cb9-65"><a href="#cb9-65" tabindex="-1"></a><span class="do">## Extent comparison</span></span>
-<span id="cb9-66"><a href="#cb9-66" tabindex="-1"></a>extent <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/hab_ice_extent_eez.csv&quot;</span>, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb9-67"><a href="#cb9-67" tabindex="-1"></a>ice_extent_eez <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">sprintf</span>(<span class="st">&quot;../%s/output/hab_ice_extent_eez.csv&quot;</span>, previous_year), <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span> <span class="co"># compare to last year&#39;s data</span></span>
-<span id="cb9-68"><a href="#cb9-68" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">km2_prev_assess =</span> km2) <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(extent)</span>
-<span id="cb9-69"><a href="#cb9-69" tabindex="-1"></a></span>
-<span id="cb9-70"><a href="#cb9-70" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> ice_extent_eez) <span class="sc">+</span><span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span>km2_prev_assess, <span class="at">y =</span> km2)) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
-<span id="cb9-71"><a href="#cb9-71" tabindex="-1"></a></span>
+<span id="cb9-50"><a href="#cb9-50" tabindex="-1"></a><span class="do">## Trend comparison</span></span>
+<span id="cb9-51"><a href="#cb9-51" tabindex="-1"></a>trend <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_trend_eez.csv&quot;</span>)</span>
+<span id="cb9-52"><a href="#cb9-52" tabindex="-1"></a>ice_trend_eez <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">sprintf</span>(<span class="st">&quot;globalprep/hab_seaice/%s/output/hab_ice_trend_eez.csv&quot;</span>, previous_year)) <span class="sc">%&gt;%</span> <span class="co"># compare to last year&#39;s data</span></span>
+<span id="cb9-53"><a href="#cb9-53" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">trend_prev_assess =</span> trend) <span class="sc">%&gt;%</span></span>
+<span id="cb9-54"><a href="#cb9-54" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(trend, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;habitat&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-55"><a href="#cb9-55" tabindex="-1"></a>  <span class="fu">na.omit</span>(<span class="st">&quot;trend&quot;</span>)</span>
+<span id="cb9-56"><a href="#cb9-56" tabindex="-1"></a></span>
+<span id="cb9-57"><a href="#cb9-57" tabindex="-1"></a><span class="co">#update label years </span></span>
+<span id="cb9-58"><a href="#cb9-58" tabindex="-1"></a>trend_comp <span class="ot">&lt;-</span> <span class="fu">ggplot</span>() <span class="sc">+</span> <span class="fu">geom_point</span>(<span class="at">data =</span> ice_trend_eez, <span class="fu">aes</span>(<span class="at">x =</span> trend_prev_assess, <span class="at">y =</span> trend)) <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;previous assessment trend (2016-2022)&quot;</span>, <span class="at">y=</span> <span class="st">&quot;current assessment trend (2017-2023)&quot;</span>) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
+<span id="cb9-59"><a href="#cb9-59" tabindex="-1"></a></span>
+<span id="cb9-60"><a href="#cb9-60" tabindex="-1"></a>plotly<span class="sc">::</span><span class="fu">ggplotly</span>(trend_comp)</span>
+<span id="cb9-61"><a href="#cb9-61" tabindex="-1"></a></span>
+<span id="cb9-62"><a href="#cb9-62" tabindex="-1"></a><span class="do">### let&#39;s compare the data year 2023 to data year 2022 (current data year vs the year before)</span></span>
+<span id="cb9-63"><a href="#cb9-63" tabindex="-1"></a></span>
+<span id="cb9-64"><a href="#cb9-64" tabindex="-1"></a>trend_2023 <span class="ot">&lt;-</span> trend <span class="sc">%&gt;%</span></span>
+<span id="cb9-65"><a href="#cb9-65" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> (current_year))</span>
+<span id="cb9-66"><a href="#cb9-66" tabindex="-1"></a></span>
+<span id="cb9-67"><a href="#cb9-67" tabindex="-1"></a>trend_2022 <span class="ot">&lt;-</span> ice_trend_eez <span class="sc">%&gt;%</span></span>
+<span id="cb9-68"><a href="#cb9-68" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(year <span class="sc">==</span> last_year) <span class="sc">%&gt;%</span></span>
+<span id="cb9-69"><a href="#cb9-69" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>year, <span class="sc">-</span>trend)</span>
+<span id="cb9-70"><a href="#cb9-70" tabindex="-1"></a></span>
+<span id="cb9-71"><a href="#cb9-71" tabindex="-1"></a>trend_old_new <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">left_join</span>(trend_2023, trend_2022) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">difference =</span> (trend <span class="sc">-</span> trend_prev_assess)) <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(regions)</span>
 <span id="cb9-72"><a href="#cb9-72" tabindex="-1"></a></span>
-<span id="cb9-73"><a href="#cb9-73" tabindex="-1"></a><span class="do">### let&#39;s compare the data year 2022 to data year 2021</span></span>
+<span id="cb9-73"><a href="#cb9-73" tabindex="-1"></a>year_trend_change_plot <span class="ot">&lt;-</span><span class="fu">ggplot</span>() <span class="sc">+</span> <span class="fu">geom_point</span>(<span class="at">data =</span> trend_old_new, <span class="fu">aes</span>(<span class="at">x =</span> trend_prev_assess, <span class="at">y =</span> trend, <span class="at">text =</span> <span class="fu">paste</span>(<span class="st">&quot;Region ID:&quot;</span>, rgn_id, <span class="st">&quot;&lt;br&gt;Habitat:&quot;</span>, habitat))) <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;previous data year trend (2022)&quot;</span>, <span class="at">y =</span> <span class="st">&quot;current data year trend (2023)&quot;</span>) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
 <span id="cb9-74"><a href="#cb9-74" tabindex="-1"></a></span>
-<span id="cb9-75"><a href="#cb9-75" tabindex="-1"></a>extent_2022 <span class="ot">&lt;-</span> extent </span>
+<span id="cb9-75"><a href="#cb9-75" tabindex="-1"></a>plotly<span class="sc">::</span><span class="fu">ggplotly</span>(year_trend_change_plot, <span class="at">tooltip =</span> <span class="st">&quot;text&quot;</span>)</span>
 <span id="cb9-76"><a href="#cb9-76" tabindex="-1"></a></span>
-<span id="cb9-77"><a href="#cb9-77" tabindex="-1"></a>extent_2021 <span class="ot">&lt;-</span> ice_extent_eez</span>
-<span id="cb9-78"><a href="#cb9-78" tabindex="-1"></a></span>
-<span id="cb9-79"><a href="#cb9-79" tabindex="-1"></a>extent_old_new <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">left_join</span>(extent_2022, extent_2021)</span>
-<span id="cb9-80"><a href="#cb9-80" tabindex="-1"></a></span>
-<span id="cb9-81"><a href="#cb9-81" tabindex="-1"></a> <span class="co"># extent doesn&#39;t change at all, because we use the same year for extent every year</span></span>
-<span id="cb9-82"><a href="#cb9-82" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> extent_old_new) <span class="sc">+</span> <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> km2_prev_assess, <span class="at">y =</span> km2)) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
+<span id="cb9-77"><a href="#cb9-77" tabindex="-1"></a><span class="do">## Extent comparison</span></span>
+<span id="cb9-78"><a href="#cb9-78" tabindex="-1"></a>extent <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_extent_eez.csv&quot;</span>, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb9-79"><a href="#cb9-79" tabindex="-1"></a>ice_extent_eez <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">sprintf</span>(<span class="st">&quot;globalprep/hab_seaice/%s/output/hab_ice_extent_eez.csv&quot;</span>, previous_year), <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span> <span class="co"># compare to last year&#39;s data</span></span>
+<span id="cb9-80"><a href="#cb9-80" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">km2_prev_assess =</span> km2) <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(extent)</span>
+<span id="cb9-81"><a href="#cb9-81" tabindex="-1"></a></span>
+<span id="cb9-82"><a href="#cb9-82" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> ice_extent_eez) <span class="sc">+</span><span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span>km2_prev_assess, <span class="at">y =</span> km2)) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
 <span id="cb9-83"><a href="#cb9-83" tabindex="-1"></a></span>
 <span id="cb9-84"><a href="#cb9-84" tabindex="-1"></a></span>
-<span id="cb9-85"><a href="#cb9-85" tabindex="-1"></a><span class="do">## Pair with region names</span></span>
-<span id="cb9-86"><a href="#cb9-86" tabindex="-1"></a>regions <span class="ot">&lt;-</span> rgn_master <span class="sc">%&gt;%</span></span>
-<span id="cb9-87"><a href="#cb9-87" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">rgn_id =</span> rgn_id_2013, <span class="at">rgn_name =</span> rgn_nam_2013) <span class="sc">%&gt;%</span></span>
-<span id="cb9-88"><a href="#cb9-88" tabindex="-1"></a>  <span class="fu">unique</span>()</span>
-<span id="cb9-89"><a href="#cb9-89" tabindex="-1"></a></span>
-<span id="cb9-90"><a href="#cb9-90" tabindex="-1"></a><span class="do">## Make sure sea ice health across regions makes intuitive sense...</span></span>
-<span id="cb9-91"><a href="#cb9-91" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/hab_ice_health_eez.csv&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-92"><a href="#cb9-92" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(regions, <span class="at">by =</span> <span class="st">&quot;rgn_id&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-93"><a href="#cb9-93" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(habitat, health)</span>
-<span id="cb9-94"><a href="#cb9-94" tabindex="-1"></a></span>
+<span id="cb9-85"><a href="#cb9-85" tabindex="-1"></a><span class="do">### let&#39;s compare the data year 2023 to data year 2022</span></span>
+<span id="cb9-86"><a href="#cb9-86" tabindex="-1"></a></span>
+<span id="cb9-87"><a href="#cb9-87" tabindex="-1"></a>extent_2023 <span class="ot">&lt;-</span> extent </span>
+<span id="cb9-88"><a href="#cb9-88" tabindex="-1"></a></span>
+<span id="cb9-89"><a href="#cb9-89" tabindex="-1"></a>extent_2022 <span class="ot">&lt;-</span> ice_extent_eez</span>
+<span id="cb9-90"><a href="#cb9-90" tabindex="-1"></a></span>
+<span id="cb9-91"><a href="#cb9-91" tabindex="-1"></a>extent_old_new <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">left_join</span>(extent_2023, extent_2022)</span>
+<span id="cb9-92"><a href="#cb9-92" tabindex="-1"></a></span>
+<span id="cb9-93"><a href="#cb9-93" tabindex="-1"></a> <span class="co"># extent doesn&#39;t change at all, because we use the same year for extent every year</span></span>
+<span id="cb9-94"><a href="#cb9-94" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> extent_old_new) <span class="sc">+</span> <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> km2_prev_assess, <span class="at">y =</span> km2)) <span class="sc">+</span> <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span>
 <span id="cb9-95"><a href="#cb9-95" tabindex="-1"></a></span>
 <span id="cb9-96"><a href="#cb9-96" tabindex="-1"></a></span>
-<span id="cb9-97"><a href="#cb9-97" tabindex="-1"></a><span class="do">#### Check largest score changes for v2021 ####</span></span>
-<span id="cb9-98"><a href="#cb9-98" tabindex="-1"></a></span>
-<span id="cb9-99"><a href="#cb9-99" tabindex="-1"></a></span>
-<span id="cb9-100"><a href="#cb9-100" tabindex="-1"></a></span>
-<span id="cb9-101"><a href="#cb9-101" tabindex="-1"></a><span class="do">## Bouvet Island, rgn_id == 105, HAB score +15.15</span></span>
-<span id="cb9-102"><a href="#cb9-102" tabindex="-1"></a></span>
-<span id="cb9-103"><a href="#cb9-103" tabindex="-1"></a></span>
-<span id="cb9-104"><a href="#cb9-104" tabindex="-1"></a><span class="co"># health </span></span>
-<span id="cb9-105"><a href="#cb9-105" tabindex="-1"></a>bouv_health <span class="ot">&lt;-</span> health_old_new <span class="sc">%&gt;%</span></span>
-<span id="cb9-106"><a href="#cb9-106" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">105</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-107"><a href="#cb9-107" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">diff =</span> health <span class="sc">-</span> health_prev_assess) <span class="co"># +0.19 </span></span>
+<span id="cb9-97"><a href="#cb9-97" tabindex="-1"></a><span class="do">## Pair with region names</span></span>
+<span id="cb9-98"><a href="#cb9-98" tabindex="-1"></a>regions <span class="ot">&lt;-</span> rgn_master <span class="sc">%&gt;%</span></span>
+<span id="cb9-99"><a href="#cb9-99" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">rgn_id =</span> rgn_id_2013, <span class="at">rgn_name =</span> rgn_nam_2013) <span class="sc">%&gt;%</span></span>
+<span id="cb9-100"><a href="#cb9-100" tabindex="-1"></a>  <span class="fu">unique</span>()</span>
+<span id="cb9-101"><a href="#cb9-101" tabindex="-1"></a></span>
+<span id="cb9-102"><a href="#cb9-102" tabindex="-1"></a><span class="do">## Make sure sea ice health across regions makes intuitive sense...</span></span>
+<span id="cb9-103"><a href="#cb9-103" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_health_eez.csv&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-104"><a href="#cb9-104" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(regions, <span class="at">by =</span> <span class="st">&quot;rgn_id&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-105"><a href="#cb9-105" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(habitat, health)</span>
+<span id="cb9-106"><a href="#cb9-106" tabindex="-1"></a></span>
+<span id="cb9-107"><a href="#cb9-107" tabindex="-1"></a><span class="do">#### Check largest score changes for v2024 ####</span></span>
 <span id="cb9-108"><a href="#cb9-108" tabindex="-1"></a></span>
-<span id="cb9-109"><a href="#cb9-109" tabindex="-1"></a><span class="co"># trend </span></span>
-<span id="cb9-110"><a href="#cb9-110" tabindex="-1"></a>bouv_trend <span class="ot">&lt;-</span> trend_old_new <span class="sc">%&gt;%</span></span>
-<span id="cb9-111"><a href="#cb9-111" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">105</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-112"><a href="#cb9-112" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">diff =</span> trend <span class="sc">-</span> trend_prev_assess) <span class="co"># trend got worse </span></span>
-<span id="cb9-113"><a href="#cb9-113" tabindex="-1"></a></span>
-<span id="cb9-114"><a href="#cb9-114" tabindex="-1"></a><span class="do">## checked against previous conditions, and it looks like Bouvet Island and Jan Mayen (our two largest increases for 2021) have pretty volatile condition scores year after year, so I think this is ok. Nothing went wrong in the data processing on our part. </span></span></code></pre></div>
+<span id="cb9-109"><a href="#cb9-109" tabindex="-1"></a></span>
+<span id="cb9-110"><a href="#cb9-110" tabindex="-1"></a><span class="do">## Bouvet Island, rgn_id == 105, HAB score +</span></span>
+<span id="cb9-111"><a href="#cb9-111" tabindex="-1"></a></span>
+<span id="cb9-112"><a href="#cb9-112" tabindex="-1"></a></span>
+<span id="cb9-113"><a href="#cb9-113" tabindex="-1"></a><span class="co"># health </span></span>
+<span id="cb9-114"><a href="#cb9-114" tabindex="-1"></a>bouv_health <span class="ot">&lt;-</span> health_old_new <span class="sc">%&gt;%</span></span>
+<span id="cb9-115"><a href="#cb9-115" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">105</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-116"><a href="#cb9-116" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">diff =</span> health <span class="sc">-</span> health_prev_assess) <span class="co"># -0.33</span></span>
+<span id="cb9-117"><a href="#cb9-117" tabindex="-1"></a></span>
+<span id="cb9-118"><a href="#cb9-118" tabindex="-1"></a><span class="co"># trend </span></span>
+<span id="cb9-119"><a href="#cb9-119" tabindex="-1"></a>bouv_trend <span class="ot">&lt;-</span> trend_old_new <span class="sc">%&gt;%</span></span>
+<span id="cb9-120"><a href="#cb9-120" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">105</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-121"><a href="#cb9-121" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">diff =</span> trend <span class="sc">-</span> trend_prev_assess) <span class="co"># trend got worse (-.01 previously to -0.14 in 2024)</span></span>
+<span id="cb9-122"><a href="#cb9-122" tabindex="-1"></a></span>
+<span id="cb9-123"><a href="#cb9-123" tabindex="-1"></a></span>
+<span id="cb9-124"><a href="#cb9-124" tabindex="-1"></a><span class="do">## checked against previous conditions, and it looks like Bouvet Island and Jan Mayen (our two largest increases for 2021) have pretty volatile condition scores year after year, so I think this is ok. Nothing went wrong in the data processing on our part. </span></span></code></pre></div>
 </div>
 <div id="gapfill" class="section level2" number="4.8">
 <h2><span class="header-section-number">4.8</span> Gapfill</h2>
@@ -917,25 +933,25 @@ between these data.<br />
 values of 0. Note: all layers need a gf file, eventhough if there was no
 gapfilling. In this case the gapfill value is 0 for every region.</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="do">## Health gapfill</span></span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>hab_ice_health_gf <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/hab_ice_health_eez.csv&quot;</span>)<span class="sc">%&gt;%</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>hab_ice_health_gf <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_health_eez.csv&quot;</span>)<span class="sc">%&gt;%</span></span>
 <span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfilled =</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span> </span>
 <span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, gapfilled)</span>
 <span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a></span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="fu">write.csv</span>(hab_ice_health_gf, <span class="st">&quot;output/hab_ice_health_eez_gf.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>) <span class="co"># save sea ice health gapfill file</span></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="fu">write.csv</span>(hab_ice_health_gf, <span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_health_eez_gf.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>) <span class="co"># save sea ice health gapfill file</span></span>
 <span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a></span>
 <span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="do">## Extent gapfill</span></span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>hab_ice_extent_gf <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/hab_ice_extent_eez.csv&quot;</span>)<span class="sc">%&gt;%</span></span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>hab_ice_extent_gf <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_extent_eez.csv&quot;</span>)<span class="sc">%&gt;%</span></span>
 <span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfilled =</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span> </span>
 <span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, gapfilled)</span>
 <span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a></span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="fu">write.csv</span>(hab_ice_health_gf, <span class="st">&quot;output/hab_ice_extent_eez_gf.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>) <span class="co"># save sea ice extent gapfill file</span></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="fu">write.csv</span>(hab_ice_health_gf, <span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_extent_eez_gf.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>) <span class="co"># save sea ice extent gapfill file</span></span>
 <span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a></span>
 <span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a><span class="do">## Trend gapfill</span></span>
-<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>hab_ice_trend_gf <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/hab_ice_trend_eez.csv&quot;</span>)<span class="sc">%&gt;%</span></span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>hab_ice_trend_gf <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_trend_eez.csv&quot;</span>)<span class="sc">%&gt;%</span></span>
 <span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfilled =</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span> </span>
 <span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, gapfilled)</span>
 <span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a></span>
-<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a><span class="fu">write.csv</span>(hab_ice_health_gf, <span class="st">&quot;output/hab_ice_trend_eez_gf.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>) <span class="co"># save sea ice trend gapfill file</span></span></code></pre></div>
+<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a><span class="fu">write.csv</span>(hab_ice_health_gf, <span class="st">&quot;globalprep/hab_seaice/v2024/output/hab_ice_trend_eez_gf.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>) <span class="co"># save sea ice trend gapfill file</span></span></code></pre></div>
 <hr />
 </div>
 </div>
