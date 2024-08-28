@@ -43,11 +43,13 @@ New year of FAO data (2021). Replaced deprecated functions (`replace_at()`, `spr
 - Global aquatic trade - All partners aggregated - Quantities and Values - 1976-2022 (Release date: July 2024)
 
 
-**Downloaded**: July, 26, 2024
+**Downloaded**: 2024-08-07
 
 **Description**: Quantity (tonnes) and value (USD) of raw commodities (Exports only) for each country, taxa, year. The FAO data is subset to include commodities in these categories: ornamental fish, fish oil, seaweed and plants (see: raw/commodities2products_weighting.csv for details).
 
 **Time range**: 1976-2022
+
+Files can be found on Mazu: `home/shares/ohi/git-annex/globalprep/_raw_data/FAO_commodities/d2024` accompanied by README.md with detailed download instructions. 
 
 ------------------------------------------------------------------------
 
@@ -279,7 +281,15 @@ h <- h %>%
 
 ### Add FAO-zero-correction 
 
+Some regions had 0 E and 0.00 (no "..." missing data flag) recorded for tonnes, but simultaneously had non-zero data for USD. 
+Before gap-filling, we need to replace zeros with NAs in two cases:
+
+    1.    When `tonnes` is equal to 0 and `usd` is not `NA` and `usd` is greater than 0
+    
+    2.    When `usd` is equal to 0 and `tonnes` is not `NA` and `tonnes` is greater than 0
+
 ```{r}
+# replace certain zeros with NA to flag for gapfilling
 h_zero_na <- h %>% 
   mutate(tonnes = ifelse(tonnes == 0 & !is.na(usd) & usd > 0, NA, tonnes)) %>% 
   mutate(usd = ifelse(usd == 0 & !is.na(tonnes) & tonnes > 0, NA, usd))
@@ -292,6 +302,8 @@ h %>% filter(rgn_id == 208, year %in% (2017:2022), product %in% c("ornamentals")
 h_zero_na %>% filter(rgn_id == 208, year %in% (2017:2022), product %in% c("ornamentals")) %>% arrange(desc(year))
 
 # nice!
+
+# issue w region 209 for 1990-1992 -- 0 values for tonnes, non-zero for usd 
 ```
 
 
