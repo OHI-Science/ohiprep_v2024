@@ -4,7 +4,7 @@ author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
     toc: true
-    number_sections: true
+    number_sections: false
     toc_float: yes
     theme: cerulean
     highlight: haddock
@@ -29,6 +29,7 @@ This analysis converts FAO commodities data into data layers used to calculate O
 *   Updated data cleaning to follow tidyverse style, use of `janitor::clean_names()`
 *   Updated `read.csv` and `write.csv` to `read_csv` and `write_csv` 
 *   Updated `fao_fxn.R` to use `str_detect("...")` instead of `value == "..."` to properly replace FAO "missing value" codes with `NA`s. 
+*   Added extra `0 --> NA` correction for specific conditions where this is appropriate (before gapfilling). See section: [Add FAO-zero-correction]
 
 ### v2023
 New year of FAO data (2021). Replaced deprecated functions (`replace_at()`, `spread()`, `gather()`)
@@ -279,7 +280,7 @@ h <- h %>%
 ```
 
 
-### Add FAO-zero-correction 
+### Add FAO-zero-correction
 
 Some regions had 0 E and 0.00 (no "..." missing data flag) recorded for tonnes, but simultaneously had non-zero data for USD. 
 Before gap-filling, we need to replace zeros with NAs in two cases:
@@ -309,16 +310,6 @@ h_zero_na %>% filter(rgn_id == 208,
 
 # nice!
 
-# issue w region 209 for 1990-1992 -- 0 values for tonnes, non-zero for usd 
-h %>% filter(rgn_id == 209,
-                     #year %in% (check_start:check_stop),
-                     product %in% c("seaweeds")) %>% 
-  arrange(desc(year))
-
-h_zero_na %>% filter(rgn_id == 209,
-                     #year %in% (check_start:check_stop),
-                     product %in% c("seaweeds")) %>% 
-  arrange(desc(year))
 ```
 
 
