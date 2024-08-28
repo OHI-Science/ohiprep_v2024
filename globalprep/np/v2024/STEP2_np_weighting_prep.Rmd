@@ -5,7 +5,7 @@ output:
   html_document:
     toc: true
     toc_float: yes
-    number_sections: true
+    number_sections: false
     theme: cerulean
     highlight: haddock
     includes: 
@@ -141,24 +141,27 @@ of forage fish for fed aquaculture. Nature Sustainability 1, 298.
 ## Setup
 
 ```{r setup, warning=FALSE, message=FALSE}
+library(formatR) # for wrapping code when rendered
 
-knitr::opts_chunk$set(eval=FALSE)
+knitr::opts_chunk$set(eval=FALSE, tidy.opts = list(width.cutoff = 80), tidy = TRUE)
 
-# Read in packages 
+# Read in packages ----
 library(here)
 library(tidyverse)
 
-# Set scenario year, reproducible file paths
+# Set scenario year, reproducible file paths ----
 scen_year_number <- 2024 # update this!!
 scenario_year <- as.character(scen_year_number)
 v_scen_year <- paste0("v", scenario_year)
-
+# define file paths to simplify read and write operations
 current_np_dir <- here::here("globalprep", "np", v_scen_year)
 previous_np_dir <- here::here("globalprep", "np", paste0("v", scen_year_number - 1))
 
-# Source scripts/functions
-source(here::here("workflow", "R", "common.R")) # directory locations
-source(here::here(current_np_dir, "R", "np_fxn.R")) # function for handling FAO commodity data specific to NP
+# Source scripts/functions ----
+# directory locations
+source(here::here("workflow", "R", "common.R")) 
+# function for handling FAO commodity data specific to NP
+source(here::here(current_np_dir, "R", "np_fxn.R")) 
 
 # Archived setup:
 #prep_year <- 2023
@@ -172,8 +175,8 @@ Tonne average value per product per region. Gapfill these based on the
 UN geopolitical region/global values.
 
 ```{r}
-# Read in the prepped FAO commodities data set 
-harvest_tonnes_usd <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>% # created on line 453 in step 1a
+# Read in the prepped FAO commodities data set (created on line 453 in step 1a)
+harvest_tonnes_usd <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>% 
   filter(rgn_id != 213) # filter out Antarctica
 
 # Make a data frame with every region and every product ----
@@ -196,9 +199,12 @@ products <- data.frame(product = c("seaweeds", "ornamentals", "fish_oil"))
 
 # Create full rgn x product x years dataframe
 region_product <- rgns_eez %>% 
-  dplyr::select(rgn_id) %>%  # select rgn_id from rgns_eez
-  cross_join(products) %>% # cross join with products (match every row in x with every row in y)
-  cross_join(years_df) # cross join with years
+  # select rgn_id from rgns_eez
+  dplyr::select(rgn_id) %>%  
+  # cross join with products (match every row in x with every row in y)
+  cross_join(products) %>% 
+  # cross join with years
+  cross_join(years_df) 
 
 # Archived method for joining rgns, products, and years dfs
 # region_product <- full_join(rgns_eez, products, by = character()) %>%
@@ -217,6 +223,7 @@ harvest_tonnes_usd_geo_rgn <- harvest_tonnes_usd %>%
 # calculate georgn values (for each region, year, and product)
 geo_rgn_values_df <- harvest_tonnes_usd_geo_rgn %>%
   dplyr::group_by(georgn_id, year, product) %>%
+  # calculate values ($/tonnes)
   dplyr::mutate(values = usd/tonnes) %>%
     mutate(values = ifelse(values == "Inf", NA, values)) %>% ## assign Inf as NA
   summarise(georgn_values = mean(values, na.rm = TRUE)) %>% 
@@ -236,19 +243,23 @@ harvest_tonnes_usd_values_gf <- harvest_tonnes_usd_geo_rgn %>%
   left_join(global_values_df, by = join_by("product", "year")) %>%
   mutate(values = usd/tonnes) %>%
   mutate(values = ifelse(values == "Inf", NA, 
-                         ifelse(values == "NaN", NA, values))) %>% ## assign Inf (n/0) and NaNs (0/0) as NA
-  ## gapfill so that when there is no regional value, take the geo regional value, 
+                         # assign Inf (n/0) and NaNs (0/0) as NA
+                         ifelse(values == "NaN", NA, values))) %>% 
+  # gapfill so that when there is no regional value, take the geo regional value, 
   mutate(values_final = ifelse(is.na(values) & georgn_values != "NaN", georgn_values, 
-                               # and if there is no geo regional value, take the global value. Else, keep original values. 
+                               # and if there is no geo regional value, take the global value; else, keep original values. 
                                ifelse(is.na(values) & georgn_values == "NaN", global_values, values))) %>% 
-  ## make note of gapfilling if any occurred in the previous step
+  # make note of gapfilling if any occurred in the previous step
   mutate(values_gf_description = ifelse(is.na(values) & georgn_values != "NaN", "geo_region",
                                         ifelse(is.na(values) & georgn_values == "NaN", "global", "none"))) %>%
   mutate(values_gf = ifelse(is.na(values) & georgn_values != "NaN", 1,
-                            ifelse(is.na(values) & georgn_values == "NaN", 1, 0))) ## now we have a dataset with gapfilled average values and calculated yearly values... now we will save this, and then calculate the 5 year averages
+                            ifelse(is.na(values) & georgn_values == "NaN", 1, 0)))
+# now we have a dataset with gap-filled average values and calculated yearly values... 
+# we will save this and then calculate the 5 year averages
 
 # Save this data frame to int
-readr::write_csv(harvest_tonnes_usd_values_gf, here(current_np_dir, "int", "harvest_tonnes_usd_weighting_gf.csv"))
+readr::write_csv(harvest_tonnes_usd_values_gf,
+                 here(current_np_dir, "int", "harvest_tonnes_usd_weighting_gf.csv"))
 
 # Now calculate 5 year averages (and assign year = 2020 <- legacy comment, no longer what the code does)
 weighting_usd_values_final <- harvest_tonnes_usd_values_gf %>%
@@ -258,7 +269,8 @@ weighting_usd_values_final <- harvest_tonnes_usd_values_gf %>%
   ungroup() 
 
 #save this df
-readr::write_csv(weighting_usd_values_final, here(current_np_dir, "int", "harvest_weighting_values.csv"))
+readr::write_csv(weighting_usd_values_final,
+                 here(current_np_dir, "int", "harvest_weighting_values.csv"))
 
 ```
 
@@ -271,10 +283,16 @@ fofm_tonnes <- read_csv(here(current_np_dir, "int", "mean_catch_FOFM.csv")) %>%
   dplyr::filter(year %in% years) %>% # v2024 range of 2001:2019 to 2018:2019
   mutate(product = "fish_oil") %>%
   group_by(rgn_id, year, product) %>%
-  summarise(tonnes = sum(catch) * 0.3) %>% ## Note: multiply by 0.3 to account for water loss when converting fish to fish oil.. about 30% of fish are water and 70% are fish oil
+  # Note: multiply by 0.3 to account for water loss when converting fish to fish oil.. 
+  ## about 30% of fish are water and 70% are fish oil
+  summarise(tonnes = sum(catch) * 0.3) %>% 
   ungroup() %>%
   group_by(rgn_id, product) %>%
-  summarise(tonnes = mean(tonnes)) %>% ##calculate 5 year mean of catch -- note: in v2024, there were only 2 years in the former year column: 2018 and 2019 -- could be due to data year cap of 2019 in SAUP (downloaded in 2022 with data up to year 2019, hasn't been updated since)
+  # calculate 5 year mean of catch -- 
+  ## note: in v2024, there were only 2 years in the former year column: 
+  ## 2018 and 2019 -- could be due to data year cap of 2019 in SAUP 
+  ## (downloaded in 2022 with data up to year 2019, hasn't been updated since)
+  summarise(tonnes = mean(tonnes)) %>% 
   ungroup() %>%
   full_join(rgns_eez) %>%
   dplyr::select(rgn_id, product, tonnes) %>%
@@ -295,14 +313,18 @@ orn_fill_df <- region_product %>% # has years from 2018:2022 in v2024 (proper 5 
   filter(product == "ornamentals")
   
 orn_tonnes <- np_tonnes %>%
-  dplyr::filter(year %in% years, # filter to 5 year range defined in the beginning of the first methods chunk
+  # filter to 5 year range defined in the beginning of the first methods chunk
+  dplyr::filter(year %in% years, 
                 product == "ornamentals") %>% 
-  full_join(orn_fill_df, by = c("rgn_id", "year", "product")) %>% ## full join to fill in the rest of the regions with 0
+  # full join to fill in the rest of the regions with 0
+  full_join(orn_fill_df, by = c("rgn_id", "year", "product")) %>% 
+  # gapfill the NAs to be 0
   mutate(tonnes = ifelse(is.na(tonnes), 0, tonnes),
-         usd = ifelse(is.na(usd), 0, usd)) %>% ## gapfill the NAs to be 0
+         usd = ifelse(is.na(usd), 0, usd)) %>% 
   dplyr::select(rgn_id, year, product, tonnes) %>%
   group_by(rgn_id, product) %>%
-  summarise(tonnes = mean(tonnes)) %>% ## calculate 5 year mean of catch
+  # calculate 5 year mean of catch
+  summarise(tonnes = mean(tonnes)) %>% 
   ungroup()
 
 # # write out for troubleshooting, bookkeeping
@@ -321,7 +343,7 @@ sw_tonnes <- sw_tonnes_raw %>%
   summarise(tonnes = sum(tonnes, na.rm = TRUE)) %>% # sum across all species of seaweed
   dplyr::filter(year %in% years) %>% # filter to 5 year range 
   full_join(sw_fill_df, by = c("rgn_id", "year", "product")) %>%
-    mutate(tonnes = ifelse(is.na(tonnes), 0, tonnes)) %>% ## gapfill the NAs to be 0
+    mutate(tonnes = ifelse(is.na(tonnes), 0, tonnes)) %>% # gapfill the NAs to be 0
   dplyr::select(rgn_id, year, product, tonnes) %>%
   ungroup() %>%
   group_by(rgn_id, product) %>%
@@ -434,8 +456,7 @@ test_belize <- harvest_tonnes_usd %>%
 test <- harvest_tonnes_usd %>%
   filter(rgn_id == 46)
 
-harvest_tonnes_usd_old <- #read_csv(file.path(prep, paste0("../v", prep_year-1, "/int/np_harvest_tonnes_usd.csv"))) %>%
-  read_csv(here(previous_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>%
+harvest_tonnes_usd_old <- read_csv(here(previous_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>%
   filter(rgn_id != 213)
 
 test2 <- harvest_tonnes_usd_old %>%
@@ -587,10 +608,12 @@ fofm_tonnes_old <- fofm_tonnes_old_full %>%
   dplyr::filter(year %in% 2017:2019) %>% # v2024 range of 2001:2019 to 2018:2019
   mutate(product = "fish_oil") %>%
   group_by(rgn_id, year, product) %>%
-  summarise(tonnes = sum(catch) * 0.3) %>% ## Note: multiply by 0.3 to account for water loss when converting fish to fish oil.. about 30% of fish are water and 70% are fish oil
+  # Note: multiply by 0.3 to account for water loss when converting fish to fish oil.. 
+  ## about 30% of fish are water and 70% are fish oil
+  summarise(tonnes = sum(catch) * 0.3) %>% 
   ungroup() %>%
   group_by(rgn_id, product) %>%
-  summarise(tonnes = mean(tonnes)) %>% ##calculate 5 year mean of catch -- note: in v2024, there were only 2 years in the former year column: 2018 and 2019 -- could be due to data year cap of 2019 in SAUP (downloaded in 2022 with data up to year 2019, hasn't been updated since)
+  summarise(tonnes = mean(tonnes)) %>% 
   ungroup() %>%
   full_join(rgns_eez) %>%
   dplyr::select(rgn_id, product, tonnes) %>%
@@ -740,7 +763,9 @@ check <- prod_weights %>%
 
 
 #old_prod_weights <- read_csv(here(previous_np_dir, "output", "np_product_weights.csv"))
-older_prod_weights <- read_csv(here("globalprep", "np", paste0("v", scen_year_number - 2), "output", "np_product_weights.csv"))
+older_prod_weights <- read_csv(here("globalprep", "np",
+                                    paste0("v", scen_year_number - 2),
+                                    "output", "np_product_weights.csv"))
 
 check_older <- older_prod_weights %>%
   rename("older_weight" = "weight") %>%
@@ -762,7 +787,9 @@ g_new <- ggplot(check, aes(x = weight, y = new_weight, color = product,
   geom_point(alpha = 0.8) +
   geom_abline(intercept = 0, slope = 1, alpha = 0.7,
               color = "red", linetype = "solid") +
-  scale_color_manual(values = c("fish_oil" = "#edae49", "seaweeds" = "#386641", "ornamentals" = "#83c5be")) +
+  scale_color_manual(values = c("fish_oil" = "#edae49",
+                                "seaweeds" = "#386641",
+                                "ornamentals" = "#83c5be")) +
   labs(title = paste(v_scen_year, "vs", v_prev_year, "Natural Product Weights by Product"),
        x = paste(v_prev_year, "Weights"),
        y = paste(v_scen_year, "Weights"),
@@ -811,7 +838,9 @@ g_old <- ggplot(check_older, aes(
   geom_abline(intercept = 0, slope = 1, alpha = 0.7,
               color = "red", linetype = "solid") +
   # customize colors
-  scale_color_manual(values = c("fish_oil" = "#edae49", "seaweeds" = "#386641", "ornamentals" = "#83c5be")) +
+  scale_color_manual(values = c("fish_oil" = "#edae49",
+                                "seaweeds" = "#386641",
+                                "ornamentals" = "#83c5be")) +
   # update labels
   labs(title = paste(v_prev_year, "vs", v_prev_2_year, "Natural Products Weights by Product"),
        x = paste(v_prev_2_year, "Weights"),
