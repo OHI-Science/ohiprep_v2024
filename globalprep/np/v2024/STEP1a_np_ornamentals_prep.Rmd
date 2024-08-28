@@ -294,16 +294,31 @@ h_zero_na <- h %>%
   mutate(tonnes = ifelse(tonnes == 0 & !is.na(usd) & usd > 0, NA, tonnes)) %>% 
   mutate(usd = ifelse(usd == 0 & !is.na(tonnes) & tonnes > 0, NA, usd))
 
-
-
+check_start <- max(h$year) - 5
+check_stop <- max(h$year)
 # check Singapore
-h %>% filter(rgn_id == 208, year %in% (2017:2022), product %in% c("ornamentals")) %>% arrange(desc(year))
+h %>% filter(rgn_id == 208,
+             year %in% (check_start:check_stop), # feel free to update dates
+             product %in% c("ornamentals")) %>% 
+  arrange(desc(year))
 
-h_zero_na %>% filter(rgn_id == 208, year %in% (2017:2022), product %in% c("ornamentals")) %>% arrange(desc(year))
+h_zero_na %>% filter(rgn_id == 208,
+                     year %in% (check_start:check_stop),
+                     product %in% c("ornamentals")) %>% 
+  arrange(desc(year))
 
 # nice!
 
 # issue w region 209 for 1990-1992 -- 0 values for tonnes, non-zero for usd 
+h %>% filter(rgn_id == 209,
+                     #year %in% (check_start:check_stop),
+                     product %in% c("seaweeds")) %>% 
+  arrange(desc(year))
+
+h_zero_na %>% filter(rgn_id == 209,
+                     #year %in% (check_start:check_stop),
+                     product %in% c("seaweeds")) %>% 
+  arrange(desc(year))
 ```
 
 
