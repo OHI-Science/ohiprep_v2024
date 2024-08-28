@@ -23,11 +23,12 @@ This analysis converts FAO commodities data into data layers used to calculate O
 # Updates from previous assessment
 
 ### v2024
-- New year of FAO data (2022)\
-- Updated links to datasets\
-- Updated file paths to be more reproducible, enable cross-platform capability (not dependent on direction of directory separator)
-- Updated data cleaning to follow tidyverse style, use of `janitor::clean_names()`
-- Updated `read.csv` and `write.csv` to `read_csv` and `write_csv` 
+*   New year of FAO data (2022)\
+*   Updated links to datasets\
+*   Updated file paths to be more reproducible, enable cross-platform capability (not dependent on direction of directory separator)
+*   Updated data cleaning to follow tidyverse style, use of `janitor::clean_names()`
+*   Updated `read.csv` and `write.csv` to `read_csv` and `write_csv` 
+*   Updated `fao_fxn.R` to use `str_detect("...")` instead of `value == "..."` to properly replace FAO "missing value" codes with `NA`s. 
 
 ### v2023
 New year of FAO data (2021). Replaced deprecated functions (`replace_at()`, `spread()`, `gather()`)
@@ -116,7 +117,7 @@ files_old <- list.files(dir_fao_data_old, pattern = glob2rx('*.csv'), full.names
 
 # ===== loop ================
 for (f in files) {
-  # f <- files[1] # un-comment and update to test individual files
+  #f <- files[2] # un-comment and update to test individual files # 1 = quant, 2 = usd
   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
   
   #d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
@@ -275,6 +276,26 @@ h <- h %>%
     dplyr::filter(product %in% c("fish_oil", "ornamentals", "seaweeds")) 
 ```
 
+
+### Add FAO-zero-correction 
+
+```{r}
+h_zero_na <- h %>% 
+  mutate(tonnes = ifelse(tonnes == 0 & !is.na(usd) & usd > 0, NA, tonnes)) %>% 
+  mutate(usd = ifelse(usd == 0 & !is.na(tonnes) & tonnes > 0, NA, usd))
+
+
+
+# check Singapore
+h %>% filter(rgn_id == 208, year %in% (2017:2022), product %in% c("ornamentals")) %>% arrange(desc(year))
+
+h_zero_na %>% filter(rgn_id == 208, year %in% (2017:2022), product %in% c("ornamentals")) %>% arrange(desc(year))
+
+# nice!
+```
+
+
+
 # Gapfilling
 
 Summary of gapfilling that is performed:
@@ -287,7 +308,7 @@ Summary of gapfilling that is performed:
 
 ```{r}
 
-h <- h %>% np_harvest_gapflag()
+h <- h_zero_na %>% np_harvest_gapflag()
 ## Adds flag for required gap-filling, based upon NAs in data. 
 ## NOTE: Does not perform any gap-filling.
 ## At this point, h includes: 

@@ -285,7 +285,7 @@ seaweed_np <- seaweed_np %>% rename(species = FAO_name)
 # Bonaire/S.Eustatius/Saba
 # Yugoslavia SFR: no longer a country after 1992
 seaweed_np <- seaweed_np %>%
-  mutate(country = ifelse(country=="Réunion", "Reunion", country)) %>%  # this one is hard to get right; v2020: last year it was "R\xe9union", but this year it was "Réunion" - not present in v2021 data, not present in v2024 data
+  mutate(country = ifelse(country == "Réunion", "Reunion", country)) %>%  # this one is hard to get right; v2020: last year it was "R\xe9union", but this year it was "Réunion" - not present in v2021 data, not present in v2024 data
   ohicore::split_regions()  # function in mar_fxs.R
 
 mar_rgn_all <- name_2_rgn(df_in = seaweed_np, 
@@ -634,7 +634,6 @@ np_old <- readr::read_csv(here("globalprep", "np", paste0("v", prev_scen_year), 
 
 # read in current year's harvest data 
 np_new <- readr::read_csv(here(current_np_dir, "output", "np_seaweed_harvest_tonnes.csv"))
-
 
 # Compare yield data for Saint Lucia
 np_old_sl <- np_old %>% 

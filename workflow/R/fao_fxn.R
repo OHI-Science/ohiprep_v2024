@@ -52,7 +52,10 @@ fao_clean_data_new <- function(m, sub_N = 0.1) {
       value = str_replace(value, fixed(' X'), ''),
       # Replace '...' (... = missing value) with NA ----
       #value = ifelse(value == '...', NA, value), # FAO's code for NA
-      value = case_when(str_detect(value, "...") ~ NA,
+      # value = ifelse(str_detect(value, pattern = "..."), NA, value),
+      # value = case_when(str_detect(value, pattern = "...") ~ NA,
+      #                   TRUE ~ value),
+      value = case_when(str_detect(value, "0  ...") ~ NA,
                         TRUE ~ value),
       #value = str_replace(value, fixed(' N'), sub_N),
       # Replace N (N = not significant, < 0.5) with substitution
