@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 3
     toc_float: yes
-    number_sections: true
+    number_sections: false
     theme: cerulean
     highlight: haddock
     includes: 
@@ -45,7 +45,7 @@ Initially, there are three scripts, each with different starting units of value,
 ## Setup
 
 ```{r render-setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, eval = FALSE)
 
 options(scipen=99) # for number of digits printed
 ```

@@ -149,7 +149,7 @@ if(!file.exists(file.path(dirname(dir_github), 'README.md'))) {
 raw <- list.files(file.path(dir_server, sprintf("CIESEandCIAT_population/%s", data_yr_gpw)),
                   full.names = TRUE, pattern = "\\.tif$",
                   recursive = TRUE)
-raw <- raw[grep("count_", raw)] # keep only the files that include the word "density"
+raw <- raw[grep("count_", raw)] # keep only the files that include the word "count"
 raw # check that this looks correct; can double check with the folder on Mazu server folder
 
 # Rename count files to better work with grep function and interpolate function. These are our start rasters for the 'yearly_interpolate_terra' function
@@ -184,10 +184,9 @@ pop <- read.csv(file.path(dir_server,
 
 Gridded world population counts from CIESE and CIAT are in WGS 1984 Projection, and the ocean_plus25mile_inland.tif is projected in the World Mollweide coordinate reference system. We will resample the ocean raster using nearest neighbor method to match the population count raster 0.008333333 x 0.008333333 degree resolution. 
 
-Why reproject the ocean raster? It is a categorical raster defining zones, whereas the population raster is a continuous raster with highly variable cell values. As a result, changing the projection of the categorical raster would minimize errors propagating through calculations because it is 1. not directly modifying the data that we're interested in, and 2. categorical, indicating that the faster "nearest neighbor" method of resampling won't realistically change the underlying structure of the regions - only borders, which are typically less developed and less populated [And There Was Light:
-Trade and the Development of Border Regions](https://people.unil.ch/mariusbrulhart/files/2023/06/borderlights.pdf). 
+Why reproject the ocean raster? It is a categorical raster defining zones, whereas the population raster is a continuous raster with highly variable cell values. As a result, changing the projection of the categorical raster would minimize errors propagating through calculations because it both 1. minimizes direct modifications to the data that we're interested in, and 2. is a categorical raster, indicating that the faster "nearest neighbor" method of resampling won't realistically change the underlying structure of the regions - only borders, which are typically less developed and less populated [And There Was Light: Trade and the Development of Border Regions](https://people.unil.ch/mariusbrulhart/files/2023/06/borderlights.pdf). 
 
-Therefore, when choosing which raster to manipulate, we saw 1. that modifying the population raster resulted in some pretty large errors propagating, 2. manipulating the ocean raster is methodologically more sound, and 3. Because we're not manipulating the population raster scale, it doesn't need to be population density, so we can use an unequal areas projection to run zonal statistics. 
+Therefore, when choosing which raster to manipulate, we saw 1. that modifying the population raster resulted in some pretty large errors propagating, 2. manipulating the ocean raster is methodologically more sound, and 3. because we're not manipulating the population raster scale, it doesn't need to be population density, so we can use an unequal areas projection to run zonal statistics. 
 
 ```{r create eez + 25-mile inland raster, eval=FALSE}
 
@@ -213,7 +212,7 @@ ocean_rast_int <- terra::as.int(eez_25mi_inland) # Changing from float raster to
 plot(ocean_rast_int)  # Checking to make sure that it makes sense 
 
 # Reproject integer raster to WGS 1984 (same as population count raster)
-ocean_int_reproj <- terra::project(x = ocean_rast_int, count_rast, method="near") # Reprojecting to population raster projection  
+ocean_int_reproj <- terra::project(x = ocean_rast_int, count_rast, method="near")
 
 plot(ocean_int_reproj) # Checking to make sure that it makes sense
 
@@ -233,7 +232,6 @@ names(ocean_fact_reproj) # [1] "ocean_plus25mile_inland"
 names(ocean_fact_reproj) = c("zone") # [1] "zone"
 
 # Another command can be used to set the layer name of ocean raster 
-
 # terra::set.names(ocean_fact_reproj, "zone")
 
 ## Writing the ocean raster out to Mazu --> for future reference, you only need to load this raster and then rename the layer to 'zone'
@@ -247,13 +245,13 @@ GWPv4 data is for years 2005, 2010, 2015, and 2020. Data for missing years must 
 
 ```{r functions for interpolation, eval=FALSE}
 
-## Define and apply function to calculate yearly change in population density 
+## Define and apply function to calculate yearly change in population count 
 ## Create function for average yearly change
 library(terra)
 
 yearly_diff_terra <- function(year_min, year_max, count_files = raw, scenario_yr, dir_M){
   # Load the raster files
-  # contingency for rasters with year = 2015 because the grep dont work (picks up all the files because they all have a 2015 in them)
+  # contingency for rasters with year = 2015 because the grep dont work (picks up all the files because they all have a 2015 in them). Kind of over engineered because you could just replace the year_max within the grep() argument to the contingency and get rid of the if statement but it works either way. 
   if(year_max == 2015){
     contingency <- paste0("rev11_", year_max)
     rast_max <- rast(count_files[grep(contingency, count_files)])
@@ -288,7 +286,7 @@ yearly_diff_terra(2010, 2015, count_files = raw, dir_M = dir_M, scenario_yr = sc
 yearly_diff_terra(2015, 2020, count_files = raw, dir_M = dir_M, scenario_yr = scenario_yr)
 
 ################### 
-# Take a break here and check to make sure that the Mazu folder has both "yearly_change_YYYY_to_YYYY" files and "human_count_YYYY" files. Should be four and five, respectively
+# Take a break here and check to make sure that the Mazu folder has both "yearly_change_YYYY_to_YYYY" files and "human_count_YYYY" files. Should be four and five files, respectively
 
 
 ## Now that we have the yearly change for each five year increment, we're going to reload the files list to have access for the yearly_interpolate_terra function
@@ -300,7 +298,8 @@ yearly_interpolate_terra <- function(files, raw_files, start_years, dir_M=dir_M,
   # Define start year 
   for (start_year in start_years) { # The start years will have 4 files: 2000, 2005, 2010, 2015
     
-    end_year = start_year+5
+    end_year = start_year+5 # The end years are always going to be the last year in each 5-year increment 
+    
     raster_initial <- terra::rast(raw_files[grep(sprintf("rev11_%s", start_year), raw_files)])
     
     names(raster_initial) <- sprintf("pop_%s", start_year)
@@ -319,7 +318,8 @@ yearly_interpolate_terra <- function(files, raw_files, start_years, dir_M=dir_M,
           if (yr <= end_year) { # Check that year is less than or equal to the end_year (should be)
             # Define each raster that its calculating as raster_current 
             ## Calculated with yearly change times the year out that its calculating (1, 2, 3, 4)
-            raster_current <- raster_initial + (i * change_raster) # calculate w/ yearly change * 
+            raster_current <- raster_initial + (i * change_raster) # calculate w/ change in years * avg change/year  
+            
             # Rename the current raster with name and the yr variable 
             names(raster_current) <- sprintf("pop_%s", yr)
             
@@ -624,13 +624,13 @@ summary(old_area)
 
 ## Manual option for creating interpolated files (See note)
 
-* NOTE: Creating these files and storing them in R will max out the tmp directory storage (limit 40GB) if other large objects are also loaded. It is highly recommended to use the yearly_interpolate_terra function but if that doesn't work then use this method but DONT run it all at once. Run one, check it to make sure it makes sense by runnning the following 
+* NOTE: Creating these files and storing them in R will max out the tmp directory storage (limit 40GB) for mazu if other large objects are also loaded. It is highly recommended to use the yearly_interpolate_terra function but if that doesn't work then use this method but I would not recommend running it all at once. Run one, check it to make sure it makes sense by runnning the following 
   
-  * global(raster_2001, "sum", na.rm=TRUE)
+  * global(raster_YYYY, "sum", na.rm=TRUE)
   
-  * Then write it out using writeRaster, and remove it from the environment using rm(object_name) before moving to the next one 
+  * Then write it out using writeRaster, and remove it from the environment using rm(raster_YYYY) before moving to the next one 
   
-  * You will need each raw raster (2000, 2005, 2010, 2015) and each yearly change raster for each of the in-between years over a five-year increment, so just remove the "in-between year" rasters after they're written out  
+  * **You will need each raw raster (2000, 2005, 2010, 2015) and each yearly change raster for each of the in-between years over a five-year increment, so just remove the "in-between year" rasters after they're written out**  
 
 ```{r}
 ## Pulling from "files"

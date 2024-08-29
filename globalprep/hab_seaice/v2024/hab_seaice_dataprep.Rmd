@@ -47,7 +47,7 @@ Colorado USA. NASA National Snow and Ice Data Center Distributed Active
 Archive Center. <https://doi.org/10.5067/MPYG15WAA4WX> Date Accessed
 06-05-2023.
 
-**Downloaded**: June 5th 2023
+**Downloaded**: July 12, 2024
 
 **Description**: Monthly sea ice extent data.
 
@@ -213,7 +213,7 @@ CIRES, 449 UCB University of Colorado Boulder, CO USA 80309-0449 Phone:
 +1 303-492-6199 Fax: +1 303-492-2468 E-mail:
 [nsidc\@nsidc.org](mailto:nsidc@nsidc.org){.email}
 
-**Time range**: 1979-2022
+**Time range**: 1979-2023
 
 ------------------------------------------------------------------------
 
@@ -288,7 +288,7 @@ prj.mol = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m 
 fp.n <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assess_year, "north")
 fp.s <- file.path(dir_M, "git-annex/globalprep/_raw_data/NSIDC_SeaIce", assess_year, "south")
 
-## Potential for the need to modify this if there are not data available for all 12 months of the most recent year. For example, this year (2024), there are only data up to september (month 09) rather than to december (month 12)
+## Potential for the need to modify this if there are not data available for all 12 months of the most recent year. For example, the ObtainingData.R and ObtainingData_Parallel.R scripts rely on a 12 month interval when looping, so this will introduce problems if the "last_year" of data only has data through September (9).
 poles = c("n","s")
 years = c(1979:last_year) # full range of data
 months = 1:12
@@ -297,8 +297,6 @@ i.pym = 0
 ```
 
 ## Function 1
-
-**This should be updated to account for already having read in the data and receiving an error or something else. Its re-reading in all data from mazu whereas there should be a "backup" function that says if the ...rgns_pts.x files already exist to just stack them to create the .rdata**
 
 Collects the data for each month/year from mazu and add to raster stack
 that is saved in tmp folder as: `n_rasters_points.rdata` or
@@ -310,11 +308,12 @@ script for more details.
 ## Soft limit to running 5 cores per dataprep script. For this process running additional cores did not decrease the runtime. 
 tic()
 ## Previously (<2022) update to some file paths with the correct assessment year in ObtainingData.R was needed
-## Currently (2023) this is automatic from this script with `assess_year` variable
+## Currently (>2023) this is automatic from this script with `assess_year` variable
 
-## ATTN! Because this is now done in parallel rather than in sequence (saving ~2hrs of processing time), this script will not display the progress as it does when its sequentially run. Thats okay as long as you check mazu and ensure that the tmp folder is updated about 2 minutes into run-time, and the v2024 folder should have n_rasters_points.rdata and s_rasters_points.rdata populated in about 1.25-1.5 hours. 
+## Attention: Because this is now done in parallel using the  "ObtainingData_Parallel.R" script rather than in sequence using the "ObtainingData.R" script (saving ~2hrs of processing time), this function will not display the progress as it does when its sequentially run. That is okay as long as you check mazu and ensure that the tmp folder is updated about 2 minutes into run-time, and the v202X folder should have n_rasters_points.rdata and s_rasters_points.rdata populated in about 1.25-1.5 hours.
 
-source("globalprep/hab_seaice/v2024/ObtainingData_Parallel.R") ## This has changed (2024) to account for the current working directory being ohiprep_v2024 rather than 'hab_seaice/v2024'
+source(here("globalprep/hab_seaice/v2024/ObtainingData_Parallel.R")) 
+
 toc()
 ## should take ~1.5 hrs to completely run with ObtainingData_Parallel.R 
 ```
@@ -322,9 +321,7 @@ toc()
 ## Function 2
 
 Using the data from the .rdata files created from Function 1 with the
-`ObtainingData.R` script, this function calculates status and trend for
-shoreline ice and ice edge habitat. Data is saved in intermediate
-(`int`) folder:
+`ObtainingData_Parallel.R` script, this function calculates status and trend for shoreline ice and ice edge habitat. Data is saved in intermediate (`int`) folder:
 
 -   Habitat: `n_IceEdgeHabitat.csv`, `s_IceEdgeHabitat.csv`
 -   Coastal Protection: `n_IceShoreProtection.csv`,
@@ -340,7 +337,7 @@ toc()
 ## Final calculations and organization
 
 Read in ice edge habitat and ice shore protection csv-format datasets,
-remove anamolous eez regions with minimal ice cover, remove disputed
+remove anomalous eez regions with minimal ice cover, remove disputed
 regions. Bind these datasets and convert to units of km\^2. Save seaice
 health, extent, trend, and extent data.
 
@@ -414,7 +411,8 @@ write.csv(extent, "globalprep/hab_seaice/v2024/output/hab_ice_extent_eez.csv", r
 ```{r data checks, eval=FALSE}
 ## Health comparison
 
-## Because the last full year of data is 2022, 'previous_year' reflects 2022 instead of 2023. Changing the variable to that of previous assessment rather than previous year of full data. This wont change anything for 2024 because 2023 uses 2022 data year (last full data year) instead of 2023 data.
+## v2024: Because the last full year of data is 2022, 'previous_year' reflects 2022 instead of 2023. Changing the variable to that of previous assessment rather than previous year of full data. This wont change anything for 2024 because 2023 uses 2022 data year (last full data year) instead of 2023 data.
+
 previous_assessment_full_data <- 2023
 previous_year <- paste0("v", previous_assessment_full_data)
 
@@ -437,13 +435,13 @@ regions <- rgn_master %>%
   dplyr::select(rgn_id = rgn_id_2013, rgn_name = rgn_nam_2013) %>%
   unique()
 
-## Changing current year back to 2022 because that's the last full year of data.
+## Current full year of data
 current_year = 2023
 
 health_2023 <- health %>%
   dplyr::filter(year == current_year)
 
-## Changing last year to 2021 because that's the 'last year of data' provided that the current year is using 2022 as its data 
+## Last full year of data
 last_year = 2022
 
 health_2022 <- ice_health_eez %>%
@@ -495,7 +493,7 @@ ice_extent_eez <- read.csv(sprintf("globalprep/hab_seaice/%s/output/hab_ice_exte
 ggplot(data = ice_extent_eez) +geom_point(aes(x =km2_prev_assess, y = km2)) + geom_abline(slope = 1, intercept = 0, col = "red")
 
 
-### let's compare the data year 2022 to data year 2021
+### let's compare the data year 2023 to data year 2022
 
 extent_2023 <- extent 
 
