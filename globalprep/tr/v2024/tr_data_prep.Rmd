@@ -181,11 +181,11 @@ unwto_clean <- unwto_arrivals_int %>%
       is.na(overnights) & !is.na(same_day) & !is.na(total_arrivals) ~ total_arrivals - same_day, # gapfill, when there is no data on overnights, fill with total_arrivals - same day
       TRUE ~ tourism_arrivals_ct # otherwise, NA
     ), # there were 0 situations like this in v2024
-    total_arrivals = case_when(
-      !is.na(total_arrivals) ~ total_arrivals, 
-      is.na(total_arrivals) & !is.na(same_day) & !is.na(overnights) ~ overnights + same_day,
-      TRUE ~ total_arrivals
-    )
+    # total_arrivals = case_when(
+    #   !is.na(total_arrivals) ~ total_arrivals, 
+    #   is.na(total_arrivals) & !is.na(same_day) & !is.na(overnights) ~ overnights + same_day,
+    #   TRUE ~ total_arrivals
+    # )
   ) %>% # v2024: overnights has 1036 NAs out of 6021
   # v2024: same_day has 3131 NAs out of 6021
   # v2024: total_arrivals has 2363 NAs
@@ -351,6 +351,8 @@ all_nas_tourism_int <- unwto_int_upfill %>%
   group_by(rgn_id) %>%
   filter(all(is.na(tourism_arrivals_ct))) %>%
   dplyr::select(rgn_id, rgn_name, year, tourism_arrivals_ct, data_source, arrivals_gf)
+# see how many regions have only 3 values, see how many are dropped at less than or equal to 3, look at 4 and 5 as well
+# this needs to happen before upfilling -- make sure at least 3 data pts between 2003-2021 or at LEAST last 5 years of data, filter in the beginning!!
 
 unwto_gapfill_lm_2019_tourism_int <- unwto_int_upfill %>%
   mutate(year = as.numeric(year)) %>% 
