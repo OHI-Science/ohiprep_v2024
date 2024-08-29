@@ -262,7 +262,7 @@ setdiff(spp_1, spp_2)
 
 setdiff(rgn_1, rgn_2)
 # went from 53 to 52 countries - this is ok... because the one we "lost" was an NA - v2022
-# v2024: NA
+# v2024: NA/50 unique regions?
 
 # Eliminate country-species data with zero production throughout the time-series (1950-recent)
 seaweed_np <- seaweed_np %>%
