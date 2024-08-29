@@ -18,7 +18,7 @@ output:
 
 # Summary
 
-This analysis converts FAO commodities data into data layers used to calculate OHI `r format(Sys.time(), "%Y")` global natural products scores. We will conduct this data prep on the commodities seaweed, fish oil, and ornamentals, so that we can produce \$ values for weighting later on, however, our final layer (saved to the output folder) from this data prep will only consist of ornamental fish. This will also calculate a sustainability layer based off of risk and exposure for ornamental fishing.
+This analysis converts FAO commodities data into data layers used to calculate OHI `r format(Sys.time(), "%Y")` global natural products scores. We will conduct this data prep on the commodities seaweed, fish oil, and ornamentals, so that we can produce \$ values for weighting later on.
 
 # Updates from previous assessment
 

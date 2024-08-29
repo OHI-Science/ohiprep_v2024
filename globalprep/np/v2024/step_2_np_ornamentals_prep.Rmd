@@ -1,0 +1,122 @@
+---
+title: 'OHI `r format(Sys.time(), "%Y")`: Natural Products: Ornamentals Data Prep'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: false
+    toc_float: yes
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+[REFERENCE RMD FILE: <http://ohi-science.org/ohiprep_v2024/globalprep/np/v2024/STEP1a_np_ornamentals_prep.html>]
+
+# Summary
+
+This analysis calculates the score for ornamentals per region based on FAO commodities data. This calculation process includes creating a sustainability layer based off of risk and exposure for ornamental fishing.
+
+# Updates from previous assessment
+
+### v2024
+*   Complete overhaul of methodology from previous years. Original data prep file: `STEP1a_np_ornamental_prep.Rmd`
+*   New year of FAO data (2022)
+
+------------------------------------------------------------------------
+
+# Data Source
+
+**Reference**:\
+<https://www.fao.org/fishery/en/statistics/software/fishstatj> App release date: March 2024 FAO raw commodities quantity 1976_2021 FAO raw commodities value 1976_2022 [FAO metadata](http://www.fao.org/fishery/statistics/global-commodities-production/en)
+
+- Global aquatic trade - All partners aggregated - Quantities and Values - 1976-2022 (Release date: July 2024)
+
+
+**Downloaded**: 2024-08-07
+
+**Description**: Quantity (tonnes) and value (USD) of raw commodities (Exports only) for each country, taxa, year. The FAO data is subset to include commodities in these categories: ornamental fish, fish oil, seaweed and plants (see: raw/commodities2products_weighting.csv for details).
+
+**Time range**: 1976-2022
+
+Files can be found on Mazu: `home/shares/ohi/git-annex/globalprep/_raw_data/FAO_commodities/d2024` accompanied by README.md with detailed download instructions. 
+
+------------------------------------------------------------------------
+
+# Methods
+
+
+STEP 2: Ornamentals
+a. 	Using data A, filter the tonnes and USD for ornamentals.  
+b. 	Calculate exposure and risk, and then use it estimate sustainability,
+mutate(sustainability = 1 - mean(c(exposure, risk), na.rm = TRUE))
+c. 	Calculate sustainable tonnes: tonnes * sustainability
+d. 	Rolling average of sustainable tonnes
+e. 	Identify max value from rolling average of sustainable tonnes (maybe limit to most recent 10 years of data to ID max). 
+F. 	get relative tonnes by dividing the rolling average of sustainable tonnes by max(rolling average of sustainable tonnes)
+So you can then save an intermediate dataset that looks like this:
+
+rgn_id
+year,
+product, (ornamentals, in this case)
+tonnes: from gapfilled FAO commodity data
+usd: from gapfilled FAO commodity data
+sustainability: 1 - mean(c(exposure, risk), na.rm = TRUE)
+sustainable_tonnes: tonnes * sustainability
+max_sustainable_tonnes: max(sustainable_tonnes)
+rel_sust_tonnes: tonnes_rollmean / peak_sust_tonnes
+
+Then, in final data, save rgn_id, product, year, tonnes_rel 
+
+
+```{r}
+# filter FAO commodities int data to ornamentals
+
+
+
+
+
+
+```
+
+
+
+## Calculate Exposure
+
+
+
+## Calculate Risk
+
+
+
+## Calculate Sustainability
+
+1 - mean(c(exposure, risk), na.rm = TRUE)
+
+
+## Calculate Sustainable Harvest
+
+tonnes * sustainability
+
+
+
+## Rolling Average of Sustainable Tonnes
+
+
+
+## Identify Max Sustainable Tonnes
+
+max(sustainable_tonnes)
+
+
+## Relative Sustainable Tonnes
+
+
+tonnes_rollmean / peak_sust_tonnes
+
+
+
+
