@@ -82,7 +82,7 @@ data_dir_year <- paste0("d", scen_year)
 prev_data_dir_year <- paste0("d", prev_scen_year)
 v_scen_year <- paste0("v", scen_year)
 
-current_np_dir <- here::here("globalprep", "np", v_scen_year)
+current_np_dir <- here::here("globalprep", "np", paste0(v_scen_year, "_new"))
 
 # ======== Source functions ===========
 source(here::here("workflow", "R", "common.R")) # directory locations
@@ -219,7 +219,10 @@ np_exp_gf <- np_exp_orn_rescale %>%
   dplyr::mutate(method = ifelse(is.na(exposure), "prod_average", NA)) %>%
   dplyr::select(rgn_id = rgn_id, product, year, gapfilled, method)
 
-readr::write_csv(np_exp_gf, here(current_np_dir, "output", "np_exposure_ornamentals_gf_record.csv"))
+readr::write_csv(np_exp_gf, here(current_np_dir, 
+                                 "int", # used to be output, moved to int
+                                 # because exposure is no longer an output
+                                 "np_exposure_ornamentals_gf_record.csv"))
 
 ### add exposure for countries with (habitat extent == NA)
 np_exp_orn <- np_exp_orn_rescale %>%
@@ -232,9 +235,12 @@ np_exp_orn <- np_exp_orn_rescale %>%
   dplyr::select(rgn_id, year, product, exposure)
 
 ## save exposure as a layer
-readr::write_csv(np_exp_orn, here(current_np_dir, "output", "np_exposure_ornamentals.csv"))
+readr::write_csv(np_exp_orn, here(current_np_dir,
+                                  "int", # used to be output, moved to int
+                                 # because exposure is no longer an output
+                                  "np_exposure_ornamentals.csv"))
 
-
+# potentially filter to past 20 years (or hardcode from 2004 onward)
 
 ```
 
