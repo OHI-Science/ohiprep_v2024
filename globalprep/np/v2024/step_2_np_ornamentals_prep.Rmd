@@ -48,6 +48,51 @@ Files can be found on Mazu: `home/shares/ohi/git-annex/globalprep/_raw_data/FAO_
 
 # Methods
 
+## Setup
+
+```{r}
+
+knitr::opts_chunk$set(eval = FALSE)
+
+# ======= Load packages ============
+if (!require(librarian)) {
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  ohicore, #devtools::install_github('ohi-science/ohicore@dev') #if relevant: restart session after reinstalling
+  dplyr,
+  stringr,
+  tidyr,
+  here,
+  tidyverse,
+  zoo,
+  ggplot2,
+  plotly,
+  tictoc,
+  RColorBrewer
+)
+
+# ======= Set directories ===========
+# Update scenario year, set up programmatic scenario year updates
+scen_year_number <- 2024
+scen_year <- as.character(scen_year_number)
+prev_scen_year <- as.character(scen_year_number - 1)
+data_dir_year <- paste0("d", scen_year)
+prev_data_dir_year <- paste0("d", prev_scen_year)
+v_scen_year <- paste0("v", scen_year)
+
+current_np_dir <- here::here("globalprep", "np", paste0(v_scen_year, "_new"))
+
+# ======== Source functions ===========
+source(here::here("workflow", "R", "common.R")) # directory locations
+# Load FAO-specific user-defined functions
+source(here::here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
+# function for handling FAO commodity data specific to NP
+source(here::here(current_np_dir, "R", "np_fxn.R")) 
+```
+
+
 
 STEP 2: Ornamentals
 a. 	Using data A, filter the tonnes and USD for ornamentals.  
@@ -73,12 +118,16 @@ Then, in final data, save rgn_id, product, year, tonnes_rel
 
 
 ```{r}
+# read in FAO commodities usd tonnes int data
+np_harvest_usd_tonnes <- read_csv(here(current_np_dir, "int", "np_harvest_usd_tonnes_gf.csv"))
+
 # filter FAO commodities int data to ornamentals
+np_ornamentals_base <- np_harvest_usd_tonnes %>% 
+  dplyr::filter(product %in% c("ornamentals"))
 
-
-
-
-
+# check
+table(np_ornamentals_base$product)
+# 3938 -- v2024
 
 ```
 
@@ -86,10 +135,175 @@ Then, in final data, save rgn_id, product, year, tonnes_rel
 
 ## Calculate Exposure
 
+Calculate ornamentals exposure based on habitats
+
+
+Returns the first input data frame with a new column for exposure:
+[`rgn_id` `year` `product` `exposure`]
+
+```{r}
+    
+# ---- Subset np harvest ornamentals ----
+np_harvest_orn <- np_ornamentals_base %>%
+  dplyr::select(rgn_id, year, product, tonnes) %>% 
+  arrange(rgn_id)
+
+# ====== Determine Habitat Areas for Exposure ========
+# rocky reef habitat area
+hab_rocky <- readr::read_csv(here::here("globalprep", "hab_rockyreef", "v2012", # hasn't been updated since 2012
+                           "data", "habitat_extent_rocky_reef_updated.csv")) %>%
+  dplyr::select(rgn_id, km2) %>%
+  dplyr::filter(km2 > 0)
+
+# coral habitat area
+hab_coral <- readr::read_csv(here::here("globalprep", "hab_coral", "v2021", # hasn't been updated since 2021
+                           "data", "habitat_extent_coral_updated.csv")) %>%
+  dplyr::select(rgn_id, km2) %>%
+  dplyr::filter(km2 > 0)
+
+# find total area in coral and rocky reef habitats
+area_dual_hab <- np_harvest_orn %>%
+  dplyr::left_join(hab_coral %>%
+                     dplyr::rename(coral_km2 = km2),
+                   by = c('rgn_id')) %>%
+  dplyr::left_join(hab_rocky %>%
+                     dplyr::rename(rocky_km2 = km2),
+                   by = c('rgn_id')) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(km2 = sum(c(rocky_km2, coral_km2), na.rm = TRUE)) %>%
+  dplyr::filter(km2 > 0) %>%
+  dplyr::select(-coral_km2, -rocky_km2) %>% 
+  dplyr::arrange(rgn_id)
+  
+
+# ======== Determine Exposure ========
+### exposure: get tonnes / area, find max in past 10 years, use max to rescale with log transform
+
+# calculate raw exposure (tonnes / area)
+np_exp_raw <- area_dual_hab %>%
+  # find regions and years with harvest in rocky reef and coral habitat
+  dplyr::mutate(expos_raw = ifelse(tonnes > 0 & km2 > 0,
+                                   (tonnes / km2), # raw exposure: harvest tonnes / habitat area
+                                   0)) %>% # 0 exposure if no harvest or no special habitat
+  dplyr::group_by(product) 
+
+# define most recent 10 year range
+max_exp_year <- max(np_exp_raw$year)
+exp_decade_range <- seq((max_exp_year - 10), max_exp_year, 1)
+
+# find max raw exposure value in the past 10 years
+np_exp_max <- np_exp_raw %>%
+  filter(year %in% c(exp_decade_range)) %>% 
+  group_by(rgn_id) %>% 
+  dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
+#  dplyr::ungroup() %>% 
+  dplyr::select(rgn_id, expos_prod_max) %>% 
+  dplyr::distinct()
+
+# calculate rescaled exposure
+np_exp_orn_rescale <- np_exp_raw %>%
+  # bring in max (of the past 10 yrs) value, 
+  # fill single value for each region across full time range
+  dplyr::left_join(np_exp_max, by = "rgn_id") %>% 
+  # rescale exposure using max value
+  dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
+                exposure = ifelse(exposure > 1, 1, exposure)) %>%
+  dplyr::select(-km2, -expos_raw, -expos_prod_max)
+
+
+# ======== Save intermediate data products ==========
+############## Note for Mel: not sure if I need this part?? I can't find where this is ever gapfilled. 
+# clean up columns
+np_exp_gf <- np_exp_orn_rescale %>%
+  dplyr::mutate(gapfilled = ifelse(is.na(exposure), 1, 0)) %>%
+  dplyr::mutate(method = ifelse(is.na(exposure), "prod_average", NA)) %>%
+  dplyr::select(rgn_id = rgn_id, product, year, gapfilled, method)
+
+readr::write_csv(np_exp_gf, here(current_np_dir, 
+                                 "int", # used to be output, moved to int
+                                 # because exposure is no longer an output
+                                 "np_exposure_ornamentals_gf_record.csv"))
+
+### add exposure for countries with (habitat extent == NA)
+np_exp_orn <- np_exp_orn_rescale %>%
+  dplyr::group_by(product) %>%
+  dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
+  dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
+  dplyr::select(-mean_exp) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(product = as.character(product)) %>%
+  dplyr::select(rgn_id, year, product, exposure)
+
+## save exposure as a layer
+readr::write_csv(np_exp_orn, here(current_np_dir,
+                                  "int", # used to be output, moved to int
+                                 # because exposure is no longer an output
+                                  "np_exposure_ornamentals.csv"))
+
+# potentially filter to past 20 years (or hardcode from 2004 onward)
+
+```
+
 
 
 ## Calculate Risk
 
+```{r}
+
+### calculates NP risk based on:
+###   ornamentals:      risk = 1 if blast or cyanide fishing
+### Returns a data frame of risk, by product, by region:
+###
+#########################################.
+
+
+### Determine Risk
+
+r_cyanide <- 
+  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_poison_3nm_rgn2013.csv")) %>%
+  #AlignDataYears(layer_nm = "np_cyanide", layers_obj = layers) %>%
+  dplyr::filter(!is.na(score) & score > 0) %>%
+  dplyr::select(rgn_id,
+                #year = scenario_year,
+                cyanide = score)
+
+r_blast <-
+  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_blast_3nm_rgn2013.csv")) %>%
+  #AlignDataYears(layer_nm = "np_blast", layers_obj = layers)  %>%
+  filter(!is.na(score) & score > 0) %>%
+  dplyr::select(rgn_id,
+         #year = scenario_year,
+         blast = score)
+
+
+### risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code
+###  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the "relative intensity of cyanide fishing"
+risk_orn <- r_cyanide %>%
+  full_join(r_blast, by = c("rgn_id")) %>%
+  mutate(ornamentals = 1) %>%
+  dplyr::select(rgn_id, ornamentals)
+
+### risk as binary
+np_risk_orn <-
+  expand.grid(
+    rgn_id  = unique(np_harvest_orn$rgn_id),
+    year = unique(np_harvest_orn$year)
+  ) %>%
+  ### ornamentals
+  left_join(risk_orn, by = c("rgn_id"))  %>%
+  mutate(ornamentals = ifelse(is.na(ornamentals), 0, ornamentals)) %>%
+  gather(product, risk, -rgn_id, -year) %>%
+  mutate(product = as.character(product))
+
+np_risk_gf <- np_risk_orn %>%
+  mutate(gapfilled = 0, method = NA) %>%
+  dplyr::select(-risk)
+
+readr::write_csv(np_risk_gf, here(current_np_dir, "output", "np_risk_ornamentals_gf.csv"))
+
+## write this as a risk layer 
+readr::write_csv(np_risk_orn, here(current_np_dir, "output", "np_risk_ornamentals.csv"))
+```
 
 
 ## Calculate Sustainability
