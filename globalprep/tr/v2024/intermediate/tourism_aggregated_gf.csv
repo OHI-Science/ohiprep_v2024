@@ -1,11 +1,11 @@
 rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method,ag_gapfilled
-5,New Caledonia,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-5,New Caledonia,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-5,New Caledonia,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-5,New Caledonia,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-5,New Caledonia,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-5,New Caledonia,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-5,New Caledonia,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+5,New Caledonia,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+5,New Caledonia,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+5,New Caledonia,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+5,New Caledonia,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+5,New Caledonia,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+5,New Caledonia,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+5,New Caledonia,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 5,New Caledonia,2015,UNWTO,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 5,New Caledonia,2016,UNWTO,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 5,New Caledonia,2017,UNWTO,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -111,20 +111,6 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 15,Philippines,2019,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 15,Philippines,2020,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 15,Philippines,2021,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-16,Australia,2008,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2009,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2010,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2011,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2012,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2013,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2014,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2015,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2016,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2017,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2018,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2019,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-16,Australia,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-16,Australia,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 17,Papua New Guinea,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 17,Papua New Guinea,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 17,Papua New Guinea,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -168,15 +154,15 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 19,Tuvalu,2020,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 19,Tuvalu,2021,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 20,South Korea,2008,UNWTO - nearby year,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-20,South Korea,2009,UNWTO - nearby year,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-20,South Korea,2010,UNWTO - nearby year,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-20,South Korea,2011,UNWTO - nearby year,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-20,South Korea,2012,UNWTO - nearby year,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-20,South Korea,2013,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-20,South Korea,2014,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-20,South Korea,2015,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-20,South Korea,2016,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-20,South Korea,2017,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+20,South Korea,2009,UNWTO - nearby year,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+20,South Korea,2010,UNWTO - nearby year,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+20,South Korea,2011,UNWTO - nearby year,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+20,South Korea,2012,UNWTO - nearby year,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+20,South Korea,2013,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+20,South Korea,2014,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+20,South Korea,2015,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+20,South Korea,2016,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+20,South Korea,2017,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 20,South Korea,2018,UNWTO - subtraction,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 20,South Korea,2019,UNWTO - subtraction,gapfilled,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 20,South Korea,2020,UNWTO - subtraction,gapfilled,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
@@ -293,20 +279,20 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 40,Sri Lanka,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 40,Sri Lanka,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 40,Sri Lanka,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2020,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-41,Mozambique,2021,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+41,Mozambique,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 42,Madagascar,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 42,Madagascar,2009,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 42,Madagascar,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -331,8 +317,8 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 43,Kenya,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 43,Kenya,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 43,Kenya,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-43,Kenya,2018,UNWTO - linear model,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-43,Kenya,2019,UNWTO - linear model,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+43,Kenya,2018,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+43,Kenya,2019,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 43,Kenya,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 43,Kenya,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 46,Djibouti,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -357,10 +343,10 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 47,Yemen,2013,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 47,Yemen,2014,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 47,Yemen,2015,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-47,Yemen,2016,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-47,Yemen,2017,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-47,Yemen,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-47,Yemen,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
+47,Yemen,2016,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+47,Yemen,2017,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+47,Yemen,2018,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+47,Yemen,2019,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 47,Yemen,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 47,Yemen,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 48,Oman,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -388,7 +374,7 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 49,Sudan,2016,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 49,Sudan,2017,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 49,Sudan,2018,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-49,Sudan,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
+49,Sudan,2019,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 49,Sudan,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 49,Sudan,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 50,Saudi Arabia,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -438,13 +424,13 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 53,Pakistan,2010,UNWTO,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 53,Pakistan,2011,UNWTO,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 53,Pakistan,2012,UNWTO,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-53,Pakistan,2013,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-53,Pakistan,2014,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-53,Pakistan,2015,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-53,Pakistan,2016,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-53,Pakistan,2017,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-53,Pakistan,2018,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-53,Pakistan,2019,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+53,Pakistan,2013,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+53,Pakistan,2014,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+53,Pakistan,2015,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+53,Pakistan,2016,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+53,Pakistan,2017,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+53,Pakistan,2018,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+53,Pakistan,2019,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 53,Pakistan,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 53,Pakistan,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 54,United Arab Emirates,2008,UNWTO - nearby year,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
@@ -453,28 +439,28 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 54,United Arab Emirates,2011,UNWTO - nearby year,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 54,United Arab Emirates,2012,UNWTO - nearby year,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 54,United Arab Emirates,2013,UNWTO - nearby year,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-54,United Arab Emirates,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-54,United Arab Emirates,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-54,United Arab Emirates,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-54,United Arab Emirates,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-54,United Arab Emirates,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-54,United Arab Emirates,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-54,United Arab Emirates,2020,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-54,United Arab Emirates,2021,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2020,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-56,Cape Verde,2021,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+54,United Arab Emirates,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+54,United Arab Emirates,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+54,United Arab Emirates,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+54,United Arab Emirates,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+54,United Arab Emirates,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+54,United Arab Emirates,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+54,United Arab Emirates,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+54,United Arab Emirates,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+56,Cape Verde,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 59,Belgium,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 59,Belgium,2009,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 59,Belgium,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -489,48 +475,34 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 59,Belgium,2019,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 59,Belgium,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 59,Belgium,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2020,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-61,Tunisia,2021,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+61,Tunisia,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+62,Morocco,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 62,Morocco,2009,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 62,Morocco,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+62,Morocco,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+62,Morocco,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+62,Morocco,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 62,Morocco,2014,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2020,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-62,Morocco,2021,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-64,Mauritania,2008,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2009,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2010,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2011,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2012,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2013,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2014,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2015,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2016,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2017,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-64,Mauritania,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
-64,Mauritania,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+62,Morocco,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+62,Morocco,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+62,Morocco,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+62,Morocco,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+62,Morocco,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+62,Morocco,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+62,Morocco,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 65,Gambia,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 65,Gambia,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 65,Gambia,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -551,40 +523,40 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 66,Senegal,2011,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 66,Senegal,2012,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 66,Senegal,2013,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-66,Senegal,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-66,Senegal,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-66,Senegal,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-66,Senegal,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-66,Senegal,2018,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-66,Senegal,2019,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+66,Senegal,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+66,Senegal,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+66,Senegal,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+66,Senegal,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+66,Senegal,2018,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+66,Senegal,2019,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 66,Senegal,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 66,Senegal,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 67,Libya,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2009,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2010,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2011,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2012,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2013,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2014,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2015,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2016,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2017,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-67,Libya,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
+67,Libya,2009,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+67,Libya,2010,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+67,Libya,2011,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+67,Libya,2012,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+67,Libya,2013,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+67,Libya,2014,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+67,Libya,2015,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+67,Libya,2016,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+67,Libya,2017,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+67,Libya,2018,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+67,Libya,2019,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 67,Libya,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 67,Libya,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
-68,Malta,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-68,Malta,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+68,Malta,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 68,Malta,2020,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 68,Malta,2021,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 69,Latvia,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -629,20 +601,6 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 71,Bulgaria,2019,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 71,Bulgaria,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 71,Bulgaria,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2008,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2009,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2010,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2011,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2012,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2013,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2014,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2015,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2016,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2017,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2018,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2019,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-72,Romania,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-72,Romania,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 73,Russia,2008,UNWTO - subtraction,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 73,Russia,2009,UNWTO - subtraction,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 73,Russia,2010,UNWTO - subtraction,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
@@ -651,10 +609,10 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 73,Russia,2013,UNWTO - subtraction,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 73,Russia,2014,UNWTO - nearby year,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 73,Russia,2015,UNWTO - subtraction,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-73,Russia,2016,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-73,Russia,2017,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-73,Russia,2018,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-73,Russia,2019,UNWTO - linear model,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+73,Russia,2016,UNWTO - linear model,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+73,Russia,2017,UNWTO - linear model,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+73,Russia,2018,UNWTO - linear model,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+73,Russia,2019,UNWTO - linear model,gapfilled,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 73,Russia,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 73,Russia,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 74,Georgia,2008,UNWTO - nearby year,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
@@ -665,12 +623,12 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 74,Georgia,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 74,Georgia,2014,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 74,Georgia,2015,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-74,Georgia,2016,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-74,Georgia,2017,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-74,Georgia,2018,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-74,Georgia,2019,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-74,Georgia,2020,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-74,Georgia,2021,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+74,Georgia,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+74,Georgia,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+74,Georgia,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+74,Georgia,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+74,Georgia,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+74,Georgia,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 75,Ukraine,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 75,Ukraine,2009,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 75,Ukraine,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -699,20 +657,20 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 76,Turkey,2019,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 76,Turkey,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 76,Turkey,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2012,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2013,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2014,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2015,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2016,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2017,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2018,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2019,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-77,Syria,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-77,Syria,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+77,Syria,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+77,Syria,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+77,Syria,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+77,Syria,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+77,Syria,2012,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+77,Syria,2013,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+77,Syria,2014,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+77,Syria,2015,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+77,Syria,2016,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+77,Syria,2017,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+77,Syria,2018,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+77,Syria,2019,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+77,Syria,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+77,Syria,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 78,Lebanon,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 78,Lebanon,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 78,Lebanon,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -727,8 +685,8 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 78,Lebanon,2019,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 78,Lebanon,2020,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 78,Lebanon,2021,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-79,Israel,2008,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-79,Israel,2009,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+79,Israel,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+79,Israel,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 79,Israel,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 79,Israel,2011,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 79,Israel,2012,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -769,14 +727,14 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 81,Cyprus,2019,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 81,Cyprus,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 81,Cyprus,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-82,Albania,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-82,Albania,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-82,Albania,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-82,Albania,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-82,Albania,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-82,Albania,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-82,Albania,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-82,Albania,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+82,Albania,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+82,Albania,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+82,Albania,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+82,Albania,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+82,Albania,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+82,Albania,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+82,Albania,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+82,Albania,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 82,Albania,2016,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 82,Albania,2017,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 82,Albania,2018,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -797,18 +755,18 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 96,Sierra Leone,2019,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 96,Sierra Leone,2020,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 96,Sierra Leone,2021,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-98,Togo,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-98,Togo,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+98,Togo,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 98,Togo,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 98,Togo,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 99,Benin,2008,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -825,18 +783,18 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 99,Benin,2019,UNWTO,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 99,Benin,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 99,Benin,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-100,Republique du Congo,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-100,Republique du Congo,2019,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+100,Republique du Congo,2019,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 100,Republique du Congo,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 100,Republique du Congo,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 101,Namibia,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -853,20 +811,20 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 101,Namibia,2019,UNWTO,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 101,Namibia,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 101,Namibia,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2008,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2009,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2010,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2011,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2012,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2013,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2014,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2015,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2016,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2017,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2018,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2019,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2020,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-102,South Africa,2021,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+102,South Africa,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 103,Sao Tome and Principe,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 103,Sao Tome and Principe,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 103,Sao Tome and Principe,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -937,20 +895,20 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 111,Turks and Caicos Islands,2019,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 111,Turks and Caicos Islands,2020,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 111,Turks and Caicos Islands,2021,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-112,Cuba,2008,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2009,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2010,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2011,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2012,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2013,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2014,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2015,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2016,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2017,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2018,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2019,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2020,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-112,Cuba,2021,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+112,Cuba,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 113,Cayman Islands,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 113,Cayman Islands,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 113,Cayman Islands,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -1245,20 +1203,20 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 134,El Salvador,2019,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 134,El Salvador,2020,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 134,El Salvador,2021,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-135,Mexico,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2020,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-135,Mexico,2021,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+135,Mexico,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 136,Guatemala,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 136,Guatemala,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 136,Guatemala,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -1273,20 +1231,20 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 136,Guatemala,2019,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 136,Guatemala,2020,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 136,Guatemala,2021,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-138,Peru,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2020,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-138,Peru,2021,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+138,Peru,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 139,Venezuela,2008,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 139,Venezuela,2009,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 139,Venezuela,2010,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -1297,8 +1255,8 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 139,Venezuela,2015,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 139,Venezuela,2016,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 139,Venezuela,2017,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-139,Venezuela,2018,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-139,Venezuela,2019,UNWTO - linear model,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+139,Venezuela,2018,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+139,Venezuela,2019,UNWTO - linear model,gapfilled,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 139,Venezuela,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 139,Venezuela,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 140,Guadeloupe and Martinique,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -1413,20 +1371,20 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 155,Tonga,2019,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 155,Tonga,2020,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 155,Tonga,2021,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-162,New Zealand,2008,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2009,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2010,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2011,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2012,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2013,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2014,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2015,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2016,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2017,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2018,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 162,New Zealand,2019,UNWTO,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 162,New Zealand,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-162,New Zealand,2021,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+162,New Zealand,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 163,United States,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 163,United States,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 163,United States,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -1493,8 +1451,8 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 168,Suriname,2015,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 168,Suriname,2016,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 168,Suriname,2017,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-168,Suriname,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-168,Suriname,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
+168,Suriname,2018,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+168,Suriname,2019,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 168,Suriname,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 168,Suriname,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 169,French Guiana,2008,UNWTO - nearby year,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
@@ -1507,8 +1465,8 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 169,French Guiana,2015,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 169,French Guiana,2016,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 169,French Guiana,2017,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-169,French Guiana,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-169,French Guiana,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
+169,French Guiana,2018,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+169,French Guiana,2019,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 169,French Guiana,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 169,French Guiana,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 171,Brazil,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -1525,20 +1483,20 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 171,Brazil,2019,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 171,Brazil,2020,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 171,Brazil,2021,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-172,Argentina,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2012,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2013,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2014,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2015,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2016,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2017,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2018,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2019,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2020,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-172,Argentina,2021,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+172,Argentina,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 173,Uruguay,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 173,Uruguay,2009,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 173,Uruguay,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -1637,7 +1595,7 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 179,France,2019,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 179,France,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 179,France,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-180,United Kingdom,2008,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+180,United Kingdom,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 180,United Kingdom,2009,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 180,United Kingdom,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 180,United Kingdom,2011,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -1651,7 +1609,7 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 180,United Kingdom,2019,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 180,United Kingdom,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 180,United Kingdom,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-181,Ireland,2008,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+181,Ireland,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 181,Ireland,2009,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 181,Ireland,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 181,Ireland,2011,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -1714,13 +1672,13 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 185,Monaco,2012,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 185,Monaco,2013,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 185,Monaco,2014,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-185,Monaco,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-185,Monaco,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-185,Monaco,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-185,Monaco,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-185,Monaco,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-185,Monaco,2020,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-185,Monaco,2021,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+185,Monaco,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+185,Monaco,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+185,Monaco,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+185,Monaco,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+185,Monaco,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+185,Monaco,2020,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+185,Monaco,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 186,Montenegro,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 186,Montenegro,2009,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 186,Montenegro,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -1778,33 +1736,19 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 189,Lithuania,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 189,Lithuania,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 190,Qatar,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2009,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2010,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2011,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2012,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2013,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2014,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2015,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2016,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2017,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-190,Qatar,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
+190,Qatar,2009,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+190,Qatar,2010,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+190,Qatar,2011,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+190,Qatar,2012,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+190,Qatar,2013,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+190,Qatar,2014,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+190,Qatar,2015,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+190,Qatar,2016,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+190,Qatar,2017,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+190,Qatar,2018,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+190,Qatar,2019,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 190,Qatar,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 190,Qatar,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
-191,NA,2008,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2009,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2010,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2011,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2012,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2013,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2014,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2015,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2016,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2017,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2018,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2019,NA,NA,NA,NA,UNWTO - international,NA
-191,NA,2020,NA,NA,NA,NA,UNWTO - international,NA
-191,Iran,2021,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 193,Guinea Bissau,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 193,Guinea Bissau,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 193,Guinea Bissau,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -1829,8 +1773,8 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 194,Guinea,2015,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 194,Guinea,2016,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 194,Guinea,2017,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-194,Guinea,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-194,Guinea,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
+194,Guinea,2018,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+194,Guinea,2019,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 194,Guinea,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 194,Guinea,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 196,Nigeria,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -1847,34 +1791,20 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 196,Nigeria,2019,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 196,Nigeria,2020,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 196,Nigeria,2021,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2013,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2014,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2015,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2016,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2017,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2018,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2019,UNWTO - linear model,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-197,Cameroon,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+197,Cameroon,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+197,Cameroon,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+197,Cameroon,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+197,Cameroon,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+197,Cameroon,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+197,Cameroon,2013,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+197,Cameroon,2014,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+197,Cameroon,2015,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+197,Cameroon,2016,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+197,Cameroon,2017,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+197,Cameroon,2018,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+197,Cameroon,2019,UNWTO - linear model,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+197,Cameroon,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 197,Cameroon,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
-198,Gabon,2008,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2009,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2010,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2011,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2012,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2013,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2014,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2015,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2016,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2017,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-198,Gabon,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
-198,Gabon,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 199,Democratic Republic of the Congo,2008,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 199,Democratic Republic of the Congo,2009,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 199,Democratic Republic of the Congo,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -1981,10 +1911,10 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 207,Vietnam,2013,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 207,Vietnam,2014,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 207,Vietnam,2015,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-207,Vietnam,2016,UNWTO - linear model,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-207,Vietnam,2017,UNWTO - linear model,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-207,Vietnam,2018,UNWTO - linear model,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-207,Vietnam,2019,UNWTO - linear model,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+207,Vietnam,2016,UNWTO - linear model,gapfilled,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+207,Vietnam,2017,UNWTO - linear model,gapfilled,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+207,Vietnam,2018,UNWTO - linear model,gapfilled,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
+207,Vietnam,2019,UNWTO - linear model,gapfilled,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 207,Vietnam,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 207,Vietnam,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - both
 208,Singapore,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -2071,16 +2001,16 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 216,Indonesia,2019,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 216,Indonesia,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 216,Indonesia,2021,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-218,Canada,2008,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-218,Canada,2009,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-218,Canada,2010,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-218,Canada,2011,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-218,Canada,2012,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-218,Canada,2013,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-218,Canada,2014,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-218,Canada,2015,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-218,Canada,2016,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-218,Canada,2017,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+218,Canada,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+218,Canada,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+218,Canada,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+218,Canada,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+218,Canada,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+218,Canada,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+218,Canada,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+218,Canada,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+218,Canada,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+218,Canada,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 218,Canada,2018,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 218,Canada,2019,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 218,Canada,2020,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -2113,10 +2043,10 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 222,Sweden,2019,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 222,Sweden,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 222,Sweden,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-223,Norway,2008,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-223,Norway,2009,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-223,Norway,2010,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-223,Norway,2011,UNWTO,NA,UNWTO - Total:Overnights / Mean Stay,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+223,Norway,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+223,Norway,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+223,Norway,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+223,Norway,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 223,Norway,2012,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 223,Norway,2013,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 223,Norway,2014,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -2127,34 +2057,34 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 223,Norway,2019,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 223,Norway,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 223,Norway,2021,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2008,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2012,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-224,Chile,2019,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2008,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2012,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+224,Chile,2019,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 224,Chile,2020,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 224,Chile,2021,UNWTO,NA,UNWTO - Trips:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 231,East Timor,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-231,East Timor,2009,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-231,East Timor,2010,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-231,East Timor,2011,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+231,East Timor,2009,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+231,East Timor,2010,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+231,East Timor,2011,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 231,East Timor,2012,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-231,East Timor,2013,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-231,East Timor,2014,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-231,East Timor,2015,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-231,East Timor,2016,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-231,East Timor,2017,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-231,East Timor,2018,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+231,East Timor,2013,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+231,East Timor,2014,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+231,East Timor,2015,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+231,East Timor,2016,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+231,East Timor,2017,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+231,East Timor,2018,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 231,East Timor,2019,UNWTO,NA,UNWTO - linear model,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 231,East Timor,2020,UNWTO,NA,UNWTO - 2020 and 2021 gapfill method,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
-231,East Timor,2021,UNWTO,NA,UNWTO - Hotel:Guests,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
+231,East Timor,2021,UNWTO,NA,UNWTO - Hotel:Overnights,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 232,Bosnia and Herzegovina,2008,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 232,Bosnia and Herzegovina,2009,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
 232,Bosnia and Herzegovina,2010,UNWTO,NA,UNWTO - nearby year,gapfilled,UNWTO - aggregated international and domestic,gapfilled - domestic
@@ -2186,15 +2116,15 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 245,Bonaire,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 245,Bonaire,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 245,Bonaire,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-245,Bonaire,2011,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-245,Bonaire,2012,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-245,Bonaire,2013,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-245,Bonaire,2014,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-245,Bonaire,2015,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-245,Bonaire,2016,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-245,Bonaire,2017,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-245,Bonaire,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-245,Bonaire,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
+245,Bonaire,2011,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+245,Bonaire,2012,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+245,Bonaire,2013,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+245,Bonaire,2014,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+245,Bonaire,2015,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+245,Bonaire,2016,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+245,Bonaire,2017,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+245,Bonaire,2018,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+245,Bonaire,2019,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 245,Bonaire,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 245,Bonaire,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 247,Brunei,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
@@ -2214,29 +2144,29 @@ rgn_id,rgn_name,year,int_method,int_gapfilled,dom_method,dom_gapfilled,ag_method
 248,Saba,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 248,Saba,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 248,Saba,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-248,Saba,2011,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-248,Saba,2012,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-248,Saba,2013,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-248,Saba,2014,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-248,Saba,2015,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-248,Saba,2016,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-248,Saba,2017,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-248,Saba,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-248,Saba,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
+248,Saba,2011,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+248,Saba,2012,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+248,Saba,2013,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+248,Saba,2014,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+248,Saba,2015,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+248,Saba,2016,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+248,Saba,2017,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+248,Saba,2018,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+248,Saba,2019,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 248,Saba,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 248,Saba,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 249,Sint Eustatius,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 249,Sint Eustatius,2009,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
 249,Sint Eustatius,2010,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-249,Sint Eustatius,2011,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-249,Sint Eustatius,2012,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-249,Sint Eustatius,2013,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-249,Sint Eustatius,2014,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-249,Sint Eustatius,2015,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-249,Sint Eustatius,2016,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-249,Sint Eustatius,2017,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-249,Sint Eustatius,2018,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
-249,Sint Eustatius,2019,UNWTO - linear model,NA,NA,NA,UNWTO - aggregated international and domestic,NA
+249,Sint Eustatius,2011,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+249,Sint Eustatius,2012,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+249,Sint Eustatius,2013,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+249,Sint Eustatius,2014,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+249,Sint Eustatius,2015,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+249,Sint Eustatius,2016,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+249,Sint Eustatius,2017,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+249,Sint Eustatius,2018,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
+249,Sint Eustatius,2019,UNWTO - linear model,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 249,Sint Eustatius,2020,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 249,Sint Eustatius,2021,UNWTO - 2020 and 2021 gapfill method,gapfilled,NA,NA,UNWTO - aggregated international and domestic,gapfilled - international
 250,Aruba,2008,UNWTO,NA,NA,NA,UNWTO - aggregated international and domestic,NA
