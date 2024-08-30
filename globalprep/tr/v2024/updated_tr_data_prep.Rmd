@@ -96,8 +96,6 @@ output_dir <- here("globalprep","tr", version_year, "output")
 figs_dir <- here("globalprep","tr", version_year, "figs")
 ```
 
-# Calculate Ap
-
 *International data:* Click Inbound Arrivals, scroll down to "Total arrivals", click download data.
 
 *Domestic data:* Click Domestic Tourism, scroll down to "Total trips", click download. Then download from "Accommodations".
@@ -1240,12 +1238,60 @@ We decided that there would be less error after aggregating if we at least put a
 ```{r}
 # first, let's join international and domestic data to see where the gaps are!
 ## aggregating international and domestic data by region and year
-arrivals_aggregated <- left_join(unwto_all_gf_int, unwto_all_gf_dom, by = c("rgn_id","rgn_name","year")) %>% 
+arrivals_join <- left_join(unwto_all_gf_int, unwto_all_gf_dom, by = c("rgn_id","rgn_name","year")) %>% 
   rename(
     tourism_arrivals_ct_int = tourism_arrivals_ct.x,
     tourism_arrivals_ct_dom = tourism_arrivals_ct.y
-  ) %>% 
+  )
+
+length(unique(arrivals_join$rgn_name)) # v2024: 161 regions that have data! This checks out!
+```
+
+Now that we have a joined dataframe, let's adjust it to gapfill by years.
+
+```{r}
+# join with georegions again, and take the mean of the domestic guests data for r2 and r1 groups
+mean_domestic_guests <- arrivals_join %>% 
+  group_by(rgn_id) %>% 
+  complete(year = 2008:2021) %>% # ensures that there is a row for every year for each region, to ensure there are no gaps
+  left_join(georegions, by = c("rgn_id","rgn_name")) %>% 
+  ungroup() %>% 
+  group_by(r2) %>% 
   mutate(
+    tourism_arrivals_ct_dom_r2 = mean(tourism_arrivals_ct_dom, na.rm = TRUE), # take the mean of arrivals by georegion
+    tourism_arrivals_ct_dom_r2 = ifelse(is.nan(tourism_arrivals_ct_dom_r2), NA, tourism_arrivals_ct_dom_r2) # to make NaN = NAs
+  ) %>% 
+  ungroup() %>% 
+  group_by(r1) %>% 
+  mutate(
+    tourism_arrivals_ct_dom_r1 = mean(tourism_arrivals_ct_dom, na.rm = TRUE),
+    tourism_arrivals_ct_dom_r1 = ifelse(is.nan(tourism_arrivals_ct_dom_r1), NA, tourism_arrivals_ct_dom_r1)
+  ) %>% 
+  ungroup()
+
+length(unique(mean_domestic_guests$rgn_name)) # 162 regions??
+setdiff(mean_domestic_guests$rgn_name, arrivals_aggregated$rgn_name) # there is one region that is named "NA"...Iran 191. go back and check on that
+
+length(unique(georegions$r2)) # 22 r2 regions
+length(unique(mean_domestic_guests$tourism_arrivals_ct_dom_r2)) # 20, so it missed only two r2 regions!
+
+length(unique(georegions$r1)) # 7 regions
+length(unique(mean_domestic_guests$tourism_arrivals_ct_dom_r1)) # 7, that means it got all the r1 regions
+```
+
+## Calculating Ap
+
+### Aggregating International and Domestic
+
+```{r}
+# ----- use the mean domestic data to fill for any domestic rows that need guest values, then aggregate! -----
+arrivals_aggregated <- mean_domestic_guests %>% 
+  mutate(
+    tourism_arrivals_ct_dom = case_when(
+      is.na(tourism_arrivals_ct_dom) & !is.na(tourism_arrivals_ct_dom_r2) ~ tourism_arrivals_ct_dom_r2,
+      is.na(tourism_arrivals_ct_dom) & is.na(tourism_arrivals_ct_dom_r2) & !is.na(tourism_arrivals_ct_dom_r1) ~ tourism_arrivals_ct_dom_r1,
+      TRUE ~ tourism_arrivals_ct_dom
+    ),
     tourism_arrivals_ag = case_when(
       !is.na(tourism_arrivals_ct_int) & !is.na(tourism_arrivals_ct_dom) ~ tourism_arrivals_ct_int + tourism_arrivals_ct_dom,
       is.na(tourism_arrivals_ct_int) ~ tourism_arrivals_ct_dom,
@@ -1265,28 +1311,166 @@ arrivals_aggregated <- left_join(unwto_all_gf_int, unwto_all_gf_dom, by = c("rgn
       TRUE ~ arrivals_gf
     )
   )
-  # select(rgn_id, rgn_name, year, tourism_arrivals_ag, data_source, arrivals_gf)
 
-unique(is.na(arrivals_aggregated$tourism_arrivals_ag)) #v2024: FALSE! this means all regions have been gapfilled or dropped for not having any values.
+length(!is.na(arrivals_aggregated$tourism_arrivals_ct_int)) # 2254
+length(!is.na(arrivals_aggregated$tourism_arrivals_ct_dom)) # 2254, yay! now we can aggregate international and domestic with the least amount of error with the data we have
 
-length(unique(arrivals_aggregated$rgn_name)) # v2024: 161 regions that have data! This checks out!
+# save gf information
+tourism_aggregated_gf <- arrivals_aggregated %>% 
+  rename(
+    int_method = data_source,
+    int_gapfilled = arrivals_gf,
+    dom_method = arrivals_method,
+    dom_gapfilled = arrivals_gapfilled
+  ) %>% 
+  select(rgn_id, rgn_name, year, int_method, int_gapfilled, dom_method, dom_gapfilled, ag_method, ag_gapfilled)
+
+write_csv(tourism_aggregated_gf, here::here(int_dir, "tourism_aggregated_gf.csv"))
 ```
 
-Now that we have a joined dataframe, let's adjust it to gapfill by years.
+### Coastal Proportion
+
+Now, lets bring in our tourism data and calculate the coastal proportion! The coastal proportion will then be multiplied by the arrivals value per region and year. Finally, the coastal area will be divided, giving us a density of tourism per region (individuals/km^2).
+
+```{r, eval=FALSE}
+# ------- coastal population data -----------
+# In 2024, the coastal population data was fixed! This is great.  We will now use `globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv`.
+coastal_pop_data <- read_csv(here("globalprep","mar_prs_population","v2024","output","mar_pop_25mi.csv")) ## read in coastal population data from other data layer
+
+coastal_pop_data_fill <- coastal_pop_data %>%
+  filter(year == 2020) %>%
+  mutate(year = 2021) %>%
+  rbind(coastal_pop_data) # add 2021 data year, just using year 2020
+
+length(unique(coastal_pop_data_fill$rgn_id)) # v2024: 220 regions available! Any region without data is uninhabited.
+```
+
+```{r, eval=FALSE}
+# ------- total global population data -----------
+# bring in World Bank Global population data from `/home/shares/ohi/git-annex/globalprep/_raw_data/WorldBank/d2024/WorldBank_global_country_population_1960-2023`
+total_population_wb <- read_csv(here(raw_data_dir, "WorldBank", data_dir_version_year, "WorldBank_global_country_population_1960-2023","API_SP.POP.TOTL_DS2_en_csv_v2_1584446.csv"), skip = 3) %>% 
+  pivot_longer(cols = 5:ncol(.), names_to = "year",
+               values_to = "total_pop") %>% 
+  janitor::clean_names()
+
+# give ohi rgns to world bank data
+total_population_rgns <- name_2_rgn(df_in = total_population_wb, 
+                                        fld_name = 'country_name',
+                                        keep_fld_name = TRUE)
+
+# drop Macao and Hong Kong, since we only need mainland China
+# Northern Mariana Islands and Guam, Puerto Rico and Virgin Islands of the United States: aggregate!
+total_population_final <- total_population_rgns %>%
+  filter(country_name != "Hong Kong SAR, China" & country_name != "Macao SAR, China") %>% # only keep mainland, not city specific data
+  group_by(rgn_id, rgn_name, year) %>% 
+  summarise(
+    total_pop = sum(total_pop, na.rm = TRUE), # aggregate by rgn and year
+    .groups = "drop" # ungroup
+  ) %>% 
+  mutate(year = as.numeric(year))
+
+length(unique(total_population_final$rgn_name)) # v2024: 166 regions available of total population data!
+length(union(arrivals_aggregated$rgn_name, total_population_final$rgn_name)) # v2024: 176, meaning that there are 10 regions that don't have total population data
+length(intersect(arrivals_aggregated$rgn_name, total_population_final$rgn_name)) # v2024: 151, which makes sense (161 - 10)
+```
+
+### Coastal Area
+
+Now, lets bring in the $$km^2$$ of coastal area for all OHI regions by aggregating the area protected 1 kilometer inland, and 3 nautical miles out into the eez.
+
+```{r, eval=FALSE}
+# ------- coastal area data -----------
+# read in area of coastline data
+inland_filepath <- here::here("globalprep", "lsp", version_year, "int", "area_protected_1km.csv")
+inland_data <- read_csv(inland_filepath)
+offshore_filepath <- here::here("globalprep", "lsp", version_year, "int", "area_protected_3nm.csv")
+offshore_data <- read_csv(offshore_filepath)
+
+# get combined value of inland and offshore for each ohi region
+inland_offshore <- inland_data %>%
+  left_join(offshore_data, by = join_by(rgn_id, year, rgn_name)) %>%
+  select(rgn_id, year, a_tot_km2.x, a_tot_km2.y) %>%
+  group_by(rgn_id, year) %>%
+  mutate(total_inland_offshore_area = a_tot_km2.x + a_tot_km2.y,
+         year = as.numeric(year)) %>% # add the areas together, as numeric
+  select(rgn_id, year, total_inland_offshore_area)
+```
+
+### Ap
+
+Now we can join all of these data sources and conduct $$\frac{TourismArrivals * (CoastalPop/TotalPop)}{CoastalArea}$$.
+
+```{r, eval=FALSE}
+# ============= join the tourism arrival, coastal population, and total population data =================== #
+
+arrivals_prop_df <- left_join(arrivals_aggregated, total_population_final, by = c("rgn_id","rgn_name","year")) %>% 
+  mutate(year = as.numeric(year)) %>% 
+  left_join(., coastal_pop_data_fill, by = c("rgn_id","year")) %>% 
+  left_join(., inland_offshore, by = c("rgn_id","year")) %>% 
+  filter(year %in% 2000:2021) %>% # to keep consistent with the coastal pop data
+  mutate(coastal_prop = (popsum/total_pop)) %>% # values that are greater than 1 are because of inconsistencies between World Bank and the coastal population data.  However, those with a value greater than 1 are mostly islands or small regions with a large coastal area.  In that case, we could say 100% of the tourism could be coastally related.
+  mutate(coastal_prop = ifelse(coastal_prop > 1, 1, coastal_prop)) # for rgns and years in which the total_population is greater than 1, we cap it at 1 
+
+ap_final <- arrivals_prop_df %>% 
+  mutate(Ap = (tourism_arrivals_ag * coastal_prop)/(total_inland_offshore_area))  %>% 
+  drop_na(Ap) %>% # regions that did not have tourism arrival values but were present in the coastal population data
+  select(rgn_id, rgn_name, year, Ap) # this final `Ap` (arrivals proportion) is in the units of (tourists/km2).  Aka, a higher proportion indicates that there is a larger number of tourists per km2 of coastal area, and there is therefore a higher tourism density.  This number is now ready to be divided by `Sr`, or the sustainability of tourism.
+
+# save the Ap proportions dataframe
+# write_csv(ap_final, here::here(int_dir, "ap.csv"))
+
+# # save which observations were gapfilled and how into output -- from v2023 version
+# tr_arrivals_props_tourism_gf <- arrivals_prop_df %>% 
+#   select(rgn_id, rgn_name, year, data_source, arrivals_gf)
+# 
+# write_csv(tr_arrivals_props_tourism_gf, here::here(output_dir, "tr_arrivals_props_tourism_gf.csv"))
+```
 
 ```{r}
+# interactive plot of the arrival proportions before rescaling
+ap_plot <- ap_final %>%
+  plot_ly(x = ~year, y = ~Ap, color = ~rgn_name, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "Global Arrival proportions (Ap) by Region",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Arrival proportion (Ap)"))
+ap_plot
 
+# htmlwidgets::saveWidget(ap_plot, here::here(figs_dir, "ap_interactive_plot.html")) # save plot
 ```
-
-
-
-## Aggregating International and Domestic
 
 ## Rescale Ap proportion using the 90th quantile
 
 As according to the [OHI methods](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#tourism-and-recreation), the Ap values for each year and region is rescaled using the 90th quartile for each region.
 
 $$\frac{T_r}{T_{90th}}$$
+```{r}
+# to make the Ap scaled between 0 and 1, we can divide the current Ap by the 90th quartile values by region.
+ap_rescaled <- ap_final %>% 
+  group_by(rgn_id, rgn_name) %>% 
+  summarize(value_90th_percentile = quantile(Ap, 0.9, na.rm = TRUE))
+
+tr_arrivals_props_tourism <- left_join(ap_final, ap_rescaled, by = c("rgn_id", "rgn_name")) %>% 
+  mutate(
+    Ap = Ap/value_90th_percentile,
+    Ap = if_else(Ap < 0, 0, Ap), # if less than 1, that is due to gapfilling where linear models drew the tourism arrival values less than 0.  
+    Ap = if_else(Ap > 1, 1, Ap) # if more than 1, then the Ap value for that year was above the 90th percentile.  So the value is adjusted to 1
+         ) %>% 
+  select(rgn_id, rgn_name, year, Ap) # keep in rgn_name when you want to plot!!!
+
+# interactive plot of the arrival proportions
+ap_final_plot <- tr_arrivals_props_tourism %>%
+  plot_ly(x = ~year, y = ~Ap, color = ~rgn_name, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "Global Arrival proportions (Ap) by Region, Rescaled",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Arrival proportion (Ap)"))
+ap_final_plot
+
+# save the final tourism arrivals csv
+write_csv(tr_arrivals_props_tourism, here::here(output_dir, "tr_arrivals_props_tourism.csv"))
+```
+
 ## Ts: Sustainability Index -- TTDI
 
 
