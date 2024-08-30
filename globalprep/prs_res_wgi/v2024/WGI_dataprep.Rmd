@@ -67,7 +67,7 @@ library(strex)
 
 # check website to see what years are available: http://info.worldbank.org/governance/wgi/index.aspx#home
 yr_start = 1996
-yr_end   = 2023
+yr_end   = 2022
 
 scen_year <- "2024"
 
@@ -82,12 +82,18 @@ Download each of the 6 WGI indicators. Note: This didn't work in 2023 for some r
 
 ## get description of variables:
 indicators <-  data.frame(WDI_data[[1]])
-indicators[grep("VA.EST", indicators$indicator), ]
-indicators[grep("PV.EST", indicators$indicator), ]
-indicators[grep("GE.EST", indicators$indicator), ]
-indicators[grep("RQ.EST", indicators$indicator), ]
-indicators[grep("RL.EST", indicators$indicator), ]
-indicators[grep("CC.EST", indicators$indicator), ]
+indicators[grep("VA.EST", indicators$indicator), ] 
+# Voice and Accountability: Estimate
+indicators[grep("PV.EST", indicators$indicator), ] 
+# Political Stability and Absence of Violence/Terrorism: Estimate
+indicators[grep("GE.EST", indicators$indicator), ] 
+# Government Effectiveness: Estimate
+indicators[grep("RQ.EST", indicators$indicator), ] 
+# Regulatory Quality: Estimate
+indicators[grep("RL.EST", indicators$indicator), ] 
+# Rule of Law: Estimate
+indicators[grep("CC.EST", indicators$indicator), ] 
+# Control of Corruption: Estimate
 
 # identify the six indicators
 # WDIsearch('violence')# general search
@@ -138,15 +144,15 @@ d <- wgi_raw %>%
 Combine the indicators into a single table, with a column for each indicator, and rows for each country-year pair.
 
 ```{r, eval=FALSE}
-# d = key_voice %>% 
-#   select(country, year, iso3c, indicator) %>%
-#   left_join(key_polst %>% select(-iso2c), by=(c('country', 'iso3c', 'year'))) %>%
-#   left_join(key_gvtef %>% select(-iso2c), by=(c('country', 'iso3c', 'year'))) %>%
-#   left_join(key_regqt %>% select(-iso2c), by=(c('country', 'iso3c', 'year'))) %>%
-#   left_join(key_rolaw %>% select(-iso2c), by=(c('country', 'iso3c', 'year'))) %>%
-#   left_join(key_corrp %>% select(-iso2c), by=(c('country', 'iso3c', 'year'))); head(d); summary(d); sapply(d, class)
-# 
-# colnames(d) <- c("country", "year", "iso3c", "VA.EST", "PV.EST", "GE.EST",	"RQ.EST",	"RL.EST", "CC.EST")
+d = key_voice %>%
+  select(country, year, iso3c, indicator) %>%
+  left_join(key_polst %>% select(-iso2c), by=(c('country', 'iso3c', 'year'))) %>%
+  left_join(key_gvtef %>% select(-iso2c), by=(c('country', 'iso3c', 'year'))) %>%
+  left_join(key_regqt %>% select(-iso2c), by=(c('country', 'iso3c', 'year'))) %>%
+  left_join(key_rolaw %>% select(-iso2c), by=(c('country', 'iso3c', 'year'))) %>%
+  left_join(key_corrp %>% select(-iso2c), by=(c('country', 'iso3c', 'year'))); head(d); summary(d); sapply(d, class)
+
+colnames(d) <- c("country", "year", "iso3c", "VA.EST", "PV.EST", "GE.EST",	"RQ.EST",	"RL.EST", "CC.EST")
 ```
 
 ## Save a record of any new raw data for archival purposes
@@ -170,7 +176,7 @@ The first gapfilling occurs when we use the average of previous years data withi
 **Read in WGI data - change appended date in file name to reflect the most recent version of the saved WGI data:**
 ```{r, eval=FALSE}
 
-d <- read.csv(here(paste0('globalprep/prs_res_wgi/v', scen_year, '/raw/worldbank_wgi_from_wdi_api_2023-10-02.csv'))) # change appended date to most recent version
+d <- read.csv(here(paste0('globalprep/prs_res_wgi/v', scen_year, '/raw/worldbank_wgi_from_wdi_api_2024-05-24.csv'))) # change appended date to most recent version
 
 ```
 
@@ -198,7 +204,7 @@ d_gap_fill  <- d %>%
 ## Safeguard: cut regions with < 4 indicators (if any) to calculate score.
 Once gapfilling is complete, the WGI scores are calculated as an average of the 6 indicators.  However, if a country is missing 4 or more of the indicators within a year the average would be very biased.  In these cases, a different method should be used to gapfill these data 
 
-(NOTE: for the 2022 assessment all regions had at least 4 of the 6 indicators).
+(NOTE: for the 2024 assessment all regions had at least 4 of the 6 indicators).
 
 ```{r purge data poor region, eval=FALSE}
 
@@ -237,9 +243,9 @@ d_calcs <- d_gap_fill %>%
 ```{r, eval=FALSE}
 
 summary(d_calcs) # checking to make sure NA values make sense
-  ## v2022: NA_start max = 6, NA_post_gf_1 = 3
+  ## v2024: NA_start max = 6, NA_post_gf_1 max = 0
 
-## v2022: score_wgi_sclae min = -2.45, ma = 1.97... perfect
+## v2024: score_wgi_scale min = -2.409, max = 1.947... perfect
 wgi_range = c(-2.5, 2.5) # historic values have been between -2.5 and 2.5
 
 ```
@@ -320,9 +326,9 @@ d_calcs_rgn <- name_2_rgn(df_in = d_calcs,
 ## In this case, we take the weighted average
 population_weights <- data.frame(country = c("Virgin Islands (U.S.)", "Puerto Rico",
                                              "China", "Hong Kong SAR, China", "Macao SAR, China"),
-                                 population = c(104711, 3229412,
-                                         1411878144, 7350409, 704149))
-# updated population values on 02 October 2023 (source: World Bank website, 2023 values); https://databank.worldbank.org/source/population-estimates-and-projections
+                                 population = c(104917, 3205691,
+                                         1410710000, 7356100, 704149))
+# updated population values on 30 August 2024 (source: World Bank website, 2023 values); https://databank.worldbank.org/source/population-estimates-and-projections
 
 
 d_calcs_rgn <- d_calcs_rgn %>%
@@ -411,6 +417,7 @@ head(d_sovs)
 summary(d_sovs) 
   ## v2021: score has 1029 NAs
   ## v2022: 1127 NAs
+  ## v2024: 1176 NAs
 
 ```
 
@@ -425,6 +432,7 @@ d_gf2[is.na(d_gf2$score), ]
   ## v2021: score has 0 NAs
   ## v2022: 0 NAs
   ## v2023: 0 NAs
+  ## v2024: 0 NAs! 
 
 ```
 
@@ -440,24 +448,24 @@ Plot most recent shared year between last year and this year's data, and look fo
 recent_shared_year <- as.numeric(scen_year) - 2 
 prev_assessment_year <- as.numeric(scen_year) - 1
 
-new_2021_scores <- d_gf2 %>% # rename variable with respective year for clarity
+new_2022_scores <- d_gf2 %>% # rename variable with respective year for clarity
   filter(year == recent_shared_year) %>% 
   select(rgn_id, score)
 
-old_2021_scores <- read.csv(here(paste0('globalprep/prs_res_wgi/v', prev_assessment_year, '/output/wgi_res.csv'))) %>% # rename variable
+old_2022_scores <- read.csv(here(paste0('globalprep/prs_res_wgi/v', prev_assessment_year, '/output/wgi_res.csv'))) %>% # rename variable
   filter(year == recent_shared_year) %>%
   select(rgn_id, old_score=resilience_score)
 
-score_compare_2021 <- old_2021_scores %>% 
-  full_join(new_2021_scores)
+score_compare_2022 <- old_2022_scores %>% 
+  full_join(new_2022_scores)
 
 
-score_compare_plot <- ggplot(score_compare_2021, aes(x = old_score, y = score, text = rgn_id)) +
+score_compare_plot <- ggplot(score_compare_2022, aes(x = old_score, y = score, text = rgn_id)) +
   geom_point() +
   geom_abline(slope=1, intercept = 0, col = "red")
    
 score_compare_plot
-# looks good
+# v2024: looks good
 
 ```
 
