@@ -1,0 +1,405 @@
+---
+title: 'OHI `r format(Sys.time(), "%Y")`: Natural Products: Ornamentals Data Prep'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    toc: true
+    number_sections: false
+    toc_float: yes
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+---
+
+[REFERENCE RMD FILE: <http://ohi-science.org/ohiprep_v2024/globalprep/np/v2024/STEP1a_np_ornamentals_prep.html>]
+
+# Summary
+
+This analysis calculates the score for ornamentals per region based on FAO commodities data. This calculation process includes creating a sustainability layer based off of risk and exposure for ornamental fishing.
+
+# Updates from previous assessment
+
+### v2024
+*   Complete overhaul of methodology from previous years. Original data prep file: `STEP1a_np_ornamental_prep.Rmd`
+*   New year of FAO data (2022)
+
+------------------------------------------------------------------------
+
+# Data Source
+
+**Reference**:\
+<https://www.fao.org/fishery/en/statistics/software/fishstatj> App release date: March 2024 FAO raw commodities quantity 1976_2021 FAO raw commodities value 1976_2022 [FAO metadata](http://www.fao.org/fishery/statistics/global-commodities-production/en)
+
+- Global aquatic trade - All partners aggregated - Quantities and Values - 1976-2022 (Release date: July 2024)
+
+
+**Downloaded**: 2024-08-07
+
+**Description**: Quantity (tonnes) and value (USD) of raw commodities (Exports only) for each country, taxa, year. The FAO data is subset to include commodities in these categories: ornamental fish, fish oil, seaweed and plants (see: raw/commodities2products_weighting.csv for details).
+
+**Time range**: 1976-2022
+
+Files can be found on Mazu: `home/shares/ohi/git-annex/globalprep/_raw_data/FAO_commodities/d2024` accompanied by README.md with detailed download instructions. 
+
+------------------------------------------------------------------------
+
+# Methods
+
+
+
+Although we do not know actual sustainable levels of harvest for ornamentals, $S_p$, in each region, we estimated it based on exposure and risk components:
+
+$$S_c = 1 - average(E_c + R_c)$$
+
+where $E_c$ is the exposure term and $R_c$ is the risk term for ornamentals.
+
+The exposure term, $E_c$, is the ln-transformed intensity of harvest for ornamental fish calculated as tonnes of harvest per km2 of coral and rocky reef, relative to the global maximum. We ln transformed the harvest intensity scores because the distribution of values was highly skewed; because we do not know the true threshold of sustainable harvest, nearly all values would be considered highly sustainable without the log transformation. To estimate rocky reef extent area (km2) we used data from Halpern et al. (2008) ([Halpern et al. 2008](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#ref-halpern2008global)), which assumes rocky reef habitat exists in all cells within 1 km of shore. Coral extent area (km2) are from UNEP-WCMC et al. (2018) ([UNEP-WCMC et al. 2018](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#ref-unep-wcmc2018global)).
+
+
+
+The risk term, $R_c$, is based on whether ornamental fishing has unsustainable harvest practices. In specific, we used the intensity of cyanide and dynamite fishing as a proxy. Risk for ornamental fish was set based on assessments of cyanide or dynamite fishing by [Reefs at Risk Revisited](www.wri.org/publication/reefs-at-risk-revisited) under the assumption that most ornamental fishes are harvested from coral reefs.
+
+## Setup
+
+```{r}
+
+knitr::opts_chunk$set(eval = FALSE)
+
+# ======= Load packages ============
+if (!require(librarian)) {
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  ohicore, #devtools::install_github('ohi-science/ohicore@dev') #if relevant: restart session after reinstalling
+  dplyr,
+  stringr,
+  tidyr,
+  here,
+  tidyverse,
+  zoo,
+  ggplot2,
+  plotly,
+  tictoc,
+  RColorBrewer
+)
+
+# ======= Set directories ===========
+# Update scenario year, set up programmatic scenario year updates
+scen_year_number <- 2024
+scen_year <- as.character(scen_year_number)
+prev_scen_year <- as.character(scen_year_number - 1)
+data_dir_year <- paste0("d", scen_year)
+prev_data_dir_year <- paste0("d", prev_scen_year)
+v_scen_year <- paste0("v", scen_year)
+
+current_np_dir <- here::here("globalprep", "np", paste0(v_scen_year, "_new"))
+
+# ======== Source functions ===========
+source(here::here("workflow", "R", "common.R")) # directory locations
+# Load FAO-specific user-defined functions
+source(here::here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
+# function for handling FAO commodity data specific to NP
+source(here::here(current_np_dir, "R", "np_fxn.R")) 
+```
+
+
+
+STEP 2: Ornamentals
+1.    Using data A, filter the tonnes and USD for ornamentals.  
+2.    Calculate exposure and risk
+3.    then use these to estimate sustainability: mutate(sustainability = 1 - mean(c(exposure, risk), na.rm = TRUE))
+4.    Calculate sustainable tonnes: tonnes * sustainability
+5.    Rolling average of sustainable tonnes
+6.    Identify max value from rolling average of sustainable tonnes (maybe limit to most recent 10 years of data to ID max). 
+7.    get relative tonnes by dividing the rolling average of sustainable tonnes by max(rolling average of sustainable tonnes)
+
+
+So you can then save an intermediate dataset that looks like this:
+
+`rgn_id`\
+`year`,\
+`product`, (ornamentals, in this case)\
+`tonnes`: from gapfilled FAO commodity data\
+`usd`: from gapfilled FAO commodity data\
+`sustainability`: `1 - mean(c(exposure, risk), na.rm = TRUE)`\
+`sustainable_tonnes`: `tonnes` $*$ `sustainability`\
+`max_sustainable_tonnes`: `max(sustainable_tonnes)`\
+`rel_sust_tonnes`: `tonnes_rollmean` / `peak_sust_tonnes`
+
+Then, in final data, save `rgn_id`, `product`, `year`, `rel_sust_tonnes` 
+
+
+```{r}
+# read in FAO commodities usd tonnes int data
+np_harvest_usd_tonnes <- read_csv(here(current_np_dir, "int", "np_harvest_usd_tonnes_gf.csv"))
+
+# filter FAO commodities int data to ornamentals
+np_ornamentals_base <- np_harvest_usd_tonnes %>% 
+  dplyr::filter(product %in% c("ornamentals"))
+
+# check
+table(np_ornamentals_base$product)
+# 3938 -- v2024
+
+```
+
+
+
+## Calculate Exposure
+
+Calculate ornamentals exposure based on habitats
+
+
+Returns the first input data frame with a new column for exposure:
+[`rgn_id` `year` `product` `exposure`]
+
+```{r}
+    
+# ---- Subset np harvest ornamentals ----
+np_harvest_orn <- np_ornamentals_base %>%
+  dplyr::select(rgn_id, year, product, tonnes) %>% 
+  arrange(rgn_id)
+
+# ====== Determine Habitat Areas for Exposure ========
+# rocky reef habitat area
+hab_rocky <- readr::read_csv(here::here("globalprep", "hab_rockyreef", "v2012", # hasn't been updated since 2012
+                           "data", "habitat_extent_rocky_reef_updated.csv")) %>%
+  dplyr::select(rgn_id, km2) %>%
+  dplyr::filter(km2 > 0)
+
+# coral habitat area
+hab_coral <- readr::read_csv(here::here("globalprep", "hab_coral", "v2021", # hasn't been updated since 2021
+                           "data", "habitat_extent_coral_updated.csv")) %>%
+  dplyr::select(rgn_id, km2) %>%
+  dplyr::filter(km2 > 0)
+
+# find total area in coral and rocky reef habitats
+area_dual_hab <- np_harvest_orn %>%
+  dplyr::left_join(hab_coral %>%
+                     dplyr::rename(coral_km2 = km2),
+                   by = c('rgn_id')) %>%
+  dplyr::left_join(hab_rocky %>%
+                     dplyr::rename(rocky_km2 = km2),
+                   by = c('rgn_id')) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(km2 = sum(c(rocky_km2, coral_km2), na.rm = TRUE)) %>%
+  dplyr::filter(km2 > 0) %>%
+  dplyr::select(-coral_km2, -rocky_km2) %>% 
+  dplyr::arrange(rgn_id)
+  
+
+# ======== Determine Exposure ========
+### exposure: get tonnes / area, find max in past 10 years, use max to rescale with log transform
+
+# calculate raw exposure (tonnes / area)
+np_exp_raw <- area_dual_hab %>%
+  # find regions and years with harvest in rocky reef and coral habitat
+  dplyr::mutate(expos_raw = ifelse(tonnes > 0 & km2 > 0,
+                                   (tonnes / km2), # raw exposure: harvest tonnes / habitat area
+                                   0)) %>% # 0 exposure if no harvest or no special habitat
+  dplyr::group_by(product) 
+
+# define most recent 10 year range
+max_exp_year <- max(np_exp_raw$year)
+exp_decade_range <- seq((max_exp_year - 10), max_exp_year, 1)
+
+# find max raw exposure value in the past 10 years
+np_exp_max <- np_exp_raw %>%
+  filter(year %in% c(exp_decade_range)) %>% 
+  group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
+  dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
+#  dplyr::ungroup() %>% 
+  dplyr::select(rgn_id, expos_prod_max) %>% 
+  # keep 1 row with max value per region (values are the same across year range per region)
+  dplyr::distinct()
+
+# calculate rescaled exposure
+np_exp_orn_rescale <- np_exp_raw %>%
+  # bring in max (of the past 10 yrs) value, 
+  # fill single value for each region across full time range
+  dplyr::left_join(np_exp_max, by = "rgn_id") %>% 
+  # rescale exposure using max value
+  dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
+                exposure = ifelse(exposure > 1, 1, exposure)) %>%
+  dplyr::select(-km2, -expos_raw, -expos_prod_max)
+
+
+# ======== Save intermediate data products ==========
+# clean up columns
+np_exp_gf <- np_exp_orn_rescale %>%
+  dplyr::mutate(gapfilled = ifelse(is.na(exposure), 1, 0)) %>%
+  dplyr::mutate(method = ifelse(is.na(exposure), "prod_average", NA)) %>%
+  dplyr::select(rgn_id = rgn_id, product, year, gapfilled, method)
+
+# write out to int folder (directory)
+readr::write_csv(np_exp_gf, here(current_np_dir, 
+                                 "int", # used to be output, moved to int
+                                 # because exposure is no longer an output
+                                 "np_exposure_ornamentals_gf_record.csv"))
+
+# add exposure for countries with (habitat extent == NA)
+np_exp_orn <- np_exp_orn_rescale %>%
+  dplyr::group_by(product) %>% # not sure why they didn't have some georegion gapfill instead of gapfilling with mean global exposure??
+  dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
+  dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
+  dplyr::select(-mean_exp) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(product = as.character(product)) %>%
+  dplyr::select(rgn_id, year, product, exposure)
+
+# save ornamentals exposure to int 
+readr::write_csv(np_exp_orn, here(current_np_dir,
+                                  "int", # used to be output, moved to int
+                                 # because exposure is no longer an output
+                                  "np_exposure_ornamentals.csv"))
+
+# potentially filter to past 20 years (or hardcode from 2004 onward)
+
+```
+
+
+
+```{r}
+ggplot(data = np_exp_orn %>% filter(rgn_id == 163), aes(x = year, y = exposure)) + 
+  geom_line() +
+  theme_bw()
+```
+
+
+
+global-scaled exposure test:
+
+
+```{r}
+np_global_max <- np_exp_raw %>%
+  filter(year %in% c(exp_decade_range)) %>% 
+ # group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
+  dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>% # 143.385 for all...
+  dplyr::ungroup() %>% # without this, "ornamentals" column remains
+  dplyr::select(rgn_id, expos_prod_max) %>% 
+  # keep 1 row with max value per region (values are the same across year range per region)
+  dplyr::distinct()
+
+# calculate rescaled exposure
+global_exp_rescale <- np_exp_raw %>%
+  # bring in max (of the past 10 yrs) value, 
+  # fill single value for each region across full time range
+  dplyr::left_join(np_global_max, by = "rgn_id") %>% 
+  # rescale exposure using max value
+  dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
+                exposure = ifelse(exposure > 1, 1, exposure)) %>%
+  dplyr::select(-km2, -expos_raw, -expos_prod_max)
+
+
+np_exp_orn_global <- global_exp_rescale %>%
+  dplyr::group_by(product) %>% # not sure why they didn't have some georegion gapfill instead of gapfilling with mean global exposure??
+  dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
+  dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
+  dplyr::select(-mean_exp) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(product = as.character(product)) %>%
+  dplyr::select(rgn_id, year, product, exposure)
+
+
+ggplot(data = np_exp_orn_global %>% filter(rgn_id == 163), aes(x = year, y = exposure)) + 
+  geom_line() +
+  theme_bw()
+
+
+# exposure scale is much smaller now, as values are being compared to global max exposure, not regional...
+```
+
+
+
+## Calculate Risk
+
+```{r}
+
+### calculates NP risk based on:
+###   ornamentals:      risk = 1 if blast or cyanide fishing
+### Returns a data frame of risk, by product, by region:
+###
+#########################################.
+
+
+### Determine Risk
+
+r_cyanide <- 
+  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_poison_3nm_rgn2013.csv")) %>%
+  #AlignDataYears(layer_nm = "np_cyanide", layers_obj = layers) %>%
+  dplyr::filter(!is.na(score) & score > 0) %>%
+  dplyr::select(rgn_id,
+                #year = scenario_year,
+                cyanide = score)
+
+r_blast <-
+  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_blast_3nm_rgn2013.csv")) %>%
+  #AlignDataYears(layer_nm = "np_blast", layers_obj = layers)  %>%
+  filter(!is.na(score) & score > 0) %>%
+  dplyr::select(rgn_id,
+         #year = scenario_year,
+         blast = score)
+
+
+### risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code
+###  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the "relative intensity of cyanide fishing"
+risk_orn <- r_cyanide %>%
+  full_join(r_blast, by = c("rgn_id")) %>%
+  mutate(ornamentals = 1) %>%
+  dplyr::select(rgn_id, ornamentals)
+
+### risk as binary
+np_risk_orn <-
+  expand.grid(
+    rgn_id  = unique(np_harvest_orn$rgn_id),
+    year = unique(np_harvest_orn$year)
+  ) %>%
+  ### ornamentals
+  left_join(risk_orn, by = c("rgn_id"))  %>%
+  mutate(ornamentals = ifelse(is.na(ornamentals), 0, ornamentals)) %>%
+  gather(product, risk, -rgn_id, -year) %>%
+  mutate(product = as.character(product))
+
+np_risk_gf <- np_risk_orn %>%
+  mutate(gapfilled = 0, method = NA) %>%
+  dplyr::select(-risk)
+
+readr::write_csv(np_risk_gf, here(current_np_dir, "output", "np_risk_ornamentals_gf.csv"))
+
+## write this as a risk layer 
+readr::write_csv(np_risk_orn, here(current_np_dir, "output", "np_risk_ornamentals.csv"))
+```
+
+
+## Calculate Sustainability
+
+1 - mean(c(exposure, risk), na.rm = TRUE)
+
+
+## Calculate Sustainable Harvest
+
+tonnes * sustainability
+
+
+
+## Rolling Average of Sustainable Tonnes
+
+
+
+## Identify Max Sustainable Tonnes
+
+max(sustainable_tonnes)
+
+
+## Relative Sustainable Tonnes
+
+
+tonnes_rollmean / peak_sust_tonnes
+
+
+
+

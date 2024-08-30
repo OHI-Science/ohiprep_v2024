@@ -402,8 +402,9 @@ h_gap <- h %>%
 h_gap_ornamentals <- h_gap %>%
   filter(product == "ornamentals")
 
-
-readr::write_csv(h_gap, here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_gf.csv"), na = '')
+# save record of gapfilling methods
+readr::write_csv(h_gap, # not sure why this isn't h_gap_ornamentals when the file name specifies ornamentals...
+                 here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_gf.csv"), na = '')
 
 ```
 

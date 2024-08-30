@@ -1,0 +1,213 @@
+---
+title: "Exploring Seaweed Data Gaps & Possible Gap-filling" 
+author: "Anna Ramji"
+date: "2024-08-28"
+---
+
+
+
+
+[this also works if you copy and paste everything below onto line 406 of STEP 1b]
+## test FAO gapfill
+
+```{r setup-1, warning=FALSE, message=FALSE}
+# copied from step 1b
+knitr::opts_chunk$set(eval=FALSE)
+
+# ======= Load packages ============
+if (!require(librarian)) {
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  ohicore, #devtools::install_github('ohi-science/ohicore@dev')
+  zoo,
+  here,
+  tidyverse,
+  readr,
+  plotly,
+  RColorBrewer
+)
+
+
+# ======= Set directories ===========
+# Update scenario year, set up programmatic scenario year updating
+scen_year_number <- 2024 # update this!!
+scen_year <- as.character(scen_year_number)
+prev_scen_year <- as.character(scen_year_number - 1)
+
+data_dir_year <- paste0("d", scen_year)
+prev_data_dir_year <- paste0("d", prev_scen_year)
+v_scen_year <- paste0("v", scen_year)
+
+# version_year <- "2024" 
+# v_scenario_year <- paste0("v", version_year)
+data_years <- c("1950", "2022") # update to correct data years
+
+current_np_dir <- here::here("globalprep", "np", v_scen_year)
+current_mar_dir <- here::here("globalprep", "mar", v_scen_year)
+
+
+## Load FAO-specific user-defined functions
+source(here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
+source(here("workflow", "R", "common.R")) # directory locations
+source(here("globalprep", "np", v_scen_year, "R", "np_fxn.R"))
+source(here("globalprep", "mar", v_scen_year, "mar_fxs.R")) # functions specific to mariculture dealing with compound countries
+```
+
+
+```{r setup-2}
+# setup part 2
+harvest_tonnes_usd <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>% # created on line 453 in step 1a
+  filter(rgn_id != 213) # filter out Antarctica
+# Define years
+max_year <- max(harvest_tonnes_usd$year)
+min_year <- max_year - 4 
+years <- c(min_year:max_year) # get 5 year range
+years_df <- data.frame(year = min_year:max_year) # so that we can get 5 year average
+```
+
+```{r}
+# check last year's data to see if they have singapore values
+
+v2023_seaweed_tonnes_weighting <- readr::read_csv(here(previous_np_dir, "int", "np_seaweeds_tonnes_weighting.csv"))
+
+v2023_singapore_seaweed <- v2023_seaweed_tonnes_weighting %>% filter(rgn_id == 208)
+nrow(v2023_singapore_seaweed)
+# 0
+
+# Gapfilling pt. 2: FAO commodities data used to fill data gaps 
+
+np_seaweeds_tonnes_weighting <- readr::read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weighting.csv"))
+
+# read in processed FAO commodities data
+commodities_data <- readr::read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv"))
+
+fao_comm_seaweed <- commodities_data %>% 
+  filter(product == "seaweeds")
+
+seaweed_sust <- read_csv(here(current_np_dir, "output", "np_seaweed_sust.csv"))
+
+test_seaweed <- readr::read_csv(here(current_np_dir, "output", "np_seaweed_harvest_tonnes.csv"))
+
+
+# here's what np_seaweed_tonnes_weighting is used for in step 2:
+
+sw_tonnes_raw <- read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weighting.csv")) 
+
+
+aquaculture_seaweed_rgns <- unique(sw_tonnes_raw$rgn_id)
+commodities_seaweed_rgns <- unique(fao_comm_seaweed$rgn_id)
+
+setdiff(aquaculture_seaweed_rgns, commodities_seaweed_rgns)
+setdiff(commodities_seaweed_rgns, aquaculture_seaweed_rgns)
+
+length(setdiff(commodities_seaweed_rgns, aquaculture_seaweed_rgns))
+# 58
+
+
+fao_comm_sw_zero_check <- fao_comm_seaweed %>% filter(tonnes == 0)
+View(fao_comm_sw_zero_check) # noted issue in rgn 209 (China) from 1990-1992 -- 0 for tonnes, non-zero for value. could indicate that the upstream gapfilling regression coefficient is 0 for these years and the years before, or that this is the tail end of the data so it's zero-filled.
+
+# filter to relevant years (last 5)
+fao_comm_sw_zero <- fao_comm_seaweed %>% 
+  filter(year %in% years) %>%
+  group_by(rgn_id) %>% 
+  # filter to keep only regions where tonnes == 0 for ALL years
+  filter(all(tonnes == 0)) %>% 
+  # check that tonnes == 0 for all years (length of year range, or 5)
+  filter(n() == length(years)) %>%
+  # select unique region IDs
+  dplyr::distinct(rgn_id) %>% 
+  ungroup()
+
+View(fao_comm_sw_zero)
+length(unique(fao_comm_sw_zero$rgn_id))
+# 7
+# rgns: 
+# 24  50 112 164 186 196 212
+
+
+# filter out these regions from the fao commodities seaweed subset
+fao_comm_seaweed_filter <- fao_comm_seaweed %>% 
+  dplyr::filter(!rgn_id %in% fao_comm_sw_zero$rgn_id)
+
+
+# check
+nrow(fao_comm_seaweed_filter %>% distinct(rgn_id)) == (nrow(fao_comm_seaweed %>% distinct(rgn_id)) - nrow(fao_comm_sw_zero))
+# alternatively, 
+length(unique(fao_comm_seaweed_filter$rgn_id)) == (length(unique(fao_comm_seaweed$rgn_id)) - length(unique(fao_comm_sw_zero$rgn_id)))
+
+
+# after filtering out regions that have 0s for the last 5 years, there are 93 regions in the FAO commodities dataset. 
+
+
+
+aquaculture_seaweed_rgns <- unique(sw_tonnes_raw$rgn_id)
+commodities_nonzero_seaweed_rgns <- unique(fao_comm_seaweed_filter$rgn_id)
+
+setdiff(aquaculture_seaweed_rgns, commodities_nonzero_seaweed_rgns)
+setdiff(commodities_nonzero_seaweed_rgns, aquaculture_seaweed_rgns)
+
+length(setdiff(commodities_nonzero_seaweed_rgns, aquaculture_seaweed_rgns))
+# 52 
+# was 58, after filtering dropped 6 that weren't in FAO aquaculture 
+#(means that 1 we filtered was already in aquaculture, as 7 total were filtered)
+
+
+length(unique(sw_tonnes_raw$rgn_id))
+# 50
+```
+
+
+```{r step-2-usage}
+# ==== Step 2 Usage ====
+
+# Read in the prepped FAO commodities data set 
+harvest_tonnes_usd <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>% # created on line 453 in step 1a
+  filter(rgn_id != 213) # filter out Antarctica
+# Make a data frame with every region and every product ----
+# Define years (also done above)
+max_year <- max(harvest_tonnes_usd$year)
+min_year <- max_year - 4 
+years <- c(min_year:max_year) # get 5 year range
+years_df <- data.frame(year = min_year:max_year) # so that we can get 5 year average
+
+# Load OHI region data from common.R
+region_data() # gets rgns_eez
+
+# Define subset of OHI EEZ regions
+rgns_eez <- rgns_eez %>%
+  dplyr::select(rgn_id) %>%
+  filter(rgn_id != 213) # filter out Antarctica
+
+# Define products dataframe
+products <- data.frame(product = c("seaweeds", "ornamentals", "fish_oil"))
+
+# Create full rgn x product x years dataframe
+region_product <- rgns_eez %>% 
+  dplyr::select(rgn_id) %>%  # select rgn_id from rgns_eez
+  cross_join(products) %>% # cross join with products (match every row in x with every row in y)
+  cross_join(years_df) # cross join with years
+
+
+sw_fill_df <- region_product %>%
+  filter(product == "seaweeds")
+
+sw_tonnes_raw <- read_csv(here(current_np_dir, "int", "np_seaweeds_tonnes_weighting.csv")) 
+
+sw_tonnes <- sw_tonnes_raw %>%
+  mutate(product = "seaweeds") %>%
+  group_by(rgn_id, year, product) %>% # per region, year, and product,
+  summarise(tonnes = sum(tonnes, na.rm = TRUE)) %>% # sum across all species of seaweed
+  dplyr::filter(year %in% years) %>% # filter to 5 year range 
+  full_join(sw_fill_df, by = c("rgn_id", "year", "product")) %>%
+    mutate(tonnes = ifelse(is.na(tonnes), 0, tonnes)) %>% ## gapfill the NAs to be 0
+  dplyr::select(rgn_id, year, product, tonnes) %>%
+  ungroup() %>%
+  group_by(rgn_id, product) %>%
+  summarise(tonnes = mean(tonnes)) %>% ## calculate 5 year average
+  ungroup()
+```
+
+
