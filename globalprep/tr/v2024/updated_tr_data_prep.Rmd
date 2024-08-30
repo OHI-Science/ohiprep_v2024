@@ -353,7 +353,8 @@ abline(mod5, col="red") # not a linear fit, would be better to do nonlinear, but
 
 ggplot(dom_acc_guests, aes(x = total_guests, y = hotel_overnights)) +
   geom_point(alpha = 0.5) +  # Add some transparency to points
-  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") 
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  theme_minimal()
 ```
 
 So, it looks like there are about 4947 NAs within the Total:Guests column.  However, we want to preserve guests/individuals as the unit (rather than overnights), so in the Raw Gapfilling section, let's see if we can gapfill with either other columns (hotel_guests) or the "Trips" data.
@@ -419,7 +420,7 @@ unique(duplicates_2$rgn_name) # v2024: 0! yay
 ```
 
 ```{r}
-summary(dom_acc_guests_agg) # total_guests has 3793 NAs out of 4617 obs
+summary(dom_acc_guests_agg) # `total_guests` has 3793 NAs out of 4617 obs
 ```
 
 
@@ -526,7 +527,7 @@ dom_trips_agg <- rgns_unwto_dom_trips_clean %>%
     .groups = "drop" # to ungroup, fixes warning from summarise to use reframe (when it is not applicable here)
   ) #### looks good!!!
 
-x# double check to test
+# double check to test
 duplicates_trips_2 <- dom_trips_agg %>%
   group_by(rgn_id, year) %>% 
   filter(n() > 1) %>%
@@ -607,64 +608,97 @@ Let's move on to gapfilling. Since it is slightly more than 1, let's use the slo
 plot(dom_acc_guests_agg$hotel_guests, dom_acc_guests_agg$total_guests)
 abline(mod1, col="red") # looks pretty good! let's move forward using this mode that we explored in the last chunk.
 
-# first, remove any regions that only have NAs, then calculate coefficients
-dom_acc_guests_coef <- dom_acc_guests_agg %>% 
-  group_by(rgn_id) %>% # group by region
-  filter(if_all(c(total_guests, hotel_guests), ~!is.na(.))) %>% # remove rows where there are NAs for both columns
-  mutate(
-    total_guests_intercept = lm(total_guests ~ hotel_guests)$coefficient[1],
-    total_guests_slope = lm(total_guests ~ hotel_guests)$coefficient[2]
-    ) %>% # obtain the intercept and slope for each region that has data
-  ungroup() %>% 
-  distinct(rgn_id, total_guests_intercept, total_guests_slope) %>% # prep for left join, otherwise many-to-many
-  select(rgn_id, total_guests_intercept, total_guests_slope) # select the columns that will be needed
-  
 # will need to gapfill these slopes and intercepts for regions that have hotel_guests data but no total_guests data. join with georegions, group by r2, and later r1 and take the mean for those regions.  Otherwise, use regional level.
 georegions <- ohicore::georegions %>% 
   left_join(rgns_eez, by = "rgn_id") %>% 
   select(-c(Notes)) # not needed
 
-# now use the georegions to find the intercept and slope accordingly
-dom_acc_guests_coef_gf <- georegions %>% 
-  left_join(dom_acc_guests_coef, by = "rgn_id") %>% 
+# first, remove any regions that only have NAs, then calculate coefficients
+dom_acc_guests_coef <- dom_acc_guests_agg %>% 
+  left_join(georegions, by = c("rgn_id", "rgn_name")) %>% 
+  group_by(rgn_id) %>% # group by region
+  filter(if_all(c(total_guests, hotel_guests), ~!is.na(.))) %>% # remove rows where there are NAs for both columns
+  mutate(
+    total_guests_intercept = lm(total_guests ~ hotel_guests)$coefficient[1],
+    total_guests_slope = lm(total_guests ~ hotel_guests)$coefficient[2]
+  ) %>% # obtain the intercept and slope for each region that has data
+  ungroup() %>% 
   group_by(r2) %>% # get values for r1 and r2, so that if regional is available, use that... then if r2 is available, use that... finally, use r1 if you can't otherwise.
   mutate(
-    total_guests_intercept_r2 = mean(total_guests_intercept, na.rm = TRUE), # calc mean for grouping
-    total_guests_intercept_r2 = ifelse(is.nan(total_guests_intercept_r2), NA, total_guests_intercept_r2), # any NaN values to NAs
-    total_guests_slope_r2 = mean(total_guests_slope, na.rm = TRUE),
-    total_guests_slope_r2 = ifelse(is.nan(total_guests_slope_r2), NA, total_guests_slope_r2) # any NaN values to NAs
+    total_guests_intercept_r2 = lm(total_guests ~ hotel_guests)$coefficient[1], # calc int and slope for grouping
+    total_guests_slope_r2 = lm(total_guests ~ hotel_guests)$coefficient[2]
   ) %>% 
   ungroup() %>% 
   group_by(r1) %>% 
   mutate(
-    total_guests_intercept_r1 = mean(total_guests_intercept, na.rm = TRUE),
-    total_guests_intercept_r1 = ifelse(is.nan(total_guests_intercept_r1), NA, total_guests_intercept_r1), # any NaN values to NAs
-    total_guests_slope_r1 = mean(total_guests_slope, na.rm = TRUE),
-    total_guests_slope_r1 = ifelse(is.nan(total_guests_slope_r1), NA, total_guests_slope_r1) # any NaN values to NAs
+    total_guests_intercept_r1 = lm(total_guests ~ hotel_guests)$coefficient[1],
+    total_guests_slope_r1 = lm(total_guests ~ hotel_guests)$coefficient[2]
   ) %>% 
   ungroup() %>% 
-  select(rgn_id, total_guests_intercept, total_guests_slope, total_guests_intercept_r2, total_guests_slope_r2, total_guests_intercept_r1, total_guests_slope_r1) # now we have intercept and slope values for all regions, lets use that to gapfill total_guests with hotel_overnights!
+  distinct(rgn_id, r2, r1, total_guests_intercept, total_guests_slope, total_guests_intercept_r2, total_guests_slope_r2, total_guests_intercept_r1, total_guests_slope_r1) %>% # prep for left join, otherwise many-to-many
+  select(rgn_id, r2, r1, total_guests_intercept, total_guests_slope, total_guests_intercept_r2, total_guests_slope_r2, total_guests_intercept_r1, total_guests_slope_r1) # select the columns that will be needed
+            
+
+# now use the georegions to find the intercept and slope accordingly
+# dom_acc_guests_coef_gf <- georegions %>% 
+#   left_join(dom_acc_guests_coef, by = c("rgn_id","r2","r1")) %>% 
+#   group_by(r2) %>% # get values for r1 and r2, so that if regional is available, use that... then if r2 is available, use that... finally, use r1 if you can't otherwise.
+#   mutate(
+#     total_guests_intercept_r2 = mean(total_guests_intercept, na.rm = TRUE), # calc mean for grouping
+#     total_guests_intercept_r2 = ifelse(is.nan(total_guests_intercept_r2), NA, total_guests_intercept_r2), # any NaN values to NAs
+#     total_guests_slope_r2 = mean(total_guests_slope, na.rm = TRUE),
+#     total_guests_slope_r2 = ifelse(is.nan(total_guests_slope_r2), NA, total_guests_slope_r2) # any NaN values to NAs
+#   ) %>% 
+#   ungroup() %>% 
+#   group_by(r1) %>% 
+#   mutate(
+#     total_guests_intercept_r1 = mean(total_guests_intercept, na.rm = TRUE),
+#     total_guests_intercept_r1 = ifelse(is.nan(total_guests_intercept_r1), NA, total_guests_intercept_r1), # any NaN values to NAs
+#     total_guests_slope_r1 = mean(total_guests_slope, na.rm = TRUE),
+#     total_guests_slope_r1 = ifelse(is.nan(total_guests_slope_r1), NA, total_guests_slope_r1) # any NaN values to NAs
+#   ) %>% 
+#   ungroup() %>% 
+#   select(rgn_id, total_guests_intercept, total_guests_slope, total_guests_intercept_r2, total_guests_slope_r2, total_guests_intercept_r1, total_guests_slope_r1) # now we have intercept and slope values for all regions, lets use that to gapfill total_guests with hotel_overnights!
 ```
 
 
 ```{r hotel_guests_gf}
 # ------- gapfill using hotel_guests when total_guests = NA ---------
 dom_acc_guests_gf1 <- dom_acc_guests_agg %>%
-  left_join(dom_acc_guests_coef_gf, by = "rgn_id") %>%
+  left_join(georegions, by = c("rgn_id","rgn_name")) %>% 
+  left_join(dom_acc_guests_coef, by = c("rgn_id","r2","r1")) %>%
+  group_by(r2) %>% # get values for r1 and r2 for regions that do not have data, so that if regional is available, use that... then if r2 is available, use that... finally, use r1 if you can't otherwise.
+  mutate(
+    total_guests_intercept_r2mean = mean(total_guests_intercept_r2, na.rm = TRUE), # calc mean for grouping
+    total_guests_intercept_r2mean = ifelse(is.nan(total_guests_intercept_r2mean), NA, total_guests_intercept_r2mean), # any NaN values to NAs
+    total_guests_slope_r2mean = mean(total_guests_slope_r2, na.rm = TRUE),
+    total_guests_slope_r2mean = ifelse(is.nan(total_guests_slope_r2mean), NA, total_guests_slope_r2mean) # any NaN values to NAs
+  ) %>%
+  ungroup() %>%
+  group_by(r1) %>%
+  mutate(
+    total_guests_intercept_r1mean = mean(total_guests_intercept_r1, na.rm = TRUE),
+    total_guests_intercept_r1mean = ifelse(is.nan(total_guests_intercept_r1mean), NA, total_guests_intercept_r1mean), # any NaN values to NAs
+    total_guests_slope_r1mean = mean(total_guests_slope_r1, na.rm = TRUE),
+    total_guests_slope_r1mean = ifelse(is.nan(total_guests_slope_r1mean), NA, total_guests_slope_r1mean) # any NaN values to NAs
+  ) %>%
+  ungroup() %>%  # now we have intercept and slope values for all regions (at different levels), lets use that to gapfill total_guests with hotel_overnights!
   mutate(
     arrivals_method = ifelse(is.na(total_guests) & !is.na(hotel_guests), "UNWTO - Hotel:Guests", NA), # do this first so that we can use when tourism_arrivals_ct is NA as a qualifier
     tourism_arrivals_ct = case_when(
       !is.na(total_guests) ~ total_guests, # if there is a value, dont gapfill
       is.na(total_guests) & !is.na(hotel_guests) & !is.na(total_guests_intercept) ~ (hotel_guests*total_guests_slope) + total_guests_intercept,
-      is.na(total_guests) & !is.na(hotel_guests) & is.na(total_guests_intercept) & !is.na(total_guests_intercept_r2) ~ (hotel_guests*total_guests_slope_r2) + total_guests_intercept_r2, # if regional lm coefficients weren't possible, go to r2 which is second least specific, then r1
-      is.na(total_guests) & !is.na(hotel_guests) & is.na(total_guests_intercept) & is.na(total_guests_intercept_r2) & !is.na(total_guests_intercept_r1) ~ (hotel_guests*total_guests_slope_r1) + total_guests_intercept_r1,
+      is.na(total_guests) & !is.na(hotel_guests) & is.na(total_guests_intercept) & !is.na(total_guests_intercept_r2mean) ~ (hotel_guests*total_guests_slope_r2mean) + total_guests_intercept_r2mean, # if regional lm coefficients weren't possible, go to r2 which is second least specific, then r1
+      is.na(total_guests) & !is.na(hotel_guests) & is.na(total_guests_intercept) & is.na(total_guests_intercept_r2mean) & !is.na(total_guests_intercept_r1mean) ~ (hotel_guests*total_guests_slope_r1mean) + total_guests_intercept_r1mean,
       TRUE ~ tourism_arrivals_ct
     ),
-    # Kenya is a great example to show that it worked!! same with Algeria and China. To check, run code without the last select line
     arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - Hotel:Guests", "gapfilled", NA)
   ) %>% # example: 	South Korea 2017.  The numbers make sense because the estimated total_guests were larger than hotel_guests (makes sense because total includes other establishments than just hotels) and we can compare to hotel_overnights, of which tourism_arrivals_ct is about half ish, which based on our knowledge of mean_stays (found later on in raw gf for dom) the average is between 2-3 nights.  So this makes sense!
+  # same with Algeria and China. To check, run code without the last select line
   select(rgn_id, rgn_name, year, tourism_arrivals_ct, total_guests, total_overnights, hotel_guests, hotel_overnights, arrivals_method, arrivals_gapfilled) # select all that we need moving forward
 ```
+
+After I implemented the coefficients by georegion instead of just having the georegion intercept and slope be the mean of the regional coefficients in each grouping, those above examples above did not make sense.  However, the whole reason why I chose to go that route instead of just taking the mean by the grouped area is because some small regions were having very weird guest sizes...much larger than expected.  For example, New Caledonia (rgn 5).  `hotel_guests` for 2014 are 147, but the estimated total_guest amount (`tourism_arrivals_ct`) using the r1 intercept and slope is now 2063.736. This is super large, as those values are in thousands.  When looking it up, it seems that  ["New Caledonia had 107,200 tourists"](https://www.ieom.fr/IMG/pdf/ne154_portrait_synthese_2014_nouvelle-caledonie_version_anglaise.pdf) in 2014. This means that the estimation was really large in comparison.  I am thinking that perhaps it makes more sense to force the intercept to be 0 (like by using lm(total_guests ~ 0 + hotel_guests)), and then only use the slope to estimate the total_guests from hotel_guests.  That way, we also don't have any negative total_guests values (which is currently happening to Togo).
 
 
 ```{r}
