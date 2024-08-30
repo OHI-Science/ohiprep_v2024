@@ -48,6 +48,20 @@ Files can be found on Mazu: `home/shares/ohi/git-annex/globalprep/_raw_data/FAO_
 
 # Methods
 
+
+
+Although we do not know actual sustainable levels of harvest for ornamentals, $S_p$, in each region, we estimated it based on exposure and risk components:
+
+$$S_c = 1 - average(E_c + R_c)$$
+
+where $E_c$ is the exposure term and $R_c$ is the risk term for ornamentals.
+
+The exposure term, $E_c$, is the ln-transformed intensity of harvest for ornamental fish calculated as tonnes of harvest per km2 of coral and rocky reef, relative to the global maximum. We ln transformed the harvest intensity scores because the distribution of values was highly skewed; because we do not know the true threshold of sustainable harvest, nearly all values would be considered highly sustainable without the log transformation. To estimate rocky reef extent area (km2) we used data from Halpern et al. (2008) ([Halpern et al. 2008](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#ref-halpern2008global)), which assumes rocky reef habitat exists in all cells within 1 km of shore. Coral extent area (km2) are from UNEP-WCMC et al. (2018) ([UNEP-WCMC et al. 2018](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#ref-unep-wcmc2018global)).
+
+
+
+The risk term, $R_c$, is based on whether ornamental fishing has unsustainable harvest practices. In specific, we used the intensity of cyanide and dynamite fishing as a proxy. Risk for ornamental fish was set based on assessments of cyanide or dynamite fishing by [Reefs at Risk Revisited](www.wri.org/publication/reefs-at-risk-revisited) under the assumption that most ornamental fishes are harvested from coral reefs.
+
 ## Setup
 
 ```{r}
@@ -95,26 +109,28 @@ source(here::here(current_np_dir, "R", "np_fxn.R"))
 
 
 STEP 2: Ornamentals
-a. 	Using data A, filter the tonnes and USD for ornamentals.  
-b. 	Calculate exposure and risk, and then use it estimate sustainability,
-mutate(sustainability = 1 - mean(c(exposure, risk), na.rm = TRUE))
-c. 	Calculate sustainable tonnes: tonnes * sustainability
-d. 	Rolling average of sustainable tonnes
-e. 	Identify max value from rolling average of sustainable tonnes (maybe limit to most recent 10 years of data to ID max). 
-F. 	get relative tonnes by dividing the rolling average of sustainable tonnes by max(rolling average of sustainable tonnes)
+1.    Using data A, filter the tonnes and USD for ornamentals.  
+2.    Calculate exposure and risk
+3.    then use these to estimate sustainability: mutate(sustainability = 1 - mean(c(exposure, risk), na.rm = TRUE))
+4.    Calculate sustainable tonnes: tonnes * sustainability
+5.    Rolling average of sustainable tonnes
+6.    Identify max value from rolling average of sustainable tonnes (maybe limit to most recent 10 years of data to ID max). 
+7.    get relative tonnes by dividing the rolling average of sustainable tonnes by max(rolling average of sustainable tonnes)
+
+
 So you can then save an intermediate dataset that looks like this:
 
-rgn_id
-year,
-product, (ornamentals, in this case)
-tonnes: from gapfilled FAO commodity data
-usd: from gapfilled FAO commodity data
-sustainability: 1 - mean(c(exposure, risk), na.rm = TRUE)
-sustainable_tonnes: tonnes * sustainability
-max_sustainable_tonnes: max(sustainable_tonnes)
-rel_sust_tonnes: tonnes_rollmean / peak_sust_tonnes
+`rgn_id`\
+`year`,\
+`product`, (ornamentals, in this case)\
+`tonnes`: from gapfilled FAO commodity data\
+`usd`: from gapfilled FAO commodity data\
+`sustainability`: `1 - mean(c(exposure, risk), na.rm = TRUE)`\
+`sustainable_tonnes`: `tonnes` $*$ `sustainability`\
+`max_sustainable_tonnes`: `max(sustainable_tonnes)`\
+`rel_sust_tonnes`: `tonnes_rollmean` / `peak_sust_tonnes`
 
-Then, in final data, save rgn_id, product, year, tonnes_rel 
+Then, in final data, save `rgn_id`, `product`, `year`, `rel_sust_tonnes` 
 
 
 ```{r}
@@ -194,10 +210,11 @@ exp_decade_range <- seq((max_exp_year - 10), max_exp_year, 1)
 # find max raw exposure value in the past 10 years
 np_exp_max <- np_exp_raw %>%
   filter(year %in% c(exp_decade_range)) %>% 
-  group_by(rgn_id) %>% 
+  group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
   dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
 #  dplyr::ungroup() %>% 
   dplyr::select(rgn_id, expos_prod_max) %>% 
+  # keep 1 row with max value per region (values are the same across year range per region)
   dplyr::distinct()
 
 # calculate rescaled exposure
@@ -212,21 +229,21 @@ np_exp_orn_rescale <- np_exp_raw %>%
 
 
 # ======== Save intermediate data products ==========
-############## Note for Mel: not sure if I need this part?? I can't find where this is ever gapfilled. 
 # clean up columns
 np_exp_gf <- np_exp_orn_rescale %>%
   dplyr::mutate(gapfilled = ifelse(is.na(exposure), 1, 0)) %>%
   dplyr::mutate(method = ifelse(is.na(exposure), "prod_average", NA)) %>%
   dplyr::select(rgn_id = rgn_id, product, year, gapfilled, method)
 
+# write out to int folder (directory)
 readr::write_csv(np_exp_gf, here(current_np_dir, 
                                  "int", # used to be output, moved to int
                                  # because exposure is no longer an output
                                  "np_exposure_ornamentals_gf_record.csv"))
 
-### add exposure for countries with (habitat extent == NA)
+# add exposure for countries with (habitat extent == NA)
 np_exp_orn <- np_exp_orn_rescale %>%
-  dplyr::group_by(product) %>%
+  dplyr::group_by(product) %>% # not sure why they didn't have some georegion gapfill instead of gapfilling with mean global exposure??
   dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
   dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
   dplyr::select(-mean_exp) %>%
@@ -234,7 +251,7 @@ np_exp_orn <- np_exp_orn_rescale %>%
   dplyr::mutate(product = as.character(product)) %>%
   dplyr::select(rgn_id, year, product, exposure)
 
-## save exposure as a layer
+# save ornamentals exposure to int 
 readr::write_csv(np_exp_orn, here(current_np_dir,
                                   "int", # used to be output, moved to int
                                  # because exposure is no longer an output
@@ -242,6 +259,58 @@ readr::write_csv(np_exp_orn, here(current_np_dir,
 
 # potentially filter to past 20 years (or hardcode from 2004 onward)
 
+```
+
+
+
+```{r}
+ggplot(data = np_exp_orn %>% filter(rgn_id == 163), aes(x = year, y = exposure)) + 
+  geom_line() +
+  theme_bw()
+```
+
+
+
+global-scaled exposure test:
+
+
+```{r}
+np_global_max <- np_exp_raw %>%
+  filter(year %in% c(exp_decade_range)) %>% 
+ # group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
+  dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>% # 143.385 for all...
+  dplyr::ungroup() %>% # without this, "ornamentals" column remains
+  dplyr::select(rgn_id, expos_prod_max) %>% 
+  # keep 1 row with max value per region (values are the same across year range per region)
+  dplyr::distinct()
+
+# calculate rescaled exposure
+global_exp_rescale <- np_exp_raw %>%
+  # bring in max (of the past 10 yrs) value, 
+  # fill single value for each region across full time range
+  dplyr::left_join(np_global_max, by = "rgn_id") %>% 
+  # rescale exposure using max value
+  dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
+                exposure = ifelse(exposure > 1, 1, exposure)) %>%
+  dplyr::select(-km2, -expos_raw, -expos_prod_max)
+
+
+np_exp_orn_global <- global_exp_rescale %>%
+  dplyr::group_by(product) %>% # not sure why they didn't have some georegion gapfill instead of gapfilling with mean global exposure??
+  dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
+  dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
+  dplyr::select(-mean_exp) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(product = as.character(product)) %>%
+  dplyr::select(rgn_id, year, product, exposure)
+
+
+ggplot(data = np_exp_orn_global %>% filter(rgn_id == 163), aes(x = year, y = exposure)) + 
+  geom_line() +
+  theme_bw()
+
+
+# exposure scale is much smaller now, as values are being compared to global max exposure, not regional...
 ```
 
 

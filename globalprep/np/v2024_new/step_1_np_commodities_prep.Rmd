@@ -103,7 +103,7 @@ data_dir_year <- paste0("d", scen_year)
 prev_data_dir_year <- paste0("d", prev_scen_year)
 v_scen_year <- paste0("v", scen_year)
 
-current_np_dir <- here::here("globalprep", "np", paste0(v_scen_year, "_new"))
+current_np_dir <- here::here("globalprep", "np", v_scen_year)
 
 # ======== Source functions ===========
 source(here::here("workflow", "R", "common.R")) # directory locations
@@ -402,8 +402,9 @@ h_gap <- h %>%
 h_gap_ornamentals <- h_gap %>%
   filter(product == "ornamentals")
 
-
-readr::write_csv(h_gap, here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_gf.csv"), na = '')
+# save record of gapfilling methods
+readr::write_csv(h_gap, # not sure why this isn't h_gap_ornamentals when the file name specifies ornamentals...
+                 here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_gf.csv"), na = '')
 
 ```
 
