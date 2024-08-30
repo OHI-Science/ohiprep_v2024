@@ -53,7 +53,7 @@ dir_spatial <- file.path(dir_goal, '_spatial')
 source(file.path(dir_setup, 'common_fxns.R'))
 
 dir_bli <- file.path(dir_M, 'git-annex/globalprep/_raw_data/birdlife_intl/d2021')
-dir_shp <- file.path(dir_M, 'git-annex/globalprep/_raw_data/iucn_spp/d2020-3')
+dir_shp <- file.path(dir_M, 'git-annex/globalprep/_raw_data/iucn_spp/d2024-1')
   ### in this folder are shapefiles at a taxonomic level, both from
   ### IUCN spatial data download (version 2020-3)
 
@@ -110,8 +110,8 @@ if(reload == FALSE) {
 }
 
 ### for selectively rerunning taxonomic groups
-maps_to_rasterize <- maps_to_rasterize %>%
-  filter(str_detect(dbf_file, 'birdlife'))
+# maps_to_rasterize <- maps_to_rasterize %>%
+#   filter(str_detect(dbf_file, 'birdlife'))
 
 
 
@@ -139,11 +139,12 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
   bli_done_vec <- bli_already_done$iucn_sid
   
   maps_to_rasterize <- maps_to_rasterize %>%
-    filter(!(iucn_sid %in% bli_done_vec))
+    filter((iucn_sid %in% bli_done_vec))
   
   shps <- maps_to_rasterize$shp_file %>% unique()
+  # shps <- shps[1]
   for(i in seq_along(shps)) {
-    i <- 1
+    # i <- 1
     
     shp <- shps[i]
     
@@ -151,19 +152,28 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
       filter(shp_file == shp)
     
     id_fix <- maps_in_shp %>%
-      dplyr::select(shp_iucn_sid, iucn_sid, subpop, max_depth) %>%
+      dplyr::select(shp_iucn_sid, iucn_sid, subpop, max_depth) %>% 
       distinct()
     
     cat_msg(i, ' of ', length(shps), ': reading ', basename(shp), ' from: \n  ', shp)
-
-    polys_all <- read_sf(shp, type = 6) %>%
+    
+    polys_all_geometry <- read_sf(shp, type = 6) %>%
       clean_df_names()
+    
+    polys_all <- polys_all_geometry %>% 
+      st_set_geometry(NULL)
+    
       ### we will check geoms and fix them inside the mclapply, 
       ### and then reproject, one species at a time
+    
+    if('sci_name' %in% names(polys_all)) {
+      polys_all <- polys_all %>% 
+        rename(sciname = sci_name) 
+    } 
 
-    if(!'sciname' %in% names(polys_all)) {
+    if('binomial' %in% names(polys_all)) {
       polys_all <- polys_all %>%
-        rename(sciname = binomil)
+        rename(sciname = binomial)
     }
     
     if(!'subpop' %in% names(polys_all)) {
@@ -182,14 +192,20 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
     
     if('presenc' %in% names(polys_all)){
       polys_all <- polys_all %>%
-        rename(presence = presenc)
+        rename(presence = presenc) 
     }
     
     if(!'presence' %in% names(polys_all)) {
       polys_all <- polys_all %>%
-        mutate(presence = 1)
+        mutate(presence = 1) 
     }
-
+    
+    polys_all <- polys_all %>%
+        st_sf(geometry = st_geometry(polys_all_geometry))
+    
+    if(identical(st_geometry(polys_all), st_geometry(polys_all_geometry)) == FALSE) {
+      cat_msg("HALT: GEOMETRIES DO NOT MATCH FOR", i, ' of ', length(shps), 'in', basename(shp), ' from: \n  ', shp)
+    }
     
     polys_match <- polys_all %>%
       dplyr::select(shp_iucn_sid = iucn_sid, sciname, subpop, presence, geometry) %>%
@@ -213,7 +229,6 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
                                 mc.cores = 12, 
                                 FUN = function(x) {
          #x <- 81:128
-          x <- 2
         spp <- spp_ids[x]
         
         cat_msg(x, ' of ', length(spp_ids), ': Processing ', spp, ' in ', basename(shp),
@@ -235,9 +250,9 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
         ### depth clip if necessary; otherwise clip to bathy raster (which previously
         ### was clipped to area raster - so cells with any marine area will be kept,
         ### and non-marine cells will be dropped)
-        if(spp_shp$max_depth == '< 20 m') {
+        if(unique(spp_shp$max_depth) == '< 20 m') {
           spp_rast <- mask(spp_rast, rast_shallow)
-        } else if(spp_shp$max_depth == '< 200 m') {
+        } else if(unique(spp_shp$max_depth) == '< 200 m') {
           spp_rast <- mask(spp_rast, rast_neritic)
         } else {
           spp_rast <- mask(spp_rast, rast_bathy)
@@ -268,11 +283,6 @@ if(nrow(maps_to_rasterize) == 0) { ### all maps accounted for as .csvs
 ## Note: v2020: This got to the end and didn't indicate it was finished. I only knew because I periodically stopped the loop and checked after it got to the last couple of sfs and then looked at maps_to_rasterize that it was finished. 
 ## v2021: I had to add some extra if statements to fix column name issues with the new bli data.
 
-test <- read_csv(file.path(dir_goal_anx, 'spp_rasters',
-                                         sprintf('iucn_sid_%s.csv', spp)))
-test2 <- read_csv(file.path("/home/shares/ohi/git-annex/globalprep/spp/v2022/spp_risk_dists", 'spp_rasters',
-                                         sprintf('iucn_sid_%s.csv', spp)))
-setdiff(test$cell_id, spp_present$cell_id)
 ```
 
 

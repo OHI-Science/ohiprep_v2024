@@ -36,7 +36,7 @@ library(sf)
 source(here('workflow/R/common.R'))
 
 goal     <- 'spp'
-scenario <- 'v2022'
+scenario <- 'v2024'
 dir_goal <- here('globalprep', goal, scenario)
 
 ### goal specific folders and info
@@ -53,7 +53,7 @@ source(file.path(dir_setup, 'common_fxns.R'))
 
 # Summary
 
-Create a set of maps of the distribution of biodiversity intactness - all species assessed and mapped by IUCN, with the exception of deep oceanic species as these are unlikely to suffer direct human impact or to benefit from typical conservation efforts.  These maps are generated at 10 km^2^ resolution in a Gall-Peters projection.
+Create a set of maps of the distribution of biodiversity intactness - all species assessed and mapped by IUCN, with the exception of deep oceanic species as these are unlikely to suffer direct human impact or to benefit from typical conservation efforts. These maps are generated at 10 km^2^ resolution in a Gall-Peters projection.
 
 * Mean risk
 * Variance of risk
@@ -121,7 +121,7 @@ if(!file.exists(cell_summary_file) | reload == TRUE) {
   
   message('going into the first mclapply...')
   
-  ptm <- system.time({ # processing time 8.29499999999996 sec
+  ptm <- system.time({ # processing time 25.4310000000114 sec
     cell_values_all <- parallel::mclapply(sum_files, mc.cores = 12,
       FUN = function(x) {
         read_csv(x, col_types = 'dddiidi')
@@ -140,7 +140,7 @@ if(!file.exists(cell_summary_file) | reload == TRUE) {
   
   message('going into the second mclapply...')
   # system.time({ 
-    ### mclapply: processing time 38.4480000000001 sec
+    ### mclapply: processing time 63.0580000000191 sec
   ptm <- system.time({
     cell_vals_list <- parallel::mclapply(1:n_chunks, mc.cores = 12,
         FUN = function(x) { ### x <- 1
@@ -156,7 +156,7 @@ if(!file.exists(cell_summary_file) | reload == TRUE) {
   
   message('going into the third mclapply...')
   
-  ptm <- system.time({ # processing time  sec
+  ptm <- system.time({ # processing time 21.1959999999963 sec
     cell_summary_list <- parallel::mclapply(cell_vals_list, mc.cores = 12,
                                        FUN = function(x) {
       ### x <- cell_vals_list[[250]]

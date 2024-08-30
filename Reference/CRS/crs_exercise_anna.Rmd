@@ -1,42 +1,90 @@
 ---
 title: "CRS Prep & Review"
-output: html_document
-date: "2024-08-05"
+date: "2024-08-01"
+#date: "`r format(Sys.Date(), '%Y')`"
+#author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+author: "Anna Ramji"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 3
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../workflow/templates/ohi_hdr.html'
+pdf_document:
+  toc: true
+editor_options: 
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
 ---
 
-```{r setup, include=FALSE}
+## Setup
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+# ---- Load packages ----
 library(terra)
 library(here)
-
+library(tidyverse)
 ```
+
+
+## Data Exploration
 
 Data describing commercial landings (tonnes) in 2017.
+
 ```{r}
-fish <- rast(here("Reference", "CRS", "commercial_landings_2017.tif"))
+# Read in commercial landings data
+fish <- terra::rast(here("Reference", "CRS", "commercial_landings_2017.tif"))
+
+# print out geospatial data info (class, dimensions, resolution, extent, CRS, etc.)
+fish # equivalent to (fish)
+
+# print out summary of value layer
+summary(fish)
 
 ## Take a look
-plot(fish)
+terra::plot(fish)
+# adjust margins: par(mar = c(bottom, left, top, right))
+
+terra::plot(fish, mar = c(0, 1.5, 0, 5))
+par(oma = c(0,0,0,0))
+terra::plot(fish, mar = c(0, 1.5, 0, 5) )#,
+            #oma = c(0,0,0,0)) # outer margin area
+
 # lets log so we can visualize this a little better
-plot(log(fish+1))
+terra::plot(log(fish + 1), mar = c(0,1.5,0,3.5))
 ```
 
-How many fish were captured?
+
+
+### How many fish were captured?
+
 ```{r}
-global(fish, "sum", na.rm = TRUE)
+terra::global(fish, "sum", na.rm = TRUE)
 # 86.3 million tonnes
 ```
 Check against Sea Around Us to make sure this seems generally reasonable.
 
--   seems a little low <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10> but generally makes sense (close enough)
--   around 100 million <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10>
+-   seems a little low but generally makes sense (close enough) -- [Sea Around Us](https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10) says around 100 million <https://www.seaaroundus.org/data/#/global?chart=catch-chart&dimension=sector&measure=tonnage&limit=10>. 87 million seems close enough to that (within reasonable expected range of values)
 
-What is the area of each cell?
+
+### What is the area of each cell?
+
 ```{r}
-cell_area <- cellSize(fish)
-plot(cell_area, box = TRUE)
+cell_area <- terra::cellSize(fish)
+terra::plot(cell_area, box = TRUE,
+            mar = c(2, 1.5, 1, 8)) # adjusted margins for exporting plot
+
+print(cell_area)
 ```
-Describe what the plotted image is saying?
+
+### What is the plotted image saying?
 
 - cell size is much smaller at the poles, increases as you head in towards the equator
 
@@ -46,14 +94,15 @@ Given this, what is kind of deceptive about these plots?
 -   if count, same thing (seems higher than in reality)
 
 ```{r}
-plot(fish)
+terra::plot(fish)
+
 # lets log so we can visualize this a little better
-plot(log(fish+1))
+terra::plot(log(fish + 1))
 
 ```
 
 -   the cells in the northern and southern extremes have a much smaller area than those concentrated in the center
--   this may hide higher commercial fishing values in the center band, as those pixels will appear smaller when plotted
+-   this may hide higher commercial fishing values in the center band, as those cells (pixels?) may appear smaller when plotted 
 -   value associated w the cell is changing when you convert -- resampling by diff method (nearest neighbor, linear interpolation, bilinear)
 -   poles may appear to have higher values than they actually do -- same value over smaller area = higher density value
 -   more coarse resolution at the poles can lead to higher catch shown over a greater area than in reality
@@ -68,33 +117,40 @@ plot(log(fish+1))
 > For planar CRSs, the area is therefore not computed based on the linear units of the coordinate reference system, but on the *actual* area by transforming cells to longitude/latitude. If you do not want that correction, you can use transform=FALSE or init(x, prod(res(x)))
 
 
-Let's convert these data to another coordinate reference system:
+## Reprojection #1: to Mollweide
+
+Let's convert these data to another coordinate reference system and take a look at how this impacts the data:
 ```{r}
+# define Mollweide CRS specifications
 moll <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
-fish_moll <- terra::project(fish, crs(moll))
+fish_moll <- terra::project(fish, terra::crs(moll))
 
 # take a look
 par(mar = c(5, 4, 4, 0)) # set margins: bottom, left, top, right
-plot(fish_moll)
-plot(log(fish_moll + 1), main = "Transformed CRS: Mollweide")
-plot(log(fish+1), main = "Original CRS: WGS 84 EPSG 4326")
+terra::plot(fish_moll)
+terra::plot(log(fish_moll + 1), main = "Projected CRS: Mollweide")
+terra::plot(log(fish + 1), main = "Original CRS: WGS 84 EPSG 4326")
 
 ## Count the total tonnes
-global(fish_moll, "sum", na.rm = TRUE)
+terra::global(fish_moll, "sum", na.rm = TRUE)
 # 389.3 million
+```
 
+-   389 million tonnes is a much higher value than the raw data's ~87 million value. Reprojecting the data impacted the values to a significant degree. Cell sizes have been stretched and increased to be uniform across the globe. When perform our global summation after transforming, the 
+
+```{r}
 # calculate cell area
-cell_area_moll <- cellSize(fish_moll)
+cell_area_moll <- terra::cellSize(fish_moll)
 
 #par(mai = c(1, 1, 3, 5)) # set margins: bottom, left, top, right
 #par(oma = c(1, 1, 3, 4))
-#par(mar = c(1,1,1,1))
-plot(cell_area_moll, main = "Mollweide projection cell size")
+#par(mar = c(1,1,1,1)) 
+terra::plot(cell_area_moll, main = "Mollweide projection cell size", mar = c(0, 2, 0, 6))
 
-plot(cell_area, main = "Original projection cell size")
+terra::plot(cell_area, main = "Original projection cell size")
 ```
 
--   389 million tonnes is crazy
+
 
 ```{r}
 (cell_area_moll$area)
@@ -152,7 +208,7 @@ global(new_tonnes, "sum", na.rm = TRUE)
 
 
 ```{r}
-View(fish)
+#View(fish)
 
 summary(fish)
 

@@ -7,7 +7,7 @@ output:
     toc: true
     toc_depth: 3
     toc_float: yes
-    number_sections: true
+    number_sections: false
     theme: cerulean
     highlight: haddock
     includes: 
@@ -23,33 +23,112 @@ editor_options:
 ------------------------------------------------------------------------
 
 
-# Economies Dataprep (Measures the amount of revenue produced)
+# Economies Dataprep 
 
 ## Overview
 
--   **Data:**
+-   Tourism GDP \% 
+    
+    -   preliminary cleaning and tidying
+    -   filter, run `ohicore::name_2_rgn()` and make appropriate updates and subsets
+    -   investigate data gaps
+    -   gapfill
+    -   exploratory plotting
+        
+-   WorldBank GDP (constant 2015 US$)
+      
+    -   clean and tidy data
+    -   make subsets as needed
+    -   calculate tourism value for subsets
+        
+-   NBS China Data 
+      
+    -   clean and tidy data
+    -   adjust and standardize value
+        
+-   Coastal Population
+    
+    -   clean and tidy data
+    -   calculate coastal proportion multiplier
+        
+-   USA Coastal Tourism
+    
+    -   clean and tidy data
+    -   subtract Great Lakes values from total values
+    -   calculate USA true coastal tourism value, adjust to standardized 2015 US$ for joining
+        
+-   Combine various subsets as appropriate, get full coastal tourism dataset, standardize for exporting to `int` folder. 
 
-### Tourism direct GDP as a proportion of total GDP 
+        
+        
 
-Tourism direct GDP as a proportion of total GDP (indicator 8.9.1): UNWTO Dept. of Statistics (UN Tourism)
 
--   <https://www.unwto.org/tourism-statistics/economic-contribution-SDG> 
+## UNWTO: Tourism direct GDP as a proportion of total GDP 
+
+**Reference**:  World Tourism Organization. (2024). Tourism direct GDP as a proportion of total GDP (indicator 8.9.1). UNWTO. <https://www.unwto.org/tourism-statistics/economic-contribution-SDG>
+
+**Downloaded**: 2024-07-01
+
+**Last updated**: 2024-04-29
+
+**Description**: 
+Tourism direct GDP as a proportion of total GDP (%) for 118 regions. Data is aggregated from multiple sources. 
+
+**Download Instructions**: Navigate to the UN Tourism [Economic Contribution and SDG page](https://www.unwto.org/tourism-statistics/economic-contribution-SDG), find the “Tourism direct GDP as a proportion of total GDP (indicator 8.9.1)” section (should be the first section on the page), right-click on the “Download Data” button, copy the link address, and paste the link in a new tab to download the file (most browsers initially blocked the download and flagged it as “Insecure Content”). Upload the file to the appropriate folder on Mazu (UNWTO/dYYYY/, where YYYY = scenario year, e.g., 2024). 
+
+**Time range**: 2008-2022
+
+**Native data resolution**: Country-level, not spatial data.
+
+**Format**: `.xlsx`
+
+**Metadata**: Linked in the “Download Metadata” button below the “Download Data” button: <http://pre-webunwto.s3.eu-west-1.amazonaws.com/s3fs-public/2024-04/Metadata-08-09-01%202_3_april2024_updated.pdf>
 -   A big issue with this data set is that it does not have data for
 mainland China. Thus, I was instructed to gapfill using another
 data source. I found tourism revenue data on the website for the
 National Bureau of Statistics for China
 
--   China Gapfilling -- °ºNational Data: National Bureau of Statistics of China (NBS) <https://data.stats.gov.cn/english/easyquery.htm?cn=C01>
 
--   Made an account to download data:
--   Email:
-[aramji\@bren.ucsb.edu](mailto:aramji@bren.ucsb.edu){.email}
+
+## National Data: National Bureau of Statistics of China (NBS): Development of Tourism
+
+Files downloaded: 
+   *   Foreign Exchange Earnings from International Tourism(USD million)
+   *   Earnings from Domestic Tourism (100 million yuan)
+
+**Reference**:
+National Bureau of Statistics of China. (2024). Foreign Exchange Earnings from International Tourism(USD million). NBS. <https://data.stats.gov.cn/english/easyquery.htm?cn=C01> .
+
+National Bureau of Statistics of China. (2024). Earnings from Domestic Tourism (100 million yuan). NBS. <https://data.stats.gov.cn/english/easyquery.htm?cn=C01> .
+
+
+**Downloaded**: 2024-07-11
+
+**Last updated**: n.d. 2024 assumed.
+
+**Description**: 
+Foreign Exchange Earnings from International Tourism(USD million)
+“Foreign Exchange Earnings from International Tourism refer to the total expenditure on transportation, sighting, accommodation, food, shopping and entertainment of foreigners and overseas Chinese during their stay in the mainland of China.” Assumed to be in present USD (i.e., 2018 values are in 2018 USD, 2022 values are in 2022 USD). 
+
+Earnings from Domestic Tourism (100 million yuan)
+Earnings from Domestic Tourism in present 100 million yuan. 
+
+**Download Instructions**:
+-   Made an account to download data. Feel free to use this same information or create a new account.
+-   Email: [aramji\@bren.ucsb.edu](mailto:aramji@bren.ucsb.edu){.email}
 -   Password: OHI.f3ll0ws!
--   Security Question: who has influenced you the most?
--   Answer: Melanie Frazier
+-   Security Question: who has influenced you the most? Answer: Melanie Frazier
+    *   note: this account may have expired by the next scenario year
+-   Return to the [home page](https://data.stats.gov.cn/english/index.htm), click “Annual” from the top navigation bar, then click “Tourism” from options on the left navigation menu, click “Year” dropdown menu and selected “LATEST20”, then clicked the download button and select “.csv”. File appears as “Annual.csv” -- rename this to `eco_tour_china_all_metrics_[start-year]-[end-year].csv`, e.g.,  `eco_tour_china_all_metrics_2004-2023.csv` 
+-   Add new file to `_raw_data/NBS_China/dYYYY` folder on Mazu. Replace YYYY with scenario year, e.g., 2024. 
 
--   Returned to home page, clicked “Annual”, clicked “Tourism” from options on the left, clicked “Year” dropdown menu and selected “LATEST20”, then clicked the download button and selected “csv”. File appeared as “Annual.csv”, which I then renamed to `eco_tour_china_all_metrics_2004-2023.csv` 
--   Added to new file in `_raw_data` on Mazu → NBS_China
+**Time range**: 2004-2023
+
+**Native data resolution**: N/A
+
+**Format**: `.csv`
+
+**Metadata**: <https://data.stats.gov.cn/english/staticreq.htm?m=aboutctryinfo#:~:text=National%20statistical%20indicators%20involved%20in,area%2C%20forest%20resources%20and%20precipitation.>
 
 -   For this tourism revenue data used for China, I wanted to discern whether or not these numbers included Macao and Hong Kong, as that can sometimes be the case (and would significantly impact my data processing methods). Thankfully, the website where I downloaded the data had information on this: 
 
@@ -59,44 +138,132 @@ National Bureau of Statistics for China
 
 
 
-### GDP: World Bank, in "constant 2015 US$"
+## World Bank: GDP (constant 2015 US$) 
 
--   <https://data.worldbank.org/indicator/NY.GDP.MKTP.KD> 
+**Reference**: World Bank. (n.d.). *GDP (constant 2015 US$)*. World Bank Open Data. <https://data.worldbank.org/indicator/NY.GDP.MKTP.KD> .
 
-    -   Downloaded July 9, 2024. 
-    -   Contains country-level annual GDP value (in constant 2015 USD) from 1960-2023.
-    -   Additional metadata copied and saved as a `.rtf` in the `WorldBank_global_annual_GDP_2015_constant_USD` subfolder of the `_raw_data`'s `WorldBank` folder for `d2024`. 
-    -   Date last updated (found in the first few rows of the `.csv` when opened locally using Numbers): 2024-06-28
+License: CC BY-4.0
+
+**Downloaded**: 2024-07-09
+
+**Last updated**: No precise date listed on website. Found in the first few pages of the .csv when opened locally: 2024-06-28. 
+
+**Description**: “GDP at purchaser's prices is the sum of gross value added by all resident producers in the economy plus any product taxes and minus any subsidies not included in the value of the products. It is calculated without making deductions for depreciation of fabricated assets or for depletion and degradation of natural resources. Data are in constant 2015 prices, expressed in U.S. dollars. Dollar figures for GDP are converted from domestic currencies using 2015 official exchange rates. For a few countries where the official exchange rate does not reflect the rate effectively applied to actual foreign exchange transactions, an alternative conversion factor is used.” Aggregation method: Gap-filled total. 
+
+**Download Instructions**: Navigate to the World Bank GDP (constant 2015 US$) data page <https://data.worldbank.org/indicator/NY.GDP.MKTP.KD>. The full time range should be selected on the slider bar by default. Select “CSV” under the “Download” options on the lower right-hand side of the page. Save in the appropriate folder on Mazu: 
+`home/shares/ohi/git-annex/globalprep/_raw_data/WorldBank/dYYYY/WorldBank_global_annual_GDP_2015_constant_USD/WorldBank_global_annual_GDP_2015_constant_USD.csv`
+
+**Time range**: 1960-2023
+
+**Native data resolution**: Country-level (not spatial data). 
+
+**Format**: `.csv.` Note: Data is also available in XML and EXCEL formats. 
+
+**Metadata**: Click on “Details” (in the upper right hand corner of the plot on the main page), scroll to the bottom of the popup page, and select “All Metadata”.
+<http://databank.worldbank.org/data/reports.aspx?source=2&type=metadata&series=NY.GDP.MKTP.KD&_gl=1*10r25gl*_gcl_au*MTI5NjExNDc0NS4xNzE2NTY4ODAx> 
 
 
-### USA Coastal Tourism
+## Economics: National Ocean Watch (ENOW); Marine Economies: Industries for States and Coastal US
 
-Economics: National Ocean Watch (ENOW) Data
+**Reference**:
+Office for Coastal Management, 2024: Time-Series Data on the Ocean and Great Lakes Economy for Counties, States, and the Nation between 2005 and 2021 (Sector Level) from 2008-01-01 to 2019-12-31. NOAA National Centers for Environmental Information, <https://www.fisheries.noaa.gov/inport/item/48033>. Downloaded 2024-07-18.
+Reference is tailored to the filtered date range used in this project. Actual date range of data was 2005-2021 as of 2024. 
+<https://coast.noaa.gov/digitalcoast/data/> 
 
- -   Marine Economies: Industries for States and Coastal US
- -   https://coast.noaa.gov/digitalcoast/data/ 
- 
-Office for Coastal Management, 2024: Time-Series Data on the Ocean and Great Lakes Economy for Counties, States, and the Nation between 2005 and 2021 (Sector Level) from 2008-01-01 to 2019-12-31. NOAA National Centers for Environmental Information, https://www.fisheries.noaa.gov/inport/item/48033. Downloaded 2024-07-18.
+**Downloaded**: 2024-07-18
+
+**Last updated**: 2022
+
+**Description**: 
+Annual marine sector- and industry-level data at national and state levels for coastal (Great Lakes included) United States. Data is processed in this notebook to filter data to the tourism industry and ultimately calculate coastal (Great Lakes exclusive) tourism GDP. RealGDP variable indicated 2012-adjusted GDP.  
 
 > Abstract: Economics: National Ocean Watch (ENOW) contains annual time-series data for over 400 coastal counties, 30 coastal states, 8 regions, and the nation, derived from the Bureau of Labor Statistics and the Bureau of Economic Analysis. It describes six economic sectors that depend on the oceans and Great Lakes and measures four economic indicators: Establishments, Employment, Wages, and Gross Domestic Product (GDP).
 
-    -   Metadata: https://www.fisheries.noaa.gov/inport/item/48033 
+Providers: [Bureau of Economic Analysis](https://coast.noaa.gov/digitalcoast/contributing-partners/bureau-economic-analysis.html), [Bureau of Labor Statistics](https://coast.noaa.gov/digitalcoast/contributing-partners/bureau-labor-statistics.html), [NOAA Office for Coastal Management](https://coast.noaa.gov/digitalcoast/contributing-partners/office-for-coastal-management.html). 
 
--   Range: 2005-2021
+Downloaded from NOAA Office for Coastal Management; Digital Coast website: <https://coast.noaa.gov/digitalcoast/data/>.
 
+**Download Instructions**:
+Navigate to the [NOAA Digital Coast Data Catalog](https://coast.noaa.gov/digitalcoast/data/) page, scroll down to “Marine Economies: Industries for States and Coastal US” and click on it. Then click the “Download” button, right click on the “Download” hyperlinked text that pops up, and copy and paste it into a new tab in your browser to download the zip file. It should be called “ENOW_Industries.zip”. Open it (unzip it), and upload the whole folder to the appropriate folder on Mazu. 
+`home/shares/ohi/git-annex/globalprep/_raw_data/ENOW/d[YYYY]/` replace [YYYY] with your scenario year, e.g., 2024. 
+
+Note: the metadata linked for this data under “Other Resources” on the page where you download it links to the more general Time-Series Data page, which is not specific to this dataset. <https://www.fisheries.noaa.gov/inport/item/48033> 
+
+**Time range**: 2005-2021. Filtered to 2008-2019
+
+**Native data resolution**: State and national level. Not spatial data. `NA` value code: `-9999`.
+
+**Format**: `.csv`
+
+**Metadata**: <https://www.fisheries.noaa.gov/inport/item/48033> . Note: this metadata is not specific to this exact dataset. 
+
+**Notes**:
 Has sector-level data:
 -   Includes Ship and Boat Building, Tourism and Recreation, Living Resources, Fish hatcheries and aquaculture, Seafood processing, Seafood markets, Fishing, Marine Construction, Marine Transportation, All Ocean Sectors
 -   Has employment, wages, GDP, RealGDP columns (RealGDP = adjusted for inflation -- theoretically to year of most recent update based on the metadata, which would be 2021. However, upon futher investigation, the gdp and real gdp values match in the year 2012, so it seems that RealGDP is GDP adjusted to 2012 USD)
 -   Contains -9999 values for data privacy – these values are captured in the totals but not in state-level
 
-- On Mazu in `home/shares/ohi/git-annex/globalprep/_raw_data/ENOW/d2024/ENOW_Industries/ENOW_Industries_2005_2021.csv`
 
--   Downloaded from NOAA Office for Coastal Management; Digital Coast website: <https://coast.noaa.gov/digitalcoast/data/>.
+
+## National Aggregates of Geospatial Data Collection (NAGDC): Population, Landscape, And Climate Estimates (PLACE), v3 (1990, 2000, 2010)
+
+Used for Coastal Proximity (within 100km of coast) population data. National Aggregates of Geospatial Data Collection (NAGDC). From Socioeconomic Data and Applications Center (SEDAC), hosted by Center for International Earth Science Information Network (CIESIN) at Columbia University. 
+
+**Reference**:
+Center for International Earth Science Information Network - CIESIN - Columbia University. 2012. National Aggregates of Geospatial Data Collection: Population, Landscape, And Climate Estimates, Version 3 (PLACE III). Palisades, New York: NASA Socioeconomic Data and Applications Center (SEDAC). <https://doi.org/10.7927/H4F769GP>. Accessed 22 July 2024.
+
+<https://sedac.ciesin.columbia.edu/data/set/nagdc-population-landscape-climate-estimates-v3/data-download>
+
+**Downloaded**: 2024-07-22
+
+**Last updated**: 2012-07-09
+
+**Description**: 
+Abstract: 
+“The National Aggregates of Geospatial Data Collection: Population, Landscape, And Climate Estimates, Version 3 (PLACE III) data set contains estimates of national-level aggregations in urban, rural, and total designations of territorial extent and population size by biome, climate zone, coastal proximity zone, elevation zone, and population density zone, for 232 statistical areas (countries and other UN recognized territories). This data set is produced by the Columbia University Center for International Earth Science Information Network (CIESIN).” 
+Purpose: 
+“To provide tabular data to researchers without GIS capabilities who need data on population and land area by country across a range of physical characteristics. These include measures such as the number of persons living within coastal zones, the percent of a region within specific elevation strata, or the number of persons living within different climate zones.”
+
+2010 Coastal Population values used to create proportional multipliers for tourism GDP to calculate coastal tourism value. 
+
+**Download Instructions**:
+
+Navigate to the SEDAC PLACE v3 [Data Download](https://sedac.ciesin.columbia.edu/data/set/nagdc-population-landscape-climate-estimates-v3/data-download) page. Select “CSV” to download the `.csv`. You may need to make an account to download the data. In 2024, our account information was as follows:
+
+*	Username: ohifellows2024
+*	Password: OHIfellows.2024!
+After logging in, the zip file `nagdc-population-landscape-and-climate-estimates-v3-csv` should be downloaded automatically. Upload this folder to the appropriate folder on Mazu:
+`home/shares/ohi/git-annex/globalprep/_raw_data/SEDAC_CIESIN/d[YYYY]`. Replace [YYYY] with the scenario year, e.g., 2024. 
+
+**Time range**: 1990 (January 1), 2000 (January 1), 2010 (January 1)
+
+**Native data resolution**:  This is a `.csv`, but the **Spatial Domain:** is as follows: 
+Bounding Coordinates:
+West Bounding Coordinate: -180.000000
+East Bounding Coordinate: 180.000000
+North Bounding Coordinate: 85.000000
+South Bounding Coordinate: -58.000000
+
+**Format**: `.csv` Note: Data is also available in `.xlsm` format.
+
+**Metadata**: Navigate to the “Documentation” tab of the PLACE page: <https://sedac.ciesin.columbia.edu/data/set/nagdc-population-landscape-climate-estimates-v3/docs>. Under “Documentation:”, select “Methods (PDF)”. Note: also available as an RTF. 
+<https://sedac.ciesin.columbia.edu/downloads/docs/nagdc/nagdc-population-landscape-climate-estimates-v3.pdf> 
+
+Portal metadata:  <https://sedac.ciesin.columbia.edu/data/set/nagdc-population-landscape-climate-estimates-v3/metadata> 
+
+**Notes**: 
+-   This data is not updated. Future years should consider using an updated version of PLACE, such as v4. 
+
+
+## Methods 
 
 ### Setup
 
 ```{r}
-# load packages
+knitr::opts_chunk$set(eval = FALSE)
+
+# ---- Load packages ----
+
 if (!require(librarian)){
   install.packages("librarian")
   library(librarian)
@@ -127,10 +294,10 @@ librarian::shelf(
 #library(threadr)
 
 
-# source 
+# ---- Source common.R ----
 source(here::here("workflow", "R", "common.R"))
 
-# set year and file path info
+# ---- Set scenario year, reproducible file paths ----
 current_year <- 2024 # Update this!!
 
 version_year <- paste0("v",current_year)
@@ -179,7 +346,7 @@ wb_gdp_raw <- readr::read_csv(here::here(wb_dir,
 # date range from 1960 to 2023
 
 
-# ---- NBSC Data (different units for international and domestic tourism) ----
+# ---- NBS China Data (different units for international and domestic tourism) ----
 nbsc_raw <- readr::read_csv(here::here(nbsc_dir,
                                        "eco_tour_china_all_metrics_2004-2023.csv"), # update this if/when new data is downloaded
                             skip = 2) # skip first 2 rows

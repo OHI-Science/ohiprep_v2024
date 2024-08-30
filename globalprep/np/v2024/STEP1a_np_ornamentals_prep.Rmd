@@ -4,7 +4,7 @@ author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
     toc: true
-    number_sections: true
+    number_sections: false
     toc_float: yes
     theme: cerulean
     highlight: haddock
@@ -23,10 +23,13 @@ This analysis converts FAO commodities data into data layers used to calculate O
 # Updates from previous assessment
 
 ### v2024
-- New year of FAO data (2022)\
-- Updated links to datasets\
-- Updated file paths to be more reproducible, enable cross-platform capability (not dependent on direction of directory separator)
-- Updated data cleaning to follow tidyverse style, use of `janitor::clean_names()`
+*   New year of FAO data (2022)\
+*   Updated links to datasets\
+*   Updated file paths to be more reproducible, enable cross-platform capability (not dependent on direction of directory separator)
+*   Updated data cleaning to follow tidyverse style, use of `janitor::clean_names()`
+*   Updated `read.csv` and `write.csv` to `read_csv` and `write_csv` 
+*   Updated `fao_fxn.R` to use `str_detect("...")` instead of `value == "..."` to properly replace FAO "missing value" codes with `NA`s. 
+*   Added extra `0 --> NA` correction for specific conditions where this is appropriate (before gapfilling). See section: [Add FAO-zero-correction]
 
 ### v2023
 New year of FAO data (2021). Replaced deprecated functions (`replace_at()`, `spread()`, `gather()`)
@@ -41,11 +44,13 @@ New year of FAO data (2021). Replaced deprecated functions (`replace_at()`, `spr
 - Global aquatic trade - All partners aggregated - Quantities and Values - 1976-2022 (Release date: July 2024)
 
 
-**Downloaded**: July, 26, 2024
+**Downloaded**: 2024-08-07
 
 **Description**: Quantity (tonnes) and value (USD) of raw commodities (Exports only) for each country, taxa, year. The FAO data is subset to include commodities in these categories: ornamental fish, fish oil, seaweed and plants (see: raw/commodities2products_weighting.csv for details).
 
 **Time range**: 1976-2022
+
+Files can be found on Mazu: `home/shares/ohi/git-annex/globalprep/_raw_data/FAO_commodities/d2024` accompanied by README.md with detailed download instructions. 
 
 ------------------------------------------------------------------------
 
@@ -61,7 +66,7 @@ if (!require(librarian)) {
   library(librarian)
 }
 librarian::shelf(
-  ohicore, #devtools::install_github('ohi-science/ohicore@dev')
+  ohicore, #devtools::install_github('ohi-science/ohicore@dev') #if relevant: restart session after reinstalling
   dplyr,
   stringr,
   tidyr,
@@ -75,7 +80,7 @@ librarian::shelf(
 )
 
 # ======= Set directories ===========
-# Update scenario year, set up programmatic scenario year updating
+# Update scenario year, set up programmatic scenario year updates
 scen_year_number <- 2024
 scen_year <- as.character(scen_year_number)
 prev_scen_year <- as.character(scen_year_number - 1)
@@ -85,7 +90,7 @@ v_scen_year <- paste0("v", scen_year)
 
 current_np_dir <- here::here("globalprep", "np", v_scen_year)
 
-## Load FAO-specific user-defined functions
+# Load FAO-specific user-defined functions
 source(here::here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
 source(here::here("workflow", "R", "common.R")) # directory locations
 source(here::here(current_np_dir, "R", "np_fxn.R")) # function for handling FAO commodity data specific to NP
@@ -114,18 +119,20 @@ dir_fao_data_old <- here::here(dir_M, "git-annex", "globalprep", "_raw_data", "F
 files_old <- list.files(dir_fao_data_old, pattern = glob2rx('*.csv'), full.names = TRUE)
 
 # ===== loop ================
-for (f in files){
-  f <- files[1] # un-comment and update to test individual files
+for (f in files) {
+  #f <- files[2] # un-comment and update to test individual files # 1 = quant, 2 = usd
   cat(sprintf('\n\n\n====\nfile: %s\n', basename(f)))
   
-  d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
+  #d <- read.csv(f, check.names = FALSE, strip.white = TRUE, stringsAsFactors = FALSE) # stringsAsFactors=T
   # checks names syntactically, strips leading and trailing whitespace, prevents conversion of characters to factors 
-  #d_test <- readr::read_csv(f)
   
-  ## Specifies that units are tonnes if we are reading in the Commodities Quantity data csv, and usd if we are reading in the Commodities Value data csv
-  units <- c('tonnes','usd')[str_detect(f, c('quant','value'))] # detect unit name using lowercase American English
+  d <- readr::read_csv(f) # makes this a tibble, not a dataframe (check with is_tibble(d))
+  # ignore the warning here -- it's just letting you know about an empty final row (happened quietly in previous read.csv code)
+  
+  # Specifies that units are 'tonnes' if we are reading in the Commodities Quantity data csv, and 'usd' if we are reading in the Commodities Value data csv
+  units <- c("tonnes", "usd")[str_detect(f, c("quant", "value"))] # detect unit name using lowercase American English
 
-    # ---- Preliminary cleaning & tidying ----
+  # ---- Preliminary cleaning & tidying ----
   ## gather into long format and clean up FAO-specific data foibles
   ## warning: attributes are not identical across measure variables; they will be dropped: this is fine (didn't get this warning in v2024 once code was updated)
   m <- d %>% 
@@ -145,20 +152,22 @@ for (f in files){
   # ---- Run fao data cleaning function ----
   # cleans up flags, swaps out FAO-specific codes for analysis
   m <- m %>%
-    fao_clean_data_new() %>%  # swaps out FAO-specific codes. NOTE: optional parameter 'sub_N' can be passed to control how an 'N' code is interpreted.
-    select(-c(trade, unit)) %>% # eliminate 'trade' column
+    fao_clean_data_new() %>%  # swaps out FAO-specific codes. NOTE: optional 
+    # parameter 'sub_N' can be passed to control how an 'N' code is interpreted.
+    dplyr::select(-c(trade, unit)) %>% # drop 'trade' and 'unit' columns
     arrange(country, commodity, is.na(value), year)
   # warning: NAs introduced by coercion
 
   
   # ---- Products join ----
-  ## attach product categories from com2prod, and filter out 
-  ## all entries that do not match a product category.
-  ## Note: commodity_lookup is user-defined function to compare 
-  ##   commodities in data vs commodities in lookup table
+  ## attach product categories from com2prod, and filter out all entries that 
+  ## do not match a product category.
+  ## Note: commodity_lookup is user-defined function to compare commodities
+  ##  in data vs commodities in lookup table
   
   # Load lookup for converting commodities to products
-  com2prod <- read.csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na.strings = '')
+  #com2prod <- read.csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na.strings = '')
+  com2prod <- readr::read_csv(here::here(current_np_dir, "raw", "commodities2products_weighting.csv"), na = '')
   
   ## version used in 2019:
   ##    read.csv(here('globalprep/np/v2019/raw/commodities2products.csv'), na.strings='')
@@ -177,6 +186,7 @@ for (f in files){
   ##    lookup table 'com2prod', and eliminate all commodities that do not appear in the lookup table.
   m <- m %>%
       inner_join(com2prod, by = 'commodity')
+  # many-to-many relationship is expected
     
     
   ## Special case: user-defined function deals with 
@@ -187,17 +197,27 @@ for (f in files){
   m <- m  %>%
     filter(country != "Azerbaijan") 
 
-  m_rgn <- name_2_rgn(df_in = m,
+  m_rgn <- ohicore::name_2_rgn(df_in = m,
                       fld_name = 'country', 
                       flds_unique = c('commodity', 'product', 'year'))
+  
+  # check duplicates
+  # m_duplicates <- m_rgn[duplicated(m_rgn[, c("rgn_name", "year", "commodity", "product")]),]
+  # unique(m_duplicates$country)
+  # unique(m_duplicates$rgn_name)
+
   
   # v2024 removed: 
   # Ascension, Saint Helena and Tristan da Cunha -- new syntax from previous years, will update ohicore::split_regions() to account for this change
   # Yugoslavia SFR  -- this is fine, since it broke up into the six modern countries: Croatia, Montenegro, Serbia, Slovenia, Bosnia and Herzegovina, and Macedonia in 1990-1992, which means the relevant data is still captured.
-    
-# v2021 duplicates:  [1] "China"                 "China, Hong Kong SAR"  "China, Macao SAR"      "Guadeloupe"           
-# [5] "Martinique"            "Montenegro"            "Russian Federation"    "Serbia and Montenegro"
-# [9] "Sudan"                 "Sudan (former)"        "Un. Sov. Soc. Rep."     - these are all fixed in the group by and summarise below  
+  
+  # v2021 duplicates:  [1] "China" "China, Hong Kong SAR" "China, Macao SAR"  "Guadeloupe"           
+  # [5] "Martinique" "Montenegro"  "Russian Federation" "Serbia and Montenegro"
+  # [9] "Sudan" "Sudan (former)" "Un. Sov. Soc. Rep."   - these are all fixed in the group by and summarise below  
+  
+  # v2024 duplicates for quantity and value: 
+  # [1] "China, Hong Kong SAR"  "China, Macao SAR"      "Martinique"    
+  # [4] "Serbia and Montenegro" "Sudan (former)"        "Un. Sov. Soc. Rep." 
   
   ## combine composite regions
   ## When summarizing the dataset, this function provides a modified way to sum the value column while maintaining NA values when both variables are NA (rather than turning to zero values). The function will sum non-NA values normally.
@@ -215,9 +235,11 @@ for (f in files){
   names(m_rgn)[names(m_rgn) == 'value'] <- units  
   
   ## output to .csv - should create two csvs (tonnes.csv and usd.csv)
-  harvest_out <- sprintf(here(paste0('globalprep/np/v', scen_year, '/int/%s.csv')), units)
-  write.csv(m_rgn, harvest_out, row.names = FALSE, na = '')
+  harvest_out <- here::here(current_np_dir, "int", sprintf("%s.csv", units))
+    #(paste0('globalprep/np/v', scen_year, '/int/%s.csv')), units)
+  readr::write_csv(m_rgn, harvest_out, na = '')
 }
+
 
 
 ```
@@ -227,35 +249,70 @@ for (f in files){
 Combining the quantity and value data and a bit of cleaning to remove data prior to first reporting year for each commodity and region.
 
 ```{r}
+# Read in quant dataset from intermediate folder
+h_tonnes <- read_csv(here(current_np_dir, "int", "tonnes.csv"))
 
-## Read in quant dataset from intermediate folder
-h_tonnes <- read.csv(here(paste0('globalprep/np/v', scen_year, '/int/tonnes.csv')))
+# Read in value dataset from intermediate folder
+h_usd <- read_csv(here(current_np_dir, "int", "usd.csv"))
 
-## Read in value dataset from intermediate folder
-h_usd <- read.csv(here(paste0('globalprep/np/v', scen_year, '/int/usd.csv')))
-
-## concatenates h_tonnes and h_usd data
+# concatenate h_tonnes and h_usd data
 ## h includes rgn_name, rgn_id, commodity, product, year, tonnes, usd.
 h <- h_usd %>%
-    full_join(h_tonnes, by=c('rgn_name', 'rgn_id', 'commodity', 'product', 'year')) %>%
+    full_join(h_tonnes, by = c('rgn_name', 'rgn_id', 'commodity', 'product', 'year')) %>%
     mutate(commodity = as.character(commodity)) %>%
     arrange(rgn_id, product, commodity, year) 
 
-## clips out years prior to first reporting year, for each commodity per region
+# clip out years prior to first reporting year, for each commodity per region
 h <- h %>% np_harvest_preclip()
 
 
-## save a file to use in our methods document 
-write.csv(h, "int/h_methods_sum.csv", row.names = FALSE)
+# save a file to use in our methods document 
+readr::write_csv(h, here(current_np_dir, "int", "h_methods_sum.csv"))
 
 # test <- h %>%
 #   group_by(product) %>%
 #   summarise(sum_tonnes = sum(tonnes, na.rm = TRUE),
 #             sum_usd = sum(usd, na.rm = TRUE)) ## we will show this table in the methods doc
 
+# ---- filter for our commodities of interest ----
 h <- h %>%
-    dplyr::filter(product %in% c("fish_oil", "ornamentals", "seaweeds")) ##filter for our commodities of interest
+    dplyr::filter(product %in% c("fish_oil", "ornamentals", "seaweeds")) 
 ```
+
+
+### Add FAO-zero-correction
+
+Some regions had 0 E and 0.00 (no "..." missing data flag) recorded for tonnes, but simultaneously had non-zero data for USD. 
+Before gap-filling, we need to replace zeros with NAs in two cases:
+
+    1.    When `tonnes` is equal to 0 and `usd` is not `NA` and `usd` is greater than 0
+    
+    2.    When `usd` is equal to 0 and `tonnes` is not `NA` and `tonnes` is greater than 0
+
+```{r}
+# replace certain zeros with NA to flag for gapfilling
+h_zero_na <- h %>% 
+  mutate(tonnes = ifelse(tonnes == 0 & !is.na(usd) & usd > 0, NA, tonnes)) %>% 
+  mutate(usd = ifelse(usd == 0 & !is.na(tonnes) & tonnes > 0, NA, usd))
+
+check_start <- max(h$year) - 5
+check_stop <- max(h$year)
+# check Singapore
+h %>% filter(rgn_id == 208,
+             year %in% (check_start:check_stop), # feel free to update dates
+             product %in% c("ornamentals")) %>% 
+  arrange(desc(year))
+
+h_zero_na %>% filter(rgn_id == 208,
+                     year %in% (check_start:check_stop),
+                     product %in% c("ornamentals")) %>% 
+  arrange(desc(year))
+
+# nice!
+
+```
+
+
 
 # Gapfilling
 
@@ -269,7 +326,7 @@ Summary of gapfilling that is performed:
 
 ```{r}
 
-h <- h %>% np_harvest_gapflag()
+h <- h_zero_na %>% np_harvest_gapflag()
 ## Adds flag for required gap-filling, based upon NAs in data. 
 ## NOTE: Does not perform any gap-filling.
 ## At this point, h includes: 
@@ -321,11 +378,13 @@ h_comm <- h
 ## Very few usd gapfilling, and none in recent years (data used to weight contributions), so will ignore this: gapfill=="r2_u_gr"
 h_gap <- h %>%
   mutate(gapfill = ifelse(gapfill == "r2_u_gr", "none", gapfill)) %>%   # focusing only on tonnes gapfilling
-  select(rgn_id, commodity, product, year, gapfill)
+  dplyr::select(rgn_id, commodity, product, year, gapfill)
 
 h_gap_ornamentals <- h_gap %>%
   filter(product == "ornamentals")
-write.csv(h_gap, 'output/np_ornamentals_harvest_tonnes_gf.csv', row.names = FALSE, na = '')
+
+
+readr::write_csv(h_gap, here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_gf.csv"), na = '')
 
 ```
 
@@ -336,14 +395,14 @@ write.csv(h_gap, 'output/np_ornamentals_harvest_tonnes_gf.csv', row.names = FALS
 Summarize each product per country per year, e.g., all corals in Albania in 2011. And, do some error checking.
 
 ```{r}
-
-h_prod <- h_comm %>%
+# summarize product values per country per year
+h_prod <- h_comm %>% # copy-on-modify triggered for h_comm (defined earlier)
   group_by(rgn_name, rgn_id, product, year) %>%
   summarize(tonnes = sum(tonnes, na.rm = TRUE), 
             usd = sum(usd, na.rm = TRUE))
           
 ## Error-checking and table exports to see if there are duplicates
-stopifnot(sum(duplicated(h_prod[ , c('rgn_id', 'product', 'year')])) == 0)
+stopifnot(sum(duplicated(h_prod[ , c("rgn_id", "product", "year")])) == 0)
 ```
 
 ## Quick Data Check
@@ -353,14 +412,14 @@ Look at wide format with all commodities and product subtotal (where commodity c
 ```{r}
 
 h_x_tonnes <- h_comm %>% 
-  bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
-  select(rgn_name, rgn_id, commodity, product, year, tonnes) %>%
+  bind_rows(mutate(h_prod, commodity = "Z_TOTAL")) %>%
+  dplyr::select(rgn_name, rgn_id, commodity, product, year, tonnes) %>%
   arrange(rgn_name, product, commodity, year) %>%
   spread(year, tonnes)
 
 h_x_usd <- h_comm %>% 
-  bind_rows(mutate(h_prod, commodity='Z_TOTAL')) %>%
-  select(rgn_name, rgn_id, commodity, product, year, usd) %>%
+  bind_rows(mutate(h_prod, commodity = "Z_TOTAL")) %>%
+  dplyr::select(rgn_name, rgn_id, commodity, product, year, usd) %>%
   arrange(rgn_name, product, commodity, year) %>%
   spread(year, usd)
 
@@ -369,8 +428,9 @@ australia <- h_x_usd %>% filter(product == "ornamentals", rgn_name == "Australia
 australia
 
 ## Can open up in Excel to compare subtotals per country-product-year
-write.csv(h_x_tonnes, 'int/np_harvest_tonnes_wide.csv', row.names = FALSE, na = 'NA')
-write.csv(h_x_usd,    'int/np_harvest_usd_wide.csv',    row.names = FALSE, na = 'NA')
+readr::write_csv(h_x_tonnes, here(current_np_dir, "int", "np_harvest_tonnes_wide.csv"), na = 'NA')
+
+readr::write_csv(h_x_usd, here(current_np_dir, "int", "np_harvest_usd_wide.csv"), na = 'NA')
 
 ```
 
@@ -387,15 +447,15 @@ roll_prod <- h_prod %>%
   arrange(rgn_id, product, year) %>%
   group_by(rgn_id, product) %>%
   mutate(
-      tonnes_rollmean = rollapply(tonnes, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE),
-      usd_rollmean    = rollapply(   usd, width=4, FUN=mean, align='right', partial=TRUE, na.rm=FALSE)) %>%
+      tonnes_rollmean = rollapply(tonnes, width = 4, FUN = mean, align = 'right', partial = TRUE, na.rm = FALSE),
+      usd_rollmean    = rollapply(   usd, width = 4, FUN = mean, align = 'right', partial = TRUE, na.rm = FALSE)) %>%
   rename(
       tonnes_orig = tonnes, # prevent overwriting of reported and gapfilled values
       usd_orig    = usd) %>% # prevent overwriting of reported and gapfilled values
   mutate(
       tonnes = ifelse(!is.na(tonnes_rollmean), tonnes_rollmean, tonnes_orig),
       usd    = ifelse(!is.na(usd_rollmean),    usd_rollmean,    usd_orig)) %>%
-  select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
+  dplyr::select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
 
 ```
 
@@ -405,12 +465,11 @@ Score harvest (tonnes and usd) relative to peaks. Output values as .csvs. Perfor
 
 ```{r}
 
-
-## Find peak harvest per region-product and apply conservative buffer (scale down)
+# Find peak harvest per region-product and apply conservative buffer (scale down)
 ## Find max USD value over the last 10 years 
 peak_prod <- roll_prod %>%
     group_by(rgn_id, product) %>%
-    mutate(tonnes_peak = max(tonnes, na.rm=T)) %>%
+    mutate(tonnes_peak = max(tonnes, na.rm = T)) %>%
     ungroup() 
 
 ## Determine relative status:
@@ -424,145 +483,145 @@ smooth_prod <- peak_prod %>%
 ```{r}
 
 ## Write entire data frame to .csv:
-write.csv(smooth_prod, 'int/np_harvest_smoothed_data.csv', row.names = FALSE, na = '')
+readr::write_csv(smooth_prod, here(current_np_dir, "int", "np_harvest_smoothed_data.csv"), na = '')
 
 ## Save tonnes/usd data for weighting purposes 
 tonnes <- smooth_prod %>%
-  select(rgn_id, product, year, tonnes, usd) 
-write.csv(tonnes, 'int/np_harvest_tonnes_usd.csv', row.names = FALSE, na = '')
+  dplyr::select(rgn_id, product, year, tonnes, usd) 
+
+readr::write_csv(tonnes, here(current_np_dir, "int", "np_harvest_tonnes_usd.csv"), na = '')
 
 ## Save relative tonnes data for the ornamentals layer 
 tonnes_ornamentals_rel <- smooth_prod %>%
   dplyr::filter(product == "ornamentals") %>%
   dplyr::select(rgn_id, product, year, tonnes_rel)
 
-write.csv(tonnes_ornamentals_rel, 'output/np_ornamentals_harvest_tonnes_rel.csv', row.names = FALSE, na = '')
-
+readr::write_csv(tonnes_ornamentals_rel, here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_rel.csv"), na = '')
 
 ```
 
 ## Save exposure and risk layers to ornamentals (so that we can calculate sustainability in ohi-global functions.R)
 
 ```{r}
-### calculates NP exposure based on habitats (ornamentals).
+# ==== calculates NP exposure based on habitats (ornamentals) =============
     ### Returns the first input data frame with a new column for exposure:
     ### [rgn_id rgn_name product year tonnes tonnes_rel prod_weight exposure]
     #########################################.
     
-np_harvest_orn <- read_csv("int/np_harvest_tonnes_usd.csv") %>%
+np_harvest_orn <- read_csv(here(current_np_dir, "int", "np_harvest_tonnes_usd.csv")) %>%
   dplyr::select(year, rgn_id, product, tonnes) %>%
   filter(product == "ornamentals") 
 
-    ### Determine Habitat Areas for Exposure
+### Determine Habitat Areas for Exposure
+
+hab_rocky <- read_csv(here("globalprep", "hab_rockyreef", "v2012", "data", "habitat_extent_rocky_reef_updated.csv")) %>%
+  dplyr::select(rgn_id, km2) %>%
+  dplyr::filter(km2 > 0)
 
 
-    hab_rocky <- read_csv(file.path(here(), "globalprep/hab_rockyreef/v2012/data/habitat_extent_rocky_reef_updated.csv")) %>%
-      dplyr::select(rgn_id, km2) %>%
-      dplyr::filter(km2 > 0)
+hab_coral <- read_csv(here("globalprep", "hab_coral", "v2021", "data", "habitat_extent_coral_updated.csv")) %>%
+  dplyr::select(rgn_id, km2) %>%
+  dplyr::filter(km2 > 0)
 
-    
-    hab_coral <- read_csv(file.path(here(), "globalprep/hab_coral/v2021/data/habitat_extent_coral_updated.csv")) %>%
-      dplyr::select(rgn_id, km2) %>%
-      dplyr::filter(km2 > 0)
-    
-    ### area for products in both coral and rocky reef habitats: shells, ornamentals, sponges
-    area_dual_hab <- np_harvest_orn %>%
-      dplyr::left_join(hab_coral %>%
-                         dplyr::rename(coral_km2 = km2),
-                by = c('rgn_id')) %>%
-      left_join(hab_rocky %>%
-                  dplyr::rename(rocky_km2 = km2),
-                by = c('rgn_id')) %>%
-      dplyr::rowwise() %>%
-      dplyr::mutate(km2 = sum(c(rocky_km2, coral_km2), na.rm = TRUE)) %>%
-      dplyr::filter(km2 > 0) %>%
-      dplyr::select(-coral_km2,-rocky_km2)
-    
-    ### Determine Exposure
-    ### exposure: combine areas, get tonnes / area, and rescale with log transform
-    np_exp_orn <-
-      area_dual_hab %>%
-      dplyr::mutate(expos_raw = ifelse(tonnes > 0 &
-                                  km2 > 0, (tonnes / km2), 0)) %>%
-      dplyr::group_by(product) %>%
-      dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
-      dplyr::ungroup() %>%
-      dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
-             exposure = ifelse(exposure > 1, 1, exposure)) %>%
-      dplyr::select(-km2,-expos_raw,-expos_prod_max)
-    ### clean up columns
-    
-    gap_fill <- np_exp_orn %>%
-      dplyr::mutate(gapfilled = ifelse(is.na(exposure), 1, 0)) %>%
-      dplyr::mutate(method = ifelse(is.na(exposure), "prod_average", NA)) %>%
-      dplyr::select(rgn_id = rgn_id, product, year, gapfilled, method)
-    write.csv(gap_fill, "output/np_exposure_ornamentals_gf.csv", row.names = FALSE)
-    
-    ### add exposure for countries with (habitat extent == NA)
-    np_exp_orn <- np_exp_orn %>%
-      dplyr::group_by(product) %>%
-      dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
-      dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
-      dplyr::select(-mean_exp) %>%
-      dplyr::ungroup() %>%
-      dplyr::mutate(product = as.character(product)) %>%
-      dplyr::select(rgn_id, year, product, exposure)
-    
+### area for products in both coral and rocky reef habitats: shells, ornamentals, sponges
+area_dual_hab <- np_harvest_orn %>%
+  dplyr::left_join(hab_coral %>%
+                     dplyr::rename(coral_km2 = km2),
+                   by = c('rgn_id')) %>%
+  left_join(hab_rocky %>%
+              dplyr::rename(rocky_km2 = km2),
+            by = c('rgn_id')) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(km2 = sum(c(rocky_km2, coral_km2), na.rm = TRUE)) %>%
+  dplyr::filter(km2 > 0) %>%
+  dplyr::select(-coral_km2, -rocky_km2)
+
+### Determine Exposure
+### exposure: combine areas, get tonnes / area, and rescale with log transform
+np_exp_orn <- area_dual_hab %>%
+  dplyr::mutate(expos_raw = ifelse(tonnes > 0 &
+                                     km2 > 0, (tonnes / km2), 0)) %>%
+  dplyr::group_by(product) %>%
+  dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
+                exposure = ifelse(exposure > 1, 1, exposure)) %>%
+  dplyr::select(-km2, -expos_raw, -expos_prod_max)
+
+### clean up columns
+gap_fill <- np_exp_orn %>%
+  dplyr::mutate(gapfilled = ifelse(is.na(exposure), 1, 0)) %>%
+  dplyr::mutate(method = ifelse(is.na(exposure), "prod_average", NA)) %>%
+  dplyr::select(rgn_id = rgn_id, product, year, gapfilled, method)
+
+readr::write_csv(gap_fill, here(current_np_dir, "output", "np_exposure_ornamentals_gf.csv"))
+
+### add exposure for countries with (habitat extent == NA)
+np_exp_orn <- np_exp_orn %>%
+  dplyr::group_by(product) %>%
+  dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
+  dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
+  dplyr::select(-mean_exp) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(product = as.character(product)) %>%
+  dplyr::select(rgn_id, year, product, exposure)
+
 ##save exposure as a layer
-    write.csv(np_exp_orn, "output/np_exposure_ornamentals.csv", row.names = FALSE)
-    
+readr::write_csv(np_exp_orn, here(current_np_dir, "output", "np_exposure_ornamentals.csv"))
 
-    ### calculates NP risk based on:
-    ###   ornamentals:      risk = 1 if blast or cyanide fishing
-    ### Returns a data frame of risk, by product, by region:
-    ###
-    #########################################.
-    
 
-    ### Determine Risk
-    
-    r_cyanide <- 
-      read_csv(file.path(here(), "globalprep/np_prs_poison_blast_fishing/v2013/data/gl_thr_poison_3nm_rgn2013.csv")) %>%
-      #AlignDataYears(layer_nm = "np_cyanide", layers_obj = layers) %>%
-      dplyr::filter(!is.na(score) & score > 0) %>%
-      dplyr::select(rgn_id,
-             #year = scenario_year,
-             cyanide = score)
-    
-    r_blast <-
-      read_csv(file.path(here(), "globalprep/np_prs_poison_blast_fishing/v2013/data/gl_thr_blast_3nm_rgn2013.csv")) %>%
-      #AlignDataYears(layer_nm = "np_blast", layers_obj = layers)  %>%
-      filter(!is.na(score) & score > 0) %>%
-      select(rgn_id,
-             #year = scenario_year,
-             blast = score)
-    
-    
-    ### risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code
-    ###  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the "relative intensity of cyanide fishing"
-    risk_orn <- r_cyanide %>%
-      full_join(r_blast, by = c("rgn_id")) %>%
-      mutate(ornamentals = 1) %>%
-      select(rgn_id, ornamentals)
-    
-    ### risk as binary
-    np_risk_orn <-
-      expand.grid(
-        rgn_id  = unique(np_harvest_orn$rgn_id),
-        year = unique(np_harvest_orn$year)
-      ) %>%
-    ### ornamentals
-      left_join(risk_orn, by = c('rgn_id'))  %>%
-      mutate(ornamentals = ifelse(is.na(ornamentals), 0, ornamentals)) %>%
-      gather(product, risk,-rgn_id,-year) %>%
-      mutate(product = as.character(product))
-    
-    np_risk_gf <- np_risk_orn %>%
-      mutate(gapfilled = 0, method = NA) %>%
-      dplyr::select(-risk)
-    write.csv(np_risk_gf, "output/np_risk_ornamentals_gf.csv", row.names = FALSE)
-    
+### calculates NP risk based on:
+###   ornamentals:      risk = 1 if blast or cyanide fishing
+### Returns a data frame of risk, by product, by region:
+###
+#########################################.
+
+
+### Determine Risk
+
+r_cyanide <- 
+  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_poison_3nm_rgn2013.csv")) %>%
+  #AlignDataYears(layer_nm = "np_cyanide", layers_obj = layers) %>%
+  dplyr::filter(!is.na(score) & score > 0) %>%
+  dplyr::select(rgn_id,
+                #year = scenario_year,
+                cyanide = score)
+
+r_blast <-
+  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_blast_3nm_rgn2013.csv")) %>%
+  #AlignDataYears(layer_nm = "np_blast", layers_obj = layers)  %>%
+  filter(!is.na(score) & score > 0) %>%
+  dplyr::select(rgn_id,
+         #year = scenario_year,
+         blast = score)
+
+
+### risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code
+###  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the "relative intensity of cyanide fishing"
+risk_orn <- r_cyanide %>%
+  full_join(r_blast, by = c("rgn_id")) %>%
+  mutate(ornamentals = 1) %>%
+  dplyr::select(rgn_id, ornamentals)
+
+### risk as binary
+np_risk_orn <-
+  expand.grid(
+    rgn_id  = unique(np_harvest_orn$rgn_id),
+    year = unique(np_harvest_orn$year)
+  ) %>%
+  ### ornamentals
+  left_join(risk_orn, by = c("rgn_id"))  %>%
+  mutate(ornamentals = ifelse(is.na(ornamentals), 0, ornamentals)) %>%
+  gather(product, risk, -rgn_id, -year) %>%
+  mutate(product = as.character(product))
+
+np_risk_gf <- np_risk_orn %>%
+  mutate(gapfilled = 0, method = NA) %>%
+  dplyr::select(-risk)
+
+readr::write_csv(np_risk_gf, here(current_np_dir, "output", "np_risk_ornamentals_gf.csv"))
+
 ## write this as a risk layer 
-    write.csv(np_risk_orn, "output/np_risk_ornamentals.csv", row.names = FALSE)
+readr::write_csv(np_risk_orn, here(current_np_dir, "output", "np_risk_ornamentals.csv"))
 
 ```

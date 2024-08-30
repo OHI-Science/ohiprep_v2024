@@ -22,7 +22,7 @@ knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'Figs/',
                       echo = TRUE, message = FALSE, warning = FALSE)
 
 library(dplyr)
-library(rgdal)
+# library(rgdal)
 library(raster)
 library(here)
 library(ggridges)
@@ -92,9 +92,9 @@ Additional year of data
 
 
 * __Reference__: 
-    * IUCN 2022. The IUCN Red List of Threatened Species. Version 2022-1. <http://www.iucnredlist.org>.
+    * IUCN 2024. The IUCN Red List of Threatened Species. Version 2024-1. <http://www.iucnredlist.org>.
         * Shapefiles available from: https://www.iucnredlist.org/resources/spatial-data-download
-        * __Downloaded__: July, 2022
+        * __Downloaded__: August, 2024
     *BirdLife International and Handbook of the Birds of the World (2020) Bird species distribution maps of the world. Version 2020.1. BirdLife International, Cambridge, UK and NatureServe, Arlington, USA. http://datazone.birdlife.org/species/requestdis.
         * Zipped shapefile available from BirdLife International.  
         * __Downloaded__: Feb 26, 2021
@@ -163,7 +163,7 @@ In this directory are a sequence of files used to generate the bits and pieces t
       * 6a_aggregate_spp_ranges.Rmd
       * 6b_aggregate_rr_spp_ranges.Rmd
 
-#### Then run this!  Root directory: `v2022`
+#### Then run this!  Root directory: `v2024`
 
 At this level there are several scripts, prefixed `1x_biodiversity_maps`, that collate the various taxonomic group level files (generated in `setup` part 6) and summarize to the global level. These need to be run before spp_data_prep.Rmd!
   * 1a_biodiversity_maps_comp_assessed.Rmd
@@ -196,6 +196,11 @@ In the past, we have used all species with IUCN risk assessments to calculate th
 library(beyonce)
 cols <- beyonce_palette(129, 100, type = "continuous")
 
+#2024
+n_comp <- terra::rast(here("globalprep/spp/v2024/_output/n_spp_risk_raster_comp.tif"))
+log_n_comp <- log(n_comp)
+plot(log_n_comp, col=cols)
+
 #2022
 n_comp <- terra::rast(here("globalprep/spp/v2022/_output/n_spp_risk_raster_comp.tif"))
 log_n_comp <- log(n_comp)
@@ -206,6 +211,11 @@ n_comp <- terra::rast(here("globalprep/spp/v2021/_output/n_spp_risk_raster_comp.
 log_n_comp <- log(n_comp)
 plot(log_n_comp, col=cols)
 
+
+#2024
+n_all <- terra::rast(here("globalprep/spp/v2024/_output/n_spp_risk_raster_all.tif"))
+log_n_all <- log(n_all)
+plot(log_n_all, col=cols)
 
 #2022
 n_all <- terra::rast(here("globalprep/spp/v2022/_output/n_spp_risk_raster_all.tif"))
@@ -232,11 +242,11 @@ For each cell, we multiply the average species risk by the number of species in 
 
 ```{r, eval = FALSE}
 
-mean_risk_comp <- terra::rast(here("globalprep/spp/v2022/_output/mean_risk_raster_comp.tif"))
+mean_risk_comp <- terra::rast(here("globalprep/spp/v2024/_output/mean_risk_raster_comp.tif"))
 
-n_comp <- terra::rast(here("globalprep/spp/v2022/_output/n_spp_risk_raster_comp.tif"))
+n_comp <- terra::rast(here("globalprep/spp/v2024/_output/n_spp_risk_raster_comp.tif"))
 
-regions_ohi <- terra::rast(here("globalprep/spp/v2022/_spatial/eez_rast.tif"))
+regions_ohi <- terra::rast(here("globalprep/spp/v2024/_spatial/eez_rast.tif"))
 
 risk_stack_comp <- c(regions_ohi, mean_risk_comp, n_comp)
 plot(risk_stack_comp)
@@ -246,7 +256,15 @@ risk_vals_comp <- terra::values(risk_stack_comp) %>%
 risk_vals_comp <- filter(risk_vals_comp, !is.na(eez_rast))
 risk_vals_comp <- filter(risk_vals_comp, !is.na(mean_risk_raster_comp))
 
+rgn_risk_comp <- risk_vals_comp %>%
+  rowwise() %>%
+  dplyr::mutate(risk_weight = mean_risk_raster_comp * n_spp_risk_raster_comp) %>%
+  group_by(eez_rast) %>%
+  summarize(rgn_risk_weight = sum(risk_weight),
+            rgn_n_species = sum(n_spp_risk_raster_comp))
 
+
+## This is the first time this object comes up in this script and its calling on itself ?? (found the above code from the spp_data_prep.Rmd in the v2021 root directory)
  rgn_risk_comp <- rgn_risk_comp %>%
   dplyr::rowwise() %>%
   dplyr::mutate(mean_risk = rgn_risk_weight/rgn_n_species) %>%
@@ -264,11 +282,11 @@ Trend is calculated using the same method as the risk calculation. For each cell
 
 ```{r, eval = FALSE}
 
-trend_comp <- terra::rast(here("globalprep/spp/v2022/_output/trend_raster_comp.tif"))
+trend_comp <- terra::rast(here("globalprep/spp/v2024/_output/trend_raster_comp.tif"))
 
-n_trend_comp <- terra::rast(here("globalprep/spp/v2022/_output/n_trend_raster_comp.tif"))
+n_trend_comp <- terra::rast(here("globalprep/spp/v2024/_output/n_trend_raster_comp.tif"))
 
-regions_ohi <- terra::rast(here("globalprep/spp/v2022/_spatial/eez_rast.tif"))
+regions_ohi <- terra::rast(here("globalprep/spp/v2024/_spatial/eez_rast.tif"))
 
 trend_stack_comp <- c(regions_ohi, trend_comp, n_trend_comp)
 trend_vals_comp <- terra::values(trend_stack_comp) %>%
@@ -299,7 +317,7 @@ rgn_trend_comp <- rgn_trend_comp %>%
 We estimate previous risk for each region, using the trend data.  We assume change in risk is linear.  
 
 ```{r, eval = FALSE}
-assess_years <- 2012:2022
+assess_years <- 2012:2023
 years <- expand.grid(rgn_id = unique(rgn_risk_comp$rgn_id), year=assess_years)
 
 # this is what the trend will be multiplied by to get a risk estimate for each year:
@@ -359,19 +377,19 @@ status <- status_gf %>%
 dim(status)   #220*length(assess_years)
 summary(status) # should be no NA values
 
-write.csv(status, here("globalprep/spp/v2022/output/sp_status_global.csv"), row.names=FALSE)  
+write.csv(status, here("globalprep/spp/v2024/output/sp_status_global.csv"), row.names=FALSE)  
 
 ```
 
 ### Status: Compare to last year
 
 ```{r, eval = FALSE}
-status <- read_csv(here("globalprep/spp/v2022/output/sp_status_global.csv"))
+status <- read_csv(here("globalprep/spp/v2024/output/sp_status_global.csv"))
 
-old_spp <- read.csv(here("globalprep/spp/v2021/output/sp_status_global.csv")) %>%
+old_spp <- read.csv(here("globalprep/spp/v2022/output/sp_status_global.csv")) %>%
   filter(year == max(year)) %>%
   rename(old_score = score) %>%
-  mutate(year = 2021) %>%
+  mutate(year = 2022) %>%
   left_join(status) %>%
   rename(new_score = score)
 
@@ -398,7 +416,7 @@ ggplot(old_spp, aes(x = old_score, y = new_score)) +
 Getting proportional trend requires the status data (trend/status). Proportional trend is multiplied by 5 to get estimated change in five years. 
 ```{r, eval = FALSE}
 # proportional trend requires status data
-status <- read.csv(here("globalprep/spp/v2022/output/sp_status_global.csv")) %>%
+status <- read.csv(here("globalprep/spp/v2024/output/sp_status_global.csv")) %>%
   dplyr::filter(year==max(year)) %>%
   dplyr::select(rgn_id, score)
 
@@ -437,7 +455,7 @@ trend <- trend %>%
 dim(trend) # should be 220
 summary(trend) # should be no NAs
 
-write.csv(trend, here("globalprep/spp/v2022/output/sp_trend_global.csv"), row.names=FALSE)  
+write.csv(trend, here("globalprep/spp/v2024/output/sp_trend_global.csv"), row.names=FALSE)  
 
 
 ```
@@ -446,9 +464,9 @@ write.csv(trend, here("globalprep/spp/v2022/output/sp_trend_global.csv"), row.na
 Previously we used proxy data rather than actual change in IUCN status over time.  Our previous method overestimated the magnitude of the trend.  It is not surprising there is poor correlation with trend estimates in previous years (before 2019), but it is reassuring the the values mainly fall in the same quadrant, and trends are largely the same now (2019 - present)
 ```{r, eval = FALSE}
 
-trend <- read.csv(here("globalprep/spp/v2022/output/sp_trend_global.csv"))  
+trend <- read.csv(here("globalprep/spp/v2024/output/sp_trend_global.csv"))  
 
-old_spp <- read.csv(here("globalprep/spp/v2021/output/sp_trend_global.csv")) %>%
+old_spp <- read.csv(here("globalprep/spp/v2022/output/sp_trend_global.csv")) %>%
   rename(old_score = score) %>%
   left_join(trend) 
 
@@ -467,17 +485,17 @@ ggplot(old_spp, aes(x = old_score, y = score)) +
 
 ### Status/trend: save a record of gapfilling
 ```{r, eval = FALSE}
-status <- read.csv(here("globalprep/spp/v2022/output/sp_status_global.csv")) %>%
+status <- read.csv(here("globalprep/spp/v2024/output/sp_status_global.csv")) %>%
   mutate(gapfilled = ifelse(rgn_id == 232, 1, 0)) %>%
   mutate(method = ifelse(rgn_id == 232, "mean of neighbors", NA)) %>%
   dplyr::select(rgn_id, year, gapfilled, method)
-write.csv(status, here("globalprep/spp/v2022/output/sp_status_global_gf.csv"), row.names=FALSE)          
+write.csv(status, here("globalprep/spp/v2024/output/sp_status_global_gf.csv"), row.names=FALSE)          
 
-trend <- read.csv(here("globalprep/spp/v2022/output/sp_trend_global.csv")) %>%
+trend <- read.csv(here("globalprep/spp/v2024/output/sp_trend_global.csv")) %>%
   mutate(gapfilled = ifelse(rgn_id == 232, 1, 0)) %>%
   mutate(method = ifelse(rgn_id == 232, "mean of neighbors", NA)) %>%
   dplyr::select(rgn_id, gapfilled, method)
-write.csv(trend, here("globalprep/spp/v2022/output/sp_trend_global_gf.csv"), row.names=FALSE)          
+write.csv(trend, here("globalprep/spp/v2024/output/sp_trend_global_gf.csv"), row.names=FALSE)          
 
 
 ```
@@ -495,9 +513,9 @@ rgns <- raster(file.path(dir_M, "git-annex/globalprep/spatial/v2018/rgns_3nm_off
 plot(rgns)
 
 # relevant species files
-mean_risk_comp <- raster(here("globalprep/spp/v2022/_output/mean_risk_raster_comp.tif"))
+mean_risk_comp <- raster(here("globalprep/spp/v2024/_output/mean_risk_raster_comp.tif"))
 plot(mean_risk_comp)
-n_comp <- raster(here("globalprep/spp/v2022/_output/n_spp_risk_raster_comp.tif"))
+n_comp <- raster(here("globalprep/spp/v2024/_output/n_spp_risk_raster_comp.tif"))
 plot(n_comp)
 
 
@@ -507,10 +525,10 @@ plot(risk_x_n)
 # project rasters to moll
 # saved in Mazu:spp/v2022
 raster::projectRaster(risk_x_n, rgns, method="ngb", overwrite=TRUE, 
-              filename=file.path(dir_M, "git-annex/globalprep/spp/v2022/int/risk_x_n_comp_mol.tif"), progress = "text")
+              filename=file.path(dir_M, "git-annex/globalprep/spp/v2024/int/risk_x_n_comp_mol.tif"), progress = "text")
 
 projectRaster(n_comp, rgns, method="ngb", overwrite=TRUE, 
-              filename=file.path(dir_M, "git-annex/globalprep/spp/v2022/int/n_comp_mol.tif"), progress = "text")
+              filename=file.path(dir_M, "git-annex/globalprep/spp/v2024/int/n_comp_mol.tif"), progress = "text")
 
 
 ```
@@ -525,9 +543,9 @@ Extract species risk data that corresponds to 3nm regions.
 rgns <- rast(file.path(dir_M, "git-annex/globalprep/spatial/v2018/rgns_3nm_offshore_mol.tif"))
 # plot(rgns)
 
-risk_x_n_mol <- rast(file.path(dir_M, "git-annex/globalprep/spp/v2022/int/risk_x_n_comp_mol.tif"))
+risk_x_n_mol <- rast(file.path(dir_M, "git-annex/globalprep/spp/v2024/int/risk_x_n_comp_mol.tif"))
 # plot(risk_x_n_mol)
-n_mol <- rast(file.path(dir_M, "git-annex/globalprep/spp/v2022/int/n_comp_mol.tif"))
+n_mol <- rast(file.path(dir_M, "git-annex/globalprep/spp/v2024/int/n_comp_mol.tif"))
 # plot(n_mol)
 
 risk_stack <- c(rgns, risk_x_n_mol, n_mol)
@@ -564,19 +582,19 @@ We reproject the data to have higher resolution in order to more easily extract 
 ```{r, eval=FALSE}
 rgns <- raster(file.path(dir_M, "git-annex/globalprep/spatial/v2018/rgns_3nm_offshore_mol.tif"))
 
-trend_comp <- raster::raster(here("globalprep/spp/v2022/_output/trend_raster_comp.tif"))
+trend_comp <- raster::raster(here("globalprep/spp/v2024/_output/trend_raster_comp.tif"))
 
-n_trend_comp <- raster::raster(here("globalprep/spp/v2022/_output/n_trend_raster_comp.tif"))
+n_trend_comp <- raster::raster(here("globalprep/spp/v2024/_output/n_trend_raster_comp.tif"))
 
 trend_x_n <- trend_comp*n_trend_comp
 
 # project rasters to moll
 # saved in Mazu:spp/v2022
 projectRaster(trend_x_n, rgns, method="ngb", overwrite=TRUE, 
-              filename=file.path(dir_M, "git-annex/globalprep/spp/v2022/int/trend_x_n_comp_mol.tif"),
+              filename=file.path(dir_M, "git-annex/globalprep/spp/v2024/int/trend_x_n_comp_mol.tif"),
               progress="text")
 projectRaster(n_trend_comp, rgns, method="ngb", over=TRUE, 
-              filename=file.path(dir_M, "git-annex/globalprep/spp/v2022/int/n_trend_comp_mol.tif"),
+              filename=file.path(dir_M, "git-annex/globalprep/spp/v2024/int/n_trend_comp_mol.tif"),
               progress="text")
 
 ```
@@ -589,8 +607,8 @@ Extract species risk data that corresponds to 3nm regions.
 rgns_3nm <- rast(file.path(dir_M, "git-annex/globalprep/spatial/v2018/rgns_3nm_offshore_mol.tif"))
 plot(rgns_3nm)
 
-trend_3nm_mol <- rast(file.path(dir_M, "git-annex/globalprep/spp/v2022/int/trend_x_n_comp_mol.tif"))
-n_trend_3nm_mol <- rast(file.path(dir_M, "git-annex/globalprep/spp/v2022/int/n_trend_comp_mol.tif"))
+trend_3nm_mol <- rast(file.path(dir_M, "git-annex/globalprep/spp/v2024/int/trend_x_n_comp_mol.tif"))
+n_trend_3nm_mol <- rast(file.path(dir_M, "git-annex/globalprep/spp/v2024/int/n_trend_comp_mol.tif"))
 
 
 trend_stack <- c(rgns_3nm, trend_3nm_mol, n_trend_3nm_mol)
@@ -624,7 +642,7 @@ rgn_3nm_trend <- trend_df_2 %>%
 We estimate previous risk for each region, using the trend data.  We assume change in risk is linear.  
 
 ```{r, eval = FALSE}
-assess_years <- 2012:2022
+assess_years <- 2012:2023
 years <- expand.grid(rgn_id = unique(rgn_3nm_trend$rgn_id), year=assess_years)
 
 # this is what the trend will be multiplied by to get a risk estimate for each year:
@@ -670,7 +688,7 @@ summary(res_gf)
 filter(res_gf, is.na(spp_status))
 
 # get eez value:
-eez_status <- read.csv(here("globalprep/spp/v2022/output/sp_status_global.csv")) %>%
+eez_status <- read.csv(here("globalprep/spp/v2024/output/sp_status_global.csv")) %>%
   filter(rgn_id == 19) %>%
   rename(spp_status = score)
 
@@ -690,17 +708,17 @@ resilience <- res_gf %>%
 
 summary(resilience) # should be no NA values
 
-write.csv(resilience, here("globalprep/spp/v2022/output/sp_status_3nm.csv"), row.names=FALSE)  
+write.csv(resilience, here("globalprep/spp/v2024/output/sp_status_3nm.csv"), row.names=FALSE)  
 
 ```
 
 ### Resilience: save a record of gapfilling
 ```{r, eval = FALSE}
-res <- read.csv(here("globalprep/spp/v2022/output/sp_status_3nm.csv")) %>%
+res <- read.csv(here("globalprep/spp/v2024/output/sp_status_3nm.csv")) %>%
   mutate(gapfilled = ifelse(rgn_id == 19, 1, 0)) %>%
   mutate(method = ifelse(rgn_id == 19, "eez scale data used", NA)) %>%
   dplyr::select(rgn_id, year, gapfilled, method)
-write.csv(res, here("globalprep/spp/v2022/output/sp_status_3nm_gf.csv"), row.names=FALSE)          
+write.csv(res, here("globalprep/spp/v2024/output/sp_status_3nm_gf.csv"), row.names=FALSE)          
 
 
 ```
@@ -712,11 +730,11 @@ Compared to the entire EEZ, most (but not all) coastal areas have higher species
 ```{r, eval = FALSE}
 
 # compare to eez values
-eez_status <- read.csv(here("globalprep/spp/v2022/output/sp_status_global.csv")) %>%
+eez_status <- read.csv(here("globalprep/spp/v2024/output/sp_status_global.csv")) %>%
   filter(year == max(year)) %>%
   dplyr::select(rgn_id, eez_score = score)
 
-status <- read.csv(here("globalprep/spp/v2022/output/sp_status_3nm.csv")) %>%
+status <- read.csv(here("globalprep/spp/v2024/output/sp_status_3nm.csv")) %>%
   dplyr::select(rgn_id, year, nm3_score = score) %>%
   filter(year == max(year)) %>%
   left_join(eez_status, by = "rgn_id")
@@ -730,11 +748,11 @@ ggplot(status, aes(x = nm3_score, y = eez_score)) +
   labs(x = "3nm score", y = "eez score")
 
 # compare to last year's values
-status <- read.csv(here("globalprep/spp/v2022/output/sp_status_3nm.csv")) %>%
+status <- read.csv(here("globalprep/spp/v2024/output/sp_status_3nm.csv")) %>%
   filter(year == max(year)) %>%
   dplyr::select(-year)
 
-old_spp <- read.csv(here("globalprep/spp/v2021/output/sp_status_3nm.csv")) %>%
+old_spp <- read.csv(here("globalprep/spp/v2022/output/sp_status_3nm.csv")) %>%
   filter(year == max(year)) %>%
   rename(old_score = score) %>%
   # mutate(year = 2020) %>%
@@ -750,7 +768,7 @@ abline(0,1, col="red")
 ggplot(old_spp, aes(x = old_score, y = new_score)) + 
   geom_point() + 
   geom_abline(intercept = 0) +
-  labs(x = "v2021 resilience", y = "v2021 resilience")
+  labs(x = "v2022 resilience", y = "v2024 resilience")
 
 old_spp_gather <- old_spp %>%
   dplyr::select(rgn_id, old_score, new_score) %>%

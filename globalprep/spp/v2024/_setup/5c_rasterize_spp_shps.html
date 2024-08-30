@@ -9,10 +9,10 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Wed Sep 6 09:39:39 2023 by arobinson" />
+<meta name="author" content="Compiled on Wed Aug 28 18:44:04 2024 by dduncan" />
 
 
-<title>OHI 2023 - Artisanal Opportunities: Preparing stock status data</title>
+<title>Process IUCN spp shapes</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1378,7 +1378,7 @@ overflow: visible;
 </style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -1645,288 +1645,328 @@ border-radius: 0px;
 
 
 
-<h1 class="title toc-ignore">OHI 2023 - Artisanal Opportunities:
-Preparing stock status data</h1>
-<h4 class="author"><em>Compiled on Wed Sep 6 09:39:39 2023 by
-arobinson</em></h4>
+<h1 class="title toc-ignore">Process IUCN spp shapes</h1>
+<h4 class="author"><em>Compiled on Wed Aug 28 18:44:04 2024 by
+dduncan</em></h4>
 
 </div>
 
 
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>knitr<span class="sc">::</span>opts_chunk<span class="sc">$</span><span class="fu">set</span>(<span class="at">echo =</span> <span class="cn">TRUE</span>, <span class="at">eval=</span><span class="cn">FALSE</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>knitr<span class="sc">::</span>opts_chunk<span class="sc">$</span><span class="fu">set</span>(<span class="at">fig.width =</span> <span class="dv">6</span>, <span class="at">fig.height =</span> <span class="dv">4</span>, <span class="at">fig.path =</span> <span class="st">&#39;Figs/&#39;</span>,</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>                      <span class="at">echo =</span> <span class="cn">TRUE</span>, <span class="at">message =</span> <span class="cn">FALSE</span>, <span class="at">warning =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">library</span>(raster)</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">library</span>(sf)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">library</span>(fasterize)</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co"># library(rgdal)</span></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="fu">library</span>(here)</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co"># library(rgeos)</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">here</span>(<span class="st">&#39;workflow/R/common.R&#39;</span>))</span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>goal     <span class="ot">&lt;-</span> <span class="st">&#39;spp&#39;</span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>scenario <span class="ot">&lt;-</span> <span class="st">&#39;v2024&#39;</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>dir_goal <span class="ot">&lt;-</span> <span class="fu">here</span>(<span class="st">&#39;globalprep&#39;</span>, goal, scenario)</span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="do">### goal specific folders and info</span></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a>dir_data  <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_goal, <span class="st">&#39;_data&#39;</span>)</span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a>dir_setup <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_goal, <span class="st">&#39;_setup&#39;</span>)</span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a>dir_anx  <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_M, <span class="st">&#39;git-annex/globalprep&#39;</span>)</span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>dir_goal_anx <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_anx, goal, scenario, <span class="st">&#39;spp_risk_dists&#39;</span>)</span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>dir_raw_data_anx <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_anx, <span class="st">&#39;_raw_data&#39;</span>)</span>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>dir_spatial <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_goal, <span class="st">&#39;_spatial&#39;</span>)</span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a></span>
+<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">file.path</span>(dir_setup, <span class="st">&#39;common_fxns.R&#39;</span>))</span>
+<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a>dir_bli <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_M, <span class="st">&#39;git-annex/globalprep/_raw_data/birdlife_intl/d2021&#39;</span>)</span>
+<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a>dir_shp <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_M, <span class="st">&#39;git-annex/globalprep/_raw_data/iucn_spp/d2024-1&#39;</span>)</span>
+<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a>  <span class="do">### in this folder are shapefiles at a taxonomic level, both from</span></span>
+<span id="cb2-32"><a href="#cb2-32" tabindex="-1"></a>  <span class="do">### IUCN spatial data download (version 2020-3)</span></span></code></pre></div>
 <div id="summary" class="section level1" number="1">
 <h1><span class="header-section-number">1</span> Summary</h1>
-<p>This script takes prepped non-industrial 2021 SAUP data (created in
-ao_catch_prep_saup.Rmd), and B/Bmsy estimates of those stocks to
-calculate a score for artisanal fishing species per OHI region. The FIS
-data prep will need to be completed prior to this data prep. Also make
-sure to run ao_catch_prep_saup before this script.</p>
-<div id="updates-from-previous-assessment" class="section level2" number="1.1">
-<h2><span class="header-section-number">1.1</span> Updates from previous
-assessment</h2>
-<p>For 2023 the Sea Around us Project (SAUP) data used in the
-ao_catch_prep_saup had not been updated, only the RAM data was updated
-for the FIS layers. Data files that were not newly updated and were
-stored in the repository were copied from the v2022 to v2023 folder for
-consistency.</p>
-<hr />
-</div>
+<p>Using a set of IUCN species range maps, rasterize each species to 10
+km x 10 km raster using <code>fasterize</code>. Use
+<code>presence</code> field from shapefile.</p>
+<ul>
+<li>Subpopulation polygons must be identified and rasterized separately
+from the parent polygon; this must be done by sciname and subpop fields
+since the polygon IDs are based upon the parent ID.</li>
+<li>Regional assessments need not be determined at this stage - the ID
+numbers match the global ID numbers (including subpops).</li>
+</ul>
 </div>
 <div id="data-source" class="section level1" number="2">
-<h1><span class="header-section-number">2</span> Data Source</h1>
-<p><strong>Reference</strong>: Pauly D., Zeller D., Palomares M.L.D.
-(Editors), 2020. Sea Around Us Concepts, Design and Data
-(seaaroundus.org).</p>
-<p><strong>Downloaded</strong>: September 27, 2022</p>
-<p><strong>Description</strong>: Tons per year and SAUP region with
-information on sector type, industry type, fishing entitity, reporting
-status and taxonomic information.</p>
-<p><strong>Time range</strong>: 1950 - 2019</p>
-<p><strong>Format</strong>: CSV</p>
-<p><strong>Additional Information</strong>: <a href="http://www.seaaroundus.org/sea-around-us-methods-index/">Methods</a></p>
-<p><strong>Reference</strong>: <a href="http://ramlegacy.org">RAM Legacy
-Stock Assessment Database</a> v4.495</p>
-<p><strong>Downloaded</strong>: 07/06/2023</p>
-<p><strong>Description</strong>: B/Bmsy value by stock and year (other
-data, which we do not use, are also available in the database)</p>
-<p><strong>Native data resolution</strong>: stock (fish stock, species
-and region specific)</p>
-<p><strong>Time range</strong>: 1800 - 2022 (we only use the year which
-matches our fisheries catch data (2019 for v2023))</p>
-<p><strong>Format</strong>: CSV format</p>
-<p><strong>Additional Information</strong>: We use the finalized b/bmsy
-layer from OHI-global for this data prep. We do not actually read in the
-raw RAM data here.</p>
+<h1><span class="header-section-number">2</span> Data source</h1>
+<p>IUCN Red List: Spatial Data Download IUCN: Gina Ralph direct
+communication</p>
 </div>
 <div id="methods" class="section level1" number="3">
 <h1><span class="header-section-number">3</span> Methods</h1>
-<p><strong>Steps:</strong> 1. Join the non-industrial catch data with
-the final B/Bmsy layer used in the FIS model 2. Convert the B/Bmsy
-values to scores (cap them at 1.. we wont penalize for underharvesting).
-3. Take a catch weighted average of B/Bmsy scores for each region/year
-and gapfill those regions that are missing.</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">library</span>(here)</span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">here</span>(<span class="st">&#39;workflow/R/common.R&#39;</span>))</span></code></pre></div>
-<div id="join-with-the-final-bbmsy-layer-from-the-fis-model-convert-the-bbmsy-values-to-scores-this-is-done-in-functions.r-for-fis-subgoal-but-we-do-it-in-the-dataprep-for-ao-and-take-a-catch-weighted-average-of-bbmsy-scores-for-each-regionyear." class="section level2" number="3.1">
-<h2><span class="header-section-number">3.1</span> Join with the final
-B/Bmsy layer from the fis model, convert the B/Bmsy values to scores
-(this is done in functions.R for FIS subgoal, but we do it in the
-dataprep for AO), and take a catch weighted average of B/Bmsy scores for
-each region/year.</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co">#update these!! </span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>version_year <span class="ot">&lt;-</span> <span class="st">&quot;v2023&quot;</span></span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>previous_version_year <span class="ot">&lt;-</span> <span class="st">&quot;v2022&quot;</span></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>fis_bbmsy <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="fu">here</span>(), <span class="st">&quot;globalprep/fis&quot;</span>, version_year, <span class="st">&quot;output/fis_bbmsy.csv&quot;</span>))</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a></span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>catch_AO <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="fu">here</span>(), <span class="st">&quot;globalprep/ao/&quot;</span>, version_year, <span class="st">&quot;intermediate/mean_catch.csv&quot;</span>)) </span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(catch_AO<span class="sc">$</span>rgn_id)) <span class="co"># there are only 196 regions here... we want there to be 220 regions. Which regions are missing? </span></span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a></span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="fu">region_data</span>()</span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>test <span class="ot">&lt;-</span> catch_AO <span class="sc">%&gt;%</span></span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>  <span class="fu">left_join</span>(rgns_eez)</span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a></span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">setdiff</span>(rgns_eez<span class="sc">$</span>rgn_id, test<span class="sc">$</span>rgn_id))</span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a></span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">paste</span>(<span class="fu">shQuote</span>(<span class="fu">setdiff</span>(rgns_eez<span class="sc">$</span>rgn_name, test<span class="sc">$</span>rgn_name), <span class="at">type =</span> <span class="st">&quot;cmd&quot;</span>), <span class="at">collapse =</span> <span class="st">&quot;,&quot;</span>))</span>
-<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">paste</span>(<span class="fu">shQuote</span>(<span class="fu">setdiff</span>(rgns_eez<span class="sc">$</span>rgn_id, test<span class="sc">$</span>rgn_id), <span class="at">type =</span> <span class="st">&quot;cmd&quot;</span>), <span class="at">collapse =</span> <span class="st">&quot;,&quot;</span>))</span>
-<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a></span>
-<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="co">#  [1] &quot;Macquarie Island&quot;                             &quot;Wake Island&quot;                                  &quot;Glorioso Islands&quot;                            </span></span>
-<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="co">#  [4] &quot;Juan de Nova Island&quot;                          &quot;Bassas da India&quot;                              &quot;Ile Europa&quot;                                  </span></span>
-<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a><span class="co">#  [7] &quot;Ile Tromelin&quot;                                 &quot;British Indian Ocean Territory&quot;               &quot;Gibraltar&quot;                                   </span></span>
-<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a><span class="co"># [10] &quot;South Georgia and the South Sandwich Islands&quot; &quot;Prince Edward Islands&quot;                        &quot;Crozet Islands&quot;                              </span></span>
-<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a><span class="co"># [13] &quot;Amsterdam Island and Saint Paul Island&quot;       &quot;Kerguelen Islands&quot;                            &quot;Heard and McDonald Islands&quot;                  </span></span>
-<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a><span class="co"># [16] &quot;Bouvet Island&quot;                                &quot;Clipperton Island&quot;                            &quot;Jan Mayen&quot;                                   </span></span>
-<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a><span class="co"># [19] &quot;Jarvis Island&quot;                                &quot;Palmyra Atoll&quot;                                &quot;Howland Island and Baker Island&quot;             </span></span>
-<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a><span class="co"># [22] &quot;Johnston Atoll&quot;                               &quot;Monaco&quot;                                       &quot;Antarctica&quot;                                  </span></span>
-<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a><span class="co"># [25] &quot;Oecussi Ambeno&quot;    </span></span>
-<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a></span>
-<span id="cb2-32"><a href="#cb2-32" tabindex="-1"></a></span>
-<span id="cb2-33"><a href="#cb2-33" tabindex="-1"></a><span class="do">## All small islands.. weird. So we need to gapfill these regions somehow... do they have b/bmsy data?</span></span>
-<span id="cb2-34"><a href="#cb2-34" tabindex="-1"></a></span>
-<span id="cb2-35"><a href="#cb2-35" tabindex="-1"></a>missing <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Macquarie Island&quot;</span>,<span class="st">&quot;Wake Island&quot;</span>,<span class="st">&quot;Glorioso Islands&quot;</span>,<span class="st">&quot;Juan de Nova Island&quot;</span>,<span class="st">&quot;Bassas da India&quot;</span>,<span class="st">&quot;Ile Europa&quot;</span>,<span class="st">&quot;Ile Tromelin&quot;</span>,<span class="st">&quot;British Indian Ocean Territory&quot;</span>,<span class="st">&quot;Gibraltar&quot;</span>,<span class="st">&quot;South Georgia and the South Sandwich Islands&quot;</span>,<span class="st">&quot;Prince Edward Islands&quot;</span>,<span class="st">&quot;Crozet Islands&quot;</span>,<span class="st">&quot;Amsterdam Island and Saint Paul Island&quot;</span>,<span class="st">&quot;Kerguelen Islands&quot;</span>,<span class="st">&quot;Heard and McDonald Islands&quot;</span>,<span class="st">&quot;Bouvet Island&quot;</span>,<span class="st">&quot;Clipperton Island&quot;</span>,<span class="st">&quot;Jan Mayen&quot;</span>,<span class="st">&quot;Jarvis Island&quot;</span>,<span class="st">&quot;Palmyra Atoll&quot;</span>,<span class="st">&quot;Howland Island and Baker Island&quot;</span>,<span class="st">&quot;Johnston Atoll&quot;</span>,<span class="st">&quot;Monaco&quot;</span>,<span class="st">&quot;Antarctica&quot;</span>,<span class="st">&quot;Oecussi Ambeno&quot;</span>)</span>
-<span id="cb2-36"><a href="#cb2-36" tabindex="-1"></a></span>
-<span id="cb2-37"><a href="#cb2-37" tabindex="-1"></a>missing_id <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(<span class="fu">c</span>(<span class="st">&quot;4&quot;</span>,<span class="st">&quot;12&quot;</span>,<span class="st">&quot;30&quot;</span>,<span class="st">&quot;33&quot;</span>,<span class="st">&quot;34&quot;</span>,<span class="st">&quot;35&quot;</span>,<span class="st">&quot;36&quot;</span>,<span class="st">&quot;38&quot;</span>,<span class="st">&quot;60&quot;</span>,<span class="st">&quot;89&quot;</span>,<span class="st">&quot;90&quot;</span>,<span class="st">&quot;91&quot;</span>,<span class="st">&quot;92&quot;</span>,<span class="st">&quot;93&quot;</span>,<span class="st">&quot;94&quot;</span>,<span class="st">&quot;105&quot;</span>,<span class="st">&quot;107&quot;</span>,<span class="st">&quot;144&quot;</span>,<span class="st">&quot;149&quot;</span>,<span class="st">&quot;150&quot;</span>,<span class="st">&quot;158&quot;</span>,<span class="st">&quot;159&quot;</span>,<span class="st">&quot;185&quot;</span>,<span class="st">&quot;213&quot;</span>,<span class="st">&quot;237&quot;</span>))</span>
-<span id="cb2-38"><a href="#cb2-38" tabindex="-1"></a></span>
-<span id="cb2-39"><a href="#cb2-39" tabindex="-1"></a>test <span class="ot">&lt;-</span> fis_bbmsy <span class="sc">%&gt;%</span></span>
-<span id="cb2-40"><a href="#cb2-40" tabindex="-1"></a>  <span class="fu">left_join</span>(rgns_eez) <span class="sc">%&gt;%</span></span>
-<span id="cb2-41"><a href="#cb2-41" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_name <span class="sc">%in%</span> missing)</span>
-<span id="cb2-42"><a href="#cb2-42" tabindex="-1"></a></span>
-<span id="cb2-43"><a href="#cb2-43" tabindex="-1"></a><span class="fu">setdiff</span>(missing, <span class="fu">unique</span>(test<span class="sc">$</span>rgn_name)) <span class="co"># bouvet island is missing?</span></span>
-<span id="cb2-44"><a href="#cb2-44" tabindex="-1"></a><span class="do">## they do have b/bmsy data! Lets just use their overall b/bmsy scores (for industrial fishing), as their AO b/bsmy scores.. not perfect, but better than nothing!</span></span>
-<span id="cb2-45"><a href="#cb2-45" tabindex="-1"></a></span>
-<span id="cb2-46"><a href="#cb2-46" tabindex="-1"></a>bouvet_test <span class="ot">&lt;-</span> fis_bbmsy <span class="sc">%&gt;%</span></span>
-<span id="cb2-47"><a href="#cb2-47" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">105</span>)</span>
-<span id="cb2-48"><a href="#cb2-48" tabindex="-1"></a></span>
-<span id="cb2-49"><a href="#cb2-49" tabindex="-1"></a>bouvet_test <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/scores.csv&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb2-50"><a href="#cb2-50" tabindex="-1"></a>  <span class="fu">filter</span>(region_id <span class="sc">==</span> <span class="dv">105</span>,</span>
-<span id="cb2-51"><a href="#cb2-51" tabindex="-1"></a>         goal <span class="sc">==</span> <span class="st">&quot;FIS&quot;</span>) <span class="co"># bouvet has fisheries scores... so lets use that for their AO score</span></span>
-<span id="cb2-52"><a href="#cb2-52" tabindex="-1"></a></span>
-<span id="cb2-53"><a href="#cb2-53" tabindex="-1"></a><span class="do">## First cap b/bmsy scores</span></span>
-<span id="cb2-54"><a href="#cb2-54" tabindex="-1"></a>b <span class="ot">&lt;-</span> fis_bbmsy <span class="sc">%&gt;%</span></span>
-<span id="cb2-55"><a href="#cb2-55" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">bbmsy =</span> <span class="fu">ifelse</span>(bbmsy <span class="sc">&gt;</span> <span class="dv">1</span>, <span class="dv">1</span>, bbmsy))</span>
-<span id="cb2-56"><a href="#cb2-56" tabindex="-1"></a></span>
-<span id="cb2-57"><a href="#cb2-57" tabindex="-1"></a>c <span class="ot">&lt;-</span> catch_AO <span class="sc">%&gt;%</span></span>
-<span id="cb2-58"><a href="#cb2-58" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">stock_id_taxonkey =</span> <span class="fu">as.character</span>(stock_id_taxonkey)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-59"><a href="#cb2-59" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">taxon_key =</span> stringr<span class="sc">::</span><span class="fu">str_sub</span>(stock_id_taxonkey,<span class="sc">-</span><span class="dv">6</span>,<span class="sc">-</span><span class="dv">1</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-60"><a href="#cb2-60" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">stock_id =</span> <span class="fu">substr</span>(stock_id_taxonkey, <span class="dv">1</span>, <span class="fu">nchar</span>(stock_id_taxonkey) <span class="sc">-</span></span>
-<span id="cb2-61"><a href="#cb2-61" tabindex="-1"></a>                               <span class="dv">7</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-62"><a href="#cb2-62" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">catch =</span> <span class="fu">as.numeric</span>(mean_catch)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-63"><a href="#cb2-63" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(year))) <span class="sc">%&gt;%</span></span>
-<span id="cb2-64"><a href="#cb2-64" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">region_id =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(rgn_id))) <span class="sc">%&gt;%</span></span>
-<span id="cb2-65"><a href="#cb2-65" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">taxon_key =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(taxon_key))) <span class="sc">%&gt;%</span></span>
-<span id="cb2-66"><a href="#cb2-66" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, stock_id, taxon_key, mean_catch)</span>
-<span id="cb2-67"><a href="#cb2-67" tabindex="-1"></a></span>
-<span id="cb2-68"><a href="#cb2-68" tabindex="-1"></a></span>
-<span id="cb2-69"><a href="#cb2-69" tabindex="-1"></a><span class="do">## read in fisheries mean catch so we can use to gapfill missing regions</span></span>
-<span id="cb2-70"><a href="#cb2-70" tabindex="-1"></a>  fis_mean_catch <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;../../fis&quot;</span>, version_year, <span class="st">&quot;int/mean_catch.csv&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb2-71"><a href="#cb2-71" tabindex="-1"></a>     dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">stock_id_taxonkey =</span> <span class="fu">as.character</span>(stock_id_taxonkey)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-72"><a href="#cb2-72" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">taxon_key =</span> <span class="fu">sub</span>(<span class="st">&#39;.*_&#39;</span>, <span class="st">&#39;&#39;</span>, stock_id_taxonkey)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-73"><a href="#cb2-73" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">stock_id =</span> <span class="fu">sub</span>(<span class="st">&#39;_[^_]*$&#39;</span>, <span class="st">&#39;&#39;</span>, stock_id_taxonkey)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-74"><a href="#cb2-74" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">catch =</span> <span class="fu">as.numeric</span>(mean_catch)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-75"><a href="#cb2-75" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(year))) <span class="sc">%&gt;%</span></span>
-<span id="cb2-76"><a href="#cb2-76" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">region_id =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(rgn_id))) <span class="sc">%&gt;%</span></span>
-<span id="cb2-77"><a href="#cb2-77" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">taxon_key =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(taxon_key))) <span class="sc">%&gt;%</span></span>
-<span id="cb2-78"><a href="#cb2-78" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(region_id, year, stock_id, taxon_key, catch)</span>
-<span id="cb2-79"><a href="#cb2-79" tabindex="-1"></a></span>
-<span id="cb2-80"><a href="#cb2-80" tabindex="-1"></a>  <span class="co"># test &lt;- fis_mean_catch %&gt;%</span></span>
-<span id="cb2-81"><a href="#cb2-81" tabindex="-1"></a>  <span class="co">#   filter(region_id == 105)</span></span>
-<span id="cb2-82"><a href="#cb2-82" tabindex="-1"></a></span>
-<span id="cb2-83"><a href="#cb2-83" tabindex="-1"></a>b <span class="ot">&lt;-</span> b <span class="sc">%&gt;%</span></span>
-<span id="cb2-84"><a href="#cb2-84" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">bbmsy =</span> <span class="fu">as.numeric</span>(bbmsy)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-85"><a href="#cb2-85" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">region_id =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(rgn_id))) <span class="sc">%&gt;%</span></span>
-<span id="cb2-86"><a href="#cb2-86" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(year))) <span class="sc">%&gt;%</span></span>
-<span id="cb2-87"><a href="#cb2-87" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">stock_id =</span> <span class="fu">as.character</span>(stock_id)) <span class="co"># fix some classes</span></span>
-<span id="cb2-88"><a href="#cb2-88" tabindex="-1"></a>  </span>
-<span id="cb2-89"><a href="#cb2-89" tabindex="-1"></a>  </span>
-<span id="cb2-90"><a href="#cb2-90" tabindex="-1"></a>  <span class="do">####</span></span>
-<span id="cb2-91"><a href="#cb2-91" tabindex="-1"></a>  <span class="co"># Merge the b/bmsy data with catch data</span></span>
-<span id="cb2-92"><a href="#cb2-92" tabindex="-1"></a>  <span class="do">####</span></span>
-<span id="cb2-93"><a href="#cb2-93" tabindex="-1"></a>  data_fis <span class="ot">&lt;-</span> c <span class="sc">%&gt;%</span></span>
-<span id="cb2-94"><a href="#cb2-94" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">left_join</span>(b, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&#39;rgn_id&#39;</span>, <span class="st">&#39;stock_id&#39;</span>, <span class="st">&#39;year&#39;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-95"><a href="#cb2-95" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id, year, taxon_key, mean_catch, bbmsy)</span>
-<span id="cb2-96"><a href="#cb2-96" tabindex="-1"></a>  </span>
-<span id="cb2-97"><a href="#cb2-97" tabindex="-1"></a>  </span>
-<span id="cb2-98"><a href="#cb2-98" tabindex="-1"></a>  gapfill_missing <span class="ot">&lt;-</span> b <span class="sc">%&gt;%</span></span>
-<span id="cb2-99"><a href="#cb2-99" tabindex="-1"></a>    <span class="fu">filter</span>(rgn_id <span class="sc">%in%</span> missing_id) <span class="sc">%&gt;%</span> </span>
-<span id="cb2-100"><a href="#cb2-100" tabindex="-1"></a>    <span class="fu">left_join</span>(fis_mean_catch, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;region_id&quot;</span>, <span class="st">&quot;stock_id&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-101"><a href="#cb2-101" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id, year, taxon_key, <span class="at">mean_catch =</span> catch, bbmsy) </span>
-<span id="cb2-102"><a href="#cb2-102" tabindex="-1"></a>  </span>
-<span id="cb2-103"><a href="#cb2-103" tabindex="-1"></a>  fix_bouvet <span class="ot">&lt;-</span> fis_mean_catch <span class="sc">%&gt;%</span></span>
-<span id="cb2-104"><a href="#cb2-104" tabindex="-1"></a>    <span class="fu">filter</span>(region_id <span class="sc">==</span> <span class="dv">105</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb2-105"><a href="#cb2-105" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">rgn_id =</span> region_id, stock_id, year, taxon_key, <span class="at">mean_catch =</span> catch) <span class="sc">%&gt;%</span></span>
-<span id="cb2-106"><a href="#cb2-106" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">bbmsy =</span> <span class="cn">NA</span>)</span>
-<span id="cb2-107"><a href="#cb2-107" tabindex="-1"></a>  </span>
-<span id="cb2-108"><a href="#cb2-108" tabindex="-1"></a>  data_fis_final <span class="ot">&lt;-</span> <span class="fu">rbind</span>(data_fis, gapfill_missing, fix_bouvet)</span>
-<span id="cb2-109"><a href="#cb2-109" tabindex="-1"></a>  </span>
-<span id="cb2-110"><a href="#cb2-110" tabindex="-1"></a>  <span class="fu">length</span>(<span class="fu">unique</span>(data_fis_final<span class="sc">$</span>rgn_id)) <span class="co"># 220 regions ; perfect </span></span>
-<span id="cb2-111"><a href="#cb2-111" tabindex="-1"></a>  </span>
-<span id="cb2-112"><a href="#cb2-112" tabindex="-1"></a>  </span>
-<span id="cb2-113"><a href="#cb2-113" tabindex="-1"></a>  <span class="do">###</span></span>
-<span id="cb2-114"><a href="#cb2-114" tabindex="-1"></a>  <span class="co">#  Estimate scores for taxa without b/bmsy values</span></span>
-<span id="cb2-115"><a href="#cb2-115" tabindex="-1"></a>  <span class="co"># Mean score of other fish in the region is the starting point</span></span>
-<span id="cb2-116"><a href="#cb2-116" tabindex="-1"></a>  <span class="co"># Then a penalty is applied based on the level the taxa are reported at</span></span>
-<span id="cb2-117"><a href="#cb2-117" tabindex="-1"></a>  <span class="do">###</span></span>
-<span id="cb2-118"><a href="#cb2-118" tabindex="-1"></a>  </span>
-<span id="cb2-119"><a href="#cb2-119" tabindex="-1"></a>  <span class="do">## this takes the mean score within each region and year</span></span>
-<span id="cb2-120"><a href="#cb2-120" tabindex="-1"></a>  data_fis_gf <span class="ot">&lt;-</span> data_fis_final <span class="sc">%&gt;%</span></span>
-<span id="cb2-121"><a href="#cb2-121" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">group_by</span>(rgn_id, year) <span class="sc">%&gt;%</span></span>
-<span id="cb2-122"><a href="#cb2-122" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">mean_score =</span> <span class="fu">mean</span>(bbmsy, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-123"><a href="#cb2-123" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">ungroup</span>()</span>
-<span id="cb2-124"><a href="#cb2-124" tabindex="-1"></a>  </span>
-<span id="cb2-125"><a href="#cb2-125" tabindex="-1"></a>  <span class="do">## this takes the mean score across all regions within a year</span></span>
-<span id="cb2-126"><a href="#cb2-126" tabindex="-1"></a>  <span class="co"># (when no stocks have scores within a region)</span></span>
-<span id="cb2-127"><a href="#cb2-127" tabindex="-1"></a>  data_fis_gf <span class="ot">&lt;-</span> data_fis_gf <span class="sc">%&gt;%</span></span>
-<span id="cb2-128"><a href="#cb2-128" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
-<span id="cb2-129"><a href="#cb2-129" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">mean_score_global =</span> <span class="fu">mean</span>(bbmsy, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-130"><a href="#cb2-130" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb2-131"><a href="#cb2-131" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">mean_score =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(mean_score), mean_score_global, mean_score)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-132"><a href="#cb2-132" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>mean_score_global)</span>
-<span id="cb2-133"><a href="#cb2-133" tabindex="-1"></a>  </span>
-<span id="cb2-134"><a href="#cb2-134" tabindex="-1"></a>  </span>
-<span id="cb2-135"><a href="#cb2-135" tabindex="-1"></a>  data_fis_gf <span class="ot">&lt;-</span> data_fis_gf <span class="sc">%&gt;%</span></span>
-<span id="cb2-136"><a href="#cb2-136" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">TaxonPenaltyCode =</span> <span class="fu">as.numeric</span>(<span class="fu">substring</span>(taxon_key, <span class="dv">1</span>, <span class="dv">1</span>))) <span class="sc">%&gt;%</span></span>
-<span id="cb2-137"><a href="#cb2-137" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">score_gf =</span> mean_score) <span class="sc">%&gt;%</span></span>
-<span id="cb2-138"><a href="#cb2-138" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">method =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(bbmsy), <span class="st">&quot;Mean gapfilled&quot;</span>, <span class="cn">NA</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-139"><a href="#cb2-139" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfilled =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(bbmsy), <span class="dv">1</span>, <span class="dv">0</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-140"><a href="#cb2-140" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">score =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(bbmsy), score_gf, bbmsy)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-141"><a href="#cb2-141" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">method =</span> <span class="fu">ifelse</span>(rgn_id <span class="sc">%in%</span> missing_id, <span class="st">&quot;Used fisheries subgoal b/bmsy and catch&quot;</span>, method)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-142"><a href="#cb2-142" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">gapfilled =</span> <span class="fu">ifelse</span>(rgn_id <span class="sc">%in%</span> missing_id, <span class="dv">1</span>, gapfilled))</span>
-<span id="cb2-143"><a href="#cb2-143" tabindex="-1"></a>  </span>
-<span id="cb2-144"><a href="#cb2-144" tabindex="-1"></a>  test <span class="ot">&lt;-</span> data_fis_gf <span class="sc">%&gt;%</span></span>
-<span id="cb2-145"><a href="#cb2-145" tabindex="-1"></a>    <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">105</span>)</span>
-<span id="cb2-146"><a href="#cb2-146" tabindex="-1"></a>   <span class="co"># filter(method == &quot;Used fisheries subgoal b/bmsy and catch&quot;) # perfect</span></span>
-<span id="cb2-147"><a href="#cb2-147" tabindex="-1"></a>  </span>
-<span id="cb2-148"><a href="#cb2-148" tabindex="-1"></a>  </span>
-<span id="cb2-149"><a href="#cb2-149" tabindex="-1"></a>  gap_fill_data <span class="ot">&lt;-</span> data_fis_gf <span class="sc">%&gt;%</span></span>
-<span id="cb2-150"><a href="#cb2-150" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id,</span>
-<span id="cb2-151"><a href="#cb2-151" tabindex="-1"></a>           stock_id,</span>
-<span id="cb2-152"><a href="#cb2-152" tabindex="-1"></a>           taxon_key,</span>
-<span id="cb2-153"><a href="#cb2-153" tabindex="-1"></a>           year,</span>
-<span id="cb2-154"><a href="#cb2-154" tabindex="-1"></a>           mean_catch,</span>
-<span id="cb2-155"><a href="#cb2-155" tabindex="-1"></a>           score,</span>
-<span id="cb2-156"><a href="#cb2-156" tabindex="-1"></a>           gapfilled,</span>
-<span id="cb2-157"><a href="#cb2-157" tabindex="-1"></a>           method) </span>
-<span id="cb2-158"><a href="#cb2-158" tabindex="-1"></a>  </span>
-<span id="cb2-159"><a href="#cb2-159" tabindex="-1"></a>  <span class="fu">write.csv</span>(gap_fill_data, <span class="fu">here</span>(<span class="fu">file.path</span>(<span class="st">&quot;globalprep/ao&quot;</span>, version_year, <span class="st">&quot;output/AO_bbmsy_summary_gf.csv&quot;</span>)), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb2-160"><a href="#cb2-160" tabindex="-1"></a>  </span>
-<span id="cb2-161"><a href="#cb2-161" tabindex="-1"></a>  score_data <span class="ot">&lt;-</span> data_fis_gf <span class="sc">%&gt;%</span></span>
-<span id="cb2-162"><a href="#cb2-162" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id, year, mean_catch, score)</span>
-<span id="cb2-163"><a href="#cb2-163" tabindex="-1"></a>  </span>
-<span id="cb2-164"><a href="#cb2-164" tabindex="-1"></a>   <span class="do">###</span></span>
-<span id="cb2-165"><a href="#cb2-165" tabindex="-1"></a>  <span class="co"># Calculate status for each region</span></span>
-<span id="cb2-166"><a href="#cb2-166" tabindex="-1"></a>  <span class="do">###</span></span>
-<span id="cb2-167"><a href="#cb2-167" tabindex="-1"></a></span>
-<span id="cb2-168"><a href="#cb2-168" tabindex="-1"></a>  <span class="do">## Take a catch weighted average of B/Bmsy scores for each region/year.</span></span>
-<span id="cb2-169"><a href="#cb2-169" tabindex="-1"></a>  </span>
-<span id="cb2-170"><a href="#cb2-170" tabindex="-1"></a>  score_data <span class="ot">&lt;-</span> score_data <span class="sc">%&gt;%</span></span>
-<span id="cb2-171"><a href="#cb2-171" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">group_by</span>(rgn_id, year) <span class="sc">%&gt;%</span></span>
-<span id="cb2-172"><a href="#cb2-172" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">summarize</span>(<span class="at">score =</span> <span class="fu">weighted.mean</span>(score, mean_catch)) <span class="sc">%&gt;%</span></span>
-<span id="cb2-173"><a href="#cb2-173" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">ungroup</span>() </span>
-<span id="cb2-174"><a href="#cb2-174" tabindex="-1"></a></span>
-<span id="cb2-175"><a href="#cb2-175" tabindex="-1"></a><span class="fu">summary</span>(score_data)</span>
-<span id="cb2-176"><a href="#cb2-176" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(score_data<span class="sc">$</span>rgn_id)) <span class="co"># 220 - perfect! </span></span>
-<span id="cb2-177"><a href="#cb2-177" tabindex="-1"></a></span>
-<span id="cb2-178"><a href="#cb2-178" tabindex="-1"></a>test <span class="ot">&lt;-</span> score_data <span class="sc">%&gt;%</span></span>
-<span id="cb2-179"><a href="#cb2-179" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">%in%</span> missing_id) <span class="co"># perfect! </span></span>
-<span id="cb2-180"><a href="#cb2-180" tabindex="-1"></a></span>
-<span id="cb2-181"><a href="#cb2-181" tabindex="-1"></a><span class="fu">write.csv</span>(score_data, <span class="fu">here</span>(<span class="st">&quot;globalprep/ao/&quot;</span>, version_year, <span class="st">&quot;output/ao_nind_scores.csv&quot;</span>), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
-</div>
-<div id="data-check" class="section level2" number="3.2">
-<h2><span class="header-section-number">3.2</span> Data check</h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">region_data</span>()</span>
+<div id="read-spp-shapes-correct-subpop-ids-fasterize-depth-clip-save-to-csv" class="section level2" number="3.1">
+<h2><span class="header-section-number">3.1</span> Read spp shapes,
+correct subpop IDs, <code>fasterize()</code>, depth clip, save to
+csv</h2>
+<p>We will loop over each species in each shapefile and rasterize
+separately, using <code>sf</code> and <code>fasterize</code>
+packages.</p>
+<ul>
+<li>From the full map list, filter to a single shapefile</li>
+<li>Load shapefile using <code>st_read</code>, and correct subpop IDs
+from <code>shp_iucn_sid</code> to <code>iucn_sid</code></li>
+<li>Loop over each <code>iucn_sid</code> in the shapefile, rasterizing
+(<code>fasterize()</code>) to 10 km^2 resolution, using “presence”
+field.
+<ul>
+<li>clip to neritic (&lt;=200 m) and shallow (&lt;=60 m) depth raster if
+appropriate. Otherwise mask to bathy raster. Since bathy raster was
+created by masking to area raster, cells with any marine presence will
+be kept but any non-marine cells will be dropped.</li>
+<li>Save as .tif and .csv, and compare average file sizes. .csv easier
+to work with, but might be significantly larger than .tifs in the long
+run.
+<ul>
+<li>note: no longer saving as .tif for speed and file size - just use
+.csv instead!</li>
+</ul></li>
+<li>use <code>mclapply()</code> to speed this up.</li>
+</ul></li>
+</ul>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>reload <span class="ot">&lt;-</span> <span class="cn">FALSE</span></span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>stk <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/ao/&quot;</span>,version_year, <span class="st">&quot;output/ao_nind_scores.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="fu">left_join</span>(rgns_eez)</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a></span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>need <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/ao/&quot;</span>, version_year, <span class="st">&quot;output/wb_gdppcppp_rescaled_gf.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="fu">left_join</span>(rgns_eez)</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a></span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="fu">setdiff</span>(need<span class="sc">$</span>rgn_name, stk<span class="sc">$</span>rgn_name)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>maps_to_rasterize <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(dir_data,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>                                        <span class="fu">sprintf</span>(<span class="st">&#39;spp_marine_maps_%s.csv&#39;</span>, api_version)),</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>                              <span class="at">col_types =</span> <span class="st">&#39;ddcicccl&#39;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">shp_file =</span> <span class="fu">str_replace</span>(dbf_file, <span class="st">&#39;dbf$&#39;</span>, <span class="st">&#39;shp&#39;</span>))</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="do">### rast_base for cell IDs</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>rast_base <span class="ot">&lt;-</span> <span class="fu">raster</span>(<span class="fu">file.path</span>(dir_spatial, <span class="st">&#39;cell_id_rast.tif&#39;</span>))</span>
 <span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a></span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co"># character(0); perfect! </span></span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a></span>
-<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co">#update these!!</span></span>
-<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>latest_data_year <span class="ot">&lt;-</span> <span class="dv">2019</span></span>
-<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>previous_assessment_latest_data_year <span class="ot">&lt;-</span> <span class="dv">2019</span></span>
-<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a></span>
-<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#look at the difference between this year and last</span></span>
-<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>new <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/ao/&quot;</span>,version_year, <span class="st">&quot;output/ao_nind_scores.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a>  <span class="fu">left_join</span>(rgns_eez)</span>
-<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a></span>
-<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep/ao/&quot;</span>,previous_version_year, <span class="st">&quot;output/ao_nind_scores.csv&quot;</span>)) <span class="sc">%&gt;%</span> <span class="fu">select</span>(rgn_id, year, <span class="at">old_score =</span> score)</span>
-<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a></span>
-<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a>compare <span class="ot">&lt;-</span> new <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(old, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;year&quot;</span>, <span class="st">&quot;rgn_id&quot;</span>)) <span class="sc">%&gt;%</span> <span class="fu">filter</span>(year <span class="sc">==</span> previous_assessment_latest_data_year)</span>
-<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a></span>
-<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a>compare_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(<span class="at">data =</span> compare) <span class="sc">+</span> <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> old_score, <span class="at">y =</span> score, <span class="at">text =</span> rgn_id))  <span class="sc">+</span></span>
-<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">color =</span> <span class="st">&quot;red&quot;</span>) <span class="sc">+</span> </span>
-<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="fu">paste</span>(<span class="st">&quot;score&quot;</span>, previous_assessment_latest_data_year, previous_version_year),</span>
-<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a>                                    <span class="at">y =</span> <span class="fu">paste</span>(<span class="st">&quot;score&quot;</span>, previous_assessment_latest_data_year, version_year), <span class="at">title =</span> <span class="fu">paste</span>(previous_assessment_latest_data_year, <span class="st">&quot;data comparison&quot;</span>))</span>
-<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a></span>
-<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a><span class="fu">ggplotly</span>(compare_plot, <span class="at">tooltip =</span> <span class="fu">c</span>(<span class="st">&quot;text&quot;</span>, <span class="st">&quot;score&quot;</span>, <span class="st">&quot;old_score&quot;</span>))</span></code></pre></div>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="do">### If some species already processed, remove from the list to process.</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="cf">if</span>(reload <span class="sc">==</span> <span class="cn">FALSE</span>) {</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>  maps_already_rasterized <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="fu">file.path</span>(dir_goal_anx, <span class="st">&#39;spp_rasters&#39;</span>),</span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>                                        <span class="at">pattern =</span> <span class="st">&#39;.csv&#39;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>    <span class="fu">str_replace_all</span>(<span class="st">&#39;iucn_sid_|.csv$&#39;</span>, <span class="st">&#39;&#39;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>    <span class="fu">as.integer</span>()</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>  maps_to_rasterize <span class="ot">&lt;-</span> maps_to_rasterize <span class="sc">%&gt;%</span></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a>    <span class="fu">filter</span>(<span class="sc">!</span>iucn_sid <span class="sc">%in%</span> maps_already_rasterized)</span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a>}</span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a></span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="do">### for selectively rerunning taxonomic groups</span></span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="co"># maps_to_rasterize &lt;- maps_to_rasterize %&gt;%</span></span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="co">#   filter(str_detect(dbf_file, &#39;birdlife&#39;))</span></span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a></span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a></span>
+<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a></span>
+<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a><span class="cf">if</span>(<span class="fu">nrow</span>(maps_to_rasterize) <span class="sc">==</span> <span class="dv">0</span>) { <span class="do">### all maps accounted for as .csvs</span></span>
+<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a>  </span>
+<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a>  <span class="fu">cat_msg</span>(<span class="st">&#39;reload == &#39;</span>, reload, <span class="st">&#39;... No maps to process...&#39;</span>)</span>
+<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a>  </span>
+<span id="cb3-32"><a href="#cb3-32" tabindex="-1"></a>} <span class="cf">else</span> {</span>
+<span id="cb3-33"><a href="#cb3-33" tabindex="-1"></a>  </span>
+<span id="cb3-34"><a href="#cb3-34" tabindex="-1"></a>  <span class="fu">cat_msg</span>(<span class="st">&#39;reload == &#39;</span>, reload, <span class="st">&#39;... Maps to process: &#39;</span>, <span class="fu">nrow</span>(maps_to_rasterize))</span>
+<span id="cb3-35"><a href="#cb3-35" tabindex="-1"></a></span>
+<span id="cb3-36"><a href="#cb3-36" tabindex="-1"></a>  <span class="do">### These will be used as masks</span></span>
+<span id="cb3-37"><a href="#cb3-37" tabindex="-1"></a>  rast_bathy <span class="ot">&lt;-</span> <span class="fu">raster</span>(<span class="fu">file.path</span>(dir_spatial,</span>
+<span id="cb3-38"><a href="#cb3-38" tabindex="-1"></a>                                 <span class="st">&#39;bathy_rast.tif&#39;</span>))</span>
+<span id="cb3-39"><a href="#cb3-39" tabindex="-1"></a>  rast_neritic <span class="ot">&lt;-</span> <span class="fu">raster</span>(<span class="fu">file.path</span>(dir_spatial,</span>
+<span id="cb3-40"><a href="#cb3-40" tabindex="-1"></a>                                 <span class="st">&#39;bathy_rast_neritic.tif&#39;</span>))</span>
+<span id="cb3-41"><a href="#cb3-41" tabindex="-1"></a>  rast_shallow <span class="ot">&lt;-</span> <span class="fu">raster</span>(<span class="fu">file.path</span>(dir_spatial,</span>
+<span id="cb3-42"><a href="#cb3-42" tabindex="-1"></a>                                 <span class="st">&#39;bathy_rast_shallow.tif&#39;</span>))</span>
+<span id="cb3-43"><a href="#cb3-43" tabindex="-1"></a>  </span>
+<span id="cb3-44"><a href="#cb3-44" tabindex="-1"></a>  <span class="do">################################################################.</span></span>
+<span id="cb3-45"><a href="#cb3-45" tabindex="-1"></a>  <span class="do">### Loop over each distinct shapefile with species range maps</span></span>
+<span id="cb3-46"><a href="#cb3-46" tabindex="-1"></a>  <span class="do">################################################################.</span></span>
+<span id="cb3-47"><a href="#cb3-47" tabindex="-1"></a></span>
+<span id="cb3-48"><a href="#cb3-48" tabindex="-1"></a>  bli_already_done <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;/home/dduncan/ohiprep_v2024/globalprep/spp/v2021/_setup&quot;</span>, <span class="st">&quot;int/bli_already_done.csv&quot;</span>))  </span>
+<span id="cb3-49"><a href="#cb3-49" tabindex="-1"></a>  bli_done_vec <span class="ot">&lt;-</span> bli_already_done<span class="sc">$</span>iucn_sid</span>
+<span id="cb3-50"><a href="#cb3-50" tabindex="-1"></a>  </span>
+<span id="cb3-51"><a href="#cb3-51" tabindex="-1"></a>  maps_to_rasterize <span class="ot">&lt;-</span> maps_to_rasterize <span class="sc">%&gt;%</span></span>
+<span id="cb3-52"><a href="#cb3-52" tabindex="-1"></a>    <span class="fu">filter</span>((iucn_sid <span class="sc">%in%</span> bli_done_vec))</span>
+<span id="cb3-53"><a href="#cb3-53" tabindex="-1"></a>  </span>
+<span id="cb3-54"><a href="#cb3-54" tabindex="-1"></a>  shps <span class="ot">&lt;-</span> maps_to_rasterize<span class="sc">$</span>shp_file <span class="sc">%&gt;%</span> <span class="fu">unique</span>()</span>
+<span id="cb3-55"><a href="#cb3-55" tabindex="-1"></a>  <span class="co"># shps &lt;- shps[1]</span></span>
+<span id="cb3-56"><a href="#cb3-56" tabindex="-1"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="fu">seq_along</span>(shps)) {</span>
+<span id="cb3-57"><a href="#cb3-57" tabindex="-1"></a>    <span class="co"># i &lt;- 1</span></span>
+<span id="cb3-58"><a href="#cb3-58" tabindex="-1"></a>    </span>
+<span id="cb3-59"><a href="#cb3-59" tabindex="-1"></a>    shp <span class="ot">&lt;-</span> shps[i]</span>
+<span id="cb3-60"><a href="#cb3-60" tabindex="-1"></a>    </span>
+<span id="cb3-61"><a href="#cb3-61" tabindex="-1"></a>    maps_in_shp <span class="ot">&lt;-</span> maps_to_rasterize <span class="sc">%&gt;%</span></span>
+<span id="cb3-62"><a href="#cb3-62" tabindex="-1"></a>      <span class="fu">filter</span>(shp_file <span class="sc">==</span> shp)</span>
+<span id="cb3-63"><a href="#cb3-63" tabindex="-1"></a>    </span>
+<span id="cb3-64"><a href="#cb3-64" tabindex="-1"></a>    id_fix <span class="ot">&lt;-</span> maps_in_shp <span class="sc">%&gt;%</span></span>
+<span id="cb3-65"><a href="#cb3-65" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">select</span>(shp_iucn_sid, iucn_sid, subpop, max_depth) <span class="sc">%&gt;%</span> </span>
+<span id="cb3-66"><a href="#cb3-66" tabindex="-1"></a>      <span class="fu">distinct</span>()</span>
+<span id="cb3-67"><a href="#cb3-67" tabindex="-1"></a>    </span>
+<span id="cb3-68"><a href="#cb3-68" tabindex="-1"></a>    <span class="fu">cat_msg</span>(i, <span class="st">&#39; of &#39;</span>, <span class="fu">length</span>(shps), <span class="st">&#39;: reading &#39;</span>, <span class="fu">basename</span>(shp), <span class="st">&#39; from: </span><span class="sc">\n</span><span class="st">  &#39;</span>, shp)</span>
+<span id="cb3-69"><a href="#cb3-69" tabindex="-1"></a>    </span>
+<span id="cb3-70"><a href="#cb3-70" tabindex="-1"></a>    polys_all_geometry <span class="ot">&lt;-</span> <span class="fu">read_sf</span>(shp, <span class="at">type =</span> <span class="dv">6</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb3-71"><a href="#cb3-71" tabindex="-1"></a>      <span class="fu">clean_df_names</span>()</span>
+<span id="cb3-72"><a href="#cb3-72" tabindex="-1"></a>    </span>
+<span id="cb3-73"><a href="#cb3-73" tabindex="-1"></a>    polys_all <span class="ot">&lt;-</span> polys_all_geometry <span class="sc">%&gt;%</span> </span>
+<span id="cb3-74"><a href="#cb3-74" tabindex="-1"></a>      <span class="fu">st_set_geometry</span>(<span class="cn">NULL</span>)</span>
+<span id="cb3-75"><a href="#cb3-75" tabindex="-1"></a>    </span>
+<span id="cb3-76"><a href="#cb3-76" tabindex="-1"></a>      <span class="do">### we will check geoms and fix them inside the mclapply, </span></span>
+<span id="cb3-77"><a href="#cb3-77" tabindex="-1"></a>      <span class="do">### and then reproject, one species at a time</span></span>
+<span id="cb3-78"><a href="#cb3-78" tabindex="-1"></a>    </span>
+<span id="cb3-79"><a href="#cb3-79" tabindex="-1"></a>    <span class="cf">if</span>(<span class="st">&#39;sci_name&#39;</span> <span class="sc">%in%</span> <span class="fu">names</span>(polys_all)) {</span>
+<span id="cb3-80"><a href="#cb3-80" tabindex="-1"></a>      polys_all <span class="ot">&lt;-</span> polys_all <span class="sc">%&gt;%</span> </span>
+<span id="cb3-81"><a href="#cb3-81" tabindex="-1"></a>        <span class="fu">rename</span>(<span class="at">sciname =</span> sci_name) </span>
+<span id="cb3-82"><a href="#cb3-82" tabindex="-1"></a>    } </span>
+<span id="cb3-83"><a href="#cb3-83" tabindex="-1"></a></span>
+<span id="cb3-84"><a href="#cb3-84" tabindex="-1"></a>    <span class="cf">if</span>(<span class="st">&#39;binomial&#39;</span> <span class="sc">%in%</span> <span class="fu">names</span>(polys_all)) {</span>
+<span id="cb3-85"><a href="#cb3-85" tabindex="-1"></a>      polys_all <span class="ot">&lt;-</span> polys_all <span class="sc">%&gt;%</span></span>
+<span id="cb3-86"><a href="#cb3-86" tabindex="-1"></a>        <span class="fu">rename</span>(<span class="at">sciname =</span> binomial)</span>
+<span id="cb3-87"><a href="#cb3-87" tabindex="-1"></a>    }</span>
+<span id="cb3-88"><a href="#cb3-88" tabindex="-1"></a>    </span>
+<span id="cb3-89"><a href="#cb3-89" tabindex="-1"></a>    <span class="cf">if</span>(<span class="sc">!</span><span class="st">&#39;subpop&#39;</span> <span class="sc">%in%</span> <span class="fu">names</span>(polys_all)) {</span>
+<span id="cb3-90"><a href="#cb3-90" tabindex="-1"></a>      polys_all<span class="sc">$</span>subpop <span class="ot">&lt;-</span> <span class="cn">NA_character_</span></span>
+<span id="cb3-91"><a href="#cb3-91" tabindex="-1"></a>      <span class="do">### if shape doesn&#39;t have subpop column, add it as NA</span></span>
+<span id="cb3-92"><a href="#cb3-92" tabindex="-1"></a>    }</span>
+<span id="cb3-93"><a href="#cb3-93" tabindex="-1"></a>    <span class="cf">if</span>(<span class="st">&#39;id_no&#39;</span> <span class="sc">%in%</span> <span class="fu">names</span>(polys_all)) {</span>
+<span id="cb3-94"><a href="#cb3-94" tabindex="-1"></a>      polys_all <span class="ot">&lt;-</span> polys_all <span class="sc">%&gt;%</span></span>
+<span id="cb3-95"><a href="#cb3-95" tabindex="-1"></a>        <span class="fu">rename</span>(<span class="at">iucn_sid =</span> id_no)</span>
+<span id="cb3-96"><a href="#cb3-96" tabindex="-1"></a>    }</span>
+<span id="cb3-97"><a href="#cb3-97" tabindex="-1"></a>    </span>
+<span id="cb3-98"><a href="#cb3-98" tabindex="-1"></a>    <span class="cf">if</span>(<span class="st">&#39;sisid&#39;</span> <span class="sc">%in%</span> <span class="fu">names</span>(polys_all)){</span>
+<span id="cb3-99"><a href="#cb3-99" tabindex="-1"></a>      polys_all <span class="ot">&lt;-</span> polys_all <span class="sc">%&gt;%</span></span>
+<span id="cb3-100"><a href="#cb3-100" tabindex="-1"></a>        <span class="fu">rename</span>(<span class="at">iucn_sid =</span> sisid)</span>
+<span id="cb3-101"><a href="#cb3-101" tabindex="-1"></a>    }</span>
+<span id="cb3-102"><a href="#cb3-102" tabindex="-1"></a>    </span>
+<span id="cb3-103"><a href="#cb3-103" tabindex="-1"></a>    <span class="cf">if</span>(<span class="st">&#39;presenc&#39;</span> <span class="sc">%in%</span> <span class="fu">names</span>(polys_all)){</span>
+<span id="cb3-104"><a href="#cb3-104" tabindex="-1"></a>      polys_all <span class="ot">&lt;-</span> polys_all <span class="sc">%&gt;%</span></span>
+<span id="cb3-105"><a href="#cb3-105" tabindex="-1"></a>        <span class="fu">rename</span>(<span class="at">presence =</span> presenc) </span>
+<span id="cb3-106"><a href="#cb3-106" tabindex="-1"></a>    }</span>
+<span id="cb3-107"><a href="#cb3-107" tabindex="-1"></a>    </span>
+<span id="cb3-108"><a href="#cb3-108" tabindex="-1"></a>    <span class="cf">if</span>(<span class="sc">!</span><span class="st">&#39;presence&#39;</span> <span class="sc">%in%</span> <span class="fu">names</span>(polys_all)) {</span>
+<span id="cb3-109"><a href="#cb3-109" tabindex="-1"></a>      polys_all <span class="ot">&lt;-</span> polys_all <span class="sc">%&gt;%</span></span>
+<span id="cb3-110"><a href="#cb3-110" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">presence =</span> <span class="dv">1</span>) </span>
+<span id="cb3-111"><a href="#cb3-111" tabindex="-1"></a>    }</span>
+<span id="cb3-112"><a href="#cb3-112" tabindex="-1"></a>    </span>
+<span id="cb3-113"><a href="#cb3-113" tabindex="-1"></a>    polys_all <span class="ot">&lt;-</span> polys_all <span class="sc">%&gt;%</span></span>
+<span id="cb3-114"><a href="#cb3-114" tabindex="-1"></a>        <span class="fu">st_sf</span>(<span class="at">geometry =</span> <span class="fu">st_geometry</span>(polys_all_geometry))</span>
+<span id="cb3-115"><a href="#cb3-115" tabindex="-1"></a>    </span>
+<span id="cb3-116"><a href="#cb3-116" tabindex="-1"></a>    <span class="cf">if</span>(<span class="fu">identical</span>(<span class="fu">st_geometry</span>(polys_all), <span class="fu">st_geometry</span>(polys_all_geometry)) <span class="sc">==</span> <span class="cn">FALSE</span>) {</span>
+<span id="cb3-117"><a href="#cb3-117" tabindex="-1"></a>      <span class="fu">cat_msg</span>(<span class="st">&quot;HALT: GEOMETRIES DO NOT MATCH FOR&quot;</span>, i, <span class="st">&#39; of &#39;</span>, <span class="fu">length</span>(shps), <span class="st">&#39;in&#39;</span>, <span class="fu">basename</span>(shp), <span class="st">&#39; from: </span><span class="sc">\n</span><span class="st">  &#39;</span>, shp)</span>
+<span id="cb3-118"><a href="#cb3-118" tabindex="-1"></a>    }</span>
+<span id="cb3-119"><a href="#cb3-119" tabindex="-1"></a>    </span>
+<span id="cb3-120"><a href="#cb3-120" tabindex="-1"></a>    polys_match <span class="ot">&lt;-</span> polys_all <span class="sc">%&gt;%</span></span>
+<span id="cb3-121"><a href="#cb3-121" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">shp_iucn_sid =</span> iucn_sid, sciname, subpop, presence, geometry) <span class="sc">%&gt;%</span></span>
+<span id="cb3-122"><a href="#cb3-122" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">presence =</span> <span class="fu">ifelse</span>(presence <span class="sc">==</span> <span class="dv">0</span>, <span class="dv">1</span>, presence),</span>
+<span id="cb3-123"><a href="#cb3-123" tabindex="-1"></a>             <span class="at">subpop   =</span> <span class="fu">as.character</span>(subpop)) <span class="sc">%&gt;%</span></span>
+<span id="cb3-124"><a href="#cb3-124" tabindex="-1"></a>      <span class="fu">inner_join</span>(id_fix, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&#39;shp_iucn_sid&#39;</span>, <span class="st">&#39;subpop&#39;</span>)) </span>
+<span id="cb3-125"><a href="#cb3-125" tabindex="-1"></a>    </span>
+<span id="cb3-126"><a href="#cb3-126" tabindex="-1"></a>    spp_ids <span class="ot">&lt;-</span> maps_in_shp<span class="sc">$</span>iucn_sid <span class="sc">%&gt;%</span> </span>
+<span id="cb3-127"><a href="#cb3-127" tabindex="-1"></a>      <span class="fu">sort</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb3-128"><a href="#cb3-128" tabindex="-1"></a>      <span class="fu">unique</span>()</span>
+<span id="cb3-129"><a href="#cb3-129" tabindex="-1"></a>    </span>
+<span id="cb3-130"><a href="#cb3-130" tabindex="-1"></a>  </span>
+<span id="cb3-131"><a href="#cb3-131" tabindex="-1"></a>    <span class="do">####################################################################.</span></span>
+<span id="cb3-132"><a href="#cb3-132" tabindex="-1"></a>    <span class="do">### In each shapefile, loop over each species ID using mclapply().</span></span>
+<span id="cb3-133"><a href="#cb3-133" tabindex="-1"></a>    <span class="do">####################################################################.</span></span>
+<span id="cb3-134"><a href="#cb3-134" tabindex="-1"></a>    </span>
+<span id="cb3-135"><a href="#cb3-135" tabindex="-1"></a>    <span class="fu">cat_msg</span>(<span class="st">&#39;Processing &#39;</span>, <span class="fu">basename</span>(shp), <span class="st">&#39; with &#39;</span>, <span class="fu">length</span>(spp_ids), <span class="st">&#39; species...&#39;</span>)</span>
+<span id="cb3-136"><a href="#cb3-136" tabindex="-1"></a>    </span>
+<span id="cb3-137"><a href="#cb3-137" tabindex="-1"></a>    <span class="co"># system.time({</span></span>
+<span id="cb3-138"><a href="#cb3-138" tabindex="-1"></a>      tmp <span class="ot">&lt;-</span> parallel<span class="sc">::</span><span class="fu">mclapply</span>(<span class="fu">seq_along</span>(spp_ids),</span>
+<span id="cb3-139"><a href="#cb3-139" tabindex="-1"></a>                                <span class="at">mc.cores =</span> <span class="dv">12</span>, </span>
+<span id="cb3-140"><a href="#cb3-140" tabindex="-1"></a>                                <span class="at">FUN =</span> <span class="cf">function</span>(x) {</span>
+<span id="cb3-141"><a href="#cb3-141" tabindex="-1"></a>         <span class="co">#x &lt;- 81:128</span></span>
+<span id="cb3-142"><a href="#cb3-142" tabindex="-1"></a>        spp <span class="ot">&lt;-</span> spp_ids[x]</span>
+<span id="cb3-143"><a href="#cb3-143" tabindex="-1"></a>        </span>
+<span id="cb3-144"><a href="#cb3-144" tabindex="-1"></a>        <span class="fu">cat_msg</span>(x, <span class="st">&#39; of &#39;</span>, <span class="fu">length</span>(spp_ids), <span class="st">&#39;: Processing &#39;</span>, spp, <span class="st">&#39; in &#39;</span>, <span class="fu">basename</span>(shp),</span>
+<span id="cb3-145"><a href="#cb3-145" tabindex="-1"></a>                <span class="st">&#39; (group &#39;</span>, i, <span class="st">&#39; of &#39;</span>, <span class="fu">length</span>(shps), <span class="st">&#39;)...</span><span class="sc">\n</span><span class="st">&#39;</span>)</span>
+<span id="cb3-146"><a href="#cb3-146" tabindex="-1"></a>        </span>
+<span id="cb3-147"><a href="#cb3-147" tabindex="-1"></a>        spp_shp <span class="ot">&lt;-</span> polys_match <span class="sc">%&gt;%</span></span>
+<span id="cb3-148"><a href="#cb3-148" tabindex="-1"></a>          <span class="fu">filter</span>(iucn_sid <span class="sc">==</span> spp)</span>
+<span id="cb3-149"><a href="#cb3-149" tabindex="-1"></a>        </span>
+<span id="cb3-150"><a href="#cb3-150" tabindex="-1"></a>        spp_shp <span class="ot">&lt;-</span> <span class="fu">valid_check</span>(spp_shp)</span>
+<span id="cb3-151"><a href="#cb3-151" tabindex="-1"></a>          <span class="do">### if invalid geom, and bounds exceeded, buffer to 0</span></span>
+<span id="cb3-152"><a href="#cb3-152" tabindex="-1"></a>        spp_shp <span class="ot">&lt;-</span> spp_shp <span class="sc">%&gt;%</span></span>
+<span id="cb3-153"><a href="#cb3-153" tabindex="-1"></a>          <span class="fu">clip_to_globe</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb3-154"><a href="#cb3-154" tabindex="-1"></a>            <span class="do">### indiv files should have adjusted boundaries already; only </span></span>
+<span id="cb3-155"><a href="#cb3-155" tabindex="-1"></a>            <span class="do">### files from Spatial Data Download should run into this</span></span>
+<span id="cb3-156"><a href="#cb3-156" tabindex="-1"></a>          <span class="fu">st_transform</span>(gp_proj4)</span>
+<span id="cb3-157"><a href="#cb3-157" tabindex="-1"></a>        </span>
+<span id="cb3-158"><a href="#cb3-158" tabindex="-1"></a>        spp_rast <span class="ot">&lt;-</span> fasterize<span class="sc">::</span><span class="fu">fasterize</span>(spp_shp, rast_base, <span class="at">field =</span> <span class="st">&#39;presence&#39;</span>, <span class="at">fun =</span> <span class="st">&#39;min&#39;</span>)</span>
+<span id="cb3-159"><a href="#cb3-159" tabindex="-1"></a>        </span>
+<span id="cb3-160"><a href="#cb3-160" tabindex="-1"></a>        <span class="do">### depth clip if necessary; otherwise clip to bathy raster (which previously</span></span>
+<span id="cb3-161"><a href="#cb3-161" tabindex="-1"></a>        <span class="do">### was clipped to area raster - so cells with any marine area will be kept,</span></span>
+<span id="cb3-162"><a href="#cb3-162" tabindex="-1"></a>        <span class="do">### and non-marine cells will be dropped)</span></span>
+<span id="cb3-163"><a href="#cb3-163" tabindex="-1"></a>        <span class="cf">if</span>(<span class="fu">unique</span>(spp_shp<span class="sc">$</span>max_depth) <span class="sc">==</span> <span class="st">&#39;&lt; 20 m&#39;</span>) {</span>
+<span id="cb3-164"><a href="#cb3-164" tabindex="-1"></a>          spp_rast <span class="ot">&lt;-</span> <span class="fu">mask</span>(spp_rast, rast_shallow)</span>
+<span id="cb3-165"><a href="#cb3-165" tabindex="-1"></a>        } <span class="cf">else</span> <span class="cf">if</span>(<span class="fu">unique</span>(spp_shp<span class="sc">$</span>max_depth) <span class="sc">==</span> <span class="st">&#39;&lt; 200 m&#39;</span>) {</span>
+<span id="cb3-166"><a href="#cb3-166" tabindex="-1"></a>          spp_rast <span class="ot">&lt;-</span> <span class="fu">mask</span>(spp_rast, rast_neritic)</span>
+<span id="cb3-167"><a href="#cb3-167" tabindex="-1"></a>        } <span class="cf">else</span> {</span>
+<span id="cb3-168"><a href="#cb3-168" tabindex="-1"></a>          spp_rast <span class="ot">&lt;-</span> <span class="fu">mask</span>(spp_rast, rast_bathy)</span>
+<span id="cb3-169"><a href="#cb3-169" tabindex="-1"></a>        }</span>
+<span id="cb3-170"><a href="#cb3-170" tabindex="-1"></a>        <span class="do">### write out as a raster:</span></span>
+<span id="cb3-171"><a href="#cb3-171" tabindex="-1"></a>        <span class="co"># rast_file &lt;- file.path(dir_o_anx, sprintf(&#39;spp_rasters/iucn_sid_%s.tif&#39;, spp))</span></span>
+<span id="cb3-172"><a href="#cb3-172" tabindex="-1"></a>        <span class="co"># raster::writeRaster(spp_rast, rast_file, overwrite = TRUE)</span></span>
+<span id="cb3-173"><a href="#cb3-173" tabindex="-1"></a>        <span class="do">### See note below about file size; rasters are larger than csvs in general</span></span>
+<span id="cb3-174"><a href="#cb3-174" tabindex="-1"></a>        </span>
+<span id="cb3-175"><a href="#cb3-175" tabindex="-1"></a>        <span class="do">### convert to dataframe and write out as a csv:</span></span>
+<span id="cb3-176"><a href="#cb3-176" tabindex="-1"></a>        spp_present <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">cell_id  =</span> <span class="fu">values</span>(rast_base),</span>
+<span id="cb3-177"><a href="#cb3-177" tabindex="-1"></a>                                  <span class="at">presence =</span> <span class="fu">values</span>(spp_rast)) <span class="sc">%&gt;%</span></span>
+<span id="cb3-178"><a href="#cb3-178" tabindex="-1"></a>          <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(presence))</span>
+<span id="cb3-179"><a href="#cb3-179" tabindex="-1"></a>        </span>
+<span id="cb3-180"><a href="#cb3-180" tabindex="-1"></a>        <span class="cf">if</span>(<span class="fu">nrow</span>(spp_present) <span class="sc">==</span> <span class="dv">0</span>) {</span>
+<span id="cb3-181"><a href="#cb3-181" tabindex="-1"></a>    <span class="fu">cat_msg</span>(<span class="st">&#39;Species ID &#39;</span>, spp, <span class="st">&#39; resulted in a zero-length dataframe.&#39;</span>)</span>
+<span id="cb3-182"><a href="#cb3-182" tabindex="-1"></a>        }</span>
+<span id="cb3-183"><a href="#cb3-183" tabindex="-1"></a>        </span>
+<span id="cb3-184"><a href="#cb3-184" tabindex="-1"></a>        <span class="fu">write_csv</span>(spp_present, <span class="fu">file.path</span>(dir_goal_anx, <span class="st">&#39;spp_rasters&#39;</span>,</span>
+<span id="cb3-185"><a href="#cb3-185" tabindex="-1"></a>                                         <span class="fu">sprintf</span>(<span class="st">&#39;iucn_sid_%s.csv&#39;</span>, spp)))</span>
+<span id="cb3-186"><a href="#cb3-186" tabindex="-1"></a>        </span>
+<span id="cb3-187"><a href="#cb3-187" tabindex="-1"></a>        <span class="fu">return</span>(<span class="cn">NA</span>)</span>
+<span id="cb3-188"><a href="#cb3-188" tabindex="-1"></a>      }) <span class="do">### end of mclapply FUN definition</span></span>
+<span id="cb3-189"><a href="#cb3-189" tabindex="-1"></a>    <span class="co"># }) </span><span class="al">###</span><span class="co"> end of system.time call</span></span>
+<span id="cb3-190"><a href="#cb3-190" tabindex="-1"></a>  } <span class="do">### end of for loop over each species group</span></span>
+<span id="cb3-191"><a href="#cb3-191" tabindex="-1"></a>} <span class="do">### end of &quot;if&quot; check to make sure there are any maps to rasterize</span></span>
+<span id="cb3-192"><a href="#cb3-192" tabindex="-1"></a></span>
+<span id="cb3-193"><a href="#cb3-193" tabindex="-1"></a><span class="do">## Note: v2020: This got to the end and didn&#39;t indicate it was finished. I only knew because I periodically stopped the loop and checked after it got to the last couple of sfs and then looked at maps_to_rasterize that it was finished. </span></span>
+<span id="cb3-194"><a href="#cb3-194" tabindex="-1"></a><span class="do">## v2021: I had to add some extra if statements to fix column name issues with the new bli data.</span></span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>maps <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(dir_data,</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>                           <span class="fu">sprintf</span>(<span class="st">&#39;spp_marine_maps_%s.csv&#39;</span>, api_version)),</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>                 <span class="at">col_types =</span> <span class="st">&#39;ddciccc&#39;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">spp_group =</span> dbf_file, iucn_sid, sciname, subpop) <span class="sc">%&gt;%</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">spp_group =</span> <span class="fu">str_replace</span>(spp_group, <span class="st">&#39;.dbf&#39;</span>, <span class="st">&#39;&#39;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="fu">distinct</span>()</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>csvs <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="fu">file.path</span>(dir_goal_anx, <span class="st">&#39;spp_rasters&#39;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  <span class="fu">str_replace_all</span>(<span class="st">&#39;iucn_sid_|.csv&#39;</span>, <span class="st">&#39;&#39;</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="fu">file.path</span>(dir_goal_anx, <span class="st">&#39;spp_rasters&#39;</span>),</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>                <span class="at">full.names =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>x <span class="ot">&lt;-</span> x[<span class="fu">str_detect</span>(x, <span class="fu">paste0</span>(csvs, <span class="at">collapse =</span> <span class="st">&#39;|&#39;</span>))]</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>y <span class="ot">&lt;-</span> <span class="fu">file.info</span>(x) <span class="sc">%&gt;%</span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">f =</span> <span class="fu">basename</span>(<span class="fu">rownames</span>(.)),</span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>         <span class="at">type =</span> <span class="fu">ifelse</span>(<span class="fu">str_detect</span>(f, <span class="st">&#39;csv$&#39;</span>), <span class="st">&#39;csv&#39;</span>, <span class="st">&#39;tif&#39;</span>),</span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>         <span class="at">iucn_sid =</span> <span class="fu">str_replace_all</span>(f, <span class="st">&#39;iucn_sid_|.(csv|tif)&#39;</span>, <span class="st">&#39;&#39;</span>),</span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>         <span class="at">iucn_sid =</span> <span class="fu">as.integer</span>(iucn_sid)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>  <span class="fu">left_join</span>(maps, <span class="at">by =</span> <span class="st">&#39;iucn_sid&#39;</span>)</span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a>z <span class="ot">&lt;-</span> y <span class="sc">%&gt;%</span></span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a>  <span class="fu">group_by</span>(type, spp_group) <span class="sc">%&gt;%</span></span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">mean_size =</span> <span class="fu">mean</span>(size), <span class="at">n_spp =</span> <span class="fu">n</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a>  <span class="fu">spread</span>(type, mean_size) <span class="sc">%&gt;%</span></span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a>  <span class="co"># mutate(ratio = tif / csv) %&gt;%</span></span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(csv))</span>
+<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a></span>
+<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a> <span class="co">#sum(z$tif * z$n_spp) </span><span class="al">###</span><span class="co"> 0</span></span>
+<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a> <span class="co">#sum(z$csv * z$n_spp) </span><span class="al">###</span><span class="co"> 3449809892</span></span>
+<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a></span>
+<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a></span>
+<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a>zz <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">spp_group =</span> <span class="st">&#39;TOTAL: all available spp maps&#39;</span>,</span>
+<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a>                <span class="at">n_spp =</span> <span class="fu">sum</span>(z<span class="sc">$</span>n_spp),</span>
+<span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a>                <span class="at">csv   =</span> <span class="fu">sum</span>(z<span class="sc">$</span>csv <span class="sc">*</span> z<span class="sc">$</span>n_spp)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-37"><a href="#cb4-37" tabindex="-1"></a>  <span class="fu">bind_rows</span>(z)</span>
+<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a></span>
+<span id="cb4-39"><a href="#cb4-39" tabindex="-1"></a>DT<span class="sc">::</span><span class="fu">datatable</span>(zz, <span class="at">caption =</span> <span class="st">&#39;Mean file size by group and type&#39;</span>)</span></code></pre></div>
 </div>
 </div>
 
@@ -1967,7 +2007,7 @@ $(document).ready(function () {
 <!-- code folding -->
 <script>
 $(document).ready(function () {
-  window.initializeCodeFolding("show" === "show");
+  window.initializeCodeFolding("hide" === "show");
 });
 </script>
 
@@ -1984,7 +2024,7 @@ $(document).ready(function ()  {
 
     // establish options
     var options = {
-      selectors: "h1",
+      selectors: "h1,h2,h3",
       theme: "bootstrap3",
       context: '.toc-content',
       hashGenerator: function (text) {

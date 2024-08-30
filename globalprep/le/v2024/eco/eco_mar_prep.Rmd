@@ -20,9 +20,9 @@ editor_options:
     wrap: 72
 ---
 
-## Overview
+# Overview
 
-### Mariculture Revenue Data
+## Mariculture Revenue Data
 
 -   Data came from FishStatJ, FAO's application to obtain different
     fishery-related metrics by country as well as by sector
@@ -48,15 +48,22 @@ editor_options:
         /home/shares/ohi/git-annex/globalprep/\_raw_data/FAO_mariculture/*your
         data year*
 
-### Mariculture Jobs Data
+## Mariculture Jobs Data
 
 -   Partially obtained from [FAO Fisheries and Aquaculture Statistical Yearbook](https://openknowledge.fao.org/server/api/core/bitstreams/2be6c2fa-07b1-429d-91c5-80d3d1af46a6/content)
 -   Also brought in OECD data from their online [OECD Data Explorer](https://data-explorer.oecd.org/vis?df%5Bds%5D=DisseminateFinalDMZ&df%5Bid%5D=DSD_SOE%40DF_SOE&df%5Bag%5D=OECD.ENV.EPI&dq=.A....&pd=1995%2C2024&to%5BTIME_PERIOD%5D=false&vw=tb)
 
+# Methods
 
-### Setup
+## Setup
 
-```{r}
+```{r render-setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, eval = FALSE)
+
+# options(scipen=99) # for number of digits printed
+```
+
+```{r library-setup}
 # load packages ---- 
 if (!require(librarian)){
   install.packages("librarian")
@@ -106,7 +113,7 @@ int_dir <- here::here(data_path, "int")
 
 ## Read in Data
 
-```{r}
+```{r read data}
 # OHI regions data ----
 # read in OHI regions for joining
 region_names <- read_csv("https://raw.githubusercontent.com/OHI-Science/ohi-global/draft/eez/spatial/regions_list.csv") %>% 
@@ -123,7 +130,7 @@ aquaculture_value <- read_csv(file.path(fao_dir, "/FAO_GlobalAquacultureProducti
 
 ## Clean Aquaculture value data
 
-### Note: This process was done manually because instead of reading in the data with "flag" as the header for each observation's symbol, 2024's year was read in with "symbol" as the header for each observation's symbool
+### Note: This process was done manually because instead of reading in the data with "flag" as the header for each observation's symbol, 2024's year was read in with "symbol" as the header for each observation's symbol
 
 -   As a result, the data cleaning function fao_online_portal_clean.R
     was not able to be run. So what I did was drag components of the
@@ -132,7 +139,7 @@ aquaculture_value <- read_csv(file.path(fao_dir, "/FAO_GlobalAquacultureProducti
     -   With the data in the correct format (drawn from online FAO
         portal), this function should apply
 
-```{r}
+```{r clean fao data}
 #clean the aquaculture value data ----
 #this will also be used in the mariculture jobs data section, so need to keep in all environments in the first step
 
@@ -257,13 +264,13 @@ total_mar_rev %>%
 ## Assigning country names to their respective regions in OHI
 
 -   **NOTE**: This year used the names_2_rgn function to find out which
-    country names needed to be hardcoded to align with the reference
+    country names needed to be hard-coded to align with the reference
     regions.
     - Run the names_2_rgn function on your data, and the output should tell you any countries that    were removed for not having a match in the look-up table 
     - Depending on which regions show up as not having a match, you may be required to hard-code the names to those of synonyms using case_when() (see chunk below for an example)
     - call 'rgn_synonyms <- ohicore::rgn_synonyms' in a code chunk to load the OHI Region synonyms for review 
 
-```{r}
+```{r fix country names}
 # Need to join with regions and assign each country its respective OHI Region ----
 
 # Checking the unique country names for anything that needs to be hard-coded
@@ -490,7 +497,7 @@ duplicates <- eco_mar_usd_raw[duplicated(eco_mar_usd_raw[, c('rgn_id','year')]),
 
 ## Find out which countries can be gapfilled versus the countries that cant be
 
-```{r}
+```{r gapfill identification}
 # For 2024: The countries that can be gapfilled are: Yemen, Uruguay, Togo, Sint Eustatius, Seychelles (needs > three data points over time), Qatar, Puerto Rico, Poland, Libya, Jordan, Falkland Islands, Estonia, Dominica, Curacao, Cape Verde
 
 eco_mar_usd_raw_cut <- eco_mar_usd_raw %>% 
@@ -515,7 +522,7 @@ heatmap
 
 Here we'll use `na.approx()` from {zoo} to interpolate missing values and extrapolate missing extremes (NA values that do not fall between non-NA values) by copying the nearest extreme value. After speaking with Melanie Frazier about our methodology, she recommended to not fill in any values for countries with only 1 data point. If you choose to do this in future years, we've provided commented-out code following the chunk below for assessing how much of your data this impacts.
 
-```{r}
+```{r gapfilling}
 # gapfilling ----
 # estimate tourism GDP proportion for geo areas with missing data
 eco_mar_usd_gf <- eco_mar_usd_raw_cut %>% 
@@ -562,7 +569,7 @@ summary(check) # Cool no NAs
 
 Refer to the OHI Methods or [Ben Halpern's Supplementary Information](https://static-content.springer.com/esm/art%3A10.1038%2Fnature11397/MediaObjects/41586_2012_BFnature11397_MOESM79_ESM.pdf) **(page 29)** for the multipliers to apply towards revenue values by sector for developing versus developed countries. For mariculture revenue, the multipliers are 1.59 for developing countries and 2.377 for developed countries.
 
-```{r}
+```{r apply multiplier and finalize}
 # Finally: Applying the multiplier to mariculture for developed versus developing countries ----
 # Setting filepath to unsd data on developing versus developed countries 
 fp_unsd <- file.path(dir_M,"git-annex/globalprep/_raw_data/UNSD/d2024/historical-classification-of-developed-and-developing-regions.xlsx")
