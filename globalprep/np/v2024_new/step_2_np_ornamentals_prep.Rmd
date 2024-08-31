@@ -234,7 +234,25 @@ np_exposure_new <- np_exp_raw %>%
   dplyr::mutate(global_95th = global_95th_quantile) %>% 
   dplyr::mutate(exposure = expos_raw / global_95th)
 
-#value/95th quantile
+ 
+# log-transform: ----
+np_exp_log <- np_exp_raw %>% 
+  dplyr::mutate(log_exp = log(expos_raw))
+
+log_exp_recent_decade <- np_exp_log %>% 
+  dplyr::filter(year %in% c(exp_decade_range))
+
+log_global_95th_exp <- stats::quantile(log_exp_recent_decade$log_exp, probs = c(0.95))
+# -1.889
+
+np_log_exposure <- np_exp_log %>% 
+  dplyr::mutate(log_global_95th = log_global_95th_exp) %>% 
+  dplyr::mutate(log_exposure = log_exp / log_global_95th)
+
+
+np_log_exposure_2 <- np_exp_log %>% 
+  dplyr::mutate(log_global_95th = log_global_95th_exp) %>% 
+  dplyr::mutate(log_exposure = (log_exp + 1) / (log_global_95th + 1))
 
 
 
