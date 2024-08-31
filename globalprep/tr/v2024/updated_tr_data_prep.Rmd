@@ -31,18 +31,62 @@ The general calculation is: tr = Ap \* Sr and Xtr = tr/90th quantile across regi
 
 *The following data are used:*
 
--   Numbers of tourist arrivals, used in the calculation of the proportion of arrivals to area of coastline to population: obtained through the [UNWTO](https://www.unwto.org/tourism-statistics/key-tourism-statistics) (in the form of thousands of people). More info on tourism terms [here](https://www.unwto.org/glossary-tourism-terms). Range: 1995-2022 (only 2008-2022 is used)
+-   Numbers of tourist arrivals, used in the calculation of the proportion of arrivals to area of coastline to population: obtained through the [UNWTO](https://www.unwto.org/tourism-statistics/key-tourism-statistics) (in the form of thousands of people). More info on tourism terms [here](https://www.unwto.org/glossary-tourism-terms). Range: 1995-2022 (only 2008-2022 is used).
+  - World bank total population data (see how to download within the README.md for `/home/shares/ohi/git-annex/globalprep/_raw_data/WorldBank/d2024/WorldBank_global_country_population_1960-2023/API_SP.POP.TOTL_DS2_en_csv_v2_1584446.csv`).
+  - Coastal pop: `/ohiprep_v2024/globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv`,
+  - Coastal area from lsp (The $$km^2$$ of coastal area for all OHI regions by aggregating the area protected 1 kilometer inland, and 3 nautical miles out into the eez)
 -   Tourism sustainability: World Economic Forum. The Travel & Tourism Development Index 2024 (version May 2024). 2024. [TTDI](https://www3.weforum.org/docs/WEF_Travel_and_Tourism_Development_Index_2024.pdf)
 -   Per capita GDP: (World Bank with gaps filled using CIA data), used to gapfill missing values in Tourism sustainability
--   World Bank (brought in from AO intermediate, \~/globalprep/ao/v2024/intermediate/gdppcppp_ohi.csv)
--   CIA (<https://www.cia.gov/the-world-factbook/field/real-gdp-per-capita/country-comparison/>)
+  -   World Bank (brought in from AO intermediate, \~/globalprep/ao/v2024/intermediate/gdppcppp_ohi.csv)
+  -   CIA (<https://www.cia.gov/the-world-factbook/field/real-gdp-per-capita/country-comparison/>) Click the download button on the website, top right hand corner.
 
-**Ap = multiply arrivals by coastal population/total population, then divide by coastal area (sum of inland (1 km) and offshore (3 nm) area)**
+**Citation**: 
+World Bank. (2024). *Population, total*. https://data.worldbank.org/indicator/SP.POP.TOTL
+© 2024 The World Bank Group, All Rights Reserved.
 
--   Rescale using the 90th quantile as the reference point, or 80th (reevaluate when we get to this step)
--   Consider dropping low population areas, like they did in v2023
--   Calculate `Sr = (S-1)/5`; Sustainability of tourism
--   Finally, use the equation: `tr = Ap * Sr` for final scores before updating ohi-global
+**Methodology:**
+
+1.  Download and clean international UNWTO inbound tourism arrivals data
+
+-   Filter to 2005:2021 and remove regions without enough data (less than or equal to three observations)
+
+2.  Download and clean domestic UNWTO inbound tourism Accommodations and Trips data
+
+-   Filter to 2005:2021 and remove regions without enough data (less than or equal to three observations)
+-   Gapfill total guests with:
+    -   "Accommodations" data: hotel guests (linear model prediction)
+    -   "Trips" data: overnight guests (simple replacement)
+    -   "Accommodations" data: total overnights (this is guests \* days; so determine average number of nights stayed and divide by this)
+    -   "Accommodations" data: hotel overnights (linear model)
+
+3.  Gapfilling missing years in preparation for International and Domestic Aggregation
+
+-   International: for years that do not have values (upfilling for previous or gap years, then lm for future years)
+-   Domestic: for years that do not have values (upfilling for previous or gap years, then lm for future years)
+-   Domestic: for regions present in international data that is not in domestic data. This is done by taking the mean of the domestic guest values by georegion (r2 and then r1 if there is not enough data for the r2). We decided that there would be less error after aggregating if we at least put a mean (by georegion) domestic guest value for regions that have no domestic data, but they have international data. That way, all international regions will be adding to a domestic value, rather than some regions only having international data.
+
+4.  Calculating Ap (arrivals proportion)
+
+-   Aggregating International and Domestic
+-   Finding the Coastal Proportion
+    -   This is done by dividing the coastal population by the total population of a region.
+        -   *Coastal pop*: `/ohiprep_v2024/globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv`,
+        -   *Total pop*: World Bank `/home/shares/ohi/git-annex/globalprep/_raw_data/WorldBank/d2024/WorldBank_global_country_population_1960-2023/API_SP.POP.TOTL_DS2_en_csv_v2_1584446.csv`
+-   Determining regional Coastal Area
+    -   The $$km^2$$ of coastal area for all OHI regions by aggregating the area protected 1 kilometer inland, and 3 nautical miles out into the eez.
+-   Ap
+    -   Join all of these data sources and conduct $$Ap = \frac{TourismArrivals * (CoastalPop/TotalPop)}{CoastalArea}$$
+
+5.  Rescale Ap proportion using the 90th quantile
+
+-   As according to the [OHI methods](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#tourism-and-recreation), the Ap values for each year and region is rescaled using the 90th quartile for each region.
+
+$$\frac{T_r}{T_{90th}}$$
+
+6.  Ts: Sustainability Index -- TTDI
+
+-   Data is from the World Economic Forum's "Travel and Tourism Development Index" (<https://www.weforum.org/publications/travel-tourism-development-index-2024/>)
+-   2023 scores are from the index. World Bank GDP per capita ppp adj from `/ohiprep_v2024/globalprep/ao/v2024/intermediate/gdppcppp_ohi.csv` and substituted with [CIA GDP per capita ppp adj](https://www.cia.gov/the-world-factbook/field/real-gdp-per-capita/country-comparison) is used to gapfill scores into previous years (2005 - 2022).
 
 # Setup
 
@@ -96,11 +140,13 @@ output_dir <- here("globalprep","tr", version_year, "output")
 figs_dir <- here("globalprep","tr", version_year, "figs")
 ```
 
+# UNWTO Tourism Arrivals
+
 *International data:* Click Inbound Arrivals, scroll down to "Total arrivals", click download data.
 
 *Domestic data:* Click Domestic Tourism, scroll down to "Total trips", click download. Then download from "Accommodations".
 
-## International UNWTO Inbound Tourism Arrivals
+## International Inbound Tourism Arrivals - UNWTO
 
 ```{r}
 file_path_unwto_international <- here::here(unwto_dir, "unwto-inbound-arrivals-data.xlsx")
@@ -249,34 +295,7 @@ length(unique(international_arrivals$rgn_id)) # v2024: 156 regions! great
 summary(international_arrivals) # only 212 NAs out of 2652 observations to gapfill!
 ```
 
-## Domestic UNWTO Inbound Tourism Accomodation and Trips
-
-Psuedocode:
-
-- Bring in Accommodations
-  - Filter to Total:Guests
-    - see how many NAs
-  - Quick lm across all other variables
-  
-- Bring in Trips
-  - Filter to Overnights
-  
-- lm of Accommodations:Total:Guests to Trips:Overnights
-  - plot them, see if 1:1.  Also plot it logged
-  
-- If the lm looks okay, and if they are correlated, use Trips:Overnights to fill in data for Accommodations:Total:Guests
-  
-- Next, see if there is a correlation between Accommodations:Total:Guests and Accommodations:Hotel:Guests
-  - If it looks good (1:1 ish, also plot logged) then you can fill in Accommodations:Hotel:Guests data for Accommodations:Total:Guests
-  
-- Use name_2_rgn to convert UNWTO's "country" into "rgn_name" so that we can use georegions to approximate `mean_stay`
-  - Ensure there are no duplicates, if there are then aggregate them accordingly
-  
-- If within the Accommodations data, there are countries which have Total:Guests and Total:Overnights, divide them to see how many nights guests stay on average for each country (call it `mean_stay`), use that to infer any gaps in Total:Guests data where there are only Overnights.
-  - If possible, take lm(mean_stay ~ r2) or lm(mean_stay ~ r1) and find that mean_stay = ____*r1 to find a value for mean_stay for each georegion grouping. 
-  - Or, after looking and seeing if they are all very similar values across georegions, take the mean and use that number to calculate guests using overnight values
-  
-- Ensure that the end product is all in the units of guests
+## Domestic Inbound Tourism Accomodation and Trips - UNWTO
 
 ### Clean Accommodations data
 
@@ -357,7 +376,7 @@ ggplot(dom_acc_guests, aes(x = total_guests, y = hotel_overnights)) +
   theme_minimal()
 ```
 
-So, it looks like there are about 4947 NAs within the Total:Guests column.  However, we want to preserve guests/individuals as the unit (rather than overnights), so in the Raw Gapfilling section, let's see if we can gapfill with either other columns (hotel_guests) or the "Trips" data.
+So, it looks like there are about 4947 NAs within the Total:Guests column. However, we want to preserve guests/individuals as the unit (rather than overnights), so in the Raw Gapfilling section, let's see if we can gapfill with either other columns (hotel_guests) or the "Trips" data.
 
 Let's run ohicore::name_2_rgn() so we don't have to worry about it in the future.
 
@@ -422,8 +441,6 @@ unique(duplicates_2$rgn_name) # v2024: 0! yay
 ```{r}
 summary(dom_acc_guests_agg) # `total_guests` has 3793 NAs out of 4617 obs
 ```
-
-
 
 ### Clean Trips data
 
@@ -539,10 +556,11 @@ unique(duplicates_trips_2$rgn_name) # v2024: 0! yay
 summary(dom_trips_agg) # 3903 NAs for `trips_overnights` out of 4563 observations
 ```
 
-
 ### Raw Gapfilling
 
 #### Accommodations:Hotel:Guests used to fill in data for Accommodations:Total:Guests
+
+Hotel guests are registered individuals that stayed overnight at a hotel or similar establishment. Total guests includes dwellings or places one might stay in that region that is not considered a hotel, but would still be associated with tourism. Let's use hotel_guests to estimate total_guests.
 
 ```{r}
 # ------- total_guests ~ hotel_guests ---------
@@ -599,7 +617,7 @@ sd(clean_dom_acc_guests$hotel_guests) # 41365.82 guests, fairly similar to each 
 # therefore, go ahead and use the linear model to conduct gapfilling in the next chunk using this data.
 ```
 
-Let's move on to gapfilling. Since it is slightly more than 1, let's use the slope and coefficient from the linear model to calculate total_guests from hotel_guests.  This is just to improve accuracy.
+Let's move on to gapfilling. Since it is slightly more than 1, let's use the slope and coefficient from the linear model to calculate total_guests from hotel_guests. This is just to improve accuracy.
 
 ```{r hotel_guests_gf}
 # ------- find coefficients for gapfilling using hotel_guests when total_guests = NA ------------------
@@ -615,52 +633,26 @@ georegions <- ohicore::georegions %>%
 
 # first, remove any regions that only have NAs, then calculate coefficients
 dom_acc_guests_coef <- dom_acc_guests_agg %>% 
-  left_join(georegions, by = c("rgn_id", "rgn_name")) %>% 
+  left_join(georegions, by = c("rgn_id")) %>% 
   group_by(rgn_id) %>% # group by region
   filter(if_all(c(total_guests, hotel_guests), ~!is.na(.))) %>% # remove rows where there are NAs for both columns
   mutate(
-    total_guests_intercept = lm(total_guests ~ hotel_guests)$coefficient[1],
-    total_guests_slope = lm(total_guests ~ hotel_guests)$coefficient[2]
+    total_guests_slope = lm(total_guests ~ 0 + hotel_guests)$coefficient[1]
   ) %>% # obtain the intercept and slope for each region that has data
   ungroup() %>% 
   group_by(r2) %>% # get values for r1 and r2, so that if regional is available, use that... then if r2 is available, use that... finally, use r1 if you can't otherwise.
   mutate(
-    total_guests_intercept_r2 = lm(total_guests ~ hotel_guests)$coefficient[1], # calc int and slope for grouping
-    total_guests_slope_r2 = lm(total_guests ~ hotel_guests)$coefficient[2]
+    total_guests_slope_r2 = lm(total_guests ~ 0 + hotel_guests)$coefficient[1]
   ) %>% 
   ungroup() %>% 
   group_by(r1) %>% 
   mutate(
-    total_guests_intercept_r1 = lm(total_guests ~ hotel_guests)$coefficient[1],
-    total_guests_slope_r1 = lm(total_guests ~ hotel_guests)$coefficient[2]
+    total_guests_slope_r1 = lm(total_guests ~ 0 + hotel_guests)$coefficient[1]
   ) %>% 
   ungroup() %>% 
-  distinct(rgn_id, r2, r1, total_guests_intercept, total_guests_slope, total_guests_intercept_r2, total_guests_slope_r2, total_guests_intercept_r1, total_guests_slope_r1) %>% # prep for left join, otherwise many-to-many
-  select(rgn_id, r2, r1, total_guests_intercept, total_guests_slope, total_guests_intercept_r2, total_guests_slope_r2, total_guests_intercept_r1, total_guests_slope_r1) # select the columns that will be needed
-            
-
-# now use the georegions to find the intercept and slope accordingly
-# dom_acc_guests_coef_gf <- georegions %>% 
-#   left_join(dom_acc_guests_coef, by = c("rgn_id","r2","r1")) %>% 
-#   group_by(r2) %>% # get values for r1 and r2, so that if regional is available, use that... then if r2 is available, use that... finally, use r1 if you can't otherwise.
-#   mutate(
-#     total_guests_intercept_r2 = mean(total_guests_intercept, na.rm = TRUE), # calc mean for grouping
-#     total_guests_intercept_r2 = ifelse(is.nan(total_guests_intercept_r2), NA, total_guests_intercept_r2), # any NaN values to NAs
-#     total_guests_slope_r2 = mean(total_guests_slope, na.rm = TRUE),
-#     total_guests_slope_r2 = ifelse(is.nan(total_guests_slope_r2), NA, total_guests_slope_r2) # any NaN values to NAs
-#   ) %>% 
-#   ungroup() %>% 
-#   group_by(r1) %>% 
-#   mutate(
-#     total_guests_intercept_r1 = mean(total_guests_intercept, na.rm = TRUE),
-#     total_guests_intercept_r1 = ifelse(is.nan(total_guests_intercept_r1), NA, total_guests_intercept_r1), # any NaN values to NAs
-#     total_guests_slope_r1 = mean(total_guests_slope, na.rm = TRUE),
-#     total_guests_slope_r1 = ifelse(is.nan(total_guests_slope_r1), NA, total_guests_slope_r1) # any NaN values to NAs
-#   ) %>% 
-#   ungroup() %>% 
-#   select(rgn_id, total_guests_intercept, total_guests_slope, total_guests_intercept_r2, total_guests_slope_r2, total_guests_intercept_r1, total_guests_slope_r1) # now we have intercept and slope values for all regions, lets use that to gapfill total_guests with hotel_overnights!
+  distinct(rgn_id, r2, r1, total_guests_slope, total_guests_slope_r2, total_guests_slope_r1) %>% # prep for left join, otherwise many-to-many
+  select(rgn_id, r2, r1, total_guests_slope, total_guests_slope_r2, total_guests_slope_r1) # select the columns that will be needed
 ```
-
 
 ```{r hotel_guests_gf}
 # ------- gapfill using hotel_guests when total_guests = NA ---------
@@ -669,16 +661,12 @@ dom_acc_guests_gf1 <- dom_acc_guests_agg %>%
   left_join(dom_acc_guests_coef, by = c("rgn_id","r2","r1")) %>%
   group_by(r2) %>% # get values for r1 and r2 for regions that do not have data, so that if regional is available, use that... then if r2 is available, use that... finally, use r1 if you can't otherwise.
   mutate(
-    total_guests_intercept_r2mean = mean(total_guests_intercept_r2, na.rm = TRUE), # calc mean for grouping
-    total_guests_intercept_r2mean = ifelse(is.nan(total_guests_intercept_r2mean), NA, total_guests_intercept_r2mean), # any NaN values to NAs
     total_guests_slope_r2mean = mean(total_guests_slope_r2, na.rm = TRUE),
     total_guests_slope_r2mean = ifelse(is.nan(total_guests_slope_r2mean), NA, total_guests_slope_r2mean) # any NaN values to NAs
   ) %>%
   ungroup() %>%
   group_by(r1) %>%
   mutate(
-    total_guests_intercept_r1mean = mean(total_guests_intercept_r1, na.rm = TRUE),
-    total_guests_intercept_r1mean = ifelse(is.nan(total_guests_intercept_r1mean), NA, total_guests_intercept_r1mean), # any NaN values to NAs
     total_guests_slope_r1mean = mean(total_guests_slope_r1, na.rm = TRUE),
     total_guests_slope_r1mean = ifelse(is.nan(total_guests_slope_r1mean), NA, total_guests_slope_r1mean) # any NaN values to NAs
   ) %>%
@@ -687,19 +675,15 @@ dom_acc_guests_gf1 <- dom_acc_guests_agg %>%
     arrivals_method = ifelse(is.na(total_guests) & !is.na(hotel_guests), "UNWTO - Hotel:Guests", NA), # do this first so that we can use when tourism_arrivals_ct is NA as a qualifier
     tourism_arrivals_ct = case_when(
       !is.na(total_guests) ~ total_guests, # if there is a value, dont gapfill
-      is.na(total_guests) & !is.na(hotel_guests) & !is.na(total_guests_intercept) ~ (hotel_guests*total_guests_slope) + total_guests_intercept,
-      is.na(total_guests) & !is.na(hotel_guests) & is.na(total_guests_intercept) & !is.na(total_guests_intercept_r2mean) ~ (hotel_guests*total_guests_slope_r2mean) + total_guests_intercept_r2mean, # if regional lm coefficients weren't possible, go to r2 which is second least specific, then r1
-      is.na(total_guests) & !is.na(hotel_guests) & is.na(total_guests_intercept) & is.na(total_guests_intercept_r2mean) & !is.na(total_guests_intercept_r1mean) ~ (hotel_guests*total_guests_slope_r1mean) + total_guests_intercept_r1mean,
+      is.na(total_guests) & !is.na(hotel_guests) & !is.na(total_guests_slope) ~ (hotel_guests*total_guests_slope),
+      is.na(total_guests) & !is.na(hotel_guests) & is.na(total_guests_slope) & !is.na(total_guests_slope_r2mean) ~ (hotel_guests*total_guests_slope_r2mean), # if regional lm coefficients weren't possible, go to r2 which is second least specific, then r1
+      is.na(total_guests) & !is.na(hotel_guests) & is.na(total_guests_slope) & is.na(total_guests_slope_r2mean) & !is.na(total_guests_slope_r1mean) ~ (hotel_guests*total_guests_slope_r1mean),
       TRUE ~ tourism_arrivals_ct
     ),
     arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - Hotel:Guests", "gapfilled", NA)
-  ) %>% # example: 	South Korea 2017.  The numbers make sense because the estimated total_guests were larger than hotel_guests (makes sense because total includes other establishments than just hotels) and we can compare to hotel_overnights, of which tourism_arrivals_ct is about half ish, which based on our knowledge of mean_stays (found later on in raw gf for dom) the average is between 2-3 nights.  So this makes sense!
-  # same with Algeria and China. To check, run code without the last select line
+  ) %>% # example: 	New Caledonia and Monaco.  The numbers make sense because the estimated total_guests were larger than hotel_guests (makes sense because total includes other establishments than just hotels) and we can compare to hotel_overnights, of which tourism_arrivals_ct is about half ish, which based on our knowledge of mean_stays (found later on in raw gf for dom) the average is between 2-3 nights.  So this makes sense!
   select(rgn_id, rgn_name, year, tourism_arrivals_ct, total_guests, total_overnights, hotel_guests, hotel_overnights, arrivals_method, arrivals_gapfilled) # select all that we need moving forward
 ```
-
-After I implemented the coefficients by georegion instead of just having the georegion intercept and slope be the mean of the regional coefficients in each grouping, those above examples above did not make sense.  However, the whole reason why I chose to go that route instead of just taking the mean by the grouped area is because some small regions were having very weird guest sizes...much larger than expected.  For example, New Caledonia (rgn 5).  `hotel_guests` for 2014 are 147, but the estimated total_guest amount (`tourism_arrivals_ct`) using the r1 intercept and slope is now 2063.736. This is super large, as those values are in thousands.  When looking it up, it seems that  ["New Caledonia had 107,200 tourists"](https://www.ieom.fr/IMG/pdf/ne154_portrait_synthese_2014_nouvelle-caledonie_version_anglaise.pdf) in 2014. This means that the estimation was really large in comparison.  I am thinking that perhaps it makes more sense to force the intercept to be 0 (like by using lm(total_guests ~ 0 + hotel_guests)), and then only use the slope to estimate the total_guests from hotel_guests.  That way, we also don't have any negative total_guests values (which is currently happening to Togo).
-
 
 ```{r}
 # take a look at how that changed the number of NAs after our first dom gf step:
@@ -708,9 +692,8 @@ summary(dom_acc_guests_gf1) # now, `tourism_arrivals_ct` has 3223 NAs, versus 37
 dom_acc_guests_gf1_noNA <- dom_acc_guests_gf1 %>% 
   filter(!is.na(tourism_arrivals_ct)) # remove NAs to see how many regions have total_guests values
 
-length(unique(dom_acc_guests_gf1_noNA$rgn_name)) # we now have 65 unique countries, not amazing. Let's move on and see if we can gapfill further.
+length(unique(dom_acc_guests_gf1_noNA$rgn_name)) # we now have 69 unique countries, thats okay. Let's move on and see if we can gapfill further.
 ```
-
 
 #### Trips:Overnights used to fill in data for Accommodations:Total:Guests
 
@@ -720,7 +703,7 @@ length(unique(dom_acc_guests_gf1_noNA$rgn_name)) # we now have 65 unique countri
 dom_acc_trips_join <- left_join(dom_acc_guests_gf1, dom_trips_agg, by = c("rgn_id","rgn_name", "year")) # now it has all variables within one data frame
 ```
 
-Now, evaluate if gapfilling is appropriate: 
+Now, evaluate if gapfilling is appropriate:
 
 ```{r}
 # ------- total_guests ~ trips_overnights ---------
@@ -791,16 +774,15 @@ dom_acc_guests_gf2_noNA <- dom_acc_guests_gf2 %>%
 length(unique(dom_acc_guests_gf2_noNA$rgn_id)) # we now have 82 unique regions,that's better! Let's move on and see if we can gapfill even further!
 ```
 
-
 #### Mean Stay as a multiplier to convert Total:Overnights into Total:Guests
 
-So, there are some instances in which there is data for Total:Overnights, but not Total:Guests.  Based on looking at the methodology (https://www.e-unwto.org/doi/epdf/10.18111/9789284424160?role=tab), it seems that guests are the individuals coming to a specific place, versus overnights includes the same people over again if they stay for multiple nights. 
+So, there are some instances in which there is data for Total:Overnights, but not Total:Guests. Based on looking at the methodology (<https://www.e-unwto.org/doi/epdf/10.18111/9789284424160?role=tab>), it seems that guests are the individuals coming to a specific place, versus overnights includes the same people over again if they stay for multiple nights.
 
 Essentially, Guests = Overnights / Mean Stay (in days).
 
-So, we need to find mean stays! As a reminder, this would need to be calculated using the raw `total_guests` and `total_overnights` variables.  
+So, we need to find mean stays! As a reminder, this would need to be calculated using the raw `total_guests` and `total_overnights` variables.
 
-We can do this by **calculating `mean_stay` for each region**, if possible. Using an lm, see if `mean_stay` could be correlated to the georegion (r2 ideally because it is more specific, but r1 works as well).  If so, take the mean for that georegion, and use it as a way to convert Accommodation:Total:Overnights into Accommodation:Total:Guests.
+We can do this by **calculating `mean_stay` for each region**, if possible. Using an lm, see if `mean_stay` could be correlated to the georegion (r2 ideally because it is more specific, but r1 works as well). If so, take the mean for that georegion, and use it as a way to convert Accommodation:Total:Overnights into Accommodation:Total:Guests.
 
 ```{r lm_mean_stay}
 dom_mean_stay <- dom_acc_guests_gf2 %>% 
@@ -828,9 +810,8 @@ summary(mod4)
 # not significant model!! Multiple R-squared is 0.01365..... NOT GOOD.
 ```
 
-
 ```{r lm_mean_stay}
-# lets do a quick plot to compare mean stays and r1:
+# lets do a quick plot to compare mean stays and r1, just to be sure that we cant use georegions to estimate mean_stay:
 # plot the data to compare
 ggplot(dom_mean_stay_georgns, aes(x = as.numeric(r1), y = mean_stay)) +
   geom_point(alpha = 0.5) +  # Add some transparency to points
@@ -864,7 +845,7 @@ clean_dom_mean_stay_georgns <- dom_mean_stay_georgns %>%
 cor(clean_dom_mean_stay_georgns$mean_stay, clean_dom_mean_stay_georgns$r1, method = "kendall") # 0.08158826, VERY LITTLE correlation... to be expected.
 ```
 
-I would not move forward using georegions to group by and take the mean. Instead, I would either use the global mean to gapfill for mean_stays, or consider using a moving average.
+We should not move forward using georegions to group by and take the mean. Instead, we should either use the global mean to gapfill for mean_stays, or consider using a moving average.
 
 What I will do for now is take the mean by region, assuming that there are some instances in which there may be some years that have overnights and guest values, but in other years it could have only overnights values. In that case, it would make the most sense to use the value found within the region if possible.
 
@@ -915,10 +896,9 @@ dom_acc_guests_gf3_noNA <- dom_acc_guests_gf3 %>%
 length(unique(dom_acc_guests_gf3_noNA$rgn_name)) # we now have 87 it added only 5 more regions --- it is still worth it!!
 ```
 
-
 #### Convert Accommodations:Hotel:Overnights into Acc:Total:Guests
 
-As a reminder, within the "Clean Accommodations Data" section we did a linear model between total_guests and hotel_overnights, and found that it was a significant model with a good multiple r-squared.  Therefore, we are going to move forward and use the significant intercept and slope to estimate total_guests.  Let's first do some exploring:
+As a reminder, within the "Clean Accommodations Data" section we did a linear model between total_guests and hotel_overnights, and found that it was a significant model with a good multiple r-squared. Therefore, we are going to move forward and use the significant intercept and slope to estimate total_guests. Let's first do some exploring:
 
 ```{r}
 # --------- lm between total_guests ~ hotel_overnights --------------
@@ -946,53 +926,57 @@ abline(mod5, col="red") # not a linear fit, would be better to do nonlinear, but
 Let's move forward, using the intercept and slope to determine total_guests values from hotel_overnights!
 
 ```{r}
-# first, remove any regions that only have NAs
+# first, remove any regions that only have NAs. Then use region and georegions to get lm coefficients
 dom_gf4_coef <- dom_acc_guests_gf3 %>% 
+  left_join(georegions, by = c("rgn_id")) %>% 
   group_by(rgn_id) %>% # group by region
   filter(if_all(c(total_guests, hotel_overnights), ~!is.na(.))) %>% # remove rows where there are NAs for both columns
   mutate(
-    total_guests_intercept = lm(total_guests ~ hotel_overnights)$coefficient[1],
-    total_guests_slope = lm(total_guests ~ hotel_overnights)$coefficient[2]
-    ) %>% # obtain the intercept and slope for each region that has data
+    total_guests_slope = lm(total_guests ~ 0 + hotel_overnights)$coefficient[1]
+  ) %>% # obtain the intercept and slope for each region that has data
   ungroup() %>% 
-  distinct(rgn_id, total_guests_intercept, total_guests_slope) %>% # prep for left join, otherwise many-to-many
-  select(rgn_id, total_guests_intercept, total_guests_slope) # select the columns that will be needed
-  
-# will need to gapfill these slopes and intercepts for regions that have hotel_overnights data but no total_guests data. join with georegions, group by r2, and take the mean for those regions.  Otherwise, use regional level.
-dom_gf4_coef_gf <- georegions %>% 
-  left_join(dom_gf4_coef, by = "rgn_id") %>% 
   group_by(r2) %>% # get values for r1 and r2, so that if regional is available, use that... then if r2 is available, use that... finally, use r1 if you can't otherwise.
   mutate(
-    total_guests_intercept_r2 = mean(total_guests_intercept, na.rm = TRUE), # calc mean for grouping
-    total_guests_intercept_r2 = ifelse(is.nan(total_guests_intercept_r2), NA, total_guests_intercept_r2), # any NaN values to NAs
-    total_guests_slope_r2 = mean(total_guests_slope, na.rm = TRUE),
-    total_guests_slope_r2 = ifelse(is.nan(total_guests_slope_r2), NA, total_guests_slope_r2) # any NaN values to NAs
+    total_guests_slope_r2 = lm(total_guests ~ 0 + hotel_overnights)$coefficient[1]
   ) %>% 
   ungroup() %>% 
   group_by(r1) %>% 
   mutate(
-    total_guests_intercept_r1 = mean(total_guests_intercept, na.rm = TRUE),
-    total_guests_intercept_r1 = ifelse(is.nan(total_guests_intercept_r1), NA, total_guests_intercept_r1), # any NaN values to NAs
-    total_guests_slope_r1 = mean(total_guests_slope, na.rm = TRUE),
-    total_guests_slope_r1 = ifelse(is.nan(total_guests_slope_r1), NA, total_guests_slope_r1) # any NaN values to NAs
+    total_guests_slope_r1 = lm(total_guests ~ 0 + hotel_overnights)$coefficient[1]
   ) %>% 
   ungroup() %>% 
-  select(rgn_id, total_guests_intercept, total_guests_slope, total_guests_intercept_r2, total_guests_slope_r2, total_guests_intercept_r1, total_guests_slope_r1) # now we have intercept and slope values for all regions, lets use that to gapfill total_guests with hotel_overnights!
-  
+  distinct(rgn_id, r2, r1, total_guests_slope, total_guests_slope_r2, total_guests_slope_r1) %>% # prep for left join, otherwise many-to-many
+  select(rgn_id, r2, r1, total_guests_slope, total_guests_slope_r2, total_guests_slope_r1) # select the columns that will be needed
+```
 
-dom_acc_guests_gf4 <- dom_acc_guests_gf3 %>% 
-  left_join(dom_gf4_coef_gf, by = "rgn_id") %>% 
+```{r}
+# ------- gapfill using hotel_overnights when total_guests = NA ---------
+# will need to gapfill these slopes and intercepts for regions that have hotel_overnights data but no total_guests data. join with georegions, group by r2, and take the mean for those regions.  Otherwise, use regional level.
+dom_acc_guests_gf4 <- dom_acc_guests_gf3 %>%
+  left_join(georegions, by = c("rgn_id","rgn_name")) %>% 
+  left_join(dom_gf4_coef, by = c("rgn_id","r2","r1")) %>%
+  group_by(r2) %>% # get values for r1 and r2 for regions that do not have data, so that if regional is available, use that... then if r2 is available, use that... finally, use r1 if you can't otherwise.
   mutate(
-    arrivals_method = ifelse(is.na(tourism_arrivals_ct) & !is.na(hotel_overnights), "UNWTO - Hotel:Overnights", arrivals_method), # do this first so that we can use when tourism_arrivals_ct is NA as a qualifier
+    total_guests_slope_r2mean = mean(total_guests_slope_r2, na.rm = TRUE),
+    total_guests_slope_r2mean = ifelse(is.nan(total_guests_slope_r2mean), NA, total_guests_slope_r2mean) # any NaN values to NAs
+  ) %>%
+  ungroup() %>%
+  group_by(r1) %>%
+  mutate(
+    total_guests_slope_r1mean = mean(total_guests_slope_r1, na.rm = TRUE),
+    total_guests_slope_r1mean = ifelse(is.nan(total_guests_slope_r1mean), NA, total_guests_slope_r1mean) # any NaN values to NAs
+  ) %>%
+  ungroup() %>%  # now we have intercept and slope values for all regions (at different levels), lets use that to gapfill total_guests with hotel_overnights!
+  mutate(
+    arrivals_method = ifelse(is.na(total_guests) & !is.na(hotel_overnights), "UNWTO - Hotel:Overnights", arrivals_method), # do this first so that we can use when tourism_arrivals_ct is NA as a qualifier
     tourism_arrivals_ct = case_when(
-      is.na(tourism_arrivals_ct) & !is.na(hotel_overnights) & !is.na(total_guests_intercept) ~ (hotel_overnights*total_guests_slope) + total_guests_intercept,
-      is.na(tourism_arrivals_ct) & !is.na(hotel_overnights) & is.na(total_guests_intercept) & !is.na(total_guests_intercept_r2) ~ (hotel_overnights*total_guests_slope_r2) + total_guests_intercept_r2,
-      is.na(tourism_arrivals_ct) & !is.na(hotel_overnights) & is.na(total_guests_intercept) & is.na(total_guests_intercept_r2) & !is.na(total_guests_intercept_r1) ~ (hotel_overnights*total_guests_slope_r1) + total_guests_intercept_r1,
+      is.na(tourism_arrivals_ct) & !is.na(hotel_overnights) & !is.na(total_guests_slope) ~ (hotel_overnights*total_guests_slope),
+      is.na(tourism_arrivals_ct) & !is.na(hotel_overnights) & is.na(total_guests_slope) & !is.na(total_guests_slope_r2mean) ~ (hotel_overnights*total_guests_slope_r2mean), # if regional lm coefficients weren't possible, go to r2 which is second least specific, then r1
+      is.na(tourism_arrivals_ct) & !is.na(hotel_overnights) & is.na(total_guests_slope) & is.na(total_guests_slope_r2mean) & !is.na(total_guests_slope_r1mean) ~ (hotel_overnights*total_guests_slope_r1mean),
       TRUE ~ tourism_arrivals_ct
     ),
-    # Kenya is a great example to show that it worked!! same with Algeria and China. To check, run code without the last select line
     arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - Hotel:Overnights", "gapfilled", arrivals_gapfilled)
-  ) %>% 
+  ) %>% # example: 	New Caledonia and Monaco.  The numbers make sense because the estimated total_guests were larger than hotel_guests (makes sense because total includes other establishments than just hotels) and we can compare to hotel_overnights, of which tourism_arrivals_ct is about half ish, which based on our knowledge of mean_stays (found later on in raw gf for dom) the average is between 2-3 nights.  So this makes sense!
   select(rgn_id, rgn_name, year, tourism_arrivals_ct, arrivals_method, arrivals_gapfilled) # select all that we need moving forward
 ```
 
@@ -1001,14 +985,22 @@ Now that we can gapfilled using this method, lets see how it changed our data:
 ```{r}
 summary(dom_acc_guests_gf4) # we now have 2688 out of 4617 observations.  This is now 58% filled!
 
- #     rgn_id        rgn_name             year           tourism_arrivals_ct
- # Min.   :  5.0   Length:4617        Length:4617        Min.   :  -8957    
- # 1st Qu.: 65.0   Class :character   Class :character   1st Qu.:   1372    
- # Median :123.0   Mode  :character   Mode  :character   Median :   6754    
- # Mean   :123.3                                         Mean   :  34629    
- # 3rd Qu.:184.0                                         3rd Qu.:  24094    
- # Max.   :250.0                                         Max.   :2321983    
- #                                                       NA's   :2688       
+ #     rgn_id        rgn_name        
+ # Min.   :  5.0   Length:4617       
+ # 1st Qu.: 65.0   Class :character  
+ # Median :123.0   Mode  :character  
+ # Mean   :123.3                     
+ # 3rd Qu.:184.0                     
+ # Max.   :250.0                     
+ #                                   
+ #     year           tourism_arrivals_ct
+ # Length:4617        Min.   :      0.3  
+ # Class :character   1st Qu.:    586.1  
+ # Mode  :character   Median :   6287.5  
+ #                    Mean   :  34599.9  
+ #                    3rd Qu.:  24990.9  
+ #                    Max.   :2321983.0  
+ #                    NA's   :2688       
  # arrivals_method    arrivals_gapfilled
  # Length:4617        Length:4617       
  # Class :character   Class :character  
@@ -1094,8 +1086,8 @@ unwto_int_upfill <-  international_arrivals %>%
   arrange(rgn_id, year) %>%
   tidyr::fill(tourism_arrivals_ct, .direction = "up") %>% # fill in any values that are empty from early years with values from the nearest year. Doing this because doesn't make sense to add earlier years based on a trend 
   mutate(
-    arrivals_gf = ifelse(is.na(data_source) & !is.na(tourism_arrivals_ct), "gapfilled", arrivals_gf),
-    data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_ct), "UNWTO - nearby year", data_source)
+    arrivals_gapfilled = ifelse(is.na(arrivals_method) & !is.na(tourism_arrivals_ct), "gapfilled", arrivals_gapfilled),
+    arrivals_method = ifelse(is.na(arrivals_method) & !is.na(tourism_arrivals_ct), "UNWTO - nearby year", arrivals_method)
          )
 
 ## calculate regional average increase or decrease in number of tourism arrivals
@@ -1114,7 +1106,7 @@ unwto_gapfill_lm_2019_tourism_int <- unwto_int_upfill %>%
   mutate(year = as.numeric(year)) %>% 
   left_join(lm_coef_data_tourism_int) %>% 
   ungroup() %>%
-  dplyr::select(rgn_id, rgn_name, year, tourism_arrivals_ct, data_source, arrivals_gf, lm_coef_tourism)
+  dplyr::select(rgn_id, rgn_name, year, tourism_arrivals_ct, arrivals_method, arrivals_gapfilled, lm_coef_tourism)
 
 ## now lets fill in any values down with the linear model average increase per year for tourists
 while(na_flag) {
@@ -1128,8 +1120,8 @@ while(na_flag) {
         TRUE ~ tourism_arrivals_ct
       )
     ) %>%
-    mutate(data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_ct), "UNWTO - linear model", data_source)) %>%
-    mutate(arrivals_gf = ifelse(data_source == "linear model", "gapfilled", arrivals_gf)) %>%
+    mutate(arrivals_method = ifelse(is.na(arrivals_method) & !is.na(tourism_arrivals_ct), "UNWTO - linear model", arrivals_method)) %>%
+    mutate(arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - linear model", "gapfilled", arrivals_gapfilled)) %>%
     ungroup()
   
   # Check if there are still NAs left in either column
@@ -1137,25 +1129,28 @@ while(na_flag) {
 }
 
 # ==== gapfill for 2020 and 2021 now ==== #
-unwto_2020_2021_int <- international_clean_names_agg %>%
+unwto_2020_2021_int <- international_arrivals %>%
   filter(year > 2019) 
 
-unwto_all_gf_int <- unwto_gapfill_lm_2019_tourism_all_int %>%
+unwto_all_gf_int <- unwto_gapfill_lm_2019_tourism_int %>%
+  select(-lm_coef_tourism) %>% 
+  complete(year = 2005:2021) %>% 
   rbind(unwto_2020_2021_int) %>%
   group_by(rgn_id) %>%
   arrange(rgn_id, year) %>%
   # apply global average proportional increase or decrease for 2020 and 2021, because of covid pandemic messing up trends...
   mutate(tourism_arrivals_ct = ifelse(year == 2020 & is.na(tourism_arrivals_ct), lag(tourism_arrivals_ct, n = 1) + lag(tourism_arrivals_ct, n = 1)*gf_2020_tourism_int, tourism_arrivals_ct)) %>%
   mutate(tourism_arrivals_ct = ifelse(year == 2021 & is.na(tourism_arrivals_ct), lag(tourism_arrivals_ct, n = 1) + lag(tourism_arrivals_ct, n = 1)*gf_2021_tourism_int, tourism_arrivals_ct)) %>%
-  mutate(data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_ct), "UNWTO - 2020 and 2021 gapfill method", data_source)) %>%
-  mutate(arrivals_gf = ifelse(data_source == "UNWTO - 2020 and 2021 gapfill method", "gapfilled", arrivals_gf)) %>%
+  mutate(arrivals_method = ifelse(is.na(arrivals_method) & !is.na(tourism_arrivals_ct), "UNWTO - 2020 and 2021 gapfill method", arrivals_method)) %>%
+  mutate(arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - 2020 and 2021 gapfill method", "gapfilled", arrivals_gapfilled)) %>%
   filter(year >= 2008) %>% # get only the year we need and beyond
   drop_na(tourism_arrivals_ct) %>%  # remove any remaining NAs (any remaining have all NAs for that region)
    mutate(year = as.numeric(year)) # ensure it is numeric
 
-length(unique(unwto_all_gf_int$rgn_name)) # now only 161 regions after gapfilling and removing regions with only NAs!
-```
+length(unique(unwto_all_gf_int$rgn_name)) # still 156 regions after gapfilling! good, same as `international_arrivals`
 
+summary(unwto_all_gf_int) # however, we do see that Libya has negative values for `tourism_arrivals_ct` when the lm slope is used to gapfill by year, since we have the lag and now are between 2008:2021.  This needs to be looked into....
+```
 
 ### Domestic - for years that do not have values
 
@@ -1246,7 +1241,8 @@ while(na_flags) {
 unwto_2020_2021_dom <- domestic_guests %>%
   filter(year > 2019) 
 
-unwto_all_gf_dom <- unwto_gapfill_lm_2019_tourism_all_dom %>%
+unwto_all_gf_dom <- unwto_future_gapfill_lm_2019_tourism_dom %>%
+  select(-lm_coef_tourism) %>% 
   rbind(unwto_2020_2021_dom) %>%
   group_by(rgn_id) %>%
   arrange(rgn_id, year) %>%
@@ -1260,14 +1256,15 @@ unwto_all_gf_dom <- unwto_gapfill_lm_2019_tourism_all_dom %>%
    mutate(year = as.numeric(year)) # ensure it is numeric
 
 length(unique(unwto_all_gf_dom$rgn_name)) # now still 87 regions after gapfilling and removing regions with only NAs!
-```
 
+summary(unwto_all_gf_dom) # and yay, no negative guest values!
+```
 
 ### Gapfilling -- for regions that do not have domestic data: prep for aggregation.
 
 Let's move on, as we decided that it makes sense to aggregate the international and domestic data! This is because we are creating a score for each region, and only comparing across regions once that score has been calculated (versus ranking regions and comparing them to each other based on tourism density, not the rescaled score).
 
-We decided that there would be less error after aggregating if we at least put a mean (by georegion) domestic guest value for regions that have no domestic data, but they have international data.  That way, all international regions will be adding to a domestic value, rather than some regions only having international data.
+We decided that there would be less error after aggregating if we at least put a mean (by georegion) domestic guest value for regions that have no domestic data, but they have international data. That way, all international regions will be adding to a domestic value, rather than some regions only having international data.
 
 ```{r}
 # first, let's join international and domestic data to see where the gaps are!
@@ -1275,10 +1272,14 @@ We decided that there would be less error after aggregating if we at least put a
 arrivals_join <- left_join(unwto_all_gf_int, unwto_all_gf_dom, by = c("rgn_id","rgn_name","year")) %>% 
   rename(
     tourism_arrivals_ct_int = tourism_arrivals_ct.x,
-    tourism_arrivals_ct_dom = tourism_arrivals_ct.y
+    tourism_arrivals_ct_dom = tourism_arrivals_ct.y,
+    data_source = arrivals_method.x,
+    arrivals_gf = arrivals_gapfilled.x,
+    arrivals_method = arrivals_method.y,
+    arrivals_gapfilled = arrivals_gapfilled.y
   )
 
-length(unique(arrivals_join$rgn_name)) # v2024: 161 regions that have data! This checks out!
+length(unique(arrivals_join$rgn_name)) # v2024: 156 regions that have data! This checks out!
 ```
 
 Now that we have a joined dataframe, let's adjust it to gapfill by years.
@@ -1303,8 +1304,7 @@ mean_domestic_guests <- arrivals_join %>%
   ) %>% 
   ungroup()
 
-length(unique(mean_domestic_guests$rgn_name)) # 162 regions??
-setdiff(mean_domestic_guests$rgn_name, arrivals_aggregated$rgn_name) # there is one region that is named "NA"...Iran 191. go back and check on that
+length(unique(mean_domestic_guests$rgn_name)) # 156 yay!
 
 length(unique(georegions$r2)) # 22 r2 regions
 length(unique(mean_domestic_guests$tourism_arrivals_ct_dom_r2)) # 20, so it missed only two r2 regions!
@@ -1346,8 +1346,8 @@ arrivals_aggregated <- mean_domestic_guests %>%
     )
   )
 
-length(!is.na(arrivals_aggregated$tourism_arrivals_ct_int)) # 2254
-length(!is.na(arrivals_aggregated$tourism_arrivals_ct_dom)) # 2254, yay! now we can aggregate international and domestic with the least amount of error with the data we have
+length(!is.na(arrivals_aggregated$tourism_arrivals_ct_int)) # 2184
+length(!is.na(arrivals_aggregated$tourism_arrivals_ct_dom)) # 2184, yay! now we can aggregate international and domestic with the least amount of error with the data we have
 
 # save gf information
 tourism_aggregated_gf <- arrivals_aggregated %>% 
@@ -1364,7 +1364,7 @@ write_csv(tourism_aggregated_gf, here::here(int_dir, "tourism_aggregated_gf.csv"
 
 ### Coastal Proportion
 
-Now, lets bring in our tourism data and calculate the coastal proportion! The coastal proportion will then be multiplied by the arrivals value per region and year. Finally, the coastal area will be divided, giving us a density of tourism per region (individuals/km^2).
+Now, lets bring in our tourism data and calculate the coastal proportion! The coastal proportion will then be multiplied by the arrivals value per region and year. Finally, the coastal area will be divided, giving us a density of tourism per region (individuals/km\^2).
 
 ```{r, eval=FALSE}
 # ------- coastal population data -----------
@@ -1392,6 +1392,16 @@ total_population_rgns <- name_2_rgn(df_in = total_population_wb,
                                         fld_name = 'country_name',
                                         keep_fld_name = TRUE)
 
+# this shows rows that have at least one duplicate, including both the first and subsequent occurrences of each duplicated row. using the tidyverse allows us to see all instances of duplicated data, not just the second and subsequent occurrences (which is what just a duplicated() call would give you).
+duplicates_wb <- total_population_rgns %>%
+  group_by(rgn_id, rgn_name, year) %>% 
+  filter(n() > 1) %>%
+  ungroup()
+unique(duplicates_wb$rgn_name)
+# [1] "China"                                              
+# [2] "Northern Mariana Islands and Guam"                  
+# [3] "Puerto Rico and Virgin Islands of the United States"
+
 # drop Macao and Hong Kong, since we only need mainland China
 # Northern Mariana Islands and Guam, Puerto Rico and Virgin Islands of the United States: aggregate!
 total_population_final <- total_population_rgns %>%
@@ -1404,8 +1414,9 @@ total_population_final <- total_population_rgns %>%
   mutate(year = as.numeric(year))
 
 length(unique(total_population_final$rgn_name)) # v2024: 166 regions available of total population data!
-length(union(arrivals_aggregated$rgn_name, total_population_final$rgn_name)) # v2024: 176, meaning that there are 10 regions that don't have total population data
-length(intersect(arrivals_aggregated$rgn_name, total_population_final$rgn_name)) # v2024: 151, which makes sense (161 - 10)
+length(unique(arrivals_aggregated$rgn_name)) # 156
+length(union(arrivals_aggregated$rgn_name, total_population_final$rgn_name)) # v2024: 176, so 10 regions do not have total population data
+length(intersect(arrivals_aggregated$rgn_name, total_population_final$rgn_name)) # v2024: 146, only 146 regions have the same name
 ```
 
 ### Coastal Area
@@ -1478,6 +1489,7 @@ ap_plot
 As according to the [OHI methods](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#tourism-and-recreation), the Ap values for each year and region is rescaled using the 90th quartile for each region.
 
 $$\frac{T_r}{T_{90th}}$$
+
 ```{r}
 # to make the Ap scaled between 0 and 1, we can divide the current Ap by the 90th quartile values by region.
 ap_rescaled <- ap_final %>% 
@@ -1492,7 +1504,7 @@ tr_arrivals_props_tourism <- left_join(ap_final, ap_rescaled, by = c("rgn_id", "
          ) %>% 
   select(rgn_id, rgn_name, year, Ap) # keep in rgn_name when you want to plot!!!
 
-# interactive plot of the arrival proportions
+# interactive plot of the arrival proportions after rescaling
 ap_final_plot <- tr_arrivals_props_tourism %>%
   plot_ly(x = ~year, y = ~Ap, color = ~rgn_name, 
           type = "scatter", mode = "lines") %>%
@@ -1501,11 +1513,13 @@ ap_final_plot <- tr_arrivals_props_tourism %>%
          yaxis = list(title = "Arrival proportion (Ap)"))
 ap_final_plot
 
+# htmlwidgets::saveWidget(ap_final_plot, here::here(figs_dir, "ap_rescaled.html")) # save plot
+
 # save the final tourism arrivals csv
 write_csv(tr_arrivals_props_tourism, here::here(output_dir, "tr_arrivals_props_tourism.csv"))
 ```
 
-## Ts: Sustainability Index -- TTDI
+# Ts: Sustainability Index -- TTDI
 
 These data are from the World Economic Forum's "Travel and Tourism Development Index" (<https://www.weforum.org/publications/travel-tourism-development-index-2024/>) Downloaded 08/20/2024.
 
@@ -1823,8 +1837,5 @@ tr_sust_final <- tr_sust %>%
 
 summary(tr_sust_final)
 
-write_csv(tr_sust, here(output_dir, "tr_sustainability.csv"))
+write_csv(tr_sust_final, here(output_dir, "tr_sustainability.csv"))
 ```
-
-
-
