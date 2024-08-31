@@ -202,12 +202,12 @@ np_exp_raw <- area_dual_hab %>%
                                    (tonnes / km2), # raw exposure: harvest tonnes / habitat area
                                    0)) %>% # 0 exposure if no harvest or no special habitat
   dplyr::group_by(product) 
-
-# define most recent 10 year range
+ 
+# define most recent 10 year range 
 max_exp_year <- max(np_exp_raw$year)
 exp_decade_range <- seq((max_exp_year - 10), max_exp_year, 1)
 
-# find max raw exposure value in the past 10 years
+## find max raw exposure value in the past 10 years
 np_exp_max <- np_exp_raw %>%
   filter(year %in% c(exp_decade_range)) %>% 
   group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
@@ -217,7 +217,28 @@ np_exp_max <- np_exp_raw %>%
   # keep 1 row with max value per region (values are the same across year range per region)
   dplyr::distinct()
 
-# calculate rescaled exposure
+
+# find 95th quantile of the past 10 years ----
+
+# subset of past 10 years
+np_exp_recent_decade <- np_exp_raw %>% 
+  dplyr::filter(year %in% c(exp_decade_range))
+
+global_95th_quantile <- stats::quantile(np_exp_recent_decade$expos_raw, probs = c(0.95))
+# v2024: 95th is 0.1511856; 99th is 45.90351 
+
+
+# completely new method: exposure = raw exposure / global 95th quantile
+# calculate rescaled exposure ----
+np_exposure_new <- np_exp_raw %>% 
+  dplyr::mutate(global_95th = global_95th_quantile) %>% 
+  dplyr::mutate(exposure = expos_raw / global_95th)
+
+#value/95th quantile
+
+
+
+## calculate rescaled exposure [old]
 np_exp_orn_rescale <- np_exp_raw %>%
   # bring in max (of the past 10 yrs) value, 
   # fill single value for each region across full time range
@@ -269,6 +290,18 @@ ggplot(data = np_exp_orn %>% filter(rgn_id == 163), aes(x = year, y = exposure))
   theme_bw()
 ```
 
+
+
+
+```{r}
+np_exp_raw
+
+ggplot(data = np_exp_raw %>% filter(rgn_id == 163), aes(x = year, y = expos_raw)) + 
+  geom_line() +
+  theme_bw()
+
+
+```
 
 
 global-scaled exposure test:
