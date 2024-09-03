@@ -171,7 +171,6 @@ Returns the first input data frame with a new column for exposure:
 [`rgn_id` `year` `product` `exposure`]
 
 ```{r}
-
 # ====== Determine Habitat Areas for Exposure ========
 # rocky reef habitat area
 hab_rocky <- readr::read_csv(here::here("globalprep", "hab_rockyreef", "v2012", # hasn't been updated since 2012
@@ -201,9 +200,10 @@ area_dual_hab <- np_harvest_orn %>%
   
 
 # ======== Determine Exposure ========
-### exposure: get tonnes / area, find max in past 10 years, use max to rescale with log transform
+### exposure: get tonnes / area, find global 95th quantile from past 10 years, 
+#### use 95th quantile value to rescale exposure from 0-1
 
-# calculate raw exposure (tonnes / area)
+# calculate raw exposure (tonnes / area) ----
 np_exp_raw <- area_dual_hab %>%
   # find regions and years with harvest in rocky reef and coral habitat
   dplyr::mutate(expos_raw = ifelse(tonnes > 0 & km2 > 0,
@@ -211,11 +211,54 @@ np_exp_raw <- area_dual_hab %>%
                                    0)) %>% # 0 exposure if no harvest or no special habitat
   dplyr::group_by(product) 
  
-# define most recent 10 year range 
+
+# define most recent 10 year range ----
 max_exp_year <- max(np_exp_raw$year)
 exp_decade_range <- seq((max_exp_year - 10), max_exp_year, 1)
 
-## find max raw exposure value in the past 10 years
+
+# ---- find 95th quantile of the past 10 years ----
+
+# subset of past 10 years
+np_exp_recent_decade <- np_exp_raw %>% 
+  dplyr::filter(year %in% c(exp_decade_range))
+
+global_95th_quantile <- stats::quantile(np_exp_recent_decade$expos_raw, probs = c(0.95))
+# v2024: 95th is 0.1511856; 99th is 45.90351 
+
+
+# ---- calculate rescaled exposure ----
+# new rescale method: 
+# if raw exposure >= 95th quantile, exposure = 1
+# else, exposure = raw exposure / global 95th quantile
+
+np_exposure_new <- np_exp_raw %>% 
+  # bring in global 95th quantile value 
+  dplyr::mutate(global_95th = global_95th_quantile) %>% 
+  # rescale following new method outlined above
+  dplyr::mutate(exposure = case_when(
+    expos_raw >= global_95th ~ 1,
+    expos_raw < global_95th ~ (expos_raw / global_95th))
+  )
+
+#summary(np_exposure_new$exposure)
+# v2024:
+#     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+# 0.000000 0.000000 0.009503 0.128015 0.082771 1.000000 
+
+# datacheck:
+# plot histogram to show distribution of rescaled points
+
+ggplot(data = np_exposure_new) +
+  geom_histogram(aes(x = exposure),
+                 color = "blue",
+                 fill = "cornflowerblue") +
+  theme_bw()
+```
+
+
+```{r test-new-log-rescale}
+# find max raw exposure value in the past 10 years
 np_exp_max <- np_exp_raw %>%
   filter(year %in% c(exp_decade_range)) %>% 
   group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
@@ -226,23 +269,6 @@ np_exp_max <- np_exp_raw %>%
   dplyr::distinct()
 
 
-# find 95th quantile of the past 10 years ----
-
-# subset of past 10 years
-np_exp_recent_decade <- np_exp_raw %>% 
-  dplyr::filter(year %in% c(exp_decade_range))
-
-global_95th_quantile <- stats::quantile(np_exp_recent_decade$expos_raw, probs = c(0.95))
-# v2024: 95th is 0.1511856; 99th is 45.90351 
-
-
-# completely new method: exposure = raw exposure / global 95th quantile
-# calculate rescaled exposure ----
-np_exposure_new <- np_exp_raw %>% 
-  dplyr::mutate(global_95th = global_95th_quantile) %>% 
-  dplyr::mutate(exposure = expos_raw / global_95th)
-
- 
 # log-transform: ----
 np_exp_log <- np_exp_raw %>% 
   dplyr::mutate(log_exp = log(expos_raw))
@@ -260,21 +286,34 @@ np_log_exposure <- np_exp_log %>%
 
 np_log_exposure_2 <- np_exp_log %>% 
   dplyr::mutate(log_global_95th = log_global_95th_exp) %>% 
-  dplyr::mutate(log_exposure = (log_exp + 1) / (log_global_95th + 1))
+  dplyr::mutate(log_exposure = (log_exp + 1) / (log_global_95th + 1),
+                log_exposure = ifelse(log_exposure > 1, 1, log_exposure))
+```
 
 
-
+```{r old-rescale}
+# # find max raw exposure value in the past 10 years
+# np_exp_max <- np_exp_raw %>%
+#   filter(year %in% c(exp_decade_range)) %>% 
+#   group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
+#   dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
+# #  dplyr::ungroup() %>% 
+#   dplyr::select(rgn_id, expos_prod_max) %>% 
+#   # keep 1 row with max value per region (values are the same across year range per region)
+#   dplyr::distinct()
 ## calculate rescaled exposure [old]
-np_exp_orn_rescale <- np_exp_raw %>%
-  # bring in max (of the past 10 yrs) value, 
-  # fill single value for each region across full time range
-  dplyr::left_join(np_exp_max, by = "rgn_id") %>% 
-  # rescale exposure using max value
-  dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
-                exposure = ifelse(exposure > 1, 1, exposure)) %>%
-  dplyr::select(-km2, -expos_raw, -expos_prod_max)
+# np_exp_orn_rescale <- np_exp_raw %>%
+#   # bring in max (of the past 10 yrs) value, 
+#   # fill single value for each region across full time range
+#   dplyr::left_join(np_exp_max, by = "rgn_id") %>% 
+#   # rescale exposure using max value
+#   dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
+#                 exposure = ifelse(exposure > 1, 1, exposure)) %>%
+#   dplyr::select(-km2, -expos_raw, -expos_prod_max)
+```
 
 
+```{r save-exposure}
 # ======== Save intermediate data products ==========
 # clean up columns
 np_exp_gf <- np_exp_orn_rescale %>%
@@ -304,7 +343,7 @@ readr::write_csv(np_exp_orn, here(current_np_dir,
                                  # because exposure is no longer an output
                                   "np_exposure_ornamentals.csv"))
 
-# potentially filter to past 20 years (or hardcode from 2004 onward)
+# updated to filter to past 20 years (hardcoded data filter from 2004 onward)
 
 ```
 
