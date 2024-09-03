@@ -134,6 +134,8 @@ Then, in final data, save `rgn_id`, `product`, `year`, `rel_sust_tonnes`
 
 
 ```{r}
+# ---- Subset np harvest ornamentals ----
+
 # read in FAO commodities usd tonnes int data
 np_harvest_usd_tonnes <- read_csv(here(current_np_dir, "int", "np_harvest_usd_tonnes_gf.csv"))
 
@@ -144,6 +146,15 @@ np_ornamentals_base <- np_harvest_usd_tonnes %>%
 # check
 table(np_ornamentals_base$product)
 # 3938 -- v2024
+
+
+# select relevant columns
+np_harvest_orn <- np_ornamentals_base %>%
+  dplyr::select(rgn_id, year, product, tonnes) %>% 
+  arrange(rgn_id)
+
+# write out tonnes subset to int
+readr::write_csv(np_harvest_orn, here(current_np_dir, "int", "np_harvest_ornamentals_tonnes.csv"))
 
 ```
 
@@ -158,11 +169,6 @@ Returns the first input data frame with a new column for exposure:
 [`rgn_id` `year` `product` `exposure`]
 
 ```{r}
-    
-# ---- Subset np harvest ornamentals ----
-np_harvest_orn <- np_ornamentals_base %>%
-  dplyr::select(rgn_id, year, product, tonnes) %>% 
-  arrange(rgn_id)
 
 # ====== Determine Habitat Areas for Exposure ========
 # rocky reef habitat area
@@ -368,6 +374,13 @@ ggplot(data = np_exp_orn_global %>% filter(rgn_id == 163), aes(x = year, y = exp
 
 ## Calculate Risk
 
+
+Calculate NP risk based on blast fishing and cyanide fishing. For ornamentals:
+
+risk = 1 if blast fishing or cyanide fishing 
+
+Create a dataframe of risk per product per region.
+
 ```{r}
 
 ### calculates NP risk based on:
@@ -377,52 +390,59 @@ ggplot(data = np_exp_orn_global %>% filter(rgn_id == 163), aes(x = year, y = exp
 #########################################.
 
 
-### Determine Risk
+# ----- Determine Risk --------
 
-r_cyanide <- 
-  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_poison_3nm_rgn2013.csv")) %>%
+r_cyanide <- read_csv(here("globalprep", "np_prs_poison_blast_fishing",
+                           "v2013", "data", "gl_thr_poison_3nm_rgn2013.csv")) %>%
   #AlignDataYears(layer_nm = "np_cyanide", layers_obj = layers) %>%
   dplyr::filter(!is.na(score) & score > 0) %>%
   dplyr::select(rgn_id,
                 #year = scenario_year,
                 cyanide = score)
 
-r_blast <-
-  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_blast_3nm_rgn2013.csv")) %>%
+r_blast <- read_csv(here("globalprep", "np_prs_poison_blast_fishing",
+                         "v2013", "data", "gl_thr_blast_3nm_rgn2013.csv")) %>%
   #AlignDataYears(layer_nm = "np_blast", layers_obj = layers)  %>%
-  filter(!is.na(score) & score > 0) %>%
+  dplyr::filter(!is.na(score) & score > 0) %>%
   dplyr::select(rgn_id,
          #year = scenario_year,
          blast = score)
 
 
-### risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code
-###  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the "relative intensity of cyanide fishing"
+# risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code
+##  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the "relative intensity of cyanide fishing"
 risk_orn <- r_cyanide %>%
   full_join(r_blast, by = c("rgn_id")) %>%
   mutate(ornamentals = 1) %>%
   dplyr::select(rgn_id, ornamentals)
 
-### risk as binary
+# define risk as binary if blast or cyanide fishing
 np_risk_orn <-
+  # create a dataframe from all combinations of rgn ID and year
   expand.grid(
     rgn_id  = unique(np_harvest_orn$rgn_id),
     year = unique(np_harvest_orn$year)
   ) %>%
-  ### ornamentals
+  # join with ornamentals
   left_join(risk_orn, by = c("rgn_id"))  %>%
   mutate(ornamentals = ifelse(is.na(ornamentals), 0, ornamentals)) %>%
-  gather(product, risk, -rgn_id, -year) %>%
-  mutate(product = as.character(product))
+#  gather(product, risk, -rgn_id, -year) %>%
+#  mutate(product = as.character(product))
+  mutate(product = "ornamentals") %>% 
+  rename(risk = ornamentals) %>% 
+  dplyr::select(rgn_id, year, product, risk)
 
+# track gapfilling for records
 np_risk_gf <- np_risk_orn %>%
   mutate(gapfilled = 0, method = NA) %>%
   dplyr::select(-risk)
 
-readr::write_csv(np_risk_gf, here(current_np_dir, "output", "np_risk_ornamentals_gf.csv"))
 
-## write this as a risk layer 
-readr::write_csv(np_risk_orn, here(current_np_dir, "output", "np_risk_ornamentals.csv"))
+# write out risk gapfilling status
+readr::write_csv(np_risk_gf, here(current_np_dir, "int", "np_risk_ornamentals_gf.csv"))
+
+# write this out to int (no longer a risk layer for ohi-global)
+readr::write_csv(np_risk_orn, here(current_np_dir, "int", "np_risk_ornamentals.csv"))
 ```
 
 
@@ -431,13 +451,65 @@ readr::write_csv(np_risk_orn, here(current_np_dir, "output", "np_risk_ornamental
 1 - mean(c(exposure, risk), na.rm = TRUE)
 
 
+
+```{r}
+# read in exposure
+exposure <- readr::read_csv(here(current_np_dir, "int", "np_exposure_ornamentals.csv"))
+
+# read in risk
+risk <- readr::read_csv(here(current_np_dir, "int", "np_risk_ornamentals.csv"))
+
+
+
+# ---- calculate sustainability ----
+
+# join dataframes
+orn_exposure_risk <- exposure %>% 
+  full_join(risk, by = join_by("rgn_id", "year", "product"))
+
+# calculate sustainability
+orn_sust <- orn_exposure_risk %>% 
+  mutate(sustainability = 1 - mean(c(exposure, risk), na.rm = TRUE))
+
+
+```
+
+
+
+
 ## Calculate Sustainable Harvest
 
 tonnes * sustainability
 
 
+```{r}
+# read in ornamentals harvest (same as earlier chunk)
+np_harvest_orn <- readr::read_csv(here(current_np_dir, "int", "np_harvest_ornamentals_tonnes.csv"))
+
+# join sustainability and tonnes
+sust_tonnes <- np_harvest_orn %>% 
+  full_join(orn_sust, by = join_by("rgn_id", "year", "product"))
+
+
+# calculate sustainable harvest
+orn_sust_harvest <- sust_tonnes %>% 
+  mutate(sust_harvest = tonnes * sustainability)
+
+
+# check
+summary(orn_sust_harvest)
+
+```
+
+
 
 ## Rolling Average of Sustainable Tonnes
+
+```{r}
+
+
+
+```
 
 
 
@@ -446,11 +518,23 @@ tonnes * sustainability
 max(sustainable_tonnes)
 
 
+```{r}
+
+
+
+```
+
+
 ## Relative Sustainable Tonnes
 
 
 tonnes_rollmean / peak_sust_tonnes
 
+```{r}
+
+
+
+```
 
 
 
