@@ -151,6 +151,8 @@ table(np_ornamentals_base$product)
 # select relevant columns
 np_harvest_orn <- np_ornamentals_base %>%
   dplyr::select(rgn_id, year, product, tonnes) %>% 
+  # hard-coded year cutoff point to ensure just enough years of data for rolling average calculations
+  dplyr::filter(year >= 2004) %>% 
   arrange(rgn_id)
 
 # write out tonnes subset to int
@@ -506,33 +508,79 @@ summary(orn_sust_harvest)
 ## Rolling Average of Sustainable Tonnes
 
 ```{r}
+# Find max year in the summarized data table
+year_max <- max(orn_sust_harvest$year)
 
+sust_tonnes_rolling <- orn_sust_harvest %>%
+  arrange(rgn_id, product, year) %>%
+  group_by(rgn_id, product) %>%
+  mutate(
+      sust_tonnes_rollmean = zoo::rollapply(sust_tonnes, width = 4, FUN = mean, align = 'right', partial = TRUE, na.rm = FALSE) #,
+    #  usd_rollmean    = rollapply(   usd, width = 4, FUN = mean, align = 'right', partial = TRUE, na.rm = FALSE)
+    ) %>%
+  rename(
+      sust_tonnes_orig = sust_tonnes #, # prevent overwriting of reported and gapfilled values (ask Mel???)
+     # usd_orig    = usd
+      ) %>% 
+  mutate(
+      sust_tonnes = ifelse(!is.na(sust_tonnes_rollmean), sust_tonnes_rollmean, sust_tonnes_orig),
+  #    usd    = ifelse(!is.na(usd_rollmean),    usd_rollmean,    usd_orig)
+  ) %>%
+  dplyr::select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
 
 
 ```
 
+cleaned:
+```{r}
+year_max <- max(orn_sust_harvest$year)
+
+sust_tonnes_rolling <- orn_sust_harvest %>%
+  arrange(rgn_id, product, year) %>%
+  group_by(rgn_id, product) %>%
+  mutate(
+      sust_tonnes_rollmean = zoo::rollapply(sust_tonnes, width = 4, FUN = mean, align = 'right', partial = TRUE, na.rm = FALSE)) %>%
+  rename(sust_tonnes_orig = sust_tonnes) %>% 
+  mutate(sust_tonnes = ifelse(!is.na(sust_tonnes_rollmean), sust_tonnes_rollmean, sust_tonnes_orig)) %>%
+  dplyr::select(rgn_id, rgn_name, product, year, tonnes, sust_tonnes, sust_tonnes_orig)
+```
 
 
 ## Identify Max Sustainable Tonnes
 
-max(sustainable_tonnes)
-
+Find the maximum sustainable tonnes per region within the past 10 years.
 
 ```{r}
+# subset to past 10 years, find max sustainable tonnes 
 
+# define 10 year range
+sust_tonnes_decade <- c((year_max - 10):year_max)
 
+max_sust_tonnes <- sust_tonnes_rolling %>% 
+  filter(year %in% c(sust_tonnes_decade)) %>% 
+  ungroup() %>% 
+  group_by(rgn_id, product) %>% 
+  mutate(peak_sust_tonnes = max(sust_tonnes, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  dplyr::select(rgn_id, peak_sust_tonnes)
+  
 
 ```
 
 
 ## Relative Sustainable Tonnes
 
-
-tonnes_rollmean / peak_sust_tonnes
+Bring max sustainable tonnes value back into sustainable tonnes full dataframe. Use this value to calculate relative sustainable tonnes:if `sust_tonnes >= peak_sust_tonnes`, then set to 1. Else, `tonnes_rollmean / peak_sust_tonnes`.  
 
 ```{r}
-
-
+# ---- Determine relative sustainable tonnes ----
+orn_relative_sust_tonnes <- 
+  # join peak sustainable tonnes with full sustainable tonnes df
+  sust_tonnes_rolling %>% 
+  ## filling in peak value per region ID across full year range
+  full_join(max_sust_tonnes, by = join_by("rgn_id")) %>% 
+  mutate(tonnes_rel = ifelse(tonnes >= tonnes_peak, 1, tonnes / tonnes_peak))
+ 
 
 ```
 
