@@ -316,7 +316,7 @@ np_log_exposure_2 <- np_exp_log %>%
 ```{r save-exposure}
 # ======== Save intermediate data products ==========
 # clean up columns
-np_exp_gf <- np_exp_orn_rescale %>%
+np_exp_gf <- np_exposure_new %>%
   dplyr::mutate(gapfilled = ifelse(is.na(exposure), 1, 0)) %>%
   dplyr::mutate(method = ifelse(is.na(exposure), "prod_average", NA)) %>%
   dplyr::select(rgn_id = rgn_id, product, year, gapfilled, method)
@@ -328,13 +328,19 @@ readr::write_csv(np_exp_gf, here(current_np_dir,
                                  "np_exposure_ornamentals_gf_record.csv"))
 
 # add exposure for countries with (habitat extent == NA)
-np_exp_orn <- np_exp_orn_rescale %>%
-  dplyr::group_by(product) %>% # not sure why they didn't have some georegion gapfill instead of gapfilling with mean global exposure??
+np_exp_orn <- np_exposure_new %>% # `was np_exp_orn_rescale`
+  dplyr::group_by(product) %>% 
+  # not gapfilling by georegion, gapfilling with mean global exposure.
+  # ^ room for improvement/development next year! (we really ran out of time...)
   dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
+  # if NA, fill with global mean exposure
   dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
+  # drop temp column
   dplyr::select(-mean_exp) %>%
   dplyr::ungroup() %>%
+  # coerce data type
   dplyr::mutate(product = as.character(product)) %>%
+  # select relevant columns
   dplyr::select(rgn_id, year, product, exposure)
 
 # save ornamentals exposure to int 
@@ -345,6 +351,14 @@ readr::write_csv(np_exp_orn, here(current_np_dir,
 
 # updated to filter to past 20 years (hardcoded data filter from 2004 onward)
 
+# datacheck:
+library(RColorBrewer)
+np_orn_exposure_plot <- ggplot(data = np_exp_orn, aes(x = year, y = exposure)) +
+  geom_line(aes(color = as.character(rgn_id))) +
+  #geom_line(aes(color = (rgn_id))) +
+  theme_bw()
+
+plotly::ggplotly(np_orn_exposure_plot)
 ```
 
 
@@ -353,19 +367,6 @@ readr::write_csv(np_exp_orn, here(current_np_dir,
 ggplot(data = np_exp_orn %>% filter(rgn_id == 163), aes(x = year, y = exposure)) + 
   geom_line() +
   theme_bw()
-```
-
-
-
-
-```{r}
-np_exp_raw
-
-ggplot(data = np_exp_raw %>% filter(rgn_id == 163), aes(x = year, y = expos_raw)) + 
-  geom_line() +
-  theme_bw()
-
-
 ```
 
 
