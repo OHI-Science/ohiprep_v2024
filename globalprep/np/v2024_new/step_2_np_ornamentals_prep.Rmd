@@ -325,7 +325,7 @@ np_exp_gf <- np_exposure_new %>%
 readr::write_csv(np_exp_gf, here(current_np_dir, 
                                  "int", # used to be output, moved to int
                                  # because exposure is no longer an output
-                                 "np_exposure_ornamentals_gf_record.csv"))
+                                 "np_exposure_ornamentals_gf.csv"))
 
 # add exposure for countries with (habitat extent == NA)
 np_exp_orn <- np_exposure_new %>% # `was np_exp_orn_rescale`
@@ -373,7 +373,7 @@ ggplot(data = np_exp_orn %>% filter(rgn_id == 163), aes(x = year, y = exposure))
 global-scaled exposure test:
 
 
-```{r}
+```{r archive-methods}
 np_global_max <- np_exp_raw %>%
   filter(year %in% c(exp_decade_range)) %>% 
  # group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
@@ -511,9 +511,18 @@ orn_exposure_risk <- exposure %>%
 
 # calculate sustainability
 orn_sust <- orn_exposure_risk %>% 
-  mutate(sustainability = 1 - mean(c(exposure, risk), na.rm = TRUE))
+  ungroup() %>% 
+  group_by(rgn_id, year, product) %>% 
+  mutate(sustainability = 1 - mean(c(exposure, risk), na.rm = TRUE)) %>% 
+  ungroup()
 
 
+# exploratory data viz / data check
+check_orn_sust_plot <- ggplot(data = orn_sust, aes(x = year, y = sustainability)) +
+  geom_line(aes(color = as.character(rgn_id))) +
+  theme_bw()
+
+plotly::ggplotly(check_orn_sust_plot)
 ```
 
 
@@ -532,6 +541,11 @@ np_harvest_orn <- readr::read_csv(here(current_np_dir, "int", "np_harvest_orname
 sust_tonnes <- np_harvest_orn %>% 
   full_join(orn_sust, by = join_by("rgn_id", "year", "product"))
 
+# check summary
+summary(sust_tonnes)
+# note: 2150 NAs in exposure, 1655 NAs in risk 
+# (and 1655 in sustainability, since we took the mean and set na.rm = TRUE) 
+#str(sust_tonnes) # checking datatypes
 
 # calculate sustainable harvest
 orn_sust_harvest <- sust_tonnes %>% 
@@ -540,7 +554,7 @@ orn_sust_harvest <- sust_tonnes %>%
 
 # check
 summary(orn_sust_harvest)
-
+# 1747 NAs in sust_harvest ~~ v2024
 ```
 
 
