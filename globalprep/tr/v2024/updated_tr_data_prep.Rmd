@@ -1502,7 +1502,7 @@ tr_arrivals_props_tourism <- left_join(ap_final, ap_rescaled, by = c("rgn_id", "
     Ap = if_else(Ap < 0, 0, Ap), # if less than 1, that is due to gapfilling where linear models drew the tourism arrival values less than 0.  
     Ap = if_else(Ap > 1, 1, Ap) # if more than 1, then the Ap value for that year was above the 90th percentile.  So the value is adjusted to 1
          ) %>% 
-  select(rgn_id, rgn_name, year, Ap) # keep in rgn_name when you want to plot!!!
+  select(rgn_id, year, Ap) # keep in rgn_name when you want to plot!!!
 
 # interactive plot of the arrival proportions after rescaling
 ap_final_plot <- tr_arrivals_props_tourism %>%
