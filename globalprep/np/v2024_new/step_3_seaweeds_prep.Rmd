@@ -726,7 +726,7 @@ seaweed_st_rolling <- mar_sw_sust_tonnes %>%
                                             partial = TRUE, na.rm = FALSE)) %>%
   dplyr::rename(sust_tonnes_orig = sust_tonnes) %>% 
   dplyr::mutate(sust_tonnes = ifelse(!is.na(sust_tonnes_rollmean), sust_tonnes_rollmean, sust_tonnes_orig)) %>%
-  dplyr::select(rgn_id, year, tonnes, sust_tonnes, sust_tonnes_orig)
+  dplyr::select(rgn_id, year, tonnes, sustainability, sust_tonnes, sust_tonnes_orig)
 
 summary(seaweed_st_rolling)
 ```
@@ -764,7 +764,7 @@ head(seaweed_st_max)
 
 ## Relative sustainable tonnes
 
-Bring max sustainable tonnes value back into sustainable tonnes full dataframe. Use this value to calculate relative sustainable tonnes: if `sust_tonnes >= peak_sust_tonnes`, then set to 1. Else, `tonnes_rollmean / peak_sust_tonnes`.  
+Bring max sustainable tonnes value back into sustainable tonnes full dataframe. Use this value to calculate relative sustainable tonnes: if `sust_tonnes > peak_sust_tonnes`, then set to 1. Else, `tonnes_rollmean / peak_sust_tonnes`.  
 
 
 ```{r}
@@ -784,8 +784,16 @@ seaweed_relative_sust_tonnes <-
 summary(seaweed_relative_sust_tonnes)
 
 
-# save to output folder
-readr::write_csv(seaweed_relative_sust_tonnes, here(current_np_dir, "output", "np_relative_sust_tonnes_seaweeds.csv"))
+# save full df to int folder
+readr::write_csv(orn_relative_sust_tonnes, here(current_np_dir, "int", "np_relative_sust_tonnes_seaweeds_full.csv"))
+
+
+# save selected columns to output folder
+final_sw_relative_sust_tonnes <- seaweed_relative_sust_tonnes %>% 
+  dplyr::select(rgn_id, product, year, rel_sust_tonnes)
+
+readr::write_csv(final_sw_relative_sust_tonnes, here(current_np_dir, "output", "np_relative_sust_tonnes_seaweeds.csv"))
+
 ```
 
 
