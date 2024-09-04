@@ -525,7 +525,7 @@ sust_tonnes_rolling <- sust_harvest_orn %>%
                                             partial = TRUE, na.rm = FALSE)) %>%
   rename(sust_tonnes_orig = sust_tonnes) %>% 
   mutate(sust_tonnes = ifelse(!is.na(sust_tonnes_rollmean), sust_tonnes_rollmean, sust_tonnes_orig)) %>%
-  dplyr::select(rgn_id, rgn_name, product, year, tonnes, sust_tonnes, sust_tonnes_orig)
+  dplyr::select(rgn_id, rgn_name, year, product, tonnes, sustainability, sust_tonnes, sust_tonnes_orig)
 
 
 ```
@@ -577,8 +577,15 @@ orn_relative_sust_tonnes <-
 summary(orn_relative_sust_tonnes)
 
 
-# save to output folder
-readr::write_csv(orn_relative_sust_tonnes, here(current_np_dir, "output", "np_relative_sust_tonnes_ornamentals.csv"))
+# save full df to int folder
+readr::write_csv(orn_relative_sust_tonnes, here(current_np_dir, "int", "np_relative_sust_tonnes_ornamentals_full.csv"))
+
+
+# save selected columns to output folder
+final_orn_relative_sust_tonnes <- orn_relative_sust_tonnes %>% 
+  dplyr::select(rgn_id, product, year, rel_sust_tonnes)
+
+readr::write_csv(final_orn_relative_sust_tonnes, here(current_np_dir, "output", "np_relative_sust_tonnes_ornamentals.csv"))
 ```
 
 
