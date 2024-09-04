@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.4.553">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Compiled on Wed Sep 4 01:12:13 2024 by lecuona">
+
+<title>OHI 2024: Ocean Acidification Data Prep</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="prs_oa_layer_prep_files/libs/clipboard/clipboard.min.js"></script>
+<script src="prs_oa_layer_prep_files/libs/quarto-html/quarto.js"></script>
+<script src="prs_oa_layer_prep_files/libs/quarto-html/popper.min.js"></script>
+<script src="prs_oa_layer_prep_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="prs_oa_layer_prep_files/libs/quarto-html/anchor.min.js"></script>
+<link href="prs_oa_layer_prep_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="prs_oa_layer_prep_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="prs_oa_layer_prep_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="prs_oa_layer_prep_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="prs_oa_layer_prep_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a>
+  <ul class="collapse">
+  <li><a href="#updates-from-2024-assessment" id="toc-updates-from-2024-assessment" class="nav-link" data-scroll-target="#updates-from-2024-assessment">Updates from 2024 assessment</a></li>
+  </ul></li>
+  <li><a href="#data-source" id="toc-data-source" class="nav-link" data-scroll-target="#data-source">Data Source</a>
+  <ul class="collapse">
+  <li><a href="#classification" id="toc-classification" class="nav-link" data-scroll-target="#classification">Classification</a></li>
+  </ul></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a></li>
+  <li><a href="#setup" id="toc-setup" class="nav-link" data-scroll-target="#setup">Setup</a>
+  <ul class="collapse">
+  <li><a href="#install-copernicusmarine-tool-in-python" id="toc-install-copernicusmarine-tool-in-python" class="nav-link" data-scroll-target="#install-copernicusmarine-tool-in-python">Install copernicusmarine tool in python</a></li>
+  </ul></li>
+  <li><a href="#automated-download-of-raw-data" id="toc-automated-download-of-raw-data" class="nav-link" data-scroll-target="#automated-download-of-raw-data">Automated download of raw data</a>
+  <ul class="collapse">
+  <li><a href="#new-data-download-copernicus-marine-service-2010---2022-downloaded-august-1-2024" id="toc-new-data-download-copernicus-marine-service-2010---2022-downloaded-august-1-2024" class="nav-link" data-scroll-target="#new-data-download-copernicus-marine-service-2010---2022-downloaded-august-1-2024">New Data Download (Copernicus Marine Service, 2010 - 2022; Downloaded August 1, 2024)</a></li>
+  <li><a href="#historical-data-download" id="toc-historical-data-download" class="nav-link" data-scroll-target="#historical-data-download">Historical Data Download</a></li>
+  <li><a href="#manual-download-of-raw-data-if-automation-has-issues-not-necessary" id="toc-manual-download-of-raw-data-if-automation-has-issues-not-necessary" class="nav-link" data-scroll-target="#manual-download-of-raw-data-if-automation-has-issues-not-necessary">Manual download of raw data, if automation has issues – not necessary!!</a></li>
+  </ul></li>
+  <li><a href="#split-into-monthly-rasters" id="toc-split-into-monthly-rasters" class="nav-link" data-scroll-target="#split-into-monthly-rasters">Split into monthly rasters</a></li>
+  <li><a href="#raster-calculations" id="toc-raster-calculations" class="nav-link" data-scroll-target="#raster-calculations">Raster Calculations</a>
+  <ul class="collapse">
+  <li><a href="#historical-reference-take-average-of-1985---2000-values" id="toc-historical-reference-take-average-of-1985---2000-values" class="nav-link" data-scroll-target="#historical-reference-take-average-of-1985---2000-values">Historical Reference (take average of 1985 - 2000 values)</a></li>
+  <li><a href="#annual-mean-aragonite-saturation" id="toc-annual-mean-aragonite-saturation" class="nav-link" data-scroll-target="#annual-mean-aragonite-saturation">Annual mean aragonite saturation</a></li>
+  </ul></li>
+  <li><a href="#rescale-from-0-to-1" id="toc-rescale-from-0-to-1" class="nav-link" data-scroll-target="#rescale-from-0-to-1">Rescale from 0 to 1</a>
+  <ul class="collapse">
+  <li><a href="#re-worked-v2024-function-for-rescaling" id="toc-re-worked-v2024-function-for-rescaling" class="nav-link" data-scroll-target="#re-worked-v2024-function-for-rescaling">Re-worked (v2024) Function for Rescaling</a></li>
+  </ul></li>
+  <li><a href="#zonal-statistics-and-results" id="toc-zonal-statistics-and-results" class="nav-link" data-scroll-target="#zonal-statistics-and-results">Zonal Statistics and Results</a>
+  <ul class="collapse">
+  <li><a href="#reproject-resample-check-extents-and-mask" id="toc-reproject-resample-check-extents-and-mask" class="nav-link" data-scroll-target="#reproject-resample-check-extents-and-mask">Reproject, resample, check extents, and mask</a></li>
+  <li><a href="#calculate-zonal-statistics" id="toc-calculate-zonal-statistics" class="nav-link" data-scroll-target="#calculate-zonal-statistics">Calculate Zonal Statistics</a></li>
+  </ul></li>
+  <li><a href="#final-pressure-scores" id="toc-final-pressure-scores" class="nav-link" data-scroll-target="#final-pressure-scores">Final Pressure Scores</a></li>
+  <li><a href="#citation-information" id="toc-citation-information" class="nav-link" data-scroll-target="#citation-information">Citation information</a></li>
+  </ul>
+<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="prs_oa_layer_prep.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">OHI 2024: Ocean Acidification Data Prep</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><em>Compiled on Wed Sep 4 01:12:13 2024 by lecuona</em> </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="summary" class="level1">
+<h1>Summary</h1>
+<p><strong>Overview</strong></p>
+<p>The <a href="https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description">data source product</a> corresponds to a REP L4 time series of monthly global reconstructed surface ocean pCO2, air-sea fluxes of CO2, pH, total alkalinity, dissolved inorganic carbon, saturation state with respect to calcite and aragonite, and associated uncertainties on a 0.25° x 0.25° regular grid. The product is obtained from an ensemble-based forward feed neural network approach mapping situ data for surface ocean fugacity (SOCAT data base, Bakker et al.&nbsp;2016, <a href="https://www.socat.info/" class="uri">https://www.socat.info/</a>) and sea surface salinity, temperature, sea surface height, chlorophyll a, mixed layer depth and atmospheric CO2 mole fraction. Sea-air flux fields are computed from the air-sea gradient of pCO2 and the dependence on wind speed of Wanninkhof (2014). Surface ocean pH on total scale, dissolved inorganic carbon, and saturation states are then computed from surface ocean pCO2 and reconstructed surface ocean alkalinity using the CO2sys speciation software [See: Citation information].</p>
+<p>Specifically, we want to evaluate aragonite saturation. This is because it is a good metric for ocean acidification pressure on marine organisms. Some sources referring to this include:</p>
+<p><a href="https://www.nature.com/scitable/knowledge/library/ocean-acidification-25822734/">Ocean Acidification | Learn Science at Scitable</a></p>
+<ol type="1">
+<li><span class="math inline">\(CO_2(aq) + H_2O ↔ H_2CO_3\)</span></li>
+<li><span class="math inline">\(H_2CO_3 ↔ HCO_3^- + H^+\)</span></li>
+<li><span class="math inline">\(HCO_3^- ↔ CO_3^{2-} + H^+\)</span></li>
+<li><span class="math inline">\(CO_2(aq) + CO_3^{2-} + H_2O → 2HCO_3^-\)</span></li>
+</ol>
+<p>For <strong>supersaturated</strong> (Ω &gt; 1) conditions, with an excess of [ <span class="math inline">\(CO_3^{2-}\)</span> ]seawater, a crystal of <span class="math inline">\(CaCO_3\)</span> will tend to grow, and in <strong>undersaturated</strong> (Ω &lt; 1) conditions, <span class="math inline">\(CaCO_3\)</span> will dissolve. [<span class="math inline">\(CO_3^{2-}\)</span>]saturation is a weak function of temperature and salinity but a strong function of water depth (pressure) meaning that deeper waters are typically more corrosive. How [saturation level] affects calcifying organisms is difficult to predict however, because different species exert varying degrees of biological control on the calcification process. <strong>Therefore, it may be a better idea to look at the current level of aragonite.</strong></p>
+<p><a href="https://sos.noaa.gov/catalog/datasets/ocean-acidification-saturation-state/#:~:text=Aragonite%20saturation%20state%20is%20commonly,organisms%20with%20calcium%20carbonate%20structures">Ocean Acidification: Saturation State - Science On a Sphere</a></p>
+<p>Aragonite saturation state is commonly used to track ocean acidification because <strong>it is a measure of carbonate ion concentration</strong>. Aragonite is one of the more soluble forms of calcium carbonate and is <u>widely used by marine calcifiers</u> (organisms with calcium carbonate structures).</p>
+<p><a href="https://www.epa.gov/climate-indicators/climate-change-indicators-ocean-acidity#:~:text=The%20global%20map%20in%20Figure,data%20(2006%E2%80%932015).">Climate Change Indicators: Ocean Acidity | US EPA.</a></p>
+<p>Aragonite is a specific form of calcium carbonate that many organisms produce and use to build their skeletons and shells, and the saturation state is a measure of how easily aragonite can dissolve in the water.</p>
+<p>The <u><strong>lower</strong></u> the saturation level, the <u><strong>more difficult</strong></u> it is for organisms to build and maintain their protective skeletons and shells.</p>
+<p>Aragonite saturation has only been measured at selected locations during the last few decades, but it can be calculated reliably for different times and locations based on the relationships scientists have observed among aragonite saturation, pH, dissolved carbon, water temperature, concentrations of carbon dioxide in the atmosphere, and other factors that can be measured.</p>
+<section id="updates-from-2024-assessment" class="level3">
+<h3 class="anchored" data-anchor-id="updates-from-2024-assessment">Updates from 2024 assessment</h3>
+<p>Copernicus Marine Service’s Global Ocean Surface Carbon product was found by Melanie Frazier, which has been an excellent resource. This layer is a revamped version of previous years’, and can be updated in future years now. In the future, I would finish updating the script by changing certain <code>raster::calc</code> and <code>raster::stack</code> functions (etc) to the <code>terra</code> package.</p>
+</section>
+</section>
+<section id="data-source" class="level1">
+<h1>Data Source</h1>
+<section id="classification" class="level3">
+<h3 class="anchored" data-anchor-id="classification">Classification</h3>
+<p><strong>Reference:</strong> <a href="https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description">Copernicus Marine Service</a></p>
+<p><strong>Downloaded:</strong></p>
+<p><strong>Description</strong>: Aragonite Saturation State <span class="math inline">\(\Omega_{arg}\)</span></p>
+<p><strong>Full name:</strong> Global Ocean Surface Carbon</p>
+<p><strong>Product ID:</strong> MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008</p>
+<p><strong>Source:</strong> In-situ observations</p>
+<p><strong>Spatial extent:</strong> Global OceanLat -88.12° to 89.88°Lon -179.87° to 179.88°</p>
+<p><strong>Spatial resolution:</strong> 0.25° × 0.25°</p>
+<p><strong>Temporal extent:</strong> 31 Dec 1984 to 30 Nov 2022</p>
+<p><strong>Temporal resolution:</strong> Monthly</p>
+<p><strong>Processing level:</strong> Level 4</p>
+<p><strong>Variables:</strong> Dissolved inorganic carbon in sea water (DIC), Sea water pH reported on total scale (pH), Surface partial pressure of carbon dioxide in sea water (spCO2), Surface downward mass flux of carbon dioxide expressed as carbon (fpCO2), Total alkalinity in sea water</p>
+<p><strong>Feature type:</strong> Grid</p>
+<p><strong>Blue markets:</strong> Conservation &amp; biodiversity, Climate &amp; adaptation, Science &amp; innovation, Marine food</p>
+<p><strong>Projection:</strong> WGS 84 / World Mercator (EPSG 3395)</p>
+<p><strong>Data assimilation:</strong> None</p>
+<p><strong>Update frequency:</strong> Annually</p>
+<p><strong>Format:</strong> NetCDF-4</p>
+<p><strong>Originating centre:</strong> LSCE (France)</p>
+<p><strong>Last metadata update:</strong> 30 November 2023</p>
+</section>
+</section>
+<section id="methods" class="level1">
+<h1>Methods</h1>
+<ol type="1">
+<li><p>Set-up source and file paths</p></li>
+<li><p>Download data needed</p></li>
+</ol>
+<ul>
+<li>Automated download of new data</li>
+<li>Automated download of historical data</li>
+</ul>
+<ol start="3" type="1">
+<li>Split the global OA MultiLayer NetCDF into its individual raster layers, which are by month.</li>
+</ol>
+<ul>
+<li>This would be saved in Mazu, within <code>/home/shares/ohi/git-annex/globalprep/prs_oa/v2024/int/oa_monthly_rasters</code></li>
+</ul>
+<ol start="4" type="1">
+<li>Raster calculations for historical and new data</li>
+</ol>
+<ul>
+<li>Create a raster of the average historical values by making a <code>terra</code> RasterBrick and calculate the average over the reference years (1985 - 2000)
+<ul>
+<li>Save within <code>/home/shares/ohi/git-annex/globalprep/prs_oa/v2024/int</code></li>
+</ul></li>
+<li>Create annual mean rasters for the new data by stacking the monthly rasters by year and using <code>raster::calc</code> to calculate the mean for that year.
+<ul>
+<li>Save within <code>/home/shares/ohi/git-annex/globalprep/prs_oa/v2024/int/oa_annual_mean</code></li>
+</ul></li>
+</ul>
+<ol start="5" type="1">
+<li><p>Rescale each annual raster between 0 to 1 using the historical average data as a reference – v2024 updated the function</p></li>
+<li><p>Project, resample, and check the extent of the new data, historical ref data, and zones raster from OHI</p></li>
+<li><p>Calculate Zonal Statistics using the “mean” between the zones raster and the rescaled annual rasters for each region. Finish by saving the dataframe within <code>/home/lecuona/OHI_Intro/ohiprep_v2024/globalprep/prs_oa/v2024/output</code>.</p></li>
+</ol>
+</section>
+<section id="setup" class="level1">
+<h1>Setup</h1>
+<div class="cell" data-verbose="false">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">#set options for all chunks in code</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span>opts_chunk<span class="sc">$</span><span class="fu">set</span>(<span class="at">message =</span> <span class="cn">FALSE</span>, <span class="at">warning =</span> <span class="cn">FALSE</span>, <span class="at">eval=</span><span class="cn">FALSE</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># load packages</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">require</span>(librarian)){</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">install.packages</span>(<span class="st">"librarian"</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(librarian)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>librarian<span class="sc">::</span><span class="fu">shelf</span>(</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  here,</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  CopernicusMarine,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  janitor,</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  raster,</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>  terra,</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>  maps,</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  httr,</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  jsonlite,</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>  purrr,</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>  tictoc,</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  sf, </span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>  googleVis,</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>  RColorBrewer,</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>  foreach,</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>  doParallel, <span class="co"># for using multiple cores, if needed</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>  tidyverse, </span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>  ohicore,</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>  ggplot2,</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>  reticulate, <span class="co"># for python coding</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>  ncmeta,</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>  ncdf4,</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>  plotly</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- sources! ----</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">here</span>(<span class="st">"workflow"</span>, <span class="st">"R"</span>, <span class="st">"common.R"</span>)) <span class="co"># file creates objects to process data</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>This file makes it easier to process data for the OHI global assessment
+ by creating the following objects:
+
+ * dir_M = identifies correct file path to Mazu (internal server) based on your operating system
+ * mollCRS = the crs code for the mollweide coordinate reference system we use in the global assessment
+ * regions_shape() = function to load global shapefile for land/eez/high seas/antarctica regions
+ * ohi_rasters() = function to load two rasters: global eez regions and ocean region
+ * region_data() = function to load 2 dataframes describing global regions 
+ * rgn_syns() = function to load dataframe of region synonyms (used to convert country names to OHI regions)
+ * low_pop() = function to load dataframe of regions with low and no human population
+ * UNgeorgn = function to load dataframe of UN geopolitical designations used to gapfill missing data</code></pre>
+</div>
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- set year and file path info ----</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>current_year <span class="ot">&lt;-</span> <span class="dv">2024</span> <span class="co"># Update this in the future!!</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>version_year <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"v"</span>,current_year)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>data_dir_version_year <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"d"</span>, current_year)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- data directories ----</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Raw data directory (on Mazu)</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>raw_data_dir <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(dir_M, <span class="st">"git-annex"</span>, <span class="st">"globalprep"</span>, <span class="st">"_raw_data"</span>)</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co"># CMS (Copernicus Marine Service) raw data directory</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>cms_dir <span class="ot">&lt;-</span> <span class="fu">here</span>(raw_data_dir, <span class="st">"CMS"</span>, data_dir_version_year)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="co"># prs_oa dir</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>oa_dir <span class="ot">&lt;-</span> <span class="fu">here</span>(dir_M, <span class="st">"git-annex"</span>, <span class="st">"globalprep"</span>, <span class="st">"prs_oa"</span>, version_year)</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co"># output data dir for intermediate data products</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>int_dir <span class="ot">&lt;-</span> <span class="fu">here</span>(oa_dir, <span class="st">"int"</span>)</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="co"># dir.create(int_dir) # to create the path on Mazu if it has not already been done</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="co"># final output dir</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>output_dir <span class="ot">&lt;-</span> <span class="fu">here</span>(<span class="st">"globalprep"</span>,<span class="st">"prs_oa"</span>, version_year, <span class="st">"output"</span>)</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="co"># set colors</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>cols <span class="ot">=</span> <span class="fu">rev</span>(<span class="fu">colorRampPalette</span>(<span class="fu">brewer.pal</span>(<span class="dv">9</span>, <span class="st">'Spectral'</span>))(<span class="dv">255</span>)) <span class="co"># rainbow color scheme</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a><span class="co"># Read in eez raster with cells at 1km -- used for resampling and zonal statistics (held on an NCEAS server)</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>zones <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(here<span class="sc">::</span><span class="fu">here</span>(dir_M, <span class="st">"git-annex"</span>, <span class="st">"globalprep"</span>,<span class="st">"spatial"</span>,<span class="st">"v2017"</span>,<span class="st">"regions_eez_with_fao_ant.tif"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<section id="install-copernicusmarine-tool-in-python" class="level2">
+<h2 class="anchored" data-anchor-id="install-copernicusmarine-tool-in-python">Install copernicusmarine tool in python</h2>
+<p>For the next two chunks, we will be using a Python Library API (Application Programming Interface) to automate the download of the data.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># first, we need to install the CMS tool using python!</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># these are "modules", much like packages in R</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> subprocess</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> install(package): <span class="co"># a function to download the copernicusmarine package</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    subprocess.check_call([sys.executable, <span class="st">"-m"</span>, <span class="st">"pip"</span>, <span class="st">"install"</span>, package]) <span class="co"># `sys.executable` is the path to the python executable. for example, "/usr/bin/python3".  This makes the process more reproducible because on the server the sys.executable for python could be different based on the individual.</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">#"-m" tells the Python interpreter to run a module, in this case "pip", as a script, using the new function "install" that we created using `def` and inputting the name of the function for the variable "package"</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    install(<span class="st">"copernicusmarine"</span>) <span class="co"># use the function to download the package</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> copernicusmarine <span class="co"># will import the package copernicusmarine.</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    <span class="co"># if the package is already installed, the rest of the code will be skipped</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span> <span class="pp">ImportError</span>:</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Installing copernicusmarine..."</span>) <span class="co"># if it does not work, this will print in the console. </span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"copernicusmarine version: </span><span class="sc">{</span>copernicusmarine<span class="sc">.</span>__version__<span class="sc">}</span><span class="ss">"</span>) <span class="co"># if correctly downloaded, then it will print the version</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="co"># v2024: copernicusmarine version: 1.3.1</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+</section>
+<section id="automated-download-of-raw-data" class="level1">
+<h1>Automated download of raw data</h1>
+<section id="new-data-download-copernicus-marine-service-2010---2022-downloaded-august-1-2024" class="level2">
+<h2 class="anchored" data-anchor-id="new-data-download-copernicus-marine-service-2010---2022-downloaded-august-1-2024">New Data Download (Copernicus Marine Service, 2010 - 2022; Downloaded August 1, 2024)</h2>
+<p>In Quarto documents, you are able to fluidly exchange between python and R code by specifying what language will be used in the chunk name. This is extremely helpful for us, as it allows us to use the python API on the <a href="https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/download">CMS website</a>. Here are the steps to download the data properly:</p>
+<ol type="1">
+<li>Login to CMS: go to their website and make your username and password. It is quick and should be usable immediately after the credentials have been made.</li>
+<li>Go to <a href="https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description" class="uri">https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/description</a>. This is the link to the “Global Ocean Surface Carbon” product. Ensure that you read the overview and check for any changes from the previous year (references, characteristics, etc).</li>
+<li>Click the “Download data” button. FYI: the button itself does not have words on it, it is just an arrow pointing downwards. It is in the upper right hand corner of the page, next to the star and map icons.</li>
+<li>This will bring you to their graphical tool download page. For the <u><strong>Variables</strong></u>, “Clear all” and select only “Aragonite saturation state in sea water: <em>omega_ar [-]</em>”. Scroll to the bottom of the page, and under <strong>Date Range</strong>, specify 2010-01-01 at a time of 00:00:00 to your current year, 20xx-12-01 at a time of 00:00:00, to ensure you are obtaining the full year.</li>
+<li>After, instead of clicking the dark blue “Download” button, you will select the grey “Automate” button. Select Python API, and copy the <code>copernicusmarine.subset()</code> code. <strong>This would be pasted starting from <code>copernicus.subset(...</code> to <code>...disable_progress_bar=False,</code></strong></li>
+</ol>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="https://data.marine.copernicus.eu/product/MULTIOBS_GLO_BIO_CARBON_SURFACE_REP_015_008/download"><img src="python_api_code_ex.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
+</figure>
+</div>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># This layer lags by 2 years, since we need a full year of data. </span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># v2024: username &lt;- slecuona; password &lt;- OceanHealth2024</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> copernicusmarine</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co"># set the credentials made on the CMS website</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>copernicusmarine.login(username<span class="op">=</span><span class="st">'slecuona'</span>, password<span class="op">=</span><span class="st">'OceanHealth2024'</span>) </span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co"># v2024: INFO - 2024-07-30T16:04:43Z - Credentials file stored in /home/lecuona/.copernicusmarine/.copernicusmarine-credentials.</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co"># define cms_dir, since the python chunk cannot read objects from previous R chunks/in your environment</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>dir_M <span class="op">=</span> <span class="st">"/home/shares/ohi"</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>current_year <span class="op">=</span> <span class="dv">2024</span> <span class="co"># UPDATE!</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>version_year <span class="op">=</span> <span class="ss">f"v</span><span class="sc">{</span>current_year<span class="sc">}</span><span class="ss">"</span> <span class="co"># using an f-string</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>data_dir_version_year <span class="op">=</span> <span class="ss">f"d</span><span class="sc">{</span>current_year<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>raw_data_dir <span class="op">=</span> os.path.join(dir_M, <span class="st">"git-annex"</span>, <span class="st">"globalprep"</span>, <span class="st">"_raw_data"</span>) <span class="co"># os.path.join is part of the os module and will merge into a single path</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>cms_dir <span class="op">=</span> os.path.join(raw_data_dir, <span class="st">"CMS"</span>, data_dir_version_year) <span class="co"># for the specific CMS folder within _raw_data</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="co"># make sure the directory exists</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>os.makedirs(cms_dir, exist_ok<span class="op">=</span><span class="va">True</span>) <span class="co"># will create the dir if it does not already exist</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="co"># use copernicusmarine to download the data --this is from the python API copyable code on the CMS site</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a><span class="co"># ============== Update each year!!!!================</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>copernicusmarine.subset( <span class="co"># start of copied code from CMS website</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>    dataset_id<span class="op">=</span><span class="st">"dataset-carbon-rep-monthly"</span>,</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>    dataset_version<span class="op">=</span><span class="st">"202311"</span>,</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>    variables<span class="op">=</span>[<span class="st">"omega_ar"</span>],</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>    minimum_longitude<span class="op">=-</span><span class="fl">179.875</span>,</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>    maximum_longitude<span class="op">=</span><span class="fl">179.875</span>,</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>    minimum_latitude<span class="op">=-</span><span class="fl">88.125</span>,</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>    maximum_latitude<span class="op">=</span><span class="fl">89.875</span>,</span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>    start_datetime<span class="op">=</span><span class="st">"2010-01-01T00:00:00"</span>,</span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>    end_datetime<span class="op">=</span><span class="st">"2022-12-01T00:00:00"</span>,</span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>    force_download<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>    subset_method<span class="op">=</span><span class="st">"strict"</span>,</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>    disable_progress_bar<span class="op">=</span><span class="va">False</span>, <span class="co"># end of copied code from CMS website</span></span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>    output_filename<span class="op">=</span>os.path.join(cms_dir, <span class="st">"global_aragonite_saturation_raw.nc"</span>) <span class="co">## This line is not copied!!! Need it to specify the Mazu directory for the data to download to</span></span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>) <span class="co"># v2024 python API download code, which will download as a singular multi-layer NetCDF file (nc-file)</span></span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Data downloaded to: </span><span class="sc">{</span>os<span class="sc">.</span>path<span class="sc">.</span>join(cms_dir, <span class="st">'global_aragonite_saturation_raw.nc'</span>)<span class="sc">}</span><span class="ss">"</span>) <span class="co"># print in console: data download finished!</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+<section id="historical-data-download" class="level2">
+<h2 class="anchored" data-anchor-id="historical-data-download">Historical Data Download</h2>
+<p>This will be used as a reference point when rescaling later on. The mean of the historical data (1985 - 2000) from CMS will be used. The download process is the same as for the new yearly data, however it has a different <strong>Date Range</strong> (1985-01-01T00:00:00 - 2000-12-01T00:00:00). Each year, the only thing that should change is the “current_year” object, unless there has been a reevaluation and the dates used for the historical reference point is changed.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> copernicusmarine</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># define cms_dir, since the python chunk cannot read objects from previous R chunks/in your environment</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>dir_M <span class="op">=</span> <span class="st">"/home/shares/ohi"</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>current_year <span class="op">=</span> <span class="dv">2024</span> <span class="co"># UPDATE!</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>version_year <span class="op">=</span> <span class="ss">f"v</span><span class="sc">{</span>current_year<span class="sc">}</span><span class="ss">"</span> <span class="co"># using an f-string</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>data_dir_version_year <span class="op">=</span> <span class="ss">f"d</span><span class="sc">{</span>current_year<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>raw_data_dir <span class="op">=</span> os.path.join(dir_M, <span class="st">"git-annex"</span>, <span class="st">"globalprep"</span>, <span class="st">"_raw_data"</span>) <span class="co"># os.path.join is part of the os module and will merge into a single path</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>cms_dir <span class="op">=</span> os.path.join(raw_data_dir, <span class="st">"CMS"</span>, data_dir_version_year) <span class="co"># for the specific CMS folder within _raw_data</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="co"># make sure the directory exists</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>os.makedirs(cms_dir, exist_ok<span class="op">=</span><span class="va">True</span>) <span class="co"># will create the dir if it does not already exist</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="co"># use copernicusmarine to download the data --this is from the python API copyable code on the CMS site</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>copernicusmarine.subset(</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  dataset_id<span class="op">=</span><span class="st">"dataset-carbon-rep-monthly"</span>,</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>  dataset_version<span class="op">=</span><span class="st">"202311"</span>,</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>  variables<span class="op">=</span>[<span class="st">"omega_ar"</span>],</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>  minimum_longitude<span class="op">=-</span><span class="fl">179.875</span>,</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  maximum_longitude<span class="op">=</span><span class="fl">179.875</span>,</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>  minimum_latitude<span class="op">=-</span><span class="fl">88.125</span>,</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>  maximum_latitude<span class="op">=</span><span class="fl">89.875</span>,</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>  start_datetime<span class="op">=</span><span class="st">"1985-01-01T00:00:00"</span>,</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>  end_datetime<span class="op">=</span><span class="st">"2000-12-01T00:00:00"</span>,</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>  force_download<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>  subset_method<span class="op">=</span><span class="st">"strict"</span>,</span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>  disable_progress_bar<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>  output_filename<span class="op">=</span>os.path.join(cms_dir, <span class="st">"historical_1985_2000_aragonite_saturation_raw.nc"</span>) <span class="co">## This line is not copied!!! Need it to specify the Mazu directory for the data to download to</span></span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>) <span class="co"># v2024 python API download code, which will download as a singular multi-layer NetCDF file for the historical data (nc-file)</span></span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Data downloaded to: </span><span class="sc">{</span>os<span class="sc">.</span>path<span class="sc">.</span>join(cms_dir, <span class="st">'historical_1985_2000_aragonite_saturation_raw.nc'</span>)<span class="sc">}</span><span class="ss">"</span>) <span class="co"># print in console: data download finished!</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+<section id="manual-download-of-raw-data-if-automation-has-issues-not-necessary" class="level2">
+<h2 class="anchored" data-anchor-id="manual-download-of-raw-data-if-automation-has-issues-not-necessary">Manual download of raw data, if automation has issues – not necessary!!</h2>
+<p>The rest of the code in the script does not use the manually downloaded data, but if it is necessary you can read it in using this method and proceed. However, keep in mind that automation is more reproducible.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># open the NetCDF file</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co"># file_path &lt;- here::here(raw_data_dir, "CMS", "d2024_manual", "dataset-carbon-rep-monthly_1722109120120.nc") # file path to the manually downloaded raw data</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+</section>
+<section id="split-into-monthly-rasters" class="level1">
+<h1>Split into monthly rasters</h1>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- create directory for storing the monthly individual rasters ----</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>int_monthly_dir <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(int_dir, <span class="st">"oa_monthly_rasters"</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(int_monthly_dir, <span class="at">showWarnings =</span> <span class="cn">TRUE</span>) <span class="co"># to create the directory in case it has not already been made in Mazu</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co"># open the NetCDF file</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>raw_file_path <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(cms_dir, <span class="st">"global_aragonite_saturation_raw.nc"</span>) <span class="co"># file path to the API downloaded raw data</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="co"># load the file as a SpatRaster to begin with, for greater usability with terra</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>oa_multi_raster <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(raw_file_path)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="co"># check the current CRS: will need to be reprojected to mollweide later, so that it can be clipped to the OHI eez layer</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="fu">crs</span>(oa_multi_raster) <span class="co"># v2024: ""GEOGCRS[\"WGS 84 (CRS84)\",\n".  </span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(oa_multi_raster) <span class="co"># to get a quick visualization of the multi-layer SpatRaster</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="co"># since nc_raster is already loaded as a SpatRaster object</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="co"># check the number of layers</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>num_layers <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">nlyr</span>(oa_multi_raster)</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(num_layers) <span class="co"># v2024: 156 layers, which makes sense because the data goes from 2010 - 2022 monthly</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="co"># get the time attribute for each layer, to check that it goes from 2010 - 2022 (v2024)</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>time_attribute <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">time</span>(oa_multi_raster)</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(time_attribute)</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a list to store individual rasters</span></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>individual_rasters <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a><span class="co"># loop through each layer and create individual rasters from the SpatRaster</span></span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>num_layers) {</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>  layer <span class="ot">&lt;-</span> oa_multi_raster[[i]] <span class="co"># the layer in the seq from 1:156 (v2024)</span></span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>  date <span class="ot">&lt;-</span> time_attribute[i] <span class="co"># the month, in this case, of the raster</span></span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>  layer_name <span class="ot">&lt;-</span> <span class="fu">format</span>(date, <span class="st">"%Y-%m-%d"</span>) <span class="co"># the name for the .tif when it is saved</span></span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>  individual_rasters[[layer_name]] <span class="ot">&lt;-</span> layer <span class="co"># put them in the list </span></span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a><span class="co"># print the names of the individual rasters in the list, to ensure the loop worked</span></span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(individual_rasters) <span class="co"># v2024: "2010-01-01" - "2022-12-01"</span></span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a><span class="co"># save individual rasters to files on Mazu at `int_monthly_dir`</span></span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (name <span class="cf">in</span> <span class="fu">names</span>(individual_rasters)) {</span>
+<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a>  output_file <span class="ot">&lt;-</span> <span class="fu">file.path</span>(int_monthly_dir, <span class="fu">paste0</span>(name, <span class="st">".tif"</span>)) <span class="co"># move each raster to the specified path in Mazu</span></span>
+<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a>  <span class="fu">writeRaster</span>(individual_rasters[[name]], <span class="at">filename =</span> output_file, <span class="at">overwrite =</span> <span class="cn">TRUE</span>) <span class="co"># if files already exist, overwrite them</span></span>
+<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">"Saved:"</span>, output_file)) <span class="co"># allows us to see the names of the files as they are being saved</span></span>
+<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a>} <span class="co">#great! check Mazu that files are all there</span></span>
+<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>() <span class="co"># v2024: 20.528 sec elapsed</span></span>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a><span class="co"># let's take a look at one of the monthly rasters we just saved</span></span>
+<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a>rast_2010_02_01 <span class="ot">&lt;-</span> <span class="fu">rast</span>(here<span class="sc">::</span><span class="fu">here</span>(int_monthly_dir, <span class="st">"2010-02-01.tif"</span>)) <span class="co"># read it in and rasterize it using terra</span></span>
+<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(rast_2010_02_01, <span class="at">main =</span> <span class="st">"Aragonite Saturation Raster - February 1, 2010"</span>, <span class="at">xlab =</span> <span class="st">"Longitude"</span>, <span class="at">ylab =</span> <span class="st">"Latitude"</span>) <span class="co"># plot it!</span></span>
+<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a><span class="fu">is.lonlat</span>(rast_2010_02_01) <span class="co"># TRUE, so it does currently have a long/lat CRS</span></span>
+<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a><span class="fu">crs</span>(rast_2010_02_01) <span class="co"># v2024: GEOGCRS[\"WGS 84\",\n. Once again, will have to reproject later.  </span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+<section id="raster-calculations" class="level1">
+<h1>Raster Calculations</h1>
+<section id="historical-reference-take-average-of-1985---2000-values" class="level2">
+<h2 class="anchored" data-anchor-id="historical-reference-take-average-of-1985---2000-values">Historical Reference (take average of 1985 - 2000 values)</h2>
+<p>The historical mean of Aragonite Saturation from 1985 - 2000 will be used for comparison, to calculate the pressure scores.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># read in NetCDF file we downloaded using the API</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>oa_hist_multilayer_nc <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(here<span class="sc">::</span><span class="fu">here</span>(cms_dir, <span class="st">"historical_1985_2000_aragonite_saturation_raw.nc"</span>)) </span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># check that the CRS is the same as the current data for rescaling later</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="fu">crs</span>(oa_hist_multilayer_nc) <span class="co"># v2024: yes, it is! "GEOGCRS[\"WGS 84 (CRS84)\",\n". We can move forward</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="fu">ext</span>(oa_hist_multilayer_nc) <span class="sc">==</span> <span class="fu">ext</span>(rast_2010_02_01) <span class="co"># TRUE, good!</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="fu">res</span>(oa_hist_multilayer_nc) <span class="sc">==</span> <span class="fu">res</span>(rast_2010_02_01) <span class="co"># TRUE TRUE, great! </span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>Calculate the local average (not global, see <a href="https://www.rdocumentation.org/packages/terra/versions/0.8-6/topics/local">documentation</a>).</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># since it already multilayer and we plan on averaging across all years, we can make it a RasterBrick. It is similar to a RasterStack (that can be created with `stack()`), but processing time should be shorter when using a RasterBrick (from documentation)</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>oa_hist_moll_brick <span class="ot">&lt;-</span> <span class="fu">brick</span>(oa_hist_multilayer_nc)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate the mean across all layers and years</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>oa_historical_average <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">mean</span>(oa_hist_moll_brick) </span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>() <span class="co"># v2024: 169.212 sec elapsed</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="co"># write the result to a new raster file for future use</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">writeRaster</span>(oa_historical_average, </span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>            <span class="at">filename =</span> here<span class="sc">::</span><span class="fu">here</span>(int_dir, <span class="st">"oa_1985_2000_historical_average.tif"</span>), <span class="co"># save to Mazu</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>            <span class="at">format =</span> <span class="st">"GTiff"</span>,</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>            <span class="at">overwrite =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+<section id="annual-mean-aragonite-saturation" class="level2">
+<h2 class="anchored" data-anchor-id="annual-mean-aragonite-saturation">Annual mean aragonite saturation</h2>
+<p>Annual mean aragonite saturation rasters calculated from the monthly data.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- create directory for storing the monthly individual rasters ----</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>oa_annual_mean_dir <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(int_dir, <span class="st">"oa_annual_mean"</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(oa_annual_mean_dir, <span class="at">showWarnings =</span> <span class="cn">TRUE</span>) <span class="co"># to create the directory in case it has not already been made in Mazu</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="co"># make a list of the already saved monthly rasters</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>oa_monthly_files <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="at">path =</span> <span class="fu">here</span>(int_monthly_dir),</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>                               <span class="at">pattern =</span> <span class="st">"</span><span class="sc">\\</span><span class="st">.tif$"</span>, <span class="co"># to ensure we only grab the .tif files, not the .tif.aux.json files</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>                               <span class="at">full.names =</span> <span class="cn">TRUE</span>) <span class="co"># returns the full path, not just the file name</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="co"># the minimum year of the individual rasters</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>minyr <span class="ot">&lt;-</span> <span class="fu">substr</span>(oa_monthly_files, <span class="dv">75</span>, <span class="dv">78</span>) <span class="sc">%&gt;%</span> <span class="co"># taking the string that defines the year the raster's data was from </span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.numeric</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">min</span>()</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a><span class="co"># the maximum year of the individual rasters</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>maxyr <span class="ot">&lt;-</span> <span class="fu">substr</span>(oa_monthly_files, <span class="dv">75</span>, <span class="dv">78</span>) <span class="sc">%&gt;%</span> <span class="co"># taking the string that defines the year the raster's data was from </span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.numeric</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">max</span>() <span class="co"># take the max of all the years for the data downloaded</span></span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a><span class="co"># check that it makes sense with the data you downloaded</span></span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a><span class="fu">paste0</span>(minyr, <span class="st">"-"</span>, maxyr)</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a><span class="do">## stack all rasters for each year, calculate the annual mean, then write as a raster</span></span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a><span class="fu">registerDoParallel</span>(<span class="dv">6</span>)</span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a><span class="fu">foreach</span>(<span class="at">yr =</span> <span class="fu">c</span>(minyr<span class="sc">:</span>maxyr)) <span class="sc">%dopar%</span> { <span class="co"># check that the minyr and maxyr are correct with what you downloaded</span></span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>  files <span class="ot">&lt;-</span> oa_monthly_files[<span class="fu">str_detect</span>(oa_monthly_files, <span class="fu">as.character</span>(yr))] <span class="co"># of the list earlier, detect the year from each file so that we can stack them by year</span></span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>  rast_annual_mean <span class="ot">&lt;-</span> <span class="fu">stack</span>(files) <span class="sc">%&gt;%</span></span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>    <span class="fu">calc</span>(mean, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span> <span class="co"># calculate the average for each year for each cell in the raster over all the months, creating a raster of the average values for that year</span></span>
+<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a>    terra<span class="sc">::</span><span class="fu">writeRaster</span>(<span class="at">filename =</span> <span class="fu">sprintf</span>(<span class="st">"%s/oa_annual_mean/oa_annual_%s.tif"</span>, int_dir, yr),</span>
+<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a>                       <span class="at">overwrite =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>() <span class="co"># v2024 - 8.114 sec elapsed</span></span>
+<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-37"><a href="#cb11-37" aria-hidden="true" tabindex="-1"></a><span class="co"># check the crs, ext, and res of the files to ensure nothing changed</span></span>
+<span id="cb11-38"><a href="#cb11-38" aria-hidden="true" tabindex="-1"></a>annual_2010 <span class="ot">&lt;-</span> <span class="fu">rast</span>(here<span class="sc">::</span><span class="fu">here</span>(oa_annual_mean_dir, <span class="st">"oa_annual_2010.tif"</span>)) <span class="co"># read it in and rasterize it using terra</span></span>
+<span id="cb11-39"><a href="#cb11-39" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(annual_2010, <span class="at">main =</span> <span class="st">"Aragonite Saturation Annual Mean - 2010"</span>, <span class="at">xlab =</span> <span class="st">"Longitude"</span>, <span class="at">ylab =</span> <span class="st">"Latitude"</span>) <span class="co"># plot it!</span></span>
+<span id="cb11-40"><a href="#cb11-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-41"><a href="#cb11-41" aria-hidden="true" tabindex="-1"></a><span class="fu">is.lonlat</span>(annual_2010) <span class="co"># TRUE, so it does currently have a long/lat CRS</span></span>
+<span id="cb11-42"><a href="#cb11-42" aria-hidden="true" tabindex="-1"></a><span class="fu">crs</span>(annual_2010) <span class="co"># v2024: GEOGCRS[\"WGS 84\",\n. The same as before `raster::calc`, time to move forward! </span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+</section>
+<section id="rescale-from-0-to-1" class="level1">
+<h1>Rescale from 0 to 1</h1>
+<p>This pressure layer is rescaled so that all values lie between 0 and 1 using both a historical reference period and a biological reference point.</p>
+<p>As a reminder, <strong>supersaturated</strong> conditions are when Ω &gt; 1, with an excess of [ <span class="math inline">\(CO_3^{2-}\)</span> ]seawater, where a crystal of <span class="math inline">\(CaCO_3\)</span> will tend to grow. <strong>Undersaturated</strong> conditions are when Ω &lt; 1, of which <span class="math inline">\(CaCO_3\)</span> will dissolve.</p>
+<p>All cells with values less than one, indicating an undersaturated state, are set equal to the highest stressor level, 1. For those that are supersaturated and greater than a value of 3, they will be set to a pressure score of 0. For all other cells, rescaling the aragonite staturation state value to between 0 and 1 relies upon the change in saturation relative to the reference period (historical_avg).</p>
+<p>Deviation from aragonite saturation state is determined for each year in the study period using this equation:</p>
+<p><span class="math display">\[1 - (\frac{oapressure-1}{3-1})\]</span></p>
+<p>And for all areas in which historical values are &gt; 1 or &lt;= 3:</p>
+<p><span class="math display">\[\Delta \Omega_{year} = \frac{(\Omega_{hist} - \Omega_{current})}{(\Omega_{hist} - 1)}\]</span></p>
+<p>Note that the current value is subtracted from the baseline(hist); this way, a reduction in <span class="math inline">\(\Omega\)</span> becomes a positive pressure value. It is then normalized by the current mean state; so a decrease in <span class="math inline">\(\Omega\)</span> while the current state is high indicates less pressure than the same decrease when the current state is near 1.</p>
+<p>Afterwards, <span class="math inline">\(\Delta \Omega_{year}\)</span> is then reclassified to account for increases in aragonite saturation state (when values are negative, pressure = 0) and aragonite sat state less than 1 (values are greater than 1, pressure = 1).</p>
+<p>The <code>oaRescale</code> function rescales each of the annual rasters accordingly.</p>
+<section id="re-worked-v2024-function-for-rescaling" class="level2">
+<h2 class="anchored" data-anchor-id="re-worked-v2024-function-for-rescaling">Re-worked (v2024) Function for Rescaling</h2>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>annual_avg_rescaled_dir <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(oa_dir, version_year, <span class="st">"int"</span>,<span class="st">"annual_avg_rescaled"</span>) </span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co"># dir.create(annual_avg_rescaled_dir) # create Mazu directory for rescaled rasters if not already created</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Read in historical raster data from earlier</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>historical_avg <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(here<span class="sc">::</span><span class="fu">here</span>(int_dir, <span class="st">"oa_1985_2000_historical_average.tif"</span>))</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="co"># make a list of the already saved annual rasters</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>oa_annual_files <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="at">path =</span> <span class="fu">here</span>(oa_annual_mean_dir),</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>                              <span class="at">full.names =</span> <span class="cn">TRUE</span>) <span class="co"># returns the full path, not just the file name</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>oaRescale_updated <span class="ot">&lt;-</span> <span class="cf">function</span>(file){</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  yr <span class="ot">=</span> <span class="fu">as.numeric</span>(<span class="fu">substr</span>(file, <span class="fu">nchar</span>(file)<span class="sc">-</span><span class="dv">7</span>, <span class="fu">nchar</span>(file)<span class="sc">-</span><span class="dv">4</span>)) <span class="co"># get year of file using the file's path/name</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>  oa_yr_avg <span class="ot">=</span> terra<span class="sc">::</span><span class="fu">rast</span>(file) <span class="co"># rasterize annual mean aragonite raster for each given year </span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>  diff <span class="ot">=</span> (historical_avg <span class="sc">-</span> oa_yr_avg)<span class="sc">/</span>(historical_avg <span class="sc">-</span> <span class="dv">1</span>) <span class="co"># deviation from aragonite saturation state for each year in the study period</span></span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>  oa_pressure <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">ifel</span>(oa_yr_avg <span class="sc">&lt;=</span> <span class="dv">1</span>, <span class="dv">1</span>, oa_yr_avg) </span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># any saturation values that are less than 1 are undersaturated, so they would have the highest pressure possible (reclassify as 1)</span></span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>  oa_pressure <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">ifel</span>(oa_yr_avg <span class="sc">&gt;</span> <span class="dv">3</span>, <span class="dv">0</span>, oa_pressure) </span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># any saturation values that are greater than 3 are way above supersaturation, so they would have the lowest pressure possible (reclassify as 0)</span></span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>  oa_pressure <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">ifel</span>(oa_pressure <span class="sc">&gt;</span> <span class="dv">1</span> <span class="sc">&amp;</span> oa_pressure <span class="sc">&lt;=</span> <span class="dv">3</span>, <span class="dv">1</span> <span class="sc">-</span> (oa_pressure <span class="sc">-</span> <span class="dv">1</span>)<span class="sc">/</span>(<span class="dv">3</span> <span class="sc">-</span> <span class="dv">1</span>), oa_pressure)</span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>  <span class="co"># for arag sat values between 1 and 3, the rescaled value would be 1 - (oa_pressure - 1)/(3 - 1)</span></span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>  oa_pressure <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">ifel</span>(historical_avg <span class="sc">&gt;</span> <span class="dv">1</span> <span class="sc">&amp;</span> historical_avg <span class="sc">&lt;=</span> <span class="dv">3</span>, diff, oa_pressure) </span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">#  if the historic values also land between 1 and 3, we replace the linear interpolation values from `diff`</span></span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>  oa_pressure <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">ifel</span>(oa_pressure <span class="sc">&lt;</span> <span class="dv">0</span>, <span class="dv">0</span>, oa_pressure) <span class="co"># any rescaled values less then 0 should be considered no pressure, because that means the current value was larger than the historical value, and therefore the aragonite sat increased in reference to the historical value</span></span>
+<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a>  oa_pressure <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">ifel</span>(oa_pressure <span class="sc">&gt;</span> <span class="dv">1</span>, <span class="dv">1</span>, oa_pressure) <span class="co"># any rescaled values greater than 1 should be considered 100% pressure, because that means the current value was smaller than the historical value, and therefore the aragonite sat decreased a lot in reference to the historical value</span></span>
+<span id="cb12-34"><a href="#cb12-34" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-35"><a href="#cb12-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">writeRaster</span>(oa_pressure, </span>
+<span id="cb12-36"><a href="#cb12-36" aria-hidden="true" tabindex="-1"></a>              <span class="at">filename =</span> <span class="fu">paste0</span>(annual_avg_rescaled_dir, <span class="st">'/oa_rescaled_'</span>, yr, <span class="st">".tif"</span>),</span>
+<span id="cb12-37"><a href="#cb12-37" aria-hidden="true" tabindex="-1"></a>              <span class="at">overwrite =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb12-38"><a href="#cb12-38" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-39"><a href="#cb12-39" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb12-40"><a href="#cb12-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-41"><a href="#cb12-41" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- apply the function to the list of annual mean files -----</span></span>
+<span id="cb12-42"><a href="#cb12-42" aria-hidden="true" tabindex="-1"></a><span class="fu">lapply</span>(oa_annual_files, oaRescale_updated)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>Now, visualize the rescaled rasters and check that rescaling worked correctly.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># plot the rescaled rasters to ensure it looks correct.  </span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>ff <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="at">path =</span> here<span class="sc">::</span><span class="fu">here</span>(annual_avg_rescaled_dir), <span class="at">pattern =</span> <span class="st">'.tif$'</span>,</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>                 <span class="at">full.names =</span> <span class="cn">TRUE</span>) </span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>oa_rescaled <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(ff) <span class="co"># make into a multilayer spatraster so that all annual rasters can be seen</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(oa_rescaled) <span class="co"># v2024: this looks great!</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+</section>
+<section id="zonal-statistics-and-results" class="level1">
+<h1>Zonal Statistics and Results</h1>
+<section id="reproject-resample-check-extents-and-mask" class="level2">
+<h2 class="anchored" data-anchor-id="reproject-resample-check-extents-and-mask">Reproject, resample, check extents, and mask</h2>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Examine the OHI eez raster</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(zones) <span class="co"># examine the .tif and ensure it looks correct</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="fu">crs</span>(zones) <span class="co"># v2024: PROJCRS[\"Mollweide\",\n</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="fu">res</span>(zones) <span class="co"># 934.4789 934.4789, lower cell size = higher resolution</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>Now, let’s reproject the rescaled rasters to <code>zones</code>, for OHI consistency</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># tic()</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="co"># oa_rescaled_moll &lt;- terra::project(oa_rescaled, zones) # using terra::project, which inherently resamples using bilinear interpolation</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="co"># toc() </span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>annual_avg_rescaled_moll_dir <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(oa_dir, <span class="st">"int"</span>,<span class="st">"annual_avg_rescaled_moll"</span>) </span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="co"># dir.create(annual_avg_rescaled_moll_dir) # create Mazu directory for rescaled rasters if not already created</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="co"># make a list of the already saved and rescaled annual rasters</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>oa_rescaled_annual_files <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="at">path =</span> <span class="fu">here</span>(annual_avg_rescaled_dir),</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>                              <span class="at">full.names =</span> <span class="cn">TRUE</span>) <span class="co"># returns the full path, not just the file name</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="co"># do not run in parallel because it is not compatible with terra::project() (package might be updated in the future to accommodate parallelization)</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="co"># reprojects each rescaled raster, sets the long/lat projection</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>reprojecting_func <span class="ot">&lt;-</span> <span class="cf">function</span>(file){</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>  yr <span class="ot">=</span> <span class="fu">as.numeric</span>(<span class="fu">substr</span>(file, <span class="fu">nchar</span>(file)<span class="sc">-</span><span class="dv">7</span>, <span class="fu">nchar</span>(file)<span class="sc">-</span><span class="dv">4</span>)) <span class="co"># get year of file using the file's path/name</span></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Read in eez raster with cells at 1km -- used for resampling and zonal statistics (held on an NCEAS server)</span></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>  zones <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(here<span class="sc">::</span><span class="fu">here</span>(dir_M, <span class="st">"git-annex"</span>, <span class="st">"globalprep"</span>,<span class="st">"spatial"</span>,<span class="st">"v2017"</span>,<span class="st">"regions_eez_with_fao_ant.tif"</span>))</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # supress suxiliary files</span></span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># setGDALconfig("GDAL_PAM_ENABLED", "FALSE")</span></span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>  <span class="co"># read in annual raster</span></span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>  r <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(file[i])</span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># reprojecting to the OHI zones file to ensure they have the same extent and proj</span></span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>  r_moll <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">project</span>(r, <span class="fu">crs</span>(zones), <span class="at">threads =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>  <span class="co"># resample to ensure they have the same resolution and write out the file to Mazu</span></span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>  r_moll_resample <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">resample</span>(<span class="at">x =</span> r_moll, <span class="at">y =</span> zones, <span class="at">method =</span> <span class="st">"bilinear"</span>, <span class="at">filename =</span> <span class="fu">paste0</span>(annual_avg_rescaled_moll_dir, <span class="st">'/oa_rescaled_moll_'</span>, yr, <span class="st">".tif"</span>), <span class="at">overwrite =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-36"><a href="#cb15-36" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a><span class="fu">lapply</span>(oa_rescaled_annual_files, reprojecting_func)</span>
+<span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>() <span class="co"># v2024: 1047.173 sec elapsed</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>Now, visualize the reprojected rasters to ensure it looks correct.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># plot the rescaled rasters to ensure it looks correct.  </span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>reproj_annual_rasts <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="at">path =</span> here<span class="sc">::</span><span class="fu">here</span>(annual_avg_rescaled_moll_dir), <span class="at">pattern =</span> <span class="st">'.tif$'</span>,</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>                 <span class="at">full.names =</span> <span class="cn">TRUE</span>) </span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>oa_reprojected <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(reproj_annual_rasts) <span class="co"># make into a multilayer spatraster so that all annual rasters can be seen</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(oa_reprojected) <span class="co"># v2024: this looks great!</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="fu">ext</span>(oa_reprojected) <span class="sc">==</span> <span class="fu">ext</span>(zones) <span class="co"># v2024: TRUE</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="fu">res</span>(oa_reprojected) <span class="sc">==</span> <span class="fu">res</span>(zones) <span class="co"># v2024: TRUE</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="fu">crs</span>(oa_reprojected) <span class="sc">==</span> <span class="fu">crs</span>(zones) <span class="co"># v2024: TRUE</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="co"># great! Now we can move on to zonal stats.</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+<section id="calculate-zonal-statistics" class="level2">
+<h2 class="anchored" data-anchor-id="calculate-zonal-statistics">Calculate Zonal Statistics</h2>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># remember: `zones` from setup chunk</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="co"># zones is from `/home/shares/ohi/git-annex/globalprep/spatial/v2017`</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="co"># regions_eez_with_fao_ant.tif: This includes all the ocean regions (eez/fao/antarctica), but the raster cell values correspond to the rgn_ant_id in regions_2017_update.  This file is most often used to extract pressure values for each region.</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="co"># use zonal statistics to calculate the average score of all the cells within each region</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>regions_stats <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">zonal</span>(oa_reprojected, zones, <span class="at">fun =</span> <span class="st">"mean"</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>, <span class="at">progress =</span> <span class="st">"text"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">data.frame</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">setNames</span>(<span class="fu">c</span>(<span class="st">"rgn_id"</span>, <span class="st">"scores_2010"</span>,<span class="st">"scores_2011"</span>,<span class="st">"scores_2012"</span>,<span class="st">"scores_2013"</span>,<span class="st">"scores_2014"</span>,<span class="st">"scores_2015"</span>,<span class="st">"scores_2016"</span>,<span class="st">"scores_2017"</span>,<span class="st">"scores_2018"</span>,<span class="st">"scores_2019"</span>,<span class="st">"scores_2020"</span>,<span class="st">"scores_2021"</span>,<span class="st">"scores_2022"</span>))</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>() <span class="co"># v2024: 361.876 sec elapsed</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a><span class="co"># bring in all OHI regions and their names to compare to our zonal statistics and see what is missing</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>rgn_data <span class="ot">&lt;-</span> <span class="fu">read_sf</span>(<span class="fu">here</span>(dir_M, <span class="st">"git-annex"</span>, <span class="st">"globalprep"</span>, <span class="st">"spatial"</span>, <span class="st">"v2017"</span>), <span class="st">"regions_2017_update"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_set_geometry</span>(<span class="cn">NULL</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(rgn_type <span class="sc">==</span> <span class="st">"eez"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">rgn_id =</span> rgn_ant_id, rgn_name)</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a><span class="co"># use `setdiff()` between the original zonal stats and the OHI regions to see if any regions are missing</span></span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a><span class="fu">setdiff</span>(regions_stats<span class="sc">$</span>rgn_id, rgn_data<span class="sc">$</span>rgn_id) <span class="co"># v2024: good! only the high seas regions that are not within the 250 OHI regions: 260 261 262 263 264 266 267 269 270 272 273 274 275 276 277</span></span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a><span class="fu">setdiff</span>(rgn_data<span class="sc">$</span>rgn_id, regions_stats<span class="sc">$</span>rgn_id) <span class="co"># v2024: integer(0)</span></span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a><span class="co"># clean up the zonal statistics resulting dataframe</span></span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>regions_stats_clean <span class="ot">&lt;-</span> regions_stats <span class="sc">%&gt;%</span></span>
+<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">&lt;=</span> <span class="dv">250</span>) <span class="sc">%&gt;%</span> <span class="co"># to filter out zonal artifacts</span></span>
+<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">gather</span>(<span class="st">"year"</span>, <span class="st">"pressure_score"</span>, <span class="sc">-</span><span class="dv">1</span>) <span class="sc">%&gt;%</span> <span class="co"># convert into tidier format</span></span>
+<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(<span class="fu">substring</span>(year, <span class="dv">8</span>, <span class="dv">11</span>)))) <span class="sc">%&gt;%</span> <span class="co"># replace year from "scores_yr" into "yr"</span></span>
+<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">pressure_score =</span> <span class="fu">format</span>(pressure_score, <span class="at">scientific =</span> <span class="cn">FALSE</span>)) <span class="co"># remove scientific notation formating</span></span>
+<span id="cb17-28"><a href="#cb17-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-29"><a href="#cb17-29" aria-hidden="true" tabindex="-1"></a><span class="co"># write out acid.csv, which is in the same format as previous years.  All future .csv write-outs are in different formats than previous years</span></span>
+<span id="cb17-30"><a href="#cb17-30" aria-hidden="true" tabindex="-1"></a><span class="co"># write_csv(regions_stats_clean, "output/acid.csv")</span></span>
+<span id="cb17-31"><a href="#cb17-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-32"><a href="#cb17-32" aria-hidden="true" tabindex="-1"></a><span class="co"># bringing the names in to allow for greater readability</span></span>
+<span id="cb17-33"><a href="#cb17-33" aria-hidden="true" tabindex="-1"></a>regions_stats_join <span class="ot">&lt;-</span> <span class="fu">left_join</span>(regions_stats_clean, rgn_data, <span class="at">by =</span> <span class="st">"rgn_id"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb17-34"><a href="#cb17-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">relocate</span>(rgn_name, <span class="at">.after =</span> rgn_id)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+</section>
+<section id="final-pressure-scores" class="level1">
+<h1>Final Pressure Scores</h1>
+<p>Visualize the final scores!</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>pressure_oa_plot <span class="ot">&lt;-</span> regions_stats_join <span class="sc">%&gt;%</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_ly</span>(<span class="at">x =</span> <span class="sc">~</span>year, <span class="at">y =</span> <span class="sc">~</span>pressure_score, <span class="at">color =</span> <span class="sc">~</span>rgn_name, </span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>          <span class="at">type =</span> <span class="st">"scatter"</span>, <span class="at">mode =</span> <span class="st">"lines"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">layout</span>(<span class="at">title =</span> <span class="st">"Ocean Acidification Pressure Scores by Region"</span>,</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>         <span class="at">xaxis =</span> <span class="fu">list</span>(<span class="at">title =</span> <span class="st">"Year"</span>),</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">yaxis =</span> <span class="fu">list</span>(<span class="at">title =</span> <span class="st">"Pressure Score"</span>))</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>pressure_oa_plot</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a><span class="co"># save plot</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="co"># htmlwidgets::saveWidget(pressure_oa_plot, file = "output/prs_oa_all_years_plot.html")</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>Save output files in <code>output_dir</code>, refer back to the setup chunk.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ----- save all data (commented out in case someone runs the whole script) ---------</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="co"># write_csv(regions_stats_join, "prs_oa_all_yrs.csv")</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="co"># group the data by year</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>yearly_data <span class="ot">&lt;-</span> regions_stats_join <span class="sc">%&gt;%</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span> <span class="co"># group by all years, in this case it should be 2010 - 2022</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_split</span>() <span class="co"># splits into a list of tibbles by the previous grouping.  It may be deprecated in the future... check documentation</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a><span class="co"># get a list of unique years</span></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>years <span class="ot">&lt;-</span> regions_stats_join <span class="sc">%&gt;%</span></span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(year) <span class="sc">%&gt;%</span> <span class="co"># specifying the year column, similar to using the $</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unique</span>() <span class="sc">%&gt;%</span> <span class="co"># all unique values in that column</span></span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sort</span>() <span class="co"># by default will sort in ascending order, double check "years" to make sure.</span></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a><span class="co"># create a function to write CSV files in the output folder</span></span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a>write_csv_by_year <span class="ot">&lt;-</span> <span class="cf">function</span>(data, year) {</span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>  filename <span class="ot">&lt;-</span> <span class="fu">file.path</span>(<span class="st">"output"</span>, <span class="fu">paste0</span>(<span class="st">"prs_oa_"</span>, year, <span class="st">".csv"</span>))</span>
+<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write.csv</span>(data, <span class="at">file =</span> filename, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb19-19"><a href="#cb19-19" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb19-20"><a href="#cb19-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-21"><a href="#cb19-21" aria-hidden="true" tabindex="-1"></a><span class="co"># ----- save yearly data (commented out in case someone runs the whole script) ---------</span></span>
+<span id="cb19-22"><a href="#cb19-22" aria-hidden="true" tabindex="-1"></a><span class="do">## use map2 (which allows two vectors of the same length) to iterate over the split data and years to write individual csvs for each year</span></span>
+<span id="cb19-23"><a href="#cb19-23" aria-hidden="true" tabindex="-1"></a><span class="co"># map2(yearly_data, years, write_csv_by_year) </span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+<section id="citation-information" class="level1">
+<h1>Citation information</h1>
+<p><strong>Product Citation:</strong></p>
+<p>Please refer to our Technical FAQ for citing products: <a href="http://marine.copernicus.eu/faq/cite-cmems-products-cmems-credit/?idpage=169" class="uri">http://marine.copernicus.eu/faq/cite-cmems-products-cmems-credit/?idpage=169</a>.</p>
+<p><strong>DOI (product):</strong></p>
+<p><a href="https://doi.org/10.48670/moi-00047" class="uri">https://doi.org/10.48670/moi-00047</a></p>
+<p><strong>References:</strong></p>
+<p>Chau, T. T. T., Gehlen, M., and Chevallier, F.: A seamless ensemble-based reconstruction of surface ocean pCO2 and air–sea CO2 fluxes over the global coastal and open oceans, Biogeosciences, 19, 1087–1109, <a href="https://doi.org/10.5194/bg-19-1087-2022" class="uri">https://doi.org/10.5194/bg-19-1087-2022</a>, 2022.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

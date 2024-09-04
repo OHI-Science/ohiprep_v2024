@@ -138,7 +138,7 @@ This layer is a revamped version of previous years', and can be updated in futur
 ```{r setup, message = FALSE, warning = FALSE, verbose = FALSE}
 
 #set options for all chunks in code
-#knitr::opts_chunk$set(warning=FALSE, message=FALSE,fig.width=6, fig.height=6)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, eval=FALSE)
 
 # load packages
 if (!require(librarian)){

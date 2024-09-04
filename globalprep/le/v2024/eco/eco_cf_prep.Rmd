@@ -12,8 +12,8 @@ output:
     highlight: haddock
     includes: 
       in_header: '../../../../workflow/templates/ohi_hdr.html'
-pdf_document:
-  toc: true
+  pdf_document:
+    toc: true
 editor_options: 
   chunk_output_type: console
   markdown: 
@@ -70,7 +70,7 @@ editor_options:
             repo](https://github.com/SFG-UCSB/price-db-sfg) associated
             with the Melnychuk et al. 2016 paper
 
-    -   \*\*Citation for paper\*\*  
+    -   \*\*Citation for paper\*\*
 
     -   Melnychuk, M. C., Clavelle, T., Owashi, B., and
         Strauss, K. 2016. Reconstruction of global ex-vessel prices of
@@ -80,6 +80,9 @@ editor_options:
 ### Setup
 
 ```{r setup}
+
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, eval=FALSE)
+
 # load packages
 if (!require(librarian)){
   install.packages("librarian")

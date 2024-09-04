@@ -65,7 +65,9 @@ For v2023 and v2024 the Sea Around us Project (SAUP) data used in the ao_catch_p
 2. Convert the B/Bmsy values to scores (cap them at 1.. we wont penalize for underharvesting).
 3. Take a catch weighted average of B/Bmsy scores for each region/year and gapfill those regions that are missing.
 
-```{r, eval = FALSE}
+```{r setup, eval = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, eval=FALSE)
+
 library(tidyverse)
 library(here)
 library(htmlwidgets)
@@ -300,9 +302,17 @@ htmlwidgets::saveWidget(compare_plotly, here::here("globalprep","ao", version_ye
 ```
 
 ```{r}
+library(tidyverse)
+library(here)
+library(htmlwidgets)
+library(patchwork)
+library(ggplot2)
+library(dplyr)
+source(here("workflow", "R", "common.R"))
+
 # ==== Percent change between this year and last year =====
 compare_diff <- new %>% 
-  left_join(old, by = c("year", "rgn_id")) %>% 
+  dplyr::left_join(old, by = c("year", "rgn_id")) %>% 
   filter(year == previous_assessment_latest_data_year) %>%  # filter the data to only 2019
   mutate(diff = ((score - old_score)/old_score)*100) # using percent change equation
 
@@ -357,7 +367,8 @@ patch_rgn_3
 # saveWidget(patch_rgn_3, here::here("globalprep","ao", version_year, "figs","rgn_3_score_comparison.html"))
 ```
 
-```{r}
+```{r echo=TRUE}
+
 region_data() # to have access to rgns_all and rgns_eez
 
 fis_bbmsy <- read_csv(here::here("globalprep","fis", version_year, "output","fis_bbmsy.csv")) # v2024
