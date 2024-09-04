@@ -43,15 +43,15 @@ For v2023 and v2024 the Sea Around us Project (SAUP) data used in the ao_catch_p
 **Additional Information**: [Methods](http://www.seaaroundus.org/sea-around-us-methods-index/)
 
 
-**Reference**: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.495
+**Reference**: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.65
 
-**Downloaded**: 07/06/2023
+**Downloaded**: 08/07/2024
 
 **Description**: B/Bmsy value by stock and year (other data, which we do not use, are also available in the database)
 
 **Native data resolution**: stock (fish stock, species and region specific)
 
-**Time range**: 1800 - 2022 (we only use the year which matches our fisheries catch data (2019 for v2023))
+**Time range**: 1800 - 2023 (we only use the year which matches our fisheries catch data (2019 for v2024))
 
 **Format**: CSV format 
 
@@ -286,7 +286,7 @@ compare <- new %>%
 ```
 
 
-```{r, eval = FALSE}
+```{r, eval=FALSE}
 library(plotly)
 library(ggplot2)
 
@@ -299,16 +299,13 @@ compare_plotly <- ggplotly(compare_plot, tooltip = c("text", "score", "old_score
 compare_plotly
 
 htmlwidgets::saveWidget(compare_plotly, here::here("globalprep","ao", version_year, "figs","v2023_v2024_compare_plot.html"))
-```
 
-```{r}
-library(tidyverse)
-library(here)
-library(htmlwidgets)
-library(patchwork)
-library(ggplot2)
-library(dplyr)
-source(here("workflow", "R", "common.R"))
+#look at the difference between this year and last
+new <- read_csv(here::here("globalprep","ao",version_year, "output","ao_nind_scores.csv")) %>%
+  left_join(rgns_eez)
+
+old <- read_csv(here::here("globalprep","ao",previous_version_year, "output","ao_nind_scores.csv")) %>% 
+  select(rgn_id, year, old_score = score)
 
 # ==== Percent change between this year and last year =====
 compare_diff <- new %>% 
@@ -367,7 +364,7 @@ patch_rgn_3
 # saveWidget(patch_rgn_3, here::here("globalprep","ao", version_year, "figs","rgn_3_score_comparison.html"))
 ```
 
-```{r echo=TRUE}
+```{r, eval = FALSE}
 
 region_data() # to have access to rgns_all and rgns_eez
 

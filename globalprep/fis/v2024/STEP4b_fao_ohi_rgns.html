@@ -9,10 +9,10 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Mon Sep 11 08:23:07 2023 by egg" />
+<meta name="author" content="Compiled on Wed Sep 4 17:08:30 2024 by lecuona" />
 
 
-<title>OHI 2023: Food Provision/Fisheries, Identify FAO and OHI regions for RAM stocks</title>
+<title>OHI 2024: Food Provision/Fisheries, Identify FAO and OHI regions for RAM stocks</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1378,7 +1378,7 @@ overflow: visible;
 </style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -1645,10 +1645,10 @@ border-radius: 0px;
 
 
 
-<h1 class="title toc-ignore">OHI 2023: Food Provision/Fisheries,
+<h1 class="title toc-ignore">OHI 2024: Food Provision/Fisheries,
 Identify FAO and OHI regions for RAM stocks</h1>
-<h4 class="author"><em>Compiled on Mon Sep 11 08:23:07 2023 by
-egg</em></h4>
+<h4 class="author"><em>Compiled on Wed Sep 4 17:08:30 2024 by
+lecuona</em></h4>
 
 </div>
 
@@ -1658,14 +1658,14 @@ egg</em></h4>
 <h1>Summary</h1>
 <p>Generates a dataset describing the OHI and FAO major fishing regions
 that correspond to each stock’s range. This combines last year’s dataset
-of stock-spatial information from RAM v4.491 database and Christopher M.
+of stock-spatial information from RAM v4.61 database and Christopher M.
 Free’s spatial work at Rutgers as well as newly added stocks from RAM
-v4.495 with manually assigned ohi and fao region ids. Dataset only
+v4.65 with manually assigned ohi and fao region ids. Dataset only
 contains stocks with B/Bmsy data.</p>
 <div id="updates-from-previous-assessment" class="section level2">
 <h2>Updates from previous assessment</h2>
 <ul>
-<li>The RAM data changed for v2023 so we re-ran this</li>
+<li>The RAM data changed for v2024 so we re-ran this</li>
 </ul>
 </div>
 <div id="setup" class="section level2">
@@ -1678,9 +1678,8 @@ contains stocks with B/Bmsy data.</p>
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
 <span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">library</span>(stringr)</span>
 <span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="fu">library</span>(here) </span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="fu">setwd</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;fis&quot;</span>,<span class="st">&quot;v2023&quot;</span>))</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&#39;../../../workflow/R/common.R&#39;</span>)</span></code></pre></div>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">here</span>(<span class="st">&quot;workflow&quot;</span>, <span class="st">&quot;R&quot;</span>, <span class="st">&quot;common.R&quot;</span>))</span></code></pre></div>
 </div>
 <div id="identify-newly-added-stocks" class="section level2">
 <h2>Identify Newly Added Stocks</h2>
@@ -1690,7 +1689,7 @@ see what additional stocks have been added.</p>
 this table only contained single assessment for each unique stock. Now
 we use `timeseries_values_view, since v4.44 (assessment year 2019).</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="do">## old stocks</span></span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">load</span>(<span class="fu">file.path</span>(dir_M, <span class="st">&quot;git-annex/globalprep/_raw_data/RAM/d2021/RAMLDB v4.495/R Data/DBdata[asmt][v4.495].RData&quot;</span>))</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">load</span>(here<span class="sc">::</span><span class="fu">here</span>(dir_M, <span class="st">&quot;git-annex&quot;</span>, <span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;_raw_data&quot;</span>,<span class="st">&quot;RAM&quot;</span>,<span class="st">&quot;d2023&quot;</span>,<span class="st">&quot;RAMLDB v4.61&quot;</span>,<span class="st">&quot;R Data&quot;</span>,<span class="st">&quot;DBdata[asmt][v4.61].RData&quot;</span>))</span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a></span>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>ram_bmsy_old <span class="ot">&lt;-</span> timeseries_values_views <span class="sc">%&gt;%</span></span>
 <span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">select</span>(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SSBdivSSBmgt) <span class="sc">%&gt;%</span></span>
@@ -1705,14 +1704,15 @@ we use `timeseries_values_view, since v4.44 (assessment year 2019).</p>
 <span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(stockid, stocklong, year, ram_bmsy)</span>
 <span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a></span>
 <span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="do">## check number of unique entries</span></span>
-<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>old_stockid <span class="ot">&lt;-</span> <span class="fu">unique</span>(ram_bmsy_old<span class="sc">$</span>stockid) <span class="co"># 488 unique entries</span></span></code></pre></div>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>old_stockid <span class="ot">&lt;-</span> <span class="fu">unique</span>(ram_bmsy_old<span class="sc">$</span>stockid) </span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>old_stockid_leng <span class="ot">&lt;-</span> <span class="fu">length</span>(<span class="fu">unique</span>(ram_bmsy_old<span class="sc">$</span>stockid)) <span class="co"># v2024: 496 unique entries</span></span></code></pre></div>
 <p>New Stocks: Used <code>timeseries_values_views</code> table, because
 in RAM v4.44, this is the table that contains the most recent assessment
 for each unique stock. The <code>timeseries</code> table has all
 assessments conducted so there are multiple <code>assessid</code> per
 unique <code>stockid</code>.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="do">## new stocks</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">load</span>(<span class="fu">file.path</span>(dir_M, <span class="st">&quot;git-annex/globalprep/_raw_data/RAM/d2023/RAMLDB v4.61/R Data/DBdata[asmt][v4.61].RData&quot;</span>))</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">load</span>(here<span class="sc">::</span><span class="fu">here</span>(dir_M, <span class="st">&quot;git-annex&quot;</span>, <span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;_raw_data&quot;</span>,<span class="st">&quot;RAM&quot;</span>,<span class="st">&quot;d2024&quot;</span>,<span class="st">&quot;RAMLDB v4.65&quot;</span>,<span class="st">&quot;R Data&quot;</span>,<span class="st">&quot;DBdata[asmt][v4.65].RData&quot;</span>))</span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a></span>
 <span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>ram_bmsy <span class="ot">&lt;-</span> timeseries_values_views <span class="sc">%&gt;%</span></span>
 <span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">select</span>(stockid, stocklong, year, TBdivTBmsy, SSBdivSSBmsy, TBdivTBmgt, SSBdivSSBmgt) <span class="sc">%&gt;%</span></span>
@@ -1727,44 +1727,36 @@ unique <code>stockid</code>.</p>
 <span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(stockid, stocklong, year, ram_bmsy)</span>
 <span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a></span>
 <span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="do">## check number of unique entries</span></span>
-<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>new_stockid <span class="ot">&lt;-</span> <span class="fu">unique</span>(ram_bmsy<span class="sc">$</span>stockid) <span class="co"># 496 unique entries</span></span></code></pre></div>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>new_stockid <span class="ot">&lt;-</span> <span class="fu">unique</span>(ram_bmsy<span class="sc">$</span>stockid)</span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>new_stockid_leng <span class="ot">&lt;-</span> <span class="fu">length</span>(<span class="fu">unique</span>(ram_bmsy<span class="sc">$</span>stockid)) <span class="co"># v2024: 474 unique entries</span></span></code></pre></div>
 <div id="investigate-differences" class="section level3">
 <h3>Investigate Differences</h3>
-<p>There were 27 stocks included in the new data but not the old data.
+<p>There were 4 stocks included in the new data but not the old data.
 These include:</p>
-<p>[1] “ANCHIXa” “BIGSKAPCOAST”<br />
-[3] “BLSHARIO” “BLSHARNATL”<br />
-[5] “BLSHARSATL” “CSLOBSTERPR”<br />
-[7] “CSLOBSTERSTC” “CSLOBSTERSTT_STJ”<br />
-[9] “DVANGSASC” “DVANGSAWC”<br />
-[11] “GJOBMHI” “GSSMELTI-II-IIIa-IV” [13] “GSSMELTVa-XIV”
-“GSSMELTVb-VIa”<br />
-[15] “IPSAILIO” “LINGVb”<br />
-[17] “NEPHFU25” “NEPHFU2627”<br />
-[19] “OWSHARCWPAC” “PERCHHG”<br />
-[21] “SCMPSCI6A” “SFMAKONATL”<br />
-[23] “SFMAKOSATL” “SLKSHARCWPAC”<br />
-[25] “SWORDSPAC” “TURIIIa”<br />
-[27] “WITFLOUNIIIa-IV-VIId”</p>
-<p>There were 19 stocks present in the old data but not the new. These
+<p>[1] “CHTRACCH” “RMULLMEDGSA7” “SARDMEDGSA17-18” “SPRBLKGSA29”</p>
+<p>There were 26 stocks present in the old data but not the new. These
 include:</p>
-<p>[1] “ANCHOCWACIV-BEN” “ANCHOCWAGAB-AGO” “BHAKECWAAGO”<br />
-[4] “BOARVI-VIII” “BONGACWAGAB-COD” “CHMACKCWAGAB-AGO” [7]
-“CHMACKCWAGNB-LBR” “CODNEARNCW” “HERRVIa”<br />
-[10] “LOBSTERGOM” “MSARDCWACIV-BEN” “PERCHQCI”<br />
-[13] “RSARDCWACIV-BEN” “SARDINCWAGAB-AGO” “SARDINCWAGNB-LBR” [16]
-“SARDNWAZC” “SCADSPPCWAGNB-LBR” “SOLECWAAGO”<br />
-[19] “SOLECWAGNB-GIN”</p>
-<ul>
-<li>PERCHQCI: ID changed to PERCHHG (redefined)</li>
-<li>LOBSTERGOM: now LOBSTERGOMGB (merged)</li>
-</ul>
+<p>[1] “BLINGVb-VI-VII” “COD3Ps”<br />
+[3] “CODFAPL” “CODIS”<br />
+[5] “CODVIIek” “HADFAPL”<br />
+[7] “HADNS-IIIa-VIa” “HADROCK”<br />
+[9] “HAKENRTN” “HERRNIRS”<br />
+[11] “HERRVIaVIIbc” “HMACKIIa-IVa-Vb-VIa-VII-VIII” [13] “HMACKIXa”
+“MACKNEICES”<br />
+[15] “NEPHFU14” “NEPHFU17”<br />
+[17] “NEPHFU7” “PLAICECHW”<br />
+[19] “POLLFAPL” “REDDEEPI-II”<br />
+[21] “SARDVIIIabd” “SOLEIS”<br />
+[23] “SPURDNEATL” “WHITNS-VIId”<br />
+[25] “WHITVIa” “WHITVIIa”</p>
+<p>v2023: - PERCHQCI: ID changed to PERCHHG (redefined) - LOBSTERGOM:
+now LOBSTERGOMGB (merged)</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="do">## find newly added stocks, when using timeseries_values_views</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>newStocks <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(new_stockid, old_stockid) <span class="co"># v2023: there are 27 new stocks</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>newStocks <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(new_stockid, old_stockid) <span class="co"># v2024: there are 4 new stocks</span></span>
 <span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>unusedStocks <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(old_stockid, new_stockid) <span class="co"># these are no longer included in the RAM data, will be deleted</span></span>
 <span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a></span>
 <span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co"># v2021: See the mispelling for COD1F-XIV vs COD1f-XIV. This is ok. We will just use the new spelling and assign the fao-ohi regions again. </span></span></code></pre></div>
-<p>Subset for just the additional stocks in RAM v4.61 data</p>
+<p>Subset for just the additional stocks in RAM v4.65 data</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>ram_bmsy_new <span class="ot">&lt;-</span> ram_bmsy <span class="sc">%&gt;%</span> </span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="fu">filter</span>(stockid <span class="sc">%in%</span> newStocks) </span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
@@ -1779,7 +1771,7 @@ include:</p>
 with its range. Make sure there are no duplicates here</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="do">## Grab last year&#39;s fao-ohi-assessid data table</span></span>
 <span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="do">## (we need to get the stock id from the old RAM data)</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>RAM_fao_ohi_rgns <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;../v2022/int/RAM_fao_ohi_rgns_final.csv&quot;</span>) </span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>RAM_fao_ohi_rgns <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;fis&quot;</span>, <span class="st">&quot;v2023&quot;</span>,<span class="st">&quot;int&quot;</span>,<span class="st">&quot;RAM_fao_ohi_rgns_final.csv&quot;</span>))</span>
 <span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a></span>
 <span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a></span>
 <span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>RAM_fao_ohi_rgns_fix <span class="ot">&lt;-</span> RAM_fao_ohi_rgns <span class="sc">%&gt;%</span></span>
@@ -1788,11 +1780,11 @@ with its range. Make sure there are no duplicates here</p>
 <span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">dupe =</span> <span class="fu">n</span>()<span class="sc">&gt;</span><span class="dv">1</span>) <span class="sc">%&gt;%</span> <span class="co"># find the rest of the duplicates </span></span>
 <span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
 <span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>  </span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a> <span class="co">#filter for duplicates</span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#filter for duplicates</span></span>
 <span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>dupes <span class="ot">&lt;-</span> RAM_fao_ohi_rgns_fix <span class="sc">%&gt;%</span></span>
-<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="fu">filter</span>(dupe <span class="sc">==</span> <span class="st">&quot;TRUE&quot;</span>) <span class="co"># 0 good</span></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>  <span class="fu">filter</span>(dupe <span class="sc">==</span> <span class="st">&quot;TRUE&quot;</span>) <span class="co"># v2024: 0 good</span></span>
 <span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a></span>
-<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>dupes<span class="sc">$</span>stockid <span class="co">#these are our problem duplicates: 0</span></span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>dupes<span class="sc">$</span>stockid <span class="co"># these are our problem duplicates: 0</span></span>
 <span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a></span>
 <span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a><span class="do">## fix the dupes </span></span>
 <span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a>dupes_fix <span class="ot">&lt;-</span> dupes <span class="sc">%&gt;%</span></span>
@@ -1807,28 +1799,32 @@ with its range. Make sure there are no duplicates here</p>
 <span id="cb7-28"><a href="#cb7-28" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>dupe) <span class="do">## now we have fixed the duplicate problem (if there was one...). </span></span></code></pre></div>
 </div>
 <div id="remove-stocks-that-are-no-longer-in-the-ram-data" class="section level2">
-<h2>remove stocks that are no longer in the RAM data</h2>
+<h2>Remove stocks that are no longer in the RAM data</h2>
 <p>(but were in the previous version)</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">filter</span>(RAM_rgns_old, stockid <span class="sc">%in%</span> unusedStocks) <span class="co"># quick check</span></span>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">filter</span>(RAM_rgns_old, stockid <span class="sc">%in%</span> unusedStocks) <span class="co"># quick check to see which stocks are not being used</span></span>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>RAM_rgns_old <span class="ot">&lt;-</span> RAM_rgns_old <span class="sc">%&gt;%</span></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>(stockid <span class="sc">%in%</span> unusedStocks))</span></code></pre></div>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co"># filter out any stocks that are unused</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>RAM_rgns_old_filt <span class="ot">&lt;-</span> RAM_rgns_old <span class="sc">%&gt;%</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>(stockid <span class="sc">%in%</span> unusedStocks)) <span class="co"># v2024: changed so it does not overwrite RAM_rgns_old</span></span></code></pre></div>
 </div>
 <div id="combine-new-and-old-stock-data" class="section level2">
 <h2>Combine New and Old Stock Data</h2>
 <p>Essentially adds new stocks to the bottom of the old stocks data
 table. The regions of the new stocks are blank at this point.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="do">## Make sure these new species aren&#39;t in the old data</span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">setdiff</span>(id_new<span class="sc">$</span>stockid, RAM_rgns_old<span class="sc">$</span>stockid)</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>RAM_rgns_new <span class="ot">&lt;-</span> RAM_rgns_old <span class="sc">%&gt;%</span> </span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  <span class="fu">full_join</span>(id_new, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;stockid&quot;</span>,<span class="st">&quot;stocklong&quot;</span>)) <span class="do">## added the 27 new stocks.</span></span></code></pre></div>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">setdiff</span>(id_new<span class="sc">$</span>stockid, RAM_rgns_old_filt<span class="sc">$</span>stockid) <span class="co"># v2024: they are not, good!</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co"># [1] &quot;CHTRACCH&quot;       </span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co"># [2] &quot;RMULLMEDGSA7&quot;   </span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co"># [3] &quot;SARDMEDGSA17-18&quot;</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co"># [4] &quot;SPRBLKGSA29&quot; </span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>RAM_rgns_new <span class="ot">&lt;-</span> RAM_rgns_old_filt <span class="sc">%&gt;%</span> </span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>  <span class="fu">full_join</span>(id_new, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;stockid&quot;</span>,<span class="st">&quot;stocklong&quot;</span>)) <span class="do">## added the 4 new stocks, still don&#39;t have rgn_ids etc</span></span></code></pre></div>
 </div>
 <div id="fill-region-ids-for-new-stocks" class="section level2">
 <h2>Fill Region IDs for New Stocks</h2>
 <p>Here we need to figure out what ohi region id and FAO region id each
-of the new stocks fall in (there are 27 new stocks for v2023).</p>
+of the new stocks fall in (there are 4 new stocks for v2024).</p>
 <ol style="list-style-type: decimal">
 <li>Filter for all of the new stocks (all those with NA rgn and fao
 ids)</li>
@@ -1863,10 +1859,10 @@ extent). * FAO major fishing areas (fao_id): <a href="https://upload.wikimedia.o
 <code>rgn_id</code> (e.g. Alaska skate Bering Sea and Aleutian Islands,
 Kamchatka flounder Bering Sea and Aleutian Islands have
 <code>fao_id</code> 61 and 67).</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="do">## v2023: We will manually add the FAO and OHI regions for all of the NA stocks here. </span></span>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="do">## v2024: We will manually add the FAO and OHI regions for all of the NA stocks here, as all 4 are multinational</span></span>
 <span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
 <span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="do">## join with stock and area</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co"># first we join our stocks that have NAs in FAO id and rgn id (there should be 27 in v2023) to the &quot;stock&quot; and &quot;area&quot; dataframes that were loaded from the RAM database</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co"># first we join our stocks that have NAs in FAO id and rgn id (there should be 4 in v2024) to the &quot;stock&quot; and &quot;area&quot; dataframes that were loaded from the RAM database</span></span>
 <span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a></span>
 <span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>RAM_nas <span class="ot">&lt;-</span> RAM_rgns_new <span class="sc">%&gt;%</span></span>
 <span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">is.na</span>(fao_id)) <span class="sc">%&gt;%</span> </span>
@@ -1886,276 +1882,366 @@ Kamchatka flounder Bering Sea and Aleutian Islands have
 <span id="cb10-21"><a href="#cb10-21" tabindex="-1"></a>  <span class="fu">left_join</span>(rgns_eez, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;ISO3_code&quot;</span> <span class="ot">=</span> <span class="st">&quot;eez_iso3&quot;</span>), <span class="at">relationship =</span></span>
 <span id="cb10-22"><a href="#cb10-22" tabindex="-1"></a>  <span class="st">&quot;many-to-many&quot;</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb10-23"><a href="#cb10-23" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, fao_id, RAM_area_m2, stockid, stocklong) <span class="sc">%&gt;%</span></span>
-<span id="cb10-24"><a href="#cb10-24" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fao_id =</span> <span class="fu">as.double</span>(fao_id)) <span class="co"># great, this leaves 18 stocks that we need to fill in now! </span></span>
+<span id="cb10-24"><a href="#cb10-24" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fao_id =</span> <span class="fu">as.double</span>(fao_id)) <span class="co"># v2024: none are multinational, so we will need to manually research all 4 stocks! </span></span>
 <span id="cb10-25"><a href="#cb10-25" tabindex="-1"></a>  </span>
 <span id="cb10-26"><a href="#cb10-26" tabindex="-1"></a></span>
-<span id="cb10-27"><a href="#cb10-27" tabindex="-1"></a></span>
-<span id="cb10-28"><a href="#cb10-28" tabindex="-1"></a><span class="do">## filter for multinational and determine what FAO ids they deserve</span></span>
-<span id="cb10-29"><a href="#cb10-29" tabindex="-1"></a></span>
-<span id="cb10-30"><a href="#cb10-30" tabindex="-1"></a>RAM_na_multi <span class="ot">&lt;-</span> RAM_nas <span class="sc">%&gt;%</span></span>
-<span id="cb10-31"><a href="#cb10-31" tabindex="-1"></a>  <span class="fu">filter</span>(country <span class="sc">==</span> <span class="st">&quot;multinational&quot;</span>)</span>
-<span id="cb10-32"><a href="#cb10-32" tabindex="-1"></a></span>
-<span id="cb10-33"><a href="#cb10-33" tabindex="-1"></a><span class="fu">unique</span>(RAM_na_multi<span class="sc">$</span>region)</span>
-<span id="cb10-34"><a href="#cb10-34" tabindex="-1"></a></span>
-<span id="cb10-35"><a href="#cb10-35" tabindex="-1"></a><span class="co"># we have five larger areas that require manual data entry</span></span>
-<span id="cb10-36"><a href="#cb10-36" tabindex="-1"></a><span class="co"># &quot;European Union&quot; &quot;Indian Ocean&quot;   &quot;Atlantic Ocean&quot; &quot;Europe non EU&quot; &quot;Pacific Ocean&quot; </span></span>
+<span id="cb10-27"><a href="#cb10-27" tabindex="-1"></a><span class="do">## filter for multinational and determine what FAO ids they deserve</span></span>
+<span id="cb10-28"><a href="#cb10-28" tabindex="-1"></a></span>
+<span id="cb10-29"><a href="#cb10-29" tabindex="-1"></a>RAM_na_multi <span class="ot">&lt;-</span> RAM_nas <span class="sc">%&gt;%</span></span>
+<span id="cb10-30"><a href="#cb10-30" tabindex="-1"></a>  <span class="fu">filter</span>(country <span class="sc">==</span> <span class="st">&quot;multinational&quot;</span>)</span>
+<span id="cb10-31"><a href="#cb10-31" tabindex="-1"></a></span>
+<span id="cb10-32"><a href="#cb10-32" tabindex="-1"></a><span class="fu">unique</span>(RAM_na_multi<span class="sc">$</span>region)</span>
+<span id="cb10-33"><a href="#cb10-33" tabindex="-1"></a></span>
+<span id="cb10-34"><a href="#cb10-34" tabindex="-1"></a><span class="co"># v2024: we have two larger areas that require manual data entry</span></span>
+<span id="cb10-35"><a href="#cb10-35" tabindex="-1"></a><span class="co"># [1] &quot;South America&quot;          </span></span>
+<span id="cb10-36"><a href="#cb10-36" tabindex="-1"></a><span class="co"># [2] &quot;Mediterranean-Black Sea&quot;</span></span>
 <span id="cb10-37"><a href="#cb10-37" tabindex="-1"></a></span>
 <span id="cb10-38"><a href="#cb10-38" tabindex="-1"></a></span>
-<span id="cb10-39"><a href="#cb10-39" tabindex="-1"></a><span class="do">####### Start with Europe</span></span>
+<span id="cb10-39"><a href="#cb10-39" tabindex="-1"></a><span class="do">#### We know from the RAM excel sheet &quot;Stock Changes History&quot; that these stocks used to be named something else. So we will look at last years &quot;RAM_fao_ohi_rgns&quot; to figure out the ohi region ids for these stocks. Not relevant for v2024.</span></span>
 <span id="cb10-40"><a href="#cb10-40" tabindex="-1"></a></span>
-<span id="cb10-41"><a href="#cb10-41" tabindex="-1"></a><span class="do">#### We know from the RAM excel sheet &quot;Stock Changes History&quot; that these stocks used to be named something else. So we will look at last years &quot;RAM_fao_ohi_rgns&quot; to figure out the ohi region ids for these stocks. Not relevant for v2023.</span></span>
+<span id="cb10-41"><a href="#cb10-41" tabindex="-1"></a><span class="do">####  now lets google each stocklong individually to figure out what OHI regions they are in</span></span>
 <span id="cb10-42"><a href="#cb10-42" tabindex="-1"></a></span>
-<span id="cb10-43"><a href="#cb10-43" tabindex="-1"></a></span>
-<span id="cb10-44"><a href="#cb10-44" tabindex="-1"></a><span class="do">####  now lets google each stocklong individually to figure out what OHI regions they are in</span></span>
-<span id="cb10-45"><a href="#cb10-45" tabindex="-1"></a></span>
-<span id="cb10-46"><a href="#cb10-46" tabindex="-1"></a><span class="co"># v2023</span></span>
-<span id="cb10-47"><a href="#cb10-47" tabindex="-1"></a><span class="co"># Europe - European Union and Europe non EU</span></span>
-<span id="cb10-48"><a href="#cb10-48" tabindex="-1"></a><span class="co"># Map of ICES/NAFO fishing areas: https://www.researchgate.net/figure/Map-of-the-ICES-and-NAFO-fishing-areas_fig1_268343176 (referenced for related areas)</span></span>
-<span id="cb10-49"><a href="#cb10-49" tabindex="-1"></a><span class="co"># Zoomed in version of Western Europe: https://www.researchgate.net/figure/Stock-units-defined-by-ICES-for-white-anglerfish-southern-stock-in-Divisions-VIIIc-and_fig1_31198841 (this is listed above too)</span></span>
-<span id="cb10-50"><a href="#cb10-50" tabindex="-1"></a><span class="co"># Map of broader FAO fishing areas: https://www.fao.org/fishery/en/area/search (see link above too)</span></span>
-<span id="cb10-51"><a href="#cb10-51" tabindex="-1"></a></span>
-<span id="cb10-52"><a href="#cb10-52" tabindex="-1"></a><span class="co"># Anchovy Portugese Waters -East (ANCHIXa): closest I could find - https://www.fishsource.org/stock_page/2687</span></span>
-<span id="cb10-53"><a href="#cb10-53" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Portugal (183), Spain (182)</span></span>
-<span id="cb10-54"><a href="#cb10-54" tabindex="-1"></a><span class="co"># fao:27.9.a</span></span>
-<span id="cb10-55"><a href="#cb10-55" tabindex="-1"></a></span>
-<span id="cb10-56"><a href="#cb10-56" tabindex="-1"></a><span class="co"># Greater silver smelt ICES 1-2-3a-4 (GSSMELTI-II-IIIa-IV): https://www.fishsource.org/stock_page/1710; https://ices-library.figshare.com/articles/report/Greater_silver_smelt_Argentina_silus_in_subareas_1_2_and_4_and_in_Division_3_a_Northeast_Arctic_North_Sea_Skagerrak_and_Kattegat_/21828207?backTo=/collections/_/6398177</span></span>
-<span id="cb10-57"><a href="#cb10-57" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Norway (223)</span></span>
-<span id="cb10-58"><a href="#cb10-58" tabindex="-1"></a><span class="co"># fao:27.1;fao:27.2;fao:27.3.a;fao:27.4</span></span>
-<span id="cb10-59"><a href="#cb10-59" tabindex="-1"></a><span class="co"># Northeast Arctic, North Sea, Skagerrak and Kattegat</span></span>
-<span id="cb10-60"><a href="#cb10-60" tabindex="-1"></a><span class="co"># Other areas associated with this region: Russia (73), Finland (174), Sweden (222), United Kingdom (Great Britain specifically, but it&#39;s lumped together) (180), Denmark (175), Germany (176), the Netherlands (177), Belgium (59), France (179)</span></span>
-<span id="cb10-61"><a href="#cb10-61" tabindex="-1"></a></span>
-<span id="cb10-62"><a href="#cb10-62" tabindex="-1"></a><span class="co"># Greater silver smelt ICES 5a-14 (GSSMELTVa-XIV): https://www.fishsource.org/stock_page/1845 (doesn&#39;t mention Greenland but seems close enough); https://ices-library.figshare.com/articles/report/Greater_silver_smelt_Argentina_silus_in_Subarea_14_and_Division_5_a_East_Greenland_and_Iceland_grounds_/19447772?backTo=/collections/ICES_Advice_2022/5796935</span></span>
-<span id="cb10-63"><a href="#cb10-63" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Iceland (143)</span></span>
-<span id="cb10-64"><a href="#cb10-64" tabindex="-1"></a><span class="co"># fao:27.14;fao:27.5.a</span></span>
-<span id="cb10-65"><a href="#cb10-65" tabindex="-1"></a><span class="co"># East Greenland and Iceland grounds</span></span>
-<span id="cb10-66"><a href="#cb10-66" tabindex="-1"></a></span>
-<span id="cb10-67"><a href="#cb10-67" tabindex="-1"></a><span class="co"># Greater silver smelt ICES 5b-6a (GSSMELTVb-VIa): https://www.fishsource.org/stock_page/1709; https://ices-library.figshare.com/articles/report/Greater_silver_smelt_Argentina_silus_in_divisions_5_b_and_6_a_Faroes_grounds_and_west_of_Scotland_/19447778?backTo=/collections/ICES_Advice_2022/5796935</span></span>
-<span id="cb10-68"><a href="#cb10-68" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Faeroe Islands (141), the Netherlands (177)</span></span>
-<span id="cb10-69"><a href="#cb10-69" tabindex="-1"></a><span class="co"># fao:27.5.b;fao:27.6.a</span></span>
-<span id="cb10-70"><a href="#cb10-70" tabindex="-1"></a><span class="co"># Faroes grounds and west of Scotland</span></span>
-<span id="cb10-71"><a href="#cb10-71" tabindex="-1"></a><span class="co"># Other areas associated with this region: United Kingdom (Scotland specifically, but it&#39;s lumped together) (180)</span></span>
-<span id="cb10-72"><a href="#cb10-72" tabindex="-1"></a></span>
-<span id="cb10-73"><a href="#cb10-73" tabindex="-1"></a><span class="co"># Ling Faroe Grounds (LINGVb): https://www.fishsource.org/stock_page/1353</span></span>
-<span id="cb10-74"><a href="#cb10-74" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Faeroe Islands (141)</span></span>
-<span id="cb10-75"><a href="#cb10-75" tabindex="-1"></a><span class="co"># fao:27.5.b</span></span>
-<span id="cb10-76"><a href="#cb10-76" tabindex="-1"></a><span class="co"># Faroe Grounds</span></span>
+<span id="cb10-43"><a href="#cb10-43" tabindex="-1"></a><span class="co"># ---- South America ----</span></span>
+<span id="cb10-44"><a href="#cb10-44" tabindex="-1"></a><span class="co"># [1] &quot;CHTRACCH&quot;; Chilean jack mackerel Chilean EEZ and offshore</span></span>
+<span id="cb10-45"><a href="#cb10-45" tabindex="-1"></a><span class="co"># https://www.fishsource.org/stock_page/756 </span></span>
+<span id="cb10-46"><a href="#cb10-46" tabindex="-1"></a><span class="co"># OHI regions: Chile (224), Peru (138), Ecuador (137)</span></span>
+<span id="cb10-47"><a href="#cb10-47" tabindex="-1"></a><span class="co"># fao_id: 87</span></span>
+<span id="cb10-48"><a href="#cb10-48" tabindex="-1"></a><span class="co"># See: `https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg` </span></span>
+<span id="cb10-49"><a href="#cb10-49" tabindex="-1"></a></span>
+<span id="cb10-50"><a href="#cb10-50" tabindex="-1"></a>ram_fao_areaname_multinational_south_america <span class="ot">&lt;-</span> RAM_na_multi <span class="sc">%&gt;%</span></span>
+<span id="cb10-51"><a href="#cb10-51" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;South America&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-52"><a href="#cb10-52" tabindex="-1"></a>  <span class="fu">distinct</span>(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) <span class="sc">%&gt;%</span> <span class="co"># these are all just general rules, taken from an emLAB project: https://github.com/emlab-ucsb/sustain-sci-subsidy-reform-paper/blob/master/data/lookup-tables/assign_fao_areas_to_ram_v4.491.Rmd</span></span>
+<span id="cb10-53"><a href="#cb10-53" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">areaname_fao_area =</span> <span class="fu">case_when</span>(</span>
+<span id="cb10-54"><a href="#cb10-54" tabindex="-1"></a>    areaname <span class="sc">==</span> <span class="st">&quot;Chilean EEZ and offshore&quot;</span> <span class="sc">~</span> <span class="st">&quot;87&quot;</span>,</span>
+<span id="cb10-55"><a href="#cb10-55" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">&quot;87&quot;</span> <span class="co"># Otherwise we assume it&#39;s 87, because we are making a new column named areaname_fao_area</span></span>
+<span id="cb10-56"><a href="#cb10-56" tabindex="-1"></a>  )) <span class="sc">%&gt;%</span> </span>
+<span id="cb10-57"><a href="#cb10-57" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ohi_rgn =</span> <span class="fu">case_when</span>(</span>
+<span id="cb10-58"><a href="#cb10-58" tabindex="-1"></a>    stockid <span class="sc">==</span> <span class="st">&quot;CHTRACCH&quot;</span> <span class="sc">~</span> <span class="st">&quot;224;138;137&quot;</span>,</span>
+<span id="cb10-59"><a href="#cb10-59" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">&quot;NA&quot;</span></span>
+<span id="cb10-60"><a href="#cb10-60" tabindex="-1"></a>  )) <span class="sc">%&gt;%</span></span>
+<span id="cb10-61"><a href="#cb10-61" tabindex="-1"></a>  <span class="fu">separate_rows</span>(<span class="fu">c</span>(ohi_rgn, areaname_fao_area), <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb10-62"><a href="#cb10-62" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;ohi_rgn&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;areaname_fao_area&quot;</span>, RAM_area_m2, stockid, stocklong)</span>
+<span id="cb10-63"><a href="#cb10-63" tabindex="-1"></a></span>
+<span id="cb10-64"><a href="#cb10-64" tabindex="-1"></a><span class="co"># ----- Mediterranean-Black Sea -----</span></span>
+<span id="cb10-65"><a href="#cb10-65" tabindex="-1"></a><span class="co"># [2] &quot;RMULLMEDGSA7&quot;; Red mullet Gulf of Lions</span></span>
+<span id="cb10-66"><a href="#cb10-66" tabindex="-1"></a><span class="co"># https://firms.fao.org/firms/resource/13618/en</span></span>
+<span id="cb10-67"><a href="#cb10-67" tabindex="-1"></a><span class="co"># OHI regions: France (179), Spain (182)</span></span>
+<span id="cb10-68"><a href="#cb10-68" tabindex="-1"></a><span class="co"># fao_id: 37 </span></span>
+<span id="cb10-69"><a href="#cb10-69" tabindex="-1"></a><span class="co"># See: `https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg` </span></span>
+<span id="cb10-70"><a href="#cb10-70" tabindex="-1"></a></span>
+<span id="cb10-71"><a href="#cb10-71" tabindex="-1"></a><span class="co"># [3] &quot;SARDMEDGSA17-18&quot;;  Sardine Adriatic Sea (GSA 17,18)</span></span>
+<span id="cb10-72"><a href="#cb10-72" tabindex="-1"></a><span class="co"># stocklong: Sardine Adriatic Sea (GSA 17,18)</span></span>
+<span id="cb10-73"><a href="#cb10-73" tabindex="-1"></a><span class="co"># https://www.fishsource.org/stock_page/779</span></span>
+<span id="cb10-74"><a href="#cb10-74" tabindex="-1"></a><span class="co"># OHI regions: Albania (82), Montenegro (186),  Croatia (187), Italy (184), Slovenia (188)</span></span>
+<span id="cb10-75"><a href="#cb10-75" tabindex="-1"></a><span class="co"># fao_id: 37 </span></span>
+<span id="cb10-76"><a href="#cb10-76" tabindex="-1"></a><span class="co"># See: `https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg` </span></span>
 <span id="cb10-77"><a href="#cb10-77" tabindex="-1"></a></span>
-<span id="cb10-78"><a href="#cb10-78" tabindex="-1"></a><span class="co"># Norway lobster North Galicia (FU 25) (NEPHFU25): did not see good enough equivalent on fishsource; https://ices-library.figshare.com/articles/report/Norway_lobster_Nephrops_norvegicus_in_Division_8_c_Functional_Unit_25_southern_Bay_of_Biscay_and_northern_Galicia_/19453487?backTo=/collections/ICES_Advice_2022/5796935 </span></span>
-<span id="cb10-79"><a href="#cb10-79" tabindex="-1"></a><span class="co"># ices_fu_nep:25</span></span>
-<span id="cb10-80"><a href="#cb10-80" tabindex="-1"></a><span class="co"># southern Bay of Biscay and northern Galicia</span></span>
-<span id="cb10-81"><a href="#cb10-81" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Spain (182)</span></span>
-<span id="cb10-82"><a href="#cb10-82" tabindex="-1"></a></span>
-<span id="cb10-83"><a href="#cb10-83" tabindex="-1"></a><span class="co"># Norway lobster West Galicia and North Portugal (FU 26-27) (NEPHFU2627): did not see good enough equivalent on fishsource; https://ices-library.figshare.com/articles/report/Norway_lobster_Nephrops_norvegicus_in_Division_9_a_functional_units_26_27_Atlantic_Iberian_waters_East_western_Galicia_and_northern_Portugal_/19453496?backTo=/collections/ICES_Advice_2022/5796935</span></span>
-<span id="cb10-84"><a href="#cb10-84" tabindex="-1"></a><span class="co"># ices_fu_nep:26;ices_fu_nep:27</span></span>
-<span id="cb10-85"><a href="#cb10-85" tabindex="-1"></a><span class="co"># Atlantic Iberian waters East, western Galicia, and northern Portugal</span></span>
-<span id="cb10-86"><a href="#cb10-86" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Spain (182), Portugal (183)</span></span>
-<span id="cb10-87"><a href="#cb10-87" tabindex="-1"></a></span>
-<span id="cb10-88"><a href="#cb10-88" tabindex="-1"></a><span class="co"># Turbot Kattegat and Skagerrak (TURIIIa): https://www.fishsource.org/fishery_page/4954 (roughly covers Skagerrak); https://www.fishsource.org/stock_page/1364 (roughly covers Kattegat); https://ices-library.figshare.com/articles/report/Turbot_Scophthalmus_maximus_in_Division_3_a_Skagerrak_and_Kattegat_/21864318</span></span>
-<span id="cb10-89"><a href="#cb10-89" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Denmark (175), Poland (178), the Netherlands (177), United Kingdom (180)</span></span>
-<span id="cb10-90"><a href="#cb10-90" tabindex="-1"></a><span class="co"># fao:27.3.a</span></span>
-<span id="cb10-91"><a href="#cb10-91" tabindex="-1"></a><span class="co"># Skagerrak and Kattegat </span></span>
-<span id="cb10-92"><a href="#cb10-92" tabindex="-1"></a><span class="co"># Other areas associated with this region: Sweden (222), Norway (223)</span></span>
-<span id="cb10-93"><a href="#cb10-93" tabindex="-1"></a></span>
-<span id="cb10-94"><a href="#cb10-94" tabindex="-1"></a><span class="co"># Witch flounder ICES 3a-4-7d (WITFLOUNIIIa-IV-VIId): did not see good enough equivalent on fishsource; https://ices-library.figshare.com/articles/report/Stock_Annex_Witch_Glyptocephalus_cynoglossus_in_Subarea_4_and_divisions_3_a_and_7_d_North_Sea_Skagerrak_and_Kattegat_eastern_English_Channel_/18623576</span></span>
-<span id="cb10-95"><a href="#cb10-95" tabindex="-1"></a><span class="co"># fao:27.3.a;fao:27.4;fao:27.7.d</span></span>
-<span id="cb10-96"><a href="#cb10-96" tabindex="-1"></a><span class="co"># North Sea, Skagerrak and Kattegat, eastern English Channel</span></span>
-<span id="cb10-97"><a href="#cb10-97" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Denmark (175), Sweden (222), Norway (223), Belgium (59), the Netherlands (177), Germany (176), United Kingdom (180), France (179)</span></span>
-<span id="cb10-98"><a href="#cb10-98" tabindex="-1"></a></span>
-<span id="cb10-99"><a href="#cb10-99" tabindex="-1"></a></span>
-<span id="cb10-100"><a href="#cb10-100" tabindex="-1"></a>ram_fao_areaname_multinational_europe <span class="ot">&lt;-</span> RAM_na_multi <span class="sc">%&gt;%</span></span>
-<span id="cb10-101"><a href="#cb10-101" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;Europe non EU&quot;</span>, <span class="st">&quot;European Union&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-102"><a href="#cb10-102" tabindex="-1"></a>  <span class="fu">distinct</span>(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) <span class="sc">%&gt;%</span> <span class="co"># these are all just general rules, taken from an emLAB project: https://github.com/emlab-ucsb/sustain-sci-subsidy-reform-paper/blob/master/data/lookup-tables/assign_fao_areas_to_ram_v4.491.Rmd</span></span>
-<span id="cb10-103"><a href="#cb10-103" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">areaname_fao_area =</span> <span class="fu">case_when</span>(<span class="co">#areaname == &quot;Azores&quot; ~ &quot;27;34&quot;, # crosses both</span></span>
-<span id="cb10-104"><a href="#cb10-104" tabindex="-1"></a>                                       <span class="co">#areaname == &quot;NAFO 1F and ICES 14&quot; ~ &quot;21;27&quot;, # crosses both</span></span>
-<span id="cb10-105"><a href="#cb10-105" tabindex="-1"></a>                                       <span class="co">#areaname == &quot;ICES 5-12-14 and NAFO Subareas 1-2 (deep)&quot; ~ &quot;21;27&quot;,</span></span>
-<span id="cb10-106"><a href="#cb10-106" tabindex="-1"></a>                                       <span class="co">#areaname == &quot;ICES 5-12-14 and NAFO Subareas 1-2 (shallow)&quot; ~ &quot;21;27&quot;,</span></span>
-<span id="cb10-107"><a href="#cb10-107" tabindex="-1"></a>                                       <span class="co">#areaname == &quot;Azores Grounds&quot; ~ &quot;27;34&quot;,</span></span>
-<span id="cb10-108"><a href="#cb10-108" tabindex="-1"></a>                                       <span class="co">#areaname == &quot;Mid-Atlantic Ridge&quot; ~ &quot;27&quot;, # check on this one</span></span>
-<span id="cb10-109"><a href="#cb10-109" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;Portugese Waters -East&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
-<span id="cb10-110"><a href="#cb10-110" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;ICES 1-2-3a-4&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
-<span id="cb10-111"><a href="#cb10-111" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;ICES 5a-14&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
-<span id="cb10-112"><a href="#cb10-112" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;ICES 5b-6a&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
-<span id="cb10-113"><a href="#cb10-113" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;Faroe Grounds&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
-<span id="cb10-114"><a href="#cb10-114" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;North Galicia (FU 25)&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
-<span id="cb10-115"><a href="#cb10-115" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;West Galicia and North Portugal (FU 26-27)&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
-<span id="cb10-116"><a href="#cb10-116" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;Kattegat and Skagerrak&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
-<span id="cb10-117"><a href="#cb10-117" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;ICES 3a-4-7d&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
-<span id="cb10-118"><a href="#cb10-118" tabindex="-1"></a>                                       <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span></span>
-<span id="cb10-119"><a href="#cb10-119" tabindex="-1"></a>                                       )) <span class="sc">%&gt;%</span> <span class="co"># Otherwise we assume it&#39;s 27 %&gt;%</span></span>
-<span id="cb10-120"><a href="#cb10-120" tabindex="-1"></a> <span class="fu">mutate</span>(<span class="at">ohi_rgn =</span> <span class="fu">case_when</span>(</span>
-<span id="cb10-121"><a href="#cb10-121" tabindex="-1"></a>   <span class="co">#stockid == &quot;WHITVIIbce-k&quot; ~ &quot;179;180;181;227;228;262&quot;,</span></span>
-<span id="cb10-122"><a href="#cb10-122" tabindex="-1"></a>   <span class="co">#stockid == &quot;COD1F-XIV&quot; ~ &quot;145&quot;, </span></span>
-<span id="cb10-123"><a href="#cb10-123" tabindex="-1"></a>   <span class="co">#stockid == &quot;EBASSVIIIab&quot; ~ &quot;179;59;177;182;180&quot;,</span></span>
-<span id="cb10-124"><a href="#cb10-124" tabindex="-1"></a>   <span class="co">#stockid == &quot;REDDEEPI-II&quot; ~ &quot;223;182;73&quot;, </span></span>
-<span id="cb10-125"><a href="#cb10-125" tabindex="-1"></a>   <span class="co">#stockid == &quot;SARDVIIIabd&quot; ~ &quot;179;182;177;181;180;175;176;189&quot;, </span></span>
-<span id="cb10-126"><a href="#cb10-126" tabindex="-1"></a>   <span class="co">#stockid == &quot;TURIV&quot; ~ &quot;180;177&quot;</span></span>
-<span id="cb10-127"><a href="#cb10-127" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;ANCHIXa&quot;</span> <span class="sc">~</span> <span class="st">&quot;182;183&quot;</span>,</span>
-<span id="cb10-128"><a href="#cb10-128" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;GSSMELTI-II-IIIa-IV&quot;</span> <span class="sc">~</span> <span class="st">&quot;223&quot;</span>,</span>
-<span id="cb10-129"><a href="#cb10-129" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;GSSMELTVa-XIV&quot;</span> <span class="sc">~</span> <span class="st">&quot;143&quot;</span>, <span class="co"># check on this</span></span>
-<span id="cb10-130"><a href="#cb10-130" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;GSSMELTVb-VIa&quot;</span> <span class="sc">~</span> <span class="st">&quot;141;177&quot;</span>,</span>
-<span id="cb10-131"><a href="#cb10-131" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;LINGVb&quot;</span> <span class="sc">~</span> <span class="st">&quot;141&quot;</span>,</span>
-<span id="cb10-132"><a href="#cb10-132" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;NEPHFU25&quot;</span> <span class="sc">~</span> <span class="st">&quot;182&quot;</span>,</span>
-<span id="cb10-133"><a href="#cb10-133" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;NEPHFU2627&quot;</span> <span class="sc">~</span> <span class="st">&quot;182;183&quot;</span>,</span>
-<span id="cb10-134"><a href="#cb10-134" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;TURIIIa&quot;</span> <span class="sc">~</span> <span class="st">&quot;175;178;177;180&quot;</span>,</span>
-<span id="cb10-135"><a href="#cb10-135" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;WITFLOUNIIIa-IV-VIId&quot;</span> <span class="sc">~</span> <span class="st">&quot;175;222;223;59;177;176;180;179&quot;</span></span>
-<span id="cb10-136"><a href="#cb10-136" tabindex="-1"></a> )) <span class="sc">%&gt;%</span></span>
-<span id="cb10-137"><a href="#cb10-137" tabindex="-1"></a>  <span class="fu">separate_rows</span>(<span class="fu">c</span>(ohi_rgn, areaname_fao_area), <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb10-138"><a href="#cb10-138" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;ohi_rgn&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;areaname_fao_area&quot;</span>, RAM_area_m2, stockid, stocklong)</span>
-<span id="cb10-139"><a href="#cb10-139" tabindex="-1"></a></span>
-<span id="cb10-140"><a href="#cb10-140" tabindex="-1"></a></span>
-<span id="cb10-141"><a href="#cb10-141" tabindex="-1"></a></span>
-<span id="cb10-142"><a href="#cb10-142" tabindex="-1"></a><span class="do">####### Now lets do Africa </span></span>
-<span id="cb10-143"><a href="#cb10-143" tabindex="-1"></a></span>
-<span id="cb10-144"><a href="#cb10-144" tabindex="-1"></a><span class="co"># assign fao id and rgn_id based on context clues from the areaname</span></span>
-<span id="cb10-145"><a href="#cb10-145" tabindex="-1"></a></span>
-<span id="cb10-146"><a href="#cb10-146" tabindex="-1"></a></span>
-<span id="cb10-147"><a href="#cb10-147" tabindex="-1"></a><span class="co"># ram_fao_areaname_multinational_west_africa &lt;- RAM_na_multi %&gt;%</span></span>
-<span id="cb10-148"><a href="#cb10-148" tabindex="-1"></a><span class="co">#   dplyr::filter(region %in% c(&quot;West Africa&quot;)) %&gt;%</span></span>
-<span id="cb10-149"><a href="#cb10-149" tabindex="-1"></a><span class="co">#   distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %&gt;%</span></span>
-<span id="cb10-150"><a href="#cb10-150" tabindex="-1"></a><span class="co">#   mutate(areaname_fao_area = case_when(areaname == &quot;Central West Africa Cote Divoire-Benin&quot; ~ &quot;34&quot;, # assuming coast along ivory coast and benin</span></span>
-<span id="cb10-151"><a href="#cb10-151" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Gabon-Angola&quot; ~ &quot;34;47&quot;, # assume coast from gabon to angola</span></span>
-<span id="cb10-152"><a href="#cb10-152" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Angola&quot; ~ &quot;47&quot;, # assume just angola</span></span>
-<span id="cb10-153"><a href="#cb10-153" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Gabon-Congo DR&quot; ~ &quot;34&quot;, # assume gabon and Dem congo</span></span>
-<span id="cb10-154"><a href="#cb10-154" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Guinea Bissau-Guinea&quot; ~ &quot;34&quot;,</span></span>
-<span id="cb10-155"><a href="#cb10-155" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Guinea Bissau-Liberia&quot; ~ &quot;34&quot;, </span></span>
-<span id="cb10-156"><a href="#cb10-156" tabindex="-1"></a><span class="co">#                                        areaname == &quot;North West Africa Zone C&quot; ~ &quot;34&quot;)) %&gt;%</span></span>
-<span id="cb10-157"><a href="#cb10-157" tabindex="-1"></a><span class="co">#   # now assign ohi rgn_id based on the same logic as above...</span></span>
-<span id="cb10-158"><a href="#cb10-158" tabindex="-1"></a><span class="co">#   mutate(ohi_rgn = case_when(areaname == &quot;Central West Africa Cote Divoire-Benin&quot; ~ &quot;195;106;98;99&quot;, # assuming coast along ivory coast and benin</span></span>
-<span id="cb10-159"><a href="#cb10-159" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Gabon-Angola&quot; ~ &quot;198;100;199;200&quot;, # assume coast from gabon to angola</span></span>
-<span id="cb10-160"><a href="#cb10-160" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Angola&quot; ~ &quot;200&quot;, # assume just angola</span></span>
-<span id="cb10-161"><a href="#cb10-161" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Gabon-Congo DR&quot; ~ &quot;198;100;199&quot;, # assume gabon and Dem congo</span></span>
-<span id="cb10-162"><a href="#cb10-162" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Guinea Bissau-Guinea&quot; ~ &quot;194;193&quot;,</span></span>
-<span id="cb10-163"><a href="#cb10-163" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Guinea Bissau-Liberia&quot; ~ &quot;193;194;96;97&quot;, </span></span>
-<span id="cb10-164"><a href="#cb10-164" tabindex="-1"></a><span class="co">#                                        areaname == &quot;North West Africa Zone C&quot; ~ &quot;62&quot;)) %&gt;%</span></span>
-<span id="cb10-165"><a href="#cb10-165" tabindex="-1"></a><span class="co">#   dplyr::select(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) %&gt;%</span></span>
-<span id="cb10-166"><a href="#cb10-166" tabindex="-1"></a><span class="co">#   separate_rows(ohi_rgn,  sep = &quot;;&quot;, convert = TRUE) %&gt;%</span></span>
-<span id="cb10-167"><a href="#cb10-167" tabindex="-1"></a><span class="co">#   separate_rows(areaname_fao_area, sep = &quot;;&quot;, convert = TRUE) %&gt;%</span></span>
-<span id="cb10-168"><a href="#cb10-168" tabindex="-1"></a><span class="co">#   dplyr::select(&quot;rgn_id&quot; = &quot;ohi_rgn&quot;, &quot;fao_id&quot; = &quot;areaname_fao_area&quot;, RAM_area_m2, stockid, stocklong)</span></span>
-<span id="cb10-169"><a href="#cb10-169" tabindex="-1"></a></span>
-<span id="cb10-170"><a href="#cb10-170" tabindex="-1"></a></span>
-<span id="cb10-171"><a href="#cb10-171" tabindex="-1"></a></span>
-<span id="cb10-172"><a href="#cb10-172" tabindex="-1"></a><span class="do">####### Now Atlantic Ocean</span></span>
-<span id="cb10-173"><a href="#cb10-173" tabindex="-1"></a><span class="co"># Blue shark Northern Atlantic (BLSHARNATL): https://www.fishsource.org/stock_page/1022</span></span>
-<span id="cb10-174"><a href="#cb10-174" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Belize (164), Japan (210), Portugal (183), Spain (182)</span></span>
-<span id="cb10-175"><a href="#cb10-175" tabindex="-1"></a><span class="co"># fao:21;fao:27;fao:31;fao:34.1;fao:34.2;fao:34.3.1;fao:34.3.2;fao:34.3.3;fao:34.3.4;fao:34.3.5;fao:34.4.2</span></span>
-<span id="cb10-176"><a href="#cb10-176" tabindex="-1"></a></span>
-<span id="cb10-177"><a href="#cb10-177" tabindex="-1"></a><span class="co"># Shortfin mako Northern Atlantic (SFMAKONATL): https://www.fishsource.org/stock_page/1156 (covers both North and South)</span></span>
-<span id="cb10-178"><a href="#cb10-178" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): United States (163)</span></span>
-<span id="cb10-179"><a href="#cb10-179" tabindex="-1"></a><span class="co"># fao:21;fao:27;fao:31;fao:34.1;fao:34.2;fao:34.3.1;fao:34.3.2;fao:34.3.3;fao:34.3.4;fao:34.3.5;fao:34.4.2</span></span>
-<span id="cb10-180"><a href="#cb10-180" tabindex="-1"></a></span>
-<span id="cb10-181"><a href="#cb10-181" tabindex="-1"></a><span class="co"># Blue shark South Atlantic (BLSHARSATL): https://www.fishsource.org/stock_page/1024</span></span>
-<span id="cb10-182"><a href="#cb10-182" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Spain (182), Portugal (183), Japan (210), Namibia (101)</span></span>
-<span id="cb10-183"><a href="#cb10-183" tabindex="-1"></a><span class="co"># fao:34.3.6;fao:34.4.1;fao:41;fao:47</span></span>
-<span id="cb10-184"><a href="#cb10-184" tabindex="-1"></a></span>
-<span id="cb10-185"><a href="#cb10-185" tabindex="-1"></a><span class="co"># Shortfin mako South Atlantic (SFMAKOSATL): https://www.fishsource.org/stock_page/1156 (covers both North and South)</span></span>
-<span id="cb10-186"><a href="#cb10-186" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): United States (163)</span></span>
-<span id="cb10-187"><a href="#cb10-187" tabindex="-1"></a><span class="co"># fao:34.3.6;fao:34.4.1;fao:41;fao:47</span></span>
-<span id="cb10-188"><a href="#cb10-188" tabindex="-1"></a></span>
-<span id="cb10-189"><a href="#cb10-189" tabindex="-1"></a>ram_fao_areaname_multinational_atlantic_ocean <span class="ot">&lt;-</span> RAM_na_multi <span class="sc">%&gt;%</span></span>
-<span id="cb10-190"><a href="#cb10-190" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;Atlantic Ocean&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-191"><a href="#cb10-191" tabindex="-1"></a>  <span class="fu">distinct</span>(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) <span class="sc">%&gt;%</span></span>
-<span id="cb10-192"><a href="#cb10-192" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">areaname_fao_area =</span> <span class="fu">case_when</span>(areaname <span class="sc">==</span> <span class="st">&quot;Northern Atlantic&quot;</span> <span class="sc">~</span> <span class="st">&quot;21;27;31;34&quot;</span>,</span>
-<span id="cb10-193"><a href="#cb10-193" tabindex="-1"></a>                                       areaname <span class="sc">==</span> <span class="st">&quot;South Atlantic&quot;</span> <span class="sc">~</span> <span class="st">&quot;34;41;47&quot;</span></span>
-<span id="cb10-194"><a href="#cb10-194" tabindex="-1"></a>                                       )) <span class="sc">%&gt;%</span></span>
-<span id="cb10-195"><a href="#cb10-195" tabindex="-1"></a>  <span class="co"># now assign ohi rgn_id based on the same logic as above...</span></span>
-<span id="cb10-196"><a href="#cb10-196" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ohi_rgn =</span> <span class="fu">case_when</span>(stockid <span class="sc">==</span> <span class="st">&quot;BLSHARNATL&quot;</span> <span class="sc">~</span> <span class="st">&quot;164;210;183;182&quot;</span>,</span>
-<span id="cb10-197"><a href="#cb10-197" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;SFMAKONATL&quot;</span> <span class="sc">~</span> <span class="st">&quot;163&quot;</span>,</span>
-<span id="cb10-198"><a href="#cb10-198" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;BLSHARSATL&quot;</span> <span class="sc">~</span> <span class="st">&quot;182;183;210;101&quot;</span>,</span>
-<span id="cb10-199"><a href="#cb10-199" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;SFMAKOSATL&quot;</span> <span class="sc">~</span> <span class="st">&quot;163&quot;</span></span>
-<span id="cb10-200"><a href="#cb10-200" tabindex="-1"></a>                             )) <span class="sc">%&gt;%</span></span>
-<span id="cb10-201"><a href="#cb10-201" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) <span class="sc">%&gt;%</span></span>
-<span id="cb10-202"><a href="#cb10-202" tabindex="-1"></a>  <span class="fu">separate_rows</span>(ohi_rgn,  <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb10-203"><a href="#cb10-203" tabindex="-1"></a>  <span class="fu">separate_rows</span>(areaname_fao_area, <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb10-204"><a href="#cb10-204" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;ohi_rgn&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;areaname_fao_area&quot;</span>, RAM_area_m2, stockid, stocklong)</span>
-<span id="cb10-205"><a href="#cb10-205" tabindex="-1"></a></span>
-<span id="cb10-206"><a href="#cb10-206" tabindex="-1"></a></span>
-<span id="cb10-207"><a href="#cb10-207" tabindex="-1"></a></span>
-<span id="cb10-208"><a href="#cb10-208" tabindex="-1"></a><span class="do">####### Now Pacific Ocean</span></span>
-<span id="cb10-209"><a href="#cb10-209" tabindex="-1"></a><span class="co"># https://www.iss-foundation.org/tuna-stocks-and-management/fisheries-management/regional-fisheries-management-organizations-rfmos/western-and-central-pacific-fisheries-commission-wcpfc/ (helpful for WCPFC)</span></span>
-<span id="cb10-210"><a href="#cb10-210" tabindex="-1"></a></span>
-<span id="cb10-211"><a href="#cb10-211" tabindex="-1"></a><span class="co"># Oceanic whitetip shark Central Western Pacific Ocean (OWSHARCWPAC): could not find on fishsource; using places bordering WCPFC zone as a proxy for fishing countries</span></span>
-<span id="cb10-212"><a href="#cb10-212" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Russia (73), Japan (210), North Korea (21), South Korea (20), Taiwan (14), China (209), Singapore (208), Vietnam (207), Cambodia (24), Thailand (25), Malaysia (206), Indonesia (216), Philippines (15), Papua New Guinea (17), Australia (16), New Zealand (162), Solomon Islands (7), American Samoa (151), Cook Islands (153), Micronesia (9), Fiji (18), French Polynesia (147), Northern Mariana Islands and Guam (13), Line Islands (Kiribati) (148), Phoenix Islands (Kiribati) (157), Gilbert Islands (Kiribati) (212), Marshall Islands (11), Nauru (10), New Caledonia (5), Niue (154), Palau (8), Samoa (152), Tokelau (156), Tonga (155), Tuvalu (19), Vanuatu (6), Wallis and Futuna (161), Brunei (247), Norfolk Island (3), Macquarie Island (4)</span></span>
-<span id="cb10-213"><a href="#cb10-213" tabindex="-1"></a><span class="co"># FAO 71</span></span>
-<span id="cb10-214"><a href="#cb10-214" tabindex="-1"></a></span>
-<span id="cb10-215"><a href="#cb10-215" tabindex="-1"></a><span class="co"># Silky shark Central Western Pacific Ocean (SLKSHARCWPAC): could only find NE Pacific on fishsource which I did not think was a close enough equivalent; using places bordering WCPFC zone as a proxy for fishing countries</span></span>
-<span id="cb10-216"><a href="#cb10-216" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Russia (73), Japan (210), North Korea (21), South Korea (20), Taiwan (14), China (209), Singapore (208), Vietnam (207), Cambodia (24), Thailand (25), Malaysia (206), Indonesia (216), Philippines (15), Papua New Guinea (17), Australia (16), New Zealand (162), Solomon Islands (7), American Samoa (151), Cook Islands (153), Micronesia (9), Fiji (18), French Polynesia (147), Northern Mariana Islands and Guam (13), Line Islands (Kiribati) (148), Phoenix Islands (Kiribati) (157), Gilbert Islands (Kiribati) (212), Marshall Islands (11), Nauru (10), New Caledonia (5), Niue (154), Palau (8), Samoa (152), Tokelau (156), Tonga (155), Tuvalu (19), Vanuatu (6), Wallis and Futuna (161), Brunei (247), Norfolk Island (3), Macquarie Island (4)</span></span>
-<span id="cb10-217"><a href="#cb10-217" tabindex="-1"></a><span class="co"># FAO 71</span></span>
-<span id="cb10-218"><a href="#cb10-218" tabindex="-1"></a></span>
-<span id="cb10-219"><a href="#cb10-219" tabindex="-1"></a><span class="co"># Swordfish South Pacific Ocean (SWORDSPAC): https://www.fishsource.org/stock_page/1051; https://www.fishsource.org/stock_page/1076 (separates out Southeast and Southwest - took information from both)</span></span>
-<span id="cb10-220"><a href="#cb10-220" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Chile (224), China (209), Ecuador (137), South Korea (20), Mexico (135), Panama (129), Peru (138), Puerto Rico and Virgin Islands of the United States (116), Spain (182), Vanuatu (6), Australia (16), Vietnam (207), Fiji (18), French Polynesia (147)</span></span>
-<span id="cb10-221"><a href="#cb10-221" tabindex="-1"></a><span class="co"># FAO 87, 81 (approximate of South Pacific Ocean for lack of better source)</span></span>
-<span id="cb10-222"><a href="#cb10-222" tabindex="-1"></a></span>
-<span id="cb10-223"><a href="#cb10-223" tabindex="-1"></a>ram_fao_areaname_multinational_pacific_ocean <span class="ot">&lt;-</span> RAM_na_multi <span class="sc">%&gt;%</span></span>
-<span id="cb10-224"><a href="#cb10-224" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;Pacific Ocean&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-225"><a href="#cb10-225" tabindex="-1"></a>  <span class="fu">distinct</span>(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) <span class="sc">%&gt;%</span></span>
-<span id="cb10-226"><a href="#cb10-226" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">areaname_fao_area =</span> <span class="fu">case_when</span>(areaname <span class="sc">==</span> <span class="st">&quot;Central Western Pacific Ocean&quot;</span> <span class="sc">~</span> <span class="st">&quot;71&quot;</span>,</span>
-<span id="cb10-227"><a href="#cb10-227" tabindex="-1"></a>                                       areaname <span class="sc">==</span> <span class="st">&quot;South Pacific Ocean&quot;</span> <span class="sc">~</span> <span class="st">&quot;87;81&quot;</span></span>
-<span id="cb10-228"><a href="#cb10-228" tabindex="-1"></a>                                       )) <span class="sc">%&gt;%</span></span>
-<span id="cb10-229"><a href="#cb10-229" tabindex="-1"></a>  <span class="co"># now assign ohi rgn_id based on the same logic as above...</span></span>
-<span id="cb10-230"><a href="#cb10-230" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ohi_rgn =</span> <span class="fu">case_when</span>(stockid <span class="sc">==</span> <span class="st">&quot;OWSHARCWPAC&quot;</span> <span class="sc">~</span> <span class="st">&quot;73;210;21;20;14;209;208;207;24;25;206;216;15;17;16;162;7;151;153;9;18;147;13;148;157;212;11;10;5;154;8;152;156;155;19;6;161;247;3;4&quot;</span>,</span>
-<span id="cb10-231"><a href="#cb10-231" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;SLKSHARCWPAC&quot;</span> <span class="sc">~</span> <span class="st">&quot;73;210;21;20;14;209;208;207;24;25;206;216;15;17;16;162;7;151;153;9;18;147;13;148;157;212;11;10;5;154;8;152;156;155;19;6;161;247;3;4&quot;</span>,</span>
-<span id="cb10-232"><a href="#cb10-232" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;SWORDSPAC&quot;</span> <span class="sc">~</span> <span class="st">&quot;224;209;137;20;135;129;138;116;182;6;16;207;18;147&quot;</span></span>
-<span id="cb10-233"><a href="#cb10-233" tabindex="-1"></a>                             )) <span class="sc">%&gt;%</span></span>
-<span id="cb10-234"><a href="#cb10-234" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) <span class="sc">%&gt;%</span></span>
-<span id="cb10-235"><a href="#cb10-235" tabindex="-1"></a>  <span class="fu">separate_rows</span>(ohi_rgn,  <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb10-236"><a href="#cb10-236" tabindex="-1"></a>  <span class="fu">separate_rows</span>(areaname_fao_area, <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb10-237"><a href="#cb10-237" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;ohi_rgn&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;areaname_fao_area&quot;</span>, RAM_area_m2, stockid, stocklong)</span>
-<span id="cb10-238"><a href="#cb10-238" tabindex="-1"></a></span>
-<span id="cb10-239"><a href="#cb10-239" tabindex="-1"></a></span>
-<span id="cb10-240"><a href="#cb10-240" tabindex="-1"></a></span>
-<span id="cb10-241"><a href="#cb10-241" tabindex="-1"></a><span class="do">####### Now Indian Ocean</span></span>
-<span id="cb10-242"><a href="#cb10-242" tabindex="-1"></a><span class="co"># http://geonetwork.d4science.org/geonetwork/srv/en/metadata.show?uuid=fao-rfb-map-iotc (helpful for IOTC)</span></span>
-<span id="cb10-243"><a href="#cb10-243" tabindex="-1"></a></span>
-<span id="cb10-244"><a href="#cb10-244" tabindex="-1"></a><span class="co"># Blue shark Indian Ocean (BLSHARIO): https://www.fishsource.org/stock_page/1031</span></span>
-<span id="cb10-245"><a href="#cb10-245" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Spain, Portugal</span></span>
-<span id="cb10-246"><a href="#cb10-246" tabindex="-1"></a><span class="co"># rfb:IOTC: FAO 57 (primary), 51</span></span>
-<span id="cb10-247"><a href="#cb10-247" tabindex="-1"></a><span class="co"># Other areas associated with this region: All places bordering Indian Ocean (FAO 57 and 51 based on fishsource and link above) - South Africa (102), Mozambique (41), Madagascar (42), Tanzania (202), Kenya (43), Somalia (44), Yemen (47), Oman (48), Iran (191), Pakistan (53), India (203), Sri Lanka (40), Bangladesh (204), Myanmar (205), Thailand (25), Indonesia (216), Australia (16), Sudan (49), Egypt (214), Saudi Arabia (50), Singapore (208), Bahrain (52), Comoro Islands (21), Djibouti (46), Eritrea (45), Iraq (192), Kuwait (51), Israel (79), Jordan (215), Maldives (39), Mauritius (37), Qatar (190), Seychelles (31), East Timor (231), Andaman and Nicobar (26), Mayotte (29), Christmas Island (2), Cocos Islands (1), Heard and McDonald Islands (94), Prince Edward Islands (90), British Indian Ocean Territory (38)</span></span>
-<span id="cb10-248"><a href="#cb10-248" tabindex="-1"></a></span>
-<span id="cb10-249"><a href="#cb10-249" tabindex="-1"></a></span>
-<span id="cb10-250"><a href="#cb10-250" tabindex="-1"></a><span class="co"># Indo-Pacific sailfish Indian Ocean (IPSAILIO): could only find Eastern Pacific which I did not think was a close enough equivalent</span></span>
-<span id="cb10-251"><a href="#cb10-251" tabindex="-1"></a><span class="co"># rfb:IOTC: FAO 57 (primary), 51</span></span>
-<span id="cb10-252"><a href="#cb10-252" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): All places bordering Indian Ocean in FAO 57 and 51 as a proxy (based on link above which defines Indian Ocean as 57 and 51) - South Africa (102), Mozambique (41), Madagascar (42), Tanzania (202), Kenya (43), Somalia (44), Yemen (47), Oman (48), Iran (191), Pakistan (53), India (203), Sri Lanka (40), Bangladesh (204), Myanmar (205), Thailand (25), Indonesia (216), Australia (16), Sudan (49), Egypt (214), Saudi Arabia (50), Singapore (208), Bahrain (52), Comoro Islands (21), Djibouti (46), Eritrea (45), Iraq (192), Kuwait (51), Israel (79), Jordan (215), Maldives (39), Mauritius (37), Qatar (190), Seychelles (31), East Timor (231), Andaman and Nicobar (26), Mayotte (29), Christmas Island (2), Cocos Islands (1), Heard and McDonald Islands (94), Prince Edward Islands (90), British Indian Ocean Territory (38)</span></span>
-<span id="cb10-253"><a href="#cb10-253" tabindex="-1"></a></span>
-<span id="cb10-254"><a href="#cb10-254" tabindex="-1"></a>ram_fao_areaname_multinational_indian_ocean <span class="ot">&lt;-</span> RAM_na_multi <span class="sc">%&gt;%</span></span>
-<span id="cb10-255"><a href="#cb10-255" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;Indian Ocean&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-256"><a href="#cb10-256" tabindex="-1"></a>  <span class="fu">distinct</span>(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) <span class="sc">%&gt;%</span></span>
-<span id="cb10-257"><a href="#cb10-257" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">areaname_fao_area =</span> <span class="fu">case_when</span>(areaname <span class="sc">==</span> <span class="st">&quot;Indian Ocean&quot;</span> <span class="sc">~</span> <span class="st">&quot;57;51&quot;</span></span>
-<span id="cb10-258"><a href="#cb10-258" tabindex="-1"></a>                                       )) <span class="sc">%&gt;%</span></span>
-<span id="cb10-259"><a href="#cb10-259" tabindex="-1"></a>  <span class="co"># now assign ohi rgn_id based on the same logic as above...</span></span>
-<span id="cb10-260"><a href="#cb10-260" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ohi_rgn =</span> <span class="fu">case_when</span>(stockid <span class="sc">==</span> <span class="st">&quot;BLSHARIO&quot;</span> <span class="sc">~</span> <span class="st">&quot;102;41;42;202;43;44;47;48;191;53;203;40;204;205;25;216;16;49;214;50;208;52;21;46;45;192;51;79;215;39;37;190;31;231;26;29;2;1;94;90;38&quot;</span>,</span>
-<span id="cb10-261"><a href="#cb10-261" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;IPSAILIO&quot;</span> <span class="sc">~</span> <span class="st">&quot;102;41;42;202;43;44;47;48;191;53;203;40;204;205;25;216;16;49;214;50;208;52;21;46;45;192;51;79;215;39;37;190;31;231;26;29;2;1;94;90;38&quot;</span></span>
-<span id="cb10-262"><a href="#cb10-262" tabindex="-1"></a>                             )) <span class="sc">%&gt;%</span></span>
-<span id="cb10-263"><a href="#cb10-263" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) <span class="sc">%&gt;%</span></span>
-<span id="cb10-264"><a href="#cb10-264" tabindex="-1"></a>  <span class="fu">separate_rows</span>(ohi_rgn,  <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb10-265"><a href="#cb10-265" tabindex="-1"></a>  <span class="fu">separate_rows</span>(areaname_fao_area, <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb10-266"><a href="#cb10-266" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;ohi_rgn&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;areaname_fao_area&quot;</span>, RAM_area_m2, stockid, stocklong)</span>
-<span id="cb10-267"><a href="#cb10-267" tabindex="-1"></a></span>
-<span id="cb10-268"><a href="#cb10-268" tabindex="-1"></a><span class="do">## Join them all together </span></span>
-<span id="cb10-269"><a href="#cb10-269" tabindex="-1"></a></span>
-<span id="cb10-270"><a href="#cb10-270" tabindex="-1"></a>RAM_na_all <span class="ot">&lt;-</span> <span class="fu">rbind</span>(RAM_na_non_multi, ram_fao_areaname_multinational_europe, ram_fao_areaname_multinational_atlantic_ocean, ram_fao_areaname_multinational_pacific_ocean, ram_fao_areaname_multinational_indian_ocean) <span class="do">## now all of the NA ones have rgn_id and fao_id! </span></span>
-<span id="cb10-271"><a href="#cb10-271" tabindex="-1"></a></span>
-<span id="cb10-272"><a href="#cb10-272" tabindex="-1"></a><span class="fu">summary</span>(RAM_na_all)</span>
-<span id="cb10-273"><a href="#cb10-273" tabindex="-1"></a><span class="co"># v2023:</span></span>
-<span id="cb10-274"><a href="#cb10-274" tabindex="-1"></a> <span class="co">#     rgn_id        fao_id     </span></span>
-<span id="cb10-275"><a href="#cb10-275" tabindex="-1"></a> <span class="co"># Min.   :  1   Min.   :21.00  </span></span>
-<span id="cb10-276"><a href="#cb10-276" tabindex="-1"></a> <span class="co"># 1st Qu.: 38   1st Qu.:51.00  </span></span>
-<span id="cb10-277"><a href="#cb10-277" tabindex="-1"></a> <span class="co"># Median :102   Median :57.00  </span></span>
-<span id="cb10-278"><a href="#cb10-278" tabindex="-1"></a> <span class="co"># Mean   :110   Mean   :56.56  </span></span>
-<span id="cb10-279"><a href="#cb10-279" tabindex="-1"></a> <span class="co"># 3rd Qu.:183   3rd Qu.:71.00  </span></span>
-<span id="cb10-280"><a href="#cb10-280" tabindex="-1"></a> <span class="co"># Max.   :247   Max.   :87.00  </span></span>
-<span id="cb10-281"><a href="#cb10-281" tabindex="-1"></a> <span class="co">#                              </span></span>
-<span id="cb10-282"><a href="#cb10-282" tabindex="-1"></a> <span class="co">#  RAM_area_m2    stockid         </span></span>
-<span id="cb10-283"><a href="#cb10-283" tabindex="-1"></a> <span class="co"># Min.   : NA   Length:340        </span></span>
-<span id="cb10-284"><a href="#cb10-284" tabindex="-1"></a> <span class="co"># 1st Qu.: NA   Class :character  </span></span>
-<span id="cb10-285"><a href="#cb10-285" tabindex="-1"></a> <span class="co"># Median : NA   Mode  :character  </span></span>
-<span id="cb10-286"><a href="#cb10-286" tabindex="-1"></a> <span class="co"># Mean   :NaN                     </span></span>
-<span id="cb10-287"><a href="#cb10-287" tabindex="-1"></a> <span class="co"># 3rd Qu.: NA                     </span></span>
-<span id="cb10-288"><a href="#cb10-288" tabindex="-1"></a> <span class="co"># Max.   : NA                     </span></span>
-<span id="cb10-289"><a href="#cb10-289" tabindex="-1"></a> <span class="co"># NA&#39;s   :340                     </span></span>
-<span id="cb10-290"><a href="#cb10-290" tabindex="-1"></a> <span class="co">#  stocklong        </span></span>
-<span id="cb10-291"><a href="#cb10-291" tabindex="-1"></a> <span class="co"># Length:340        </span></span>
-<span id="cb10-292"><a href="#cb10-292" tabindex="-1"></a> <span class="co"># Class :character  </span></span>
-<span id="cb10-293"><a href="#cb10-293" tabindex="-1"></a> <span class="co"># Mode  :character</span></span></code></pre></div>
+<span id="cb10-78"><a href="#cb10-78" tabindex="-1"></a><span class="co"># [4] &quot;SPRBLKGSA29&quot;; Sprat Black Sea</span></span>
+<span id="cb10-79"><a href="#cb10-79" tabindex="-1"></a><span class="co"># stocklong: Sprat Black Sea</span></span>
+<span id="cb10-80"><a href="#cb10-80" tabindex="-1"></a><span class="co"># https://www.fishsource.org/stock_page/2323 </span></span>
+<span id="cb10-81"><a href="#cb10-81" tabindex="-1"></a><span class="co"># OHI regions: Turkey (76), Bulgaria (71), Romania (72)</span></span>
+<span id="cb10-82"><a href="#cb10-82" tabindex="-1"></a><span class="co"># fao_id: 37</span></span>
+<span id="cb10-83"><a href="#cb10-83" tabindex="-1"></a><span class="co"># See: `https://upload.wikimedia.org/wikipedia/commons/3/3a/FAO_Major_Fishing_Areas.svg` </span></span>
+<span id="cb10-84"><a href="#cb10-84" tabindex="-1"></a></span>
+<span id="cb10-85"><a href="#cb10-85" tabindex="-1"></a>ram_fao_areaname_multinational_mbs <span class="ot">&lt;-</span> RAM_na_multi <span class="sc">%&gt;%</span></span>
+<span id="cb10-86"><a href="#cb10-86" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;Mediterranean-Black Sea&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-87"><a href="#cb10-87" tabindex="-1"></a>  <span class="fu">distinct</span>(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) <span class="sc">%&gt;%</span> <span class="co"># these are all just general rules, taken from an emLAB project: https://github.com/emlab-ucsb/sustain-sci-subsidy-reform-paper/blob/master/data/lookup-tables/assign_fao_areas_to_ram_v4.491.Rmd</span></span>
+<span id="cb10-88"><a href="#cb10-88" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">areaname_fao_area =</span> <span class="fu">case_when</span>(</span>
+<span id="cb10-89"><a href="#cb10-89" tabindex="-1"></a>    areaname <span class="sc">==</span> <span class="st">&quot;Gulf of Lions&quot;</span> <span class="sc">~</span> <span class="st">&quot;37&quot;</span>,</span>
+<span id="cb10-90"><a href="#cb10-90" tabindex="-1"></a>    areaname <span class="sc">==</span> <span class="st">&quot;Adriatic Sea (GSA 17,18)&quot;</span> <span class="sc">~</span> <span class="st">&quot;37&quot;</span>,</span>
+<span id="cb10-91"><a href="#cb10-91" tabindex="-1"></a>    areaname <span class="sc">==</span> <span class="st">&quot;Black Sea&quot;</span> <span class="sc">~</span> <span class="st">&quot;37&quot;</span>,</span>
+<span id="cb10-92"><a href="#cb10-92" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">&quot;37&quot;</span> <span class="co"># Otherwise we assume it&#39;s 37, because we are making a new column named areaname_fao_area</span></span>
+<span id="cb10-93"><a href="#cb10-93" tabindex="-1"></a>  )) <span class="sc">%&gt;%</span> </span>
+<span id="cb10-94"><a href="#cb10-94" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ohi_rgn =</span> <span class="fu">case_when</span>(</span>
+<span id="cb10-95"><a href="#cb10-95" tabindex="-1"></a>    stockid <span class="sc">==</span> <span class="st">&quot;RMULLMEDGSA7&quot;</span> <span class="sc">~</span> <span class="st">&quot;179;182&quot;</span>,</span>
+<span id="cb10-96"><a href="#cb10-96" tabindex="-1"></a>    stockid <span class="sc">==</span> <span class="st">&quot;SARDMEDGSA17-18&quot;</span> <span class="sc">~</span> <span class="st">&quot;82;186;187;184;188&quot;</span>,</span>
+<span id="cb10-97"><a href="#cb10-97" tabindex="-1"></a>    stockid <span class="sc">==</span> <span class="st">&quot;SPRBLKGSA29&quot;</span> <span class="sc">~</span> <span class="st">&quot;76;71;72&quot;</span>,</span>
+<span id="cb10-98"><a href="#cb10-98" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">&quot;NA&quot;</span></span>
+<span id="cb10-99"><a href="#cb10-99" tabindex="-1"></a>  )) <span class="sc">%&gt;%</span></span>
+<span id="cb10-100"><a href="#cb10-100" tabindex="-1"></a>  <span class="fu">separate_rows</span>(<span class="fu">c</span>(ohi_rgn, areaname_fao_area), <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb10-101"><a href="#cb10-101" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;ohi_rgn&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;areaname_fao_area&quot;</span>, RAM_area_m2, stockid, stocklong)</span>
+<span id="cb10-102"><a href="#cb10-102" tabindex="-1"></a></span>
+<span id="cb10-103"><a href="#cb10-103" tabindex="-1"></a><span class="co"># ====== Join them all together =======</span></span>
+<span id="cb10-104"><a href="#cb10-104" tabindex="-1"></a></span>
+<span id="cb10-105"><a href="#cb10-105" tabindex="-1"></a>RAM_na_all <span class="ot">&lt;-</span> <span class="fu">rbind</span>(RAM_na_non_multi, ram_fao_areaname_multinational_mbs, ram_fao_areaname_multinational_south_america) <span class="do">## now all of the NA ones have rgn_id and fao_id! </span></span>
+<span id="cb10-106"><a href="#cb10-106" tabindex="-1"></a></span>
+<span id="cb10-107"><a href="#cb10-107" tabindex="-1"></a><span class="fu">summary</span>(RAM_na_all)</span>
+<span id="cb10-108"><a href="#cb10-108" tabindex="-1"></a></span>
+<span id="cb10-109"><a href="#cb10-109" tabindex="-1"></a><span class="co"># v2024: </span></span>
+<span id="cb10-110"><a href="#cb10-110" tabindex="-1"></a> <span class="co">#     rgn_id          fao_id     </span></span>
+<span id="cb10-111"><a href="#cb10-111" tabindex="-1"></a> <span class="co"># Min.   : 71.0   Min.   :37.00  </span></span>
+<span id="cb10-112"><a href="#cb10-112" tabindex="-1"></a> <span class="co"># 1st Qu.: 82.0   1st Qu.:37.00  </span></span>
+<span id="cb10-113"><a href="#cb10-113" tabindex="-1"></a> <span class="co"># Median :179.0   Median :37.00  </span></span>
+<span id="cb10-114"><a href="#cb10-114" tabindex="-1"></a> <span class="co"># Mean   :146.6   Mean   :48.54  </span></span>
+<span id="cb10-115"><a href="#cb10-115" tabindex="-1"></a> <span class="co"># 3rd Qu.:186.0   3rd Qu.:37.00  </span></span>
+<span id="cb10-116"><a href="#cb10-116" tabindex="-1"></a> <span class="co"># Max.   :224.0   Max.   :87.00  </span></span>
+<span id="cb10-117"><a href="#cb10-117" tabindex="-1"></a> <span class="co">#                                </span></span>
+<span id="cb10-118"><a href="#cb10-118" tabindex="-1"></a> <span class="co">#  RAM_area_m2 </span></span>
+<span id="cb10-119"><a href="#cb10-119" tabindex="-1"></a> <span class="co"># Min.   : NA  </span></span>
+<span id="cb10-120"><a href="#cb10-120" tabindex="-1"></a> <span class="co"># 1st Qu.: NA  </span></span>
+<span id="cb10-121"><a href="#cb10-121" tabindex="-1"></a> <span class="co"># Median : NA  </span></span>
+<span id="cb10-122"><a href="#cb10-122" tabindex="-1"></a> <span class="co"># Mean   :NaN  </span></span>
+<span id="cb10-123"><a href="#cb10-123" tabindex="-1"></a> <span class="co"># 3rd Qu.: NA  </span></span>
+<span id="cb10-124"><a href="#cb10-124" tabindex="-1"></a> <span class="co"># Max.   : NA  </span></span>
+<span id="cb10-125"><a href="#cb10-125" tabindex="-1"></a> <span class="co"># NA&#39;s   :13   </span></span>
+<span id="cb10-126"><a href="#cb10-126" tabindex="-1"></a> <span class="co">#   stockid         </span></span>
+<span id="cb10-127"><a href="#cb10-127" tabindex="-1"></a> <span class="co"># Length:13         </span></span>
+<span id="cb10-128"><a href="#cb10-128" tabindex="-1"></a> <span class="co"># Class :character  </span></span>
+<span id="cb10-129"><a href="#cb10-129" tabindex="-1"></a> <span class="co"># Mode  :character  </span></span>
+<span id="cb10-130"><a href="#cb10-130" tabindex="-1"></a>                </span>
+<span id="cb10-131"><a href="#cb10-131" tabindex="-1"></a> <span class="co">#  stocklong        </span></span>
+<span id="cb10-132"><a href="#cb10-132" tabindex="-1"></a> <span class="co"># Length:13         </span></span>
+<span id="cb10-133"><a href="#cb10-133" tabindex="-1"></a> <span class="co"># Class :character  </span></span>
+<span id="cb10-134"><a href="#cb10-134" tabindex="-1"></a> <span class="co"># Mode  :character </span></span></code></pre></div>
+<p>For reference, here is what v2023 did:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># v2023</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="co"># Europe - European Union and Europe non EU</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co"># Map of ICES/NAFO fishing areas: https://www.researchgate.net/figure/Map-of-the-ICES-and-NAFO-fishing-areas_fig1_268343176 (referenced for related areas)</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co"># Zoomed in version of Western Europe: https://www.researchgate.net/figure/Stock-units-defined-by-ICES-for-white-anglerfish-southern-stock-in-Divisions-VIIIc-and_fig1_31198841 (this is listed above too)</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co"># Map of broader FAO fishing areas: https://www.fao.org/fishery/en/area/search (see link above too)</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a><span class="co"># Anchovy Portugese Waters -East (ANCHIXa): closest I could find - https://www.fishsource.org/stock_page/2687</span></span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Portugal (183), Spain (182)</span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="co"># fao:27.9.a</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="co"># Greater silver smelt ICES 1-2-3a-4 (GSSMELTI-II-IIIa-IV): https://www.fishsource.org/stock_page/1710; https://ices-library.figshare.com/articles/report/Greater_silver_smelt_Argentina_silus_in_subareas_1_2_and_4_and_in_Division_3_a_Northeast_Arctic_North_Sea_Skagerrak_and_Kattegat_/21828207?backTo=/collections/_/6398177</span></span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Norway (223)</span></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="co"># fao:27.1;fao:27.2;fao:27.3.a;fao:27.4</span></span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="co"># Northeast Arctic, North Sea, Skagerrak and Kattegat</span></span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a><span class="co"># Other areas associated with this region: Russia (73), Finland (174), Sweden (222), United Kingdom (Great Britain specifically, but it&#39;s lumped together) (180), Denmark (175), Germany (176), the Netherlands (177), Belgium (59), France (179)</span></span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a></span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a><span class="co"># Greater silver smelt ICES 5a-14 (GSSMELTVa-XIV): https://www.fishsource.org/stock_page/1845 (doesn&#39;t mention Greenland but seems close enough); https://ices-library.figshare.com/articles/report/Greater_silver_smelt_Argentina_silus_in_Subarea_14_and_Division_5_a_East_Greenland_and_Iceland_grounds_/19447772?backTo=/collections/ICES_Advice_2022/5796935</span></span>
+<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Iceland (143)</span></span>
+<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a><span class="co"># fao:27.14;fao:27.5.a</span></span>
+<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a><span class="co"># East Greenland and Iceland grounds</span></span>
+<span id="cb11-21"><a href="#cb11-21" tabindex="-1"></a></span>
+<span id="cb11-22"><a href="#cb11-22" tabindex="-1"></a><span class="co"># Greater silver smelt ICES 5b-6a (GSSMELTVb-VIa): https://www.fishsource.org/stock_page/1709; https://ices-library.figshare.com/articles/report/Greater_silver_smelt_Argentina_silus_in_divisions_5_b_and_6_a_Faroes_grounds_and_west_of_Scotland_/19447778?backTo=/collections/ICES_Advice_2022/5796935</span></span>
+<span id="cb11-23"><a href="#cb11-23" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Faeroe Islands (141), the Netherlands (177)</span></span>
+<span id="cb11-24"><a href="#cb11-24" tabindex="-1"></a><span class="co"># fao:27.5.b;fao:27.6.a</span></span>
+<span id="cb11-25"><a href="#cb11-25" tabindex="-1"></a><span class="co"># Faroes grounds and west of Scotland</span></span>
+<span id="cb11-26"><a href="#cb11-26" tabindex="-1"></a><span class="co"># Other areas associated with this region: United Kingdom (Scotland specifically, but it&#39;s lumped together) (180)</span></span>
+<span id="cb11-27"><a href="#cb11-27" tabindex="-1"></a></span>
+<span id="cb11-28"><a href="#cb11-28" tabindex="-1"></a><span class="co"># Ling Faroe Grounds (LINGVb): https://www.fishsource.org/stock_page/1353</span></span>
+<span id="cb11-29"><a href="#cb11-29" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Faeroe Islands (141)</span></span>
+<span id="cb11-30"><a href="#cb11-30" tabindex="-1"></a><span class="co"># fao:27.5.b</span></span>
+<span id="cb11-31"><a href="#cb11-31" tabindex="-1"></a><span class="co"># Faroe Grounds</span></span>
+<span id="cb11-32"><a href="#cb11-32" tabindex="-1"></a></span>
+<span id="cb11-33"><a href="#cb11-33" tabindex="-1"></a><span class="co"># Norway lobster North Galicia (FU 25) (NEPHFU25): did not see good enough equivalent on fishsource; https://ices-library.figshare.com/articles/report/Norway_lobster_Nephrops_norvegicus_in_Division_8_c_Functional_Unit_25_southern_Bay_of_Biscay_and_northern_Galicia_/19453487?backTo=/collections/ICES_Advice_2022/5796935 </span></span>
+<span id="cb11-34"><a href="#cb11-34" tabindex="-1"></a><span class="co"># ices_fu_nep:25</span></span>
+<span id="cb11-35"><a href="#cb11-35" tabindex="-1"></a><span class="co"># southern Bay of Biscay and northern Galicia</span></span>
+<span id="cb11-36"><a href="#cb11-36" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Spain (182)</span></span>
+<span id="cb11-37"><a href="#cb11-37" tabindex="-1"></a></span>
+<span id="cb11-38"><a href="#cb11-38" tabindex="-1"></a><span class="co"># Norway lobster West Galicia and North Portugal (FU 26-27) (NEPHFU2627): did not see good enough equivalent on fishsource; https://ices-library.figshare.com/articles/report/Norway_lobster_Nephrops_norvegicus_in_Division_9_a_functional_units_26_27_Atlantic_Iberian_waters_East_western_Galicia_and_northern_Portugal_/19453496?backTo=/collections/ICES_Advice_2022/5796935</span></span>
+<span id="cb11-39"><a href="#cb11-39" tabindex="-1"></a><span class="co"># ices_fu_nep:26;ices_fu_nep:27</span></span>
+<span id="cb11-40"><a href="#cb11-40" tabindex="-1"></a><span class="co"># Atlantic Iberian waters East, western Galicia, and northern Portugal</span></span>
+<span id="cb11-41"><a href="#cb11-41" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Spain (182), Portugal (183)</span></span>
+<span id="cb11-42"><a href="#cb11-42" tabindex="-1"></a></span>
+<span id="cb11-43"><a href="#cb11-43" tabindex="-1"></a><span class="co"># Turbot Kattegat and Skagerrak (TURIIIa): https://www.fishsource.org/fishery_page/4954 (roughly covers Skagerrak); https://www.fishsource.org/stock_page/1364 (roughly covers Kattegat); https://ices-library.figshare.com/articles/report/Turbot_Scophthalmus_maximus_in_Division_3_a_Skagerrak_and_Kattegat_/21864318</span></span>
+<span id="cb11-44"><a href="#cb11-44" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Denmark (175), Poland (178), the Netherlands (177), United Kingdom (180)</span></span>
+<span id="cb11-45"><a href="#cb11-45" tabindex="-1"></a><span class="co"># fao:27.3.a</span></span>
+<span id="cb11-46"><a href="#cb11-46" tabindex="-1"></a><span class="co"># Skagerrak and Kattegat </span></span>
+<span id="cb11-47"><a href="#cb11-47" tabindex="-1"></a><span class="co"># Other areas associated with this region: Sweden (222), Norway (223)</span></span>
+<span id="cb11-48"><a href="#cb11-48" tabindex="-1"></a></span>
+<span id="cb11-49"><a href="#cb11-49" tabindex="-1"></a><span class="co"># Witch flounder ICES 3a-4-7d (WITFLOUNIIIa-IV-VIId): did not see good enough equivalent on fishsource; https://ices-library.figshare.com/articles/report/Stock_Annex_Witch_Glyptocephalus_cynoglossus_in_Subarea_4_and_divisions_3_a_and_7_d_North_Sea_Skagerrak_and_Kattegat_eastern_English_Channel_/18623576</span></span>
+<span id="cb11-50"><a href="#cb11-50" tabindex="-1"></a><span class="co"># fao:27.3.a;fao:27.4;fao:27.7.d</span></span>
+<span id="cb11-51"><a href="#cb11-51" tabindex="-1"></a><span class="co"># North Sea, Skagerrak and Kattegat, eastern English Channel</span></span>
+<span id="cb11-52"><a href="#cb11-52" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Denmark (175), Sweden (222), Norway (223), Belgium (59), the Netherlands (177), Germany (176), United Kingdom (180), France (179)</span></span>
+<span id="cb11-53"><a href="#cb11-53" tabindex="-1"></a></span>
+<span id="cb11-54"><a href="#cb11-54" tabindex="-1"></a></span>
+<span id="cb11-55"><a href="#cb11-55" tabindex="-1"></a>ram_fao_areaname_multinational_europe <span class="ot">&lt;-</span> RAM_na_multi <span class="sc">%&gt;%</span></span>
+<span id="cb11-56"><a href="#cb11-56" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;Europe non EU&quot;</span>, <span class="st">&quot;European Union&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-57"><a href="#cb11-57" tabindex="-1"></a>  <span class="fu">distinct</span>(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) <span class="sc">%&gt;%</span> <span class="co"># these are all just general rules, taken from an emLAB project: https://github.com/emlab-ucsb/sustain-sci-subsidy-reform-paper/blob/master/data/lookup-tables/assign_fao_areas_to_ram_v4.491.Rmd</span></span>
+<span id="cb11-58"><a href="#cb11-58" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">areaname_fao_area =</span> <span class="fu">case_when</span>(<span class="co">#areaname == &quot;Azores&quot; ~ &quot;27;34&quot;, # crosses both</span></span>
+<span id="cb11-59"><a href="#cb11-59" tabindex="-1"></a>                                       <span class="co">#areaname == &quot;NAFO 1F and ICES 14&quot; ~ &quot;21;27&quot;, # crosses both</span></span>
+<span id="cb11-60"><a href="#cb11-60" tabindex="-1"></a>                                       <span class="co">#areaname == &quot;ICES 5-12-14 and NAFO Subareas 1-2 (deep)&quot; ~ &quot;21;27&quot;,</span></span>
+<span id="cb11-61"><a href="#cb11-61" tabindex="-1"></a>                                       <span class="co">#areaname == &quot;ICES 5-12-14 and NAFO Subareas 1-2 (shallow)&quot; ~ &quot;21;27&quot;,</span></span>
+<span id="cb11-62"><a href="#cb11-62" tabindex="-1"></a>                                       <span class="co">#areaname == &quot;Azores Grounds&quot; ~ &quot;27;34&quot;,</span></span>
+<span id="cb11-63"><a href="#cb11-63" tabindex="-1"></a>                                       <span class="co">#areaname == &quot;Mid-Atlantic Ridge&quot; ~ &quot;27&quot;, # check on this one</span></span>
+<span id="cb11-64"><a href="#cb11-64" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;Portugese Waters -East&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
+<span id="cb11-65"><a href="#cb11-65" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;ICES 1-2-3a-4&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
+<span id="cb11-66"><a href="#cb11-66" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;ICES 5a-14&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
+<span id="cb11-67"><a href="#cb11-67" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;ICES 5b-6a&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
+<span id="cb11-68"><a href="#cb11-68" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;Faroe Grounds&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
+<span id="cb11-69"><a href="#cb11-69" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;North Galicia (FU 25)&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
+<span id="cb11-70"><a href="#cb11-70" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;West Galicia and North Portugal (FU 26-27)&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
+<span id="cb11-71"><a href="#cb11-71" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;Kattegat and Skagerrak&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
+<span id="cb11-72"><a href="#cb11-72" tabindex="-1"></a>                                        areaname <span class="sc">==</span> <span class="st">&quot;ICES 3a-4-7d&quot;</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span>,</span>
+<span id="cb11-73"><a href="#cb11-73" tabindex="-1"></a>                                       <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">&quot;27&quot;</span></span>
+<span id="cb11-74"><a href="#cb11-74" tabindex="-1"></a>                                       )) <span class="sc">%&gt;%</span> <span class="co"># Otherwise we assume it&#39;s 27 %&gt;%</span></span>
+<span id="cb11-75"><a href="#cb11-75" tabindex="-1"></a> <span class="fu">mutate</span>(<span class="at">ohi_rgn =</span> <span class="fu">case_when</span>(</span>
+<span id="cb11-76"><a href="#cb11-76" tabindex="-1"></a>   <span class="co">#stockid == &quot;WHITVIIbce-k&quot; ~ &quot;179;180;181;227;228;262&quot;,</span></span>
+<span id="cb11-77"><a href="#cb11-77" tabindex="-1"></a>   <span class="co">#stockid == &quot;COD1F-XIV&quot; ~ &quot;145&quot;, </span></span>
+<span id="cb11-78"><a href="#cb11-78" tabindex="-1"></a>   <span class="co">#stockid == &quot;EBASSVIIIab&quot; ~ &quot;179;59;177;182;180&quot;,</span></span>
+<span id="cb11-79"><a href="#cb11-79" tabindex="-1"></a>   <span class="co">#stockid == &quot;REDDEEPI-II&quot; ~ &quot;223;182;73&quot;, </span></span>
+<span id="cb11-80"><a href="#cb11-80" tabindex="-1"></a>   <span class="co">#stockid == &quot;SARDVIIIabd&quot; ~ &quot;179;182;177;181;180;175;176;189&quot;, </span></span>
+<span id="cb11-81"><a href="#cb11-81" tabindex="-1"></a>   <span class="co">#stockid == &quot;TURIV&quot; ~ &quot;180;177&quot;</span></span>
+<span id="cb11-82"><a href="#cb11-82" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;ANCHIXa&quot;</span> <span class="sc">~</span> <span class="st">&quot;182;183&quot;</span>,</span>
+<span id="cb11-83"><a href="#cb11-83" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;GSSMELTI-II-IIIa-IV&quot;</span> <span class="sc">~</span> <span class="st">&quot;223&quot;</span>,</span>
+<span id="cb11-84"><a href="#cb11-84" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;GSSMELTVa-XIV&quot;</span> <span class="sc">~</span> <span class="st">&quot;143&quot;</span>, <span class="co"># check on this</span></span>
+<span id="cb11-85"><a href="#cb11-85" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;GSSMELTVb-VIa&quot;</span> <span class="sc">~</span> <span class="st">&quot;141;177&quot;</span>,</span>
+<span id="cb11-86"><a href="#cb11-86" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;LINGVb&quot;</span> <span class="sc">~</span> <span class="st">&quot;141&quot;</span>,</span>
+<span id="cb11-87"><a href="#cb11-87" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;NEPHFU25&quot;</span> <span class="sc">~</span> <span class="st">&quot;182&quot;</span>,</span>
+<span id="cb11-88"><a href="#cb11-88" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;NEPHFU2627&quot;</span> <span class="sc">~</span> <span class="st">&quot;182;183&quot;</span>,</span>
+<span id="cb11-89"><a href="#cb11-89" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;TURIIIa&quot;</span> <span class="sc">~</span> <span class="st">&quot;175;178;177;180&quot;</span>,</span>
+<span id="cb11-90"><a href="#cb11-90" tabindex="-1"></a>   stockid <span class="sc">==</span> <span class="st">&quot;WITFLOUNIIIa-IV-VIId&quot;</span> <span class="sc">~</span> <span class="st">&quot;175;222;223;59;177;176;180;179&quot;</span></span>
+<span id="cb11-91"><a href="#cb11-91" tabindex="-1"></a> )) <span class="sc">%&gt;%</span></span>
+<span id="cb11-92"><a href="#cb11-92" tabindex="-1"></a>  <span class="fu">separate_rows</span>(<span class="fu">c</span>(ohi_rgn, areaname_fao_area), <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-93"><a href="#cb11-93" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;ohi_rgn&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;areaname_fao_area&quot;</span>, RAM_area_m2, stockid, stocklong)</span>
+<span id="cb11-94"><a href="#cb11-94" tabindex="-1"></a></span>
+<span id="cb11-95"><a href="#cb11-95" tabindex="-1"></a></span>
+<span id="cb11-96"><a href="#cb11-96" tabindex="-1"></a></span>
+<span id="cb11-97"><a href="#cb11-97" tabindex="-1"></a><span class="do">####### Now lets do Africa </span></span>
+<span id="cb11-98"><a href="#cb11-98" tabindex="-1"></a></span>
+<span id="cb11-99"><a href="#cb11-99" tabindex="-1"></a><span class="co"># assign fao id and rgn_id based on context clues from the areaname</span></span>
+<span id="cb11-100"><a href="#cb11-100" tabindex="-1"></a></span>
+<span id="cb11-101"><a href="#cb11-101" tabindex="-1"></a></span>
+<span id="cb11-102"><a href="#cb11-102" tabindex="-1"></a><span class="co"># ram_fao_areaname_multinational_west_africa &lt;- RAM_na_multi %&gt;%</span></span>
+<span id="cb11-103"><a href="#cb11-103" tabindex="-1"></a><span class="co">#   dplyr::filter(region %in% c(&quot;West Africa&quot;)) %&gt;%</span></span>
+<span id="cb11-104"><a href="#cb11-104" tabindex="-1"></a><span class="co">#   distinct(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) %&gt;%</span></span>
+<span id="cb11-105"><a href="#cb11-105" tabindex="-1"></a><span class="co">#   mutate(areaname_fao_area = case_when(areaname == &quot;Central West Africa Cote Divoire-Benin&quot; ~ &quot;34&quot;, # assuming coast along ivory coast and benin</span></span>
+<span id="cb11-106"><a href="#cb11-106" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Gabon-Angola&quot; ~ &quot;34;47&quot;, # assume coast from gabon to angola</span></span>
+<span id="cb11-107"><a href="#cb11-107" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Angola&quot; ~ &quot;47&quot;, # assume just angola</span></span>
+<span id="cb11-108"><a href="#cb11-108" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Gabon-Congo DR&quot; ~ &quot;34&quot;, # assume gabon and Dem congo</span></span>
+<span id="cb11-109"><a href="#cb11-109" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Guinea Bissau-Guinea&quot; ~ &quot;34&quot;,</span></span>
+<span id="cb11-110"><a href="#cb11-110" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Guinea Bissau-Liberia&quot; ~ &quot;34&quot;, </span></span>
+<span id="cb11-111"><a href="#cb11-111" tabindex="-1"></a><span class="co">#                                        areaname == &quot;North West Africa Zone C&quot; ~ &quot;34&quot;)) %&gt;%</span></span>
+<span id="cb11-112"><a href="#cb11-112" tabindex="-1"></a><span class="co">#   # now assign ohi rgn_id based on the same logic as above...</span></span>
+<span id="cb11-113"><a href="#cb11-113" tabindex="-1"></a><span class="co">#   mutate(ohi_rgn = case_when(areaname == &quot;Central West Africa Cote Divoire-Benin&quot; ~ &quot;195;106;98;99&quot;, # assuming coast along ivory coast and benin</span></span>
+<span id="cb11-114"><a href="#cb11-114" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Gabon-Angola&quot; ~ &quot;198;100;199;200&quot;, # assume coast from gabon to angola</span></span>
+<span id="cb11-115"><a href="#cb11-115" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Angola&quot; ~ &quot;200&quot;, # assume just angola</span></span>
+<span id="cb11-116"><a href="#cb11-116" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Gabon-Congo DR&quot; ~ &quot;198;100;199&quot;, # assume gabon and Dem congo</span></span>
+<span id="cb11-117"><a href="#cb11-117" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Guinea Bissau-Guinea&quot; ~ &quot;194;193&quot;,</span></span>
+<span id="cb11-118"><a href="#cb11-118" tabindex="-1"></a><span class="co">#                                        areaname == &quot;Central West Africa Guinea Bissau-Liberia&quot; ~ &quot;193;194;96;97&quot;, </span></span>
+<span id="cb11-119"><a href="#cb11-119" tabindex="-1"></a><span class="co">#                                        areaname == &quot;North West Africa Zone C&quot; ~ &quot;62&quot;)) %&gt;%</span></span>
+<span id="cb11-120"><a href="#cb11-120" tabindex="-1"></a><span class="co">#   dplyr::select(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) %&gt;%</span></span>
+<span id="cb11-121"><a href="#cb11-121" tabindex="-1"></a><span class="co">#   separate_rows(ohi_rgn,  sep = &quot;;&quot;, convert = TRUE) %&gt;%</span></span>
+<span id="cb11-122"><a href="#cb11-122" tabindex="-1"></a><span class="co">#   separate_rows(areaname_fao_area, sep = &quot;;&quot;, convert = TRUE) %&gt;%</span></span>
+<span id="cb11-123"><a href="#cb11-123" tabindex="-1"></a><span class="co">#   dplyr::select(&quot;rgn_id&quot; = &quot;ohi_rgn&quot;, &quot;fao_id&quot; = &quot;areaname_fao_area&quot;, RAM_area_m2, stockid, stocklong)</span></span>
+<span id="cb11-124"><a href="#cb11-124" tabindex="-1"></a></span>
+<span id="cb11-125"><a href="#cb11-125" tabindex="-1"></a></span>
+<span id="cb11-126"><a href="#cb11-126" tabindex="-1"></a></span>
+<span id="cb11-127"><a href="#cb11-127" tabindex="-1"></a><span class="do">####### Now Atlantic Ocean</span></span>
+<span id="cb11-128"><a href="#cb11-128" tabindex="-1"></a><span class="co"># Blue shark Northern Atlantic (BLSHARNATL): https://www.fishsource.org/stock_page/1022</span></span>
+<span id="cb11-129"><a href="#cb11-129" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Belize (164), Japan (210), Portugal (183), Spain (182)</span></span>
+<span id="cb11-130"><a href="#cb11-130" tabindex="-1"></a><span class="co"># fao:21;fao:27;fao:31;fao:34.1;fao:34.2;fao:34.3.1;fao:34.3.2;fao:34.3.3;fao:34.3.4;fao:34.3.5;fao:34.4.2</span></span>
+<span id="cb11-131"><a href="#cb11-131" tabindex="-1"></a></span>
+<span id="cb11-132"><a href="#cb11-132" tabindex="-1"></a><span class="co"># Shortfin mako Northern Atlantic (SFMAKONATL): https://www.fishsource.org/stock_page/1156 (covers both North and South)</span></span>
+<span id="cb11-133"><a href="#cb11-133" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): United States (163)</span></span>
+<span id="cb11-134"><a href="#cb11-134" tabindex="-1"></a><span class="co"># fao:21;fao:27;fao:31;fao:34.1;fao:34.2;fao:34.3.1;fao:34.3.2;fao:34.3.3;fao:34.3.4;fao:34.3.5;fao:34.4.2</span></span>
+<span id="cb11-135"><a href="#cb11-135" tabindex="-1"></a></span>
+<span id="cb11-136"><a href="#cb11-136" tabindex="-1"></a><span class="co"># Blue shark South Atlantic (BLSHARSATL): https://www.fishsource.org/stock_page/1024</span></span>
+<span id="cb11-137"><a href="#cb11-137" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Spain (182), Portugal (183), Japan (210), Namibia (101)</span></span>
+<span id="cb11-138"><a href="#cb11-138" tabindex="-1"></a><span class="co"># fao:34.3.6;fao:34.4.1;fao:41;fao:47</span></span>
+<span id="cb11-139"><a href="#cb11-139" tabindex="-1"></a></span>
+<span id="cb11-140"><a href="#cb11-140" tabindex="-1"></a><span class="co"># Shortfin mako South Atlantic (SFMAKOSATL): https://www.fishsource.org/stock_page/1156 (covers both North and South)</span></span>
+<span id="cb11-141"><a href="#cb11-141" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): United States (163)</span></span>
+<span id="cb11-142"><a href="#cb11-142" tabindex="-1"></a><span class="co"># fao:34.3.6;fao:34.4.1;fao:41;fao:47</span></span>
+<span id="cb11-143"><a href="#cb11-143" tabindex="-1"></a></span>
+<span id="cb11-144"><a href="#cb11-144" tabindex="-1"></a>ram_fao_areaname_multinational_atlantic_ocean <span class="ot">&lt;-</span> RAM_na_multi <span class="sc">%&gt;%</span></span>
+<span id="cb11-145"><a href="#cb11-145" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;Atlantic Ocean&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-146"><a href="#cb11-146" tabindex="-1"></a>  <span class="fu">distinct</span>(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) <span class="sc">%&gt;%</span></span>
+<span id="cb11-147"><a href="#cb11-147" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">areaname_fao_area =</span> <span class="fu">case_when</span>(areaname <span class="sc">==</span> <span class="st">&quot;Northern Atlantic&quot;</span> <span class="sc">~</span> <span class="st">&quot;21;27;31;34&quot;</span>,</span>
+<span id="cb11-148"><a href="#cb11-148" tabindex="-1"></a>                                       areaname <span class="sc">==</span> <span class="st">&quot;South Atlantic&quot;</span> <span class="sc">~</span> <span class="st">&quot;34;41;47&quot;</span></span>
+<span id="cb11-149"><a href="#cb11-149" tabindex="-1"></a>                                       )) <span class="sc">%&gt;%</span></span>
+<span id="cb11-150"><a href="#cb11-150" tabindex="-1"></a>  <span class="co"># now assign ohi rgn_id based on the same logic as above...</span></span>
+<span id="cb11-151"><a href="#cb11-151" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ohi_rgn =</span> <span class="fu">case_when</span>(stockid <span class="sc">==</span> <span class="st">&quot;BLSHARNATL&quot;</span> <span class="sc">~</span> <span class="st">&quot;164;210;183;182&quot;</span>,</span>
+<span id="cb11-152"><a href="#cb11-152" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;SFMAKONATL&quot;</span> <span class="sc">~</span> <span class="st">&quot;163&quot;</span>,</span>
+<span id="cb11-153"><a href="#cb11-153" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;BLSHARSATL&quot;</span> <span class="sc">~</span> <span class="st">&quot;182;183;210;101&quot;</span>,</span>
+<span id="cb11-154"><a href="#cb11-154" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;SFMAKOSATL&quot;</span> <span class="sc">~</span> <span class="st">&quot;163&quot;</span></span>
+<span id="cb11-155"><a href="#cb11-155" tabindex="-1"></a>                             )) <span class="sc">%&gt;%</span></span>
+<span id="cb11-156"><a href="#cb11-156" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) <span class="sc">%&gt;%</span></span>
+<span id="cb11-157"><a href="#cb11-157" tabindex="-1"></a>  <span class="fu">separate_rows</span>(ohi_rgn,  <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-158"><a href="#cb11-158" tabindex="-1"></a>  <span class="fu">separate_rows</span>(areaname_fao_area, <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-159"><a href="#cb11-159" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;ohi_rgn&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;areaname_fao_area&quot;</span>, RAM_area_m2, stockid, stocklong)</span>
+<span id="cb11-160"><a href="#cb11-160" tabindex="-1"></a></span>
+<span id="cb11-161"><a href="#cb11-161" tabindex="-1"></a></span>
+<span id="cb11-162"><a href="#cb11-162" tabindex="-1"></a></span>
+<span id="cb11-163"><a href="#cb11-163" tabindex="-1"></a><span class="do">####### Now Pacific Ocean</span></span>
+<span id="cb11-164"><a href="#cb11-164" tabindex="-1"></a><span class="co"># https://www.iss-foundation.org/tuna-stocks-and-management/fisheries-management/regional-fisheries-management-organizations-rfmos/western-and-central-pacific-fisheries-commission-wcpfc/ (helpful for WCPFC)</span></span>
+<span id="cb11-165"><a href="#cb11-165" tabindex="-1"></a></span>
+<span id="cb11-166"><a href="#cb11-166" tabindex="-1"></a><span class="co"># Oceanic whitetip shark Central Western Pacific Ocean (OWSHARCWPAC): could not find on fishsource; using places bordering WCPFC zone as a proxy for fishing countries</span></span>
+<span id="cb11-167"><a href="#cb11-167" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Russia (73), Japan (210), North Korea (21), South Korea (20), Taiwan (14), China (209), Singapore (208), Vietnam (207), Cambodia (24), Thailand (25), Malaysia (206), Indonesia (216), Philippines (15), Papua New Guinea (17), Australia (16), New Zealand (162), Solomon Islands (7), American Samoa (151), Cook Islands (153), Micronesia (9), Fiji (18), French Polynesia (147), Northern Mariana Islands and Guam (13), Line Islands (Kiribati) (148), Phoenix Islands (Kiribati) (157), Gilbert Islands (Kiribati) (212), Marshall Islands (11), Nauru (10), New Caledonia (5), Niue (154), Palau (8), Samoa (152), Tokelau (156), Tonga (155), Tuvalu (19), Vanuatu (6), Wallis and Futuna (161), Brunei (247), Norfolk Island (3), Macquarie Island (4)</span></span>
+<span id="cb11-168"><a href="#cb11-168" tabindex="-1"></a><span class="co"># FAO 71</span></span>
+<span id="cb11-169"><a href="#cb11-169" tabindex="-1"></a></span>
+<span id="cb11-170"><a href="#cb11-170" tabindex="-1"></a><span class="co"># Silky shark Central Western Pacific Ocean (SLKSHARCWPAC): could only find NE Pacific on fishsource which I did not think was a close enough equivalent; using places bordering WCPFC zone as a proxy for fishing countries</span></span>
+<span id="cb11-171"><a href="#cb11-171" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Russia (73), Japan (210), North Korea (21), South Korea (20), Taiwan (14), China (209), Singapore (208), Vietnam (207), Cambodia (24), Thailand (25), Malaysia (206), Indonesia (216), Philippines (15), Papua New Guinea (17), Australia (16), New Zealand (162), Solomon Islands (7), American Samoa (151), Cook Islands (153), Micronesia (9), Fiji (18), French Polynesia (147), Northern Mariana Islands and Guam (13), Line Islands (Kiribati) (148), Phoenix Islands (Kiribati) (157), Gilbert Islands (Kiribati) (212), Marshall Islands (11), Nauru (10), New Caledonia (5), Niue (154), Palau (8), Samoa (152), Tokelau (156), Tonga (155), Tuvalu (19), Vanuatu (6), Wallis and Futuna (161), Brunei (247), Norfolk Island (3), Macquarie Island (4)</span></span>
+<span id="cb11-172"><a href="#cb11-172" tabindex="-1"></a><span class="co"># FAO 71</span></span>
+<span id="cb11-173"><a href="#cb11-173" tabindex="-1"></a></span>
+<span id="cb11-174"><a href="#cb11-174" tabindex="-1"></a><span class="co"># Swordfish South Pacific Ocean (SWORDSPAC): https://www.fishsource.org/stock_page/1051; https://www.fishsource.org/stock_page/1076 (separates out Southeast and Southwest - took information from both)</span></span>
+<span id="cb11-175"><a href="#cb11-175" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Chile (224), China (209), Ecuador (137), South Korea (20), Mexico (135), Panama (129), Peru (138), Puerto Rico and Virgin Islands of the United States (116), Spain (182), Vanuatu (6), Australia (16), Vietnam (207), Fiji (18), French Polynesia (147)</span></span>
+<span id="cb11-176"><a href="#cb11-176" tabindex="-1"></a><span class="co"># FAO 87, 81 (approximate of South Pacific Ocean for lack of better source)</span></span>
+<span id="cb11-177"><a href="#cb11-177" tabindex="-1"></a></span>
+<span id="cb11-178"><a href="#cb11-178" tabindex="-1"></a>ram_fao_areaname_multinational_pacific_ocean <span class="ot">&lt;-</span> RAM_na_multi <span class="sc">%&gt;%</span></span>
+<span id="cb11-179"><a href="#cb11-179" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;Pacific Ocean&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-180"><a href="#cb11-180" tabindex="-1"></a>  <span class="fu">distinct</span>(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) <span class="sc">%&gt;%</span></span>
+<span id="cb11-181"><a href="#cb11-181" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">areaname_fao_area =</span> <span class="fu">case_when</span>(areaname <span class="sc">==</span> <span class="st">&quot;Central Western Pacific Ocean&quot;</span> <span class="sc">~</span> <span class="st">&quot;71&quot;</span>,</span>
+<span id="cb11-182"><a href="#cb11-182" tabindex="-1"></a>                                       areaname <span class="sc">==</span> <span class="st">&quot;South Pacific Ocean&quot;</span> <span class="sc">~</span> <span class="st">&quot;87;81&quot;</span></span>
+<span id="cb11-183"><a href="#cb11-183" tabindex="-1"></a>                                       )) <span class="sc">%&gt;%</span></span>
+<span id="cb11-184"><a href="#cb11-184" tabindex="-1"></a>  <span class="co"># now assign ohi rgn_id based on the same logic as above...</span></span>
+<span id="cb11-185"><a href="#cb11-185" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ohi_rgn =</span> <span class="fu">case_when</span>(stockid <span class="sc">==</span> <span class="st">&quot;OWSHARCWPAC&quot;</span> <span class="sc">~</span> <span class="st">&quot;73;210;21;20;14;209;208;207;24;25;206;216;15;17;16;162;7;151;153;9;18;147;13;148;157;212;11;10;5;154;8;152;156;155;19;6;161;247;3;4&quot;</span>,</span>
+<span id="cb11-186"><a href="#cb11-186" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;SLKSHARCWPAC&quot;</span> <span class="sc">~</span> <span class="st">&quot;73;210;21;20;14;209;208;207;24;25;206;216;15;17;16;162;7;151;153;9;18;147;13;148;157;212;11;10;5;154;8;152;156;155;19;6;161;247;3;4&quot;</span>,</span>
+<span id="cb11-187"><a href="#cb11-187" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;SWORDSPAC&quot;</span> <span class="sc">~</span> <span class="st">&quot;224;209;137;20;135;129;138;116;182;6;16;207;18;147&quot;</span></span>
+<span id="cb11-188"><a href="#cb11-188" tabindex="-1"></a>                             )) <span class="sc">%&gt;%</span></span>
+<span id="cb11-189"><a href="#cb11-189" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) <span class="sc">%&gt;%</span></span>
+<span id="cb11-190"><a href="#cb11-190" tabindex="-1"></a>  <span class="fu">separate_rows</span>(ohi_rgn,  <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-191"><a href="#cb11-191" tabindex="-1"></a>  <span class="fu">separate_rows</span>(areaname_fao_area, <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-192"><a href="#cb11-192" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;ohi_rgn&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;areaname_fao_area&quot;</span>, RAM_area_m2, stockid, stocklong)</span>
+<span id="cb11-193"><a href="#cb11-193" tabindex="-1"></a></span>
+<span id="cb11-194"><a href="#cb11-194" tabindex="-1"></a></span>
+<span id="cb11-195"><a href="#cb11-195" tabindex="-1"></a></span>
+<span id="cb11-196"><a href="#cb11-196" tabindex="-1"></a><span class="do">####### Now Indian Ocean</span></span>
+<span id="cb11-197"><a href="#cb11-197" tabindex="-1"></a><span class="co"># http://geonetwork.d4science.org/geonetwork/srv/en/metadata.show?uuid=fao-rfb-map-iotc (helpful for IOTC)</span></span>
+<span id="cb11-198"><a href="#cb11-198" tabindex="-1"></a></span>
+<span id="cb11-199"><a href="#cb11-199" tabindex="-1"></a><span class="co"># Blue shark Indian Ocean (BLSHARIO): https://www.fishsource.org/stock_page/1031</span></span>
+<span id="cb11-200"><a href="#cb11-200" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): Spain, Portugal</span></span>
+<span id="cb11-201"><a href="#cb11-201" tabindex="-1"></a><span class="co"># rfb:IOTC: FAO 57 (primary), 51</span></span>
+<span id="cb11-202"><a href="#cb11-202" tabindex="-1"></a><span class="co"># Other areas associated with this region: All places bordering Indian Ocean (FAO 57 and 51 based on fishsource and link above) - South Africa (102), Mozambique (41), Madagascar (42), Tanzania (202), Kenya (43), Somalia (44), Yemen (47), Oman (48), Iran (191), Pakistan (53), India (203), Sri Lanka (40), Bangladesh (204), Myanmar (205), Thailand (25), Indonesia (216), Australia (16), Sudan (49), Egypt (214), Saudi Arabia (50), Singapore (208), Bahrain (52), Comoro Islands (21), Djibouti (46), Eritrea (45), Iraq (192), Kuwait (51), Israel (79), Jordan (215), Maldives (39), Mauritius (37), Qatar (190), Seychelles (31), East Timor (231), Andaman and Nicobar (26), Mayotte (29), Christmas Island (2), Cocos Islands (1), Heard and McDonald Islands (94), Prince Edward Islands (90), British Indian Ocean Territory (38)</span></span>
+<span id="cb11-203"><a href="#cb11-203" tabindex="-1"></a></span>
+<span id="cb11-204"><a href="#cb11-204" tabindex="-1"></a></span>
+<span id="cb11-205"><a href="#cb11-205" tabindex="-1"></a><span class="co"># Indo-Pacific sailfish Indian Ocean (IPSAILIO): could only find Eastern Pacific which I did not think was a close enough equivalent</span></span>
+<span id="cb11-206"><a href="#cb11-206" tabindex="-1"></a><span class="co"># rfb:IOTC: FAO 57 (primary), 51</span></span>
+<span id="cb11-207"><a href="#cb11-207" tabindex="-1"></a><span class="co"># OHI regions (fishing countries): All places bordering Indian Ocean in FAO 57 and 51 as a proxy (based on link above which defines Indian Ocean as 57 and 51) - South Africa (102), Mozambique (41), Madagascar (42), Tanzania (202), Kenya (43), Somalia (44), Yemen (47), Oman (48), Iran (191), Pakistan (53), India (203), Sri Lanka (40), Bangladesh (204), Myanmar (205), Thailand (25), Indonesia (216), Australia (16), Sudan (49), Egypt (214), Saudi Arabia (50), Singapore (208), Bahrain (52), Comoro Islands (21), Djibouti (46), Eritrea (45), Iraq (192), Kuwait (51), Israel (79), Jordan (215), Maldives (39), Mauritius (37), Qatar (190), Seychelles (31), East Timor (231), Andaman and Nicobar (26), Mayotte (29), Christmas Island (2), Cocos Islands (1), Heard and McDonald Islands (94), Prince Edward Islands (90), British Indian Ocean Territory (38)</span></span>
+<span id="cb11-208"><a href="#cb11-208" tabindex="-1"></a></span>
+<span id="cb11-209"><a href="#cb11-209" tabindex="-1"></a>ram_fao_areaname_multinational_indian_ocean <span class="ot">&lt;-</span> RAM_na_multi <span class="sc">%&gt;%</span></span>
+<span id="cb11-210"><a href="#cb11-210" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;Indian Ocean&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-211"><a href="#cb11-211" tabindex="-1"></a>  <span class="fu">distinct</span>(country, region, areaname, stocklong, stockid, RAM_area_m2, primary_country) <span class="sc">%&gt;%</span></span>
+<span id="cb11-212"><a href="#cb11-212" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">areaname_fao_area =</span> <span class="fu">case_when</span>(areaname <span class="sc">==</span> <span class="st">&quot;Indian Ocean&quot;</span> <span class="sc">~</span> <span class="st">&quot;57;51&quot;</span></span>
+<span id="cb11-213"><a href="#cb11-213" tabindex="-1"></a>                                       )) <span class="sc">%&gt;%</span></span>
+<span id="cb11-214"><a href="#cb11-214" tabindex="-1"></a>  <span class="co"># now assign ohi rgn_id based on the same logic as above...</span></span>
+<span id="cb11-215"><a href="#cb11-215" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ohi_rgn =</span> <span class="fu">case_when</span>(stockid <span class="sc">==</span> <span class="st">&quot;BLSHARIO&quot;</span> <span class="sc">~</span> <span class="st">&quot;102;41;42;202;43;44;47;48;191;53;203;40;204;205;25;216;16;49;214;50;208;52;21;46;45;192;51;79;215;39;37;190;31;231;26;29;2;1;94;90;38&quot;</span>,</span>
+<span id="cb11-216"><a href="#cb11-216" tabindex="-1"></a>                             stockid <span class="sc">==</span> <span class="st">&quot;IPSAILIO&quot;</span> <span class="sc">~</span> <span class="st">&quot;102;41;42;202;43;44;47;48;191;53;203;40;204;205;25;216;16;49;214;50;208;52;21;46;45;192;51;79;215;39;37;190;31;231;26;29;2;1;94;90;38&quot;</span></span>
+<span id="cb11-217"><a href="#cb11-217" tabindex="-1"></a>                             )) <span class="sc">%&gt;%</span></span>
+<span id="cb11-218"><a href="#cb11-218" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(ohi_rgn, areaname_fao_area, RAM_area_m2, stockid, stocklong) <span class="sc">%&gt;%</span></span>
+<span id="cb11-219"><a href="#cb11-219" tabindex="-1"></a>  <span class="fu">separate_rows</span>(ohi_rgn,  <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-220"><a href="#cb11-220" tabindex="-1"></a>  <span class="fu">separate_rows</span>(areaname_fao_area, <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>, <span class="at">convert =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-221"><a href="#cb11-221" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="st">&quot;rgn_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;ohi_rgn&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;areaname_fao_area&quot;</span>, RAM_area_m2, stockid, stocklong)</span>
+<span id="cb11-222"><a href="#cb11-222" tabindex="-1"></a></span>
+<span id="cb11-223"><a href="#cb11-223" tabindex="-1"></a><span class="do">## Join them all together </span></span>
+<span id="cb11-224"><a href="#cb11-224" tabindex="-1"></a></span>
+<span id="cb11-225"><a href="#cb11-225" tabindex="-1"></a><span class="co"># RAM_na_all &lt;- rbind(RAM_na_non_multi, ram_fao_areaname_multinational_europe, ram_fao_areaname_multinational_atlantic_ocean, ram_fao_areaname_multinational_pacific_ocean, ram_fao_areaname_multinational_indian_ocean) ## now all of the NA ones have rgn_id and fao_id! </span></span>
+<span id="cb11-226"><a href="#cb11-226" tabindex="-1"></a></span>
+<span id="cb11-227"><a href="#cb11-227" tabindex="-1"></a><span class="fu">summary</span>(RAM_na_all)</span>
+<span id="cb11-228"><a href="#cb11-228" tabindex="-1"></a><span class="co"># v2023:</span></span>
+<span id="cb11-229"><a href="#cb11-229" tabindex="-1"></a> <span class="co">#     rgn_id        fao_id     </span></span>
+<span id="cb11-230"><a href="#cb11-230" tabindex="-1"></a> <span class="co"># Min.   :  1   Min.   :21.00  </span></span>
+<span id="cb11-231"><a href="#cb11-231" tabindex="-1"></a> <span class="co"># 1st Qu.: 38   1st Qu.:51.00  </span></span>
+<span id="cb11-232"><a href="#cb11-232" tabindex="-1"></a> <span class="co"># Median :102   Median :57.00  </span></span>
+<span id="cb11-233"><a href="#cb11-233" tabindex="-1"></a> <span class="co"># Mean   :110   Mean   :56.56  </span></span>
+<span id="cb11-234"><a href="#cb11-234" tabindex="-1"></a> <span class="co"># 3rd Qu.:183   3rd Qu.:71.00  </span></span>
+<span id="cb11-235"><a href="#cb11-235" tabindex="-1"></a> <span class="co"># Max.   :247   Max.   :87.00  </span></span>
+<span id="cb11-236"><a href="#cb11-236" tabindex="-1"></a> <span class="co">#                              </span></span>
+<span id="cb11-237"><a href="#cb11-237" tabindex="-1"></a> <span class="co">#  RAM_area_m2    stockid         </span></span>
+<span id="cb11-238"><a href="#cb11-238" tabindex="-1"></a> <span class="co"># Min.   : NA   Length:340        </span></span>
+<span id="cb11-239"><a href="#cb11-239" tabindex="-1"></a> <span class="co"># 1st Qu.: NA   Class :character  </span></span>
+<span id="cb11-240"><a href="#cb11-240" tabindex="-1"></a> <span class="co"># Median : NA   Mode  :character  </span></span>
+<span id="cb11-241"><a href="#cb11-241" tabindex="-1"></a> <span class="co"># Mean   :NaN                     </span></span>
+<span id="cb11-242"><a href="#cb11-242" tabindex="-1"></a> <span class="co"># 3rd Qu.: NA                     </span></span>
+<span id="cb11-243"><a href="#cb11-243" tabindex="-1"></a> <span class="co"># Max.   : NA                     </span></span>
+<span id="cb11-244"><a href="#cb11-244" tabindex="-1"></a> <span class="co"># NA&#39;s   :340                     </span></span>
+<span id="cb11-245"><a href="#cb11-245" tabindex="-1"></a> <span class="co">#  stocklong        </span></span>
+<span id="cb11-246"><a href="#cb11-246" tabindex="-1"></a> <span class="co"># Length:340        </span></span>
+<span id="cb11-247"><a href="#cb11-247" tabindex="-1"></a> <span class="co"># Class :character  </span></span>
+<span id="cb11-248"><a href="#cb11-248" tabindex="-1"></a> <span class="co"># Mode  :character</span></span></code></pre></div>
 </div>
 <div id="tidy-final-datatable" class="section level2">
 <h2>Tidy Final Datatable</h2>
@@ -2164,59 +2250,67 @@ Kamchatka flounder Bering Sea and Aleutian Islands have
 <p>Each row must have both an FAO id and a rgn id. Fix
 duplicate/incorrect fao-ohi matches by using ohi_fao_rgns spatial
 file</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="do">## Spatial file with fao and ohi regions, F_CODE is the FAO id</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>fao_ohi <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="at">dsn =</span> <span class="fu">file.path</span>(dir_M, <span class="st">&quot;git-annex/globalprep/fis/v2017/int&quot;</span>),</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>                   <span class="at">layer =</span> <span class="st">&quot;ohi_fao_rgns&quot;</span>)</span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="fu">st_geometry</span>(fao_ohi) <span class="ot">&lt;-</span> <span class="cn">NULL</span> <span class="co"># removes geometry</span></span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a></span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>fao_ohi_id <span class="ot">&lt;-</span> fao_ohi <span class="sc">%&gt;%</span></span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, <span class="at">fao_id =</span> F_CODE) <span class="sc">%&gt;%</span> </span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  <span class="fu">arrange</span>(rgn_id) <span class="sc">%&gt;%</span> </span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fao_id =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(fao_id))) <span class="sc">%&gt;%</span> </span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">rgn_id =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(rgn_id))) <span class="sc">%&gt;%</span> </span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  <span class="fu">distinct</span>()</span>
-<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a></span>
-<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="do">## Filter for correct fao-ohi pairs in the RAM regions table </span></span>
-<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>RAM_rgns_new_final <span class="ot">&lt;-</span> fao_ohi_id <span class="sc">%&gt;%</span> </span>
-<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>  <span class="fu">left_join</span>(RAM_na_all, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;fao_id&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(stockid)) <span class="sc">%&gt;%</span> <span class="co"># keep matches only</span></span>
-<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a> <span class="fu">arrange</span>(stocklong, fao_id)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="do">## Spatial file with fao and ohi regions, F_CODE is the FAO id</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>fao_ohi <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="at">dsn =</span> here<span class="sc">::</span><span class="fu">here</span>(dir_M, <span class="st">&quot;git-annex&quot;</span>,<span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;fis&quot;</span>,<span class="st">&quot;v2017&quot;</span>,<span class="st">&quot;int&quot;</span>),</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>                   <span class="at">layer =</span> <span class="st">&quot;ohi_fao_rgns&quot;</span>) <span class="co"># Geodetic CRS:  WGS 84</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="fu">st_geometry</span>(fao_ohi) <span class="ot">&lt;-</span> <span class="cn">NULL</span> <span class="co"># removes geometry</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>fao_ohi_id <span class="ot">&lt;-</span> fao_ohi <span class="sc">%&gt;%</span></span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="fu">select</span>(rgn_id, <span class="at">fao_id =</span> F_CODE) <span class="sc">%&gt;%</span> </span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  <span class="fu">arrange</span>(rgn_id) <span class="sc">%&gt;%</span> </span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fao_id =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(fao_id))) <span class="sc">%&gt;%</span> </span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">rgn_id =</span> <span class="fu">as.numeric</span>(<span class="fu">as.character</span>(rgn_id))) <span class="sc">%&gt;%</span> </span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>  <span class="fu">distinct</span>() </span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a></span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a><span class="do">## Filter for correct fao-ohi pairs in the RAM regions table </span></span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>RAM_rgns_new_final <span class="ot">&lt;-</span> fao_ohi_id <span class="sc">%&gt;%</span> </span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>  <span class="fu">left_join</span>(RAM_na_all, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;fao_id&quot;</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(stockid)) <span class="sc">%&gt;%</span> <span class="co"># keep matches only</span></span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a> <span class="fu">arrange</span>(stocklong, fao_id)</span></code></pre></div>
 <p>Compare with unfiltered RAM regions table to check on fao-ohi pairs
 that were dropped</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="do">## Number of unique stocks after joining</span></span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">nrow</span>(RAM_rgns_new_final) <span class="co">#112 #v2023: 182</span></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="do">## Number of unique stocks before joining</span></span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>RAM_temp <span class="ot">&lt;-</span> RAM_na_all <span class="sc">%&gt;%</span> <span class="fu">select</span>(rgn_id, fao_id, stockid, stocklong) <span class="sc">%&gt;%</span> <span class="fu">distinct</span>() <span class="sc">%&gt;%</span> <span class="fu">arrange</span>(stocklong, fao_id)</span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="fu">nrow</span>(RAM_temp) <span class="co">#113 #v2023: 340</span></span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a></span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="do">## add identifier for the two RAM table versions</span></span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>RAM_temp<span class="sc">$</span>idtemp <span class="ot">&lt;-</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(RAM_temp)</span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>RAM_rgns_new_final<span class="sc">$</span>idtemp2 <span class="ot">&lt;-</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(RAM_rgns_new_final)</span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a></span>
-<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a><span class="do">## view the ohi-fao pairs that would be removed</span></span>
-<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>combine <span class="ot">&lt;-</span> RAM_temp <span class="sc">%&gt;%</span> </span>
-<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>  <span class="fu">full_join</span>(RAM_rgns_new_final, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;fao_id&quot;</span>, <span class="st">&quot;stockid&quot;</span>, <span class="st">&quot;stocklong&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">is.na</span>(idtemp2)) <span class="do">## we lost 1 here... This is ok though # v2023: is now 158 rows but 11 unique stocks</span></span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="do">## Number of unique stocks after joining</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">nrow</span>(RAM_rgns_new_final) <span class="co">#v2024: 13</span></span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="do">## Number of unique stocks before joining</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>RAM_temp <span class="ot">&lt;-</span> RAM_na_all <span class="sc">%&gt;%</span> <span class="fu">select</span>(rgn_id, fao_id, stockid, stocklong) <span class="sc">%&gt;%</span> <span class="fu">distinct</span>() <span class="sc">%&gt;%</span> <span class="fu">arrange</span>(stocklong, fao_id)</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="fu">nrow</span>(RAM_temp) <span class="co">#v2024: 13</span></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a></span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a><span class="do">## add identifier for the two RAM table versions</span></span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>RAM_temp<span class="sc">$</span>idtemp <span class="ot">&lt;-</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(RAM_temp)</span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>RAM_rgns_new_final<span class="sc">$</span>idtemp2 <span class="ot">&lt;-</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(RAM_rgns_new_final)</span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a></span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a><span class="do">## view the ohi-fao pairs that would be removed</span></span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>combine <span class="ot">&lt;-</span> RAM_temp <span class="sc">%&gt;%</span> </span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a>  <span class="fu">full_join</span>(RAM_rgns_new_final, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;fao_id&quot;</span>, <span class="st">&quot;stockid&quot;</span>, <span class="st">&quot;stocklong&quot;</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">is.na</span>(idtemp2)) <span class="do">## v2024: we did not lose any!</span></span></code></pre></div>
 <p>Tidy up RAM data table. After the final check (located below), I hand
 added some new regions for some of the stocks.</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># v2023: none hand-added</span></span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">write.csv</span>(RAM_rgns_new_final, <span class="st">&quot;int/RAM_new_stocks.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>)</span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="do">## check that there are still 9 unique stock ids</span></span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(RAM_rgns_new_final<span class="sc">$</span>stockid)) <span class="co"># 26, should be 27 but we lost SFMAKOSATL since US is not within the FAO zones of South Atlantic</span></span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># v2024: none hand-added</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="do">## directory for intermediate outputs</span></span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>int_dir <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;fis&quot;</span>, version_year, <span class="st">&quot;int&quot;</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a></span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a><span class="fu">write_csv</span>(RAM_rgns_new_final, <span class="fu">here</span>(int_dir, <span class="st">&quot;RAM_new_stocks.csv&quot;</span>))</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="do">## check that there are still 4 unique stock ids</span></span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(RAM_rgns_new_final<span class="sc">$</span>stockid)) <span class="co"># v2024: 4, great!</span></span></code></pre></div>
 </div>
-<div id="combine-with-full-dataset" class="section level3">
-<h3>Combine with full dataset</h3>
+<div id="return-combine-with-full-dataset" class="section level3">
+<h3>RETURN: Combine with full dataset</h3>
 <p>Combine newly added stocks with ohi and fao region information to the
 old stock data table. Make sure there are no NAs!</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>RAM_final <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(<span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;int/RAM_new_stocks.csv&quot;</span>))) <span class="sc">%&gt;%</span> </span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>idtemp2)</span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>RAM_fao_ohi_rgn_final <span class="ot">&lt;-</span> RAM_rgns_old <span class="sc">%&gt;%</span> </span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>  <span class="fu">full_join</span>(RAM_final, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;fao_id&quot;</span>, <span class="st">&quot;stockid&quot;</span>, <span class="st">&quot;stocklong&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>RAM_area_m2.y, <span class="at">RAM_area_m2 =</span> RAM_area_m2.x) </span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a> </span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a></span>
-<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a><span class="fu">write.csv</span>(RAM_fao_ohi_rgn_final, <span class="st">&quot;int/RAM_fao_ohi_rgns_final.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>RAM_final <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(<span class="fu">read_csv</span>(here<span class="sc">::</span><span class="fu">here</span>(int_dir,<span class="st">&quot;RAM_new_stocks.csv&quot;</span>))) <span class="sc">%&gt;%</span> </span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>idtemp2)</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>RAM_fao_ohi_rgn_final <span class="ot">&lt;-</span> RAM_rgns_old <span class="sc">%&gt;%</span> </span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>  <span class="fu">full_join</span>(RAM_final, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;fao_id&quot;</span>, <span class="st">&quot;stockid&quot;</span>, <span class="st">&quot;stocklong&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>RAM_area_m2.y, <span class="at">RAM_area_m2 =</span> RAM_area_m2.x) </span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a></span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>RAM_fao_ohi_rgn_final_v2 <span class="ot">&lt;-</span> RAM_rgns_old <span class="sc">%&gt;%</span> </span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>  <span class="fu">full_join</span>(RAM_final, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;fao_id&quot;</span>, <span class="st">&quot;stockid&quot;</span>, <span class="st">&quot;stocklong&quot;</span>, <span class="st">&quot;RAM_area_m2&quot;</span>))</span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a> </span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a><span class="co"># save the final output!</span></span>
+<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a><span class="fu">write_csv</span>(RAM_fao_ohi_rgn_final, <span class="fu">here</span>(int_dir, <span class="st">&quot;RAM_fao_ohi_rgns_final.csv&quot;</span>))</span></code></pre></div>
 </div>
 </div>
 </div>

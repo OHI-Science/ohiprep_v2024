@@ -9,10 +9,10 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Mon Sep 11 08:23:27 2023 by egg" />
+<meta name="author" content="Compiled on Wed Sep 4 17:11:00 2024 by lecuona" />
 
 
-<title>OHI 2023: Food Provision, Combining RAM and CMSY B/Bmsy data</title>
+<title>OHI 2024: Food Provision, Combining RAM and CMSY B/Bmsy data</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1378,7 +1378,7 @@ overflow: visible;
 </style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -1645,10 +1645,10 @@ border-radius: 0px;
 
 
 
-<h1 class="title toc-ignore">OHI 2023: Food Provision, Combining RAM and
+<h1 class="title toc-ignore">OHI 2024: Food Provision, Combining RAM and
 CMSY B/Bmsy data</h1>
-<h4 class="author"><em>Compiled on Mon Sep 11 08:23:27 2023 by
-egg</em></h4>
+<h4 class="author"><em>Compiled on Wed Sep 4 17:11:00 2024 by
+lecuona</em></h4>
 
 </div>
 
@@ -1662,7 +1662,7 @@ combination), prioritizing RAM data</p>
 <div id="updates-from-previous-assessment" class="section level2">
 <h2>Updates from previous assessment</h2>
 <ul>
-<li>New data (from steps 4a/4b) added in v2023</li>
+<li>New data (from steps 4a/4b) added in v2024</li>
 </ul>
 <hr />
 </div>
@@ -1683,22 +1683,35 @@ calculate_bbmsy.Rmd</p>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">library</span>(zoo)</span>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">library</span>(stringr)</span>
 <span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">library</span>(readr)</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&#39;../../../workflow/R/common.R&#39;</span>)</span></code></pre></div>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">library</span>(here)</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">library</span>(plotly)</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">here</span>(<span class="st">&quot;workflow&quot;</span>, <span class="st">&quot;R&quot;</span>, <span class="st">&quot;common.R&quot;</span>))</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co"># ---- set year and file path info ----</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>current_year <span class="ot">&lt;-</span> <span class="dv">2024</span> <span class="co"># Update this in the future!!</span></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>version_year <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;v&quot;</span>,current_year)</span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>data_dir_version_year <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;d&quot;</span>, current_year)</span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co"># intermediate directory</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>int_dir <span class="ot">&lt;-</span> <span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;fis&quot;</span>, version_year, <span class="st">&quot;int&quot;</span>)</span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="co"># output directory</span></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a>output_dir <span class="ot">&lt;-</span> <span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;fis&quot;</span>, version_year, <span class="st">&quot;output&quot;</span>)</span></code></pre></div>
 </div>
 <div id="prepare-bbmsy-values-from-cmsy-model" class="section level2">
 <h2>Prepare B/Bmsy values from CMSY model</h2>
 <p>For the CMSY generated B/Bmsy values we use the five year running
 mean of the values to smooth the data and to account for model
 uncertainty.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>cmsy <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&#39;output/cmsy_bbmsy.csv&#39;</span>) <span class="sc">%&gt;%</span></span>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>cmsy <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(here<span class="sc">::</span><span class="fu">here</span>(output_dir, <span class="st">&quot;cmsy_bbmsy.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(bbmsy_mean)) <span class="sc">%&gt;%</span></span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(stock_id, year, bbmsy_q2<span class="fl">.5</span>,bbmsy_q97<span class="fl">.5</span>,bbmsy_sd, bbmsy_mean, model) <span class="sc">%&gt;%</span></span>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    <span class="fu">arrange</span>(stock_id, year) <span class="sc">%&gt;%</span></span>
 <span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    <span class="fu">group_by</span>(stock_id) <span class="sc">%&gt;%</span></span>
 <span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">mean_5year =</span> <span class="fu">rollmean</span>(bbmsy_mean, <span class="dv">5</span>, <span class="at">align=</span><span class="st">&quot;right&quot;</span>, <span class="at">fill=</span><span class="cn">NA</span>))</span>
 <span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a></span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="fu">write.csv</span>(cmsy, <span class="st">&quot;int/cmsy_b_bmsy_mean5yrs.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>)</span></code></pre></div>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="fu">write_csv</span>(cmsy, <span class="fu">here</span>(int_dir, <span class="st">&quot;cmsy_b_bmsy_mean5yrs.csv&quot;</span>))</span></code></pre></div>
 </div>
 <div id="combine-ram-and-cmsy-bbmsy-values-and-watson-catch-data" class="section level2">
 <h2>Combine RAM and CMSY B/Bmsy values and Watson catch data</h2>
@@ -1706,34 +1719,36 @@ uncertainty.</p>
 scientific name). In these cases, we will average the B/Bmsy values of
 the species, weighted by the area of the RAM stock.</p>
 <p>Read in the three data tables:</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>cmsy <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&#39;int/cmsy_b_bmsy_mean5yrs.csv&#39;</span>) <span class="sc">%&gt;%</span></span>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>cmsy <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(int_dir, <span class="st">&quot;cmsy_b_bmsy_mean5yrs.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(stock_id, year, <span class="at">cmsy_bbmsy=</span>mean_5year)</span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>ram <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;int/ram_bmsy.csv&quot;</span>) <span class="sc">%&gt;%</span> <span class="co"># final output from RAM_data_prep</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>ram <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(int_dir, <span class="st">&quot;ram_bmsy.csv&quot;</span>)) <span class="sc">%&gt;%</span> <span class="co"># final output from RAM_data_prep</span></span>
 <span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">stock_id =</span> stockid) <span class="co"># to match other two data tables</span></span>
 <span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a></span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>mean_catch <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/mean_catch_minus_feed.csv&quot;</span>, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span> <span class="co"># final output from Watson catch</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>mean_catch <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(output_dir, <span class="st">&quot;mean_catch_minus_feed.csv&quot;</span>)) <span class="sc">%&gt;%</span> <span class="co"># final output from Watson catch</span></span>
 <span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">taxon_key =</span> <span class="fu">str_extract</span>(stock_id_taxonkey, <span class="st">&quot;(</span><span class="sc">\\</span><span class="st">d)+$&quot;</span>)) <span class="sc">%&gt;%</span> <span class="co"># extract ending consecutive digits</span></span>
 <span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">stock_id =</span> <span class="fu">str_extract</span>(stock_id_taxonkey, <span class="st">&quot;^(</span><span class="sc">\\</span><span class="st">w+).(</span><span class="sc">\\</span><span class="st">d){1,2}&quot;</span>)) </span></code></pre></div>
 <p>Check number of Watson stocks that have CMSY or RAM B/Bmsy
 values:</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="do">## SAUP v RAM BBMSY</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">setdiff</span>(ram<span class="sc">$</span>stock_id, mean_catch<span class="sc">$</span>stock_id)</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">setdiff</span>(mean_catch<span class="sc">$</span>stock_id, ram<span class="sc">$</span>stock_id)</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">intersect</span>(ram<span class="sc">$</span>stock_id, mean_catch<span class="sc">$</span>stock_id) <span class="co">#342 stocks with RAM-B/Bmsy data (although RAM is matched by fao and rgn ids) - v2019</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(<span class="fu">setdiff</span>(ram<span class="sc">$</span>stock_id, mean_catch<span class="sc">$</span>stock_id))) <span class="co"># v2024: 77 stocks</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(<span class="fu">setdiff</span>(mean_catch<span class="sc">$</span>stock_id, ram<span class="sc">$</span>stock_id))) <span class="co"># v2024: 8479 stocks</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(<span class="fu">intersect</span>(ram<span class="sc">$</span>stock_id, mean_catch<span class="sc">$</span>stock_id))) </span>
 <span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#332 stocks with RAM-B/Bmsy data (although RAM is matched by fao and rgn ids) - v2020</span></span>
 <span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#367 stocks with RAM-B/Bmsy data (although RAM is matched by fao and rgns ids) - v2021</span></span>
 <span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co"># 374 stocks with RAM-B/Bmsy data (although RAM is matched by fao and rgns ids) - v2022</span></span>
 <span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co"># 398 stocks with RAM-B/Bmsy data (although RAM is matched by fao and rgns ids) - v2023</span></span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a></span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="do">## SAUP v CMSY</span></span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="fu">setdiff</span>(cmsy<span class="sc">$</span>stock_id, mean_catch<span class="sc">$</span>stock_id)</span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="fu">setdiff</span>(mean_catch<span class="sc">$</span>stock_id, cmsy<span class="sc">$</span>stock_id)</span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">intersect</span>(mean_catch<span class="sc">$</span>stock_id, cmsy<span class="sc">$</span>stock_id)) <span class="co">#738 stocks with CMSY-B/Bmsy data - v2019</span></span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#703 stocks with CMSY-B/Bmsy data - v2020</span></span>
-<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#1014 stocks with CMSY-B/Bmsy data; WOW! - v2021</span></span>
-<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#1022 stocks with CMSY-B/Bmsy data; WOW! - v2022</span></span>
-<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#1022 stocks with CMSY-B/Bmsy data; WOW! - v2023 (didn&#39;t change because none of these were updated this year)</span></span></code></pre></div>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co"># 396 stocks with RAM-B/Bmsy data (although RAM is matched by fao and rgn ids) - v2024</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="do">## SAUP v CMSY</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="fu">setdiff</span>(cmsy<span class="sc">$</span>stock_id, mean_catch<span class="sc">$</span>stock_id) <span class="co"># v2024: 7 stocks in cmsy not in mean_catch</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(<span class="fu">setdiff</span>(mean_catch<span class="sc">$</span>stock_id, cmsy<span class="sc">$</span>stock_id))) <span class="co"># v2024: 7853 in mean_catch not in cmsy</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">intersect</span>(mean_catch<span class="sc">$</span>stock_id, cmsy<span class="sc">$</span>stock_id)) <span class="co"># v2024: 1022 stocks with CMSY-B/Bmsy data</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#703 stocks with CMSY-B/Bmsy data - v2020</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#1014 stocks with CMSY-B/Bmsy data; WOW! - v2021</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#1022 stocks with CMSY-B/Bmsy data; WOW! - v2022</span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co">#1022 stocks with CMSY-B/Bmsy data; WOW! - v2023 (didn&#39;t change because none of these were updated this year)</span></span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co"># 1022 stocks with CMSY-B/Bmsy data; WOW! - v2024 (didn&#39;t change because none of these were updated this year)</span></span></code></pre></div>
 <p>Combine Watson to RAM-B/Bmsy:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>data <span class="ot">&lt;-</span> mean_catch <span class="sc">%&gt;%</span></span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="fu">left_join</span>(ram, <span class="at">by=</span><span class="fu">c</span>(<span class="st">&#39;rgn_id&#39;</span>, <span class="st">&#39;stock_id&#39;</span>, <span class="st">&quot;year&quot;</span>))</span>
@@ -1743,109 +1758,259 @@ values:</p>
 <span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co"># 609501 catch records (catch from specific fao and ohi regions) when joined with ram increases to 615043 because there are multiple stocks for some species; we see this decrease in catch records from last year because we are using new fisheries data (SAUP) this year - v2021</span></span>
 <span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co"># 648270 catch records (catch from specific fao and ohi regions) when joined with ram increases to 653878 because there are multiple stocks for some species; we see this increase in catch records from last year because we are using an extra year of catch data (SAUP) this year - v2022</span></span>
 <span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co"># 654524 catch records (catch from specific fao and ohi regions) when joined with ram increases to 653878 because there are multiple stocks for some species; we see this increase in catch records from last year because we are using an extra year of RAM data - v2023</span></span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a></span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(data<span class="sc">$</span>ram_bmsy))<span class="sc">/</span><span class="fu">nrow</span>(data) <span class="co"># about 7.4% of catch records have RAM data - v2023</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="fu">sum</span>(data<span class="sc">$</span>mean_catch[<span class="sc">!</span><span class="fu">is.na</span>(data<span class="sc">$</span>ram_bmsy)])<span class="sc">/</span><span class="fu">sum</span>(data<span class="sc">$</span>mean_catch) <span class="co"># about 47.9% of tons of catch have RAM data (this is more than last year!) - v2023</span></span></code></pre></div>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co"># 648270 catch records (catch from specific fao and ohi regions) when joined with ram increases to 653783 because there are multiple stocks for some species; we see this decrease in catch records from last year because there were more unused stocks than new stocks - v2024</span></span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a></span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(data<span class="sc">$</span>ram_bmsy))<span class="sc">/</span><span class="fu">nrow</span>(data) <span class="co"># about 7.32% of catch records have RAM data - v2024</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>perc_ram <span class="ot">&lt;-</span> <span class="fu">sum</span>(data<span class="sc">$</span>mean_catch[<span class="sc">!</span><span class="fu">is.na</span>(data<span class="sc">$</span>ram_bmsy)])<span class="sc">/</span><span class="fu">sum</span>(data<span class="sc">$</span>mean_catch) <span class="sc">*</span><span class="dv">100</span> <span class="co"># about 46.3% of tons of catch have RAM data (this is less than last year, which was 47%!) - v2024</span></span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># to see how much data is sourced from RAM vs CMSY </span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>compare_ram_cmsy <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">category =</span> <span class="fu">c</span>(<span class="st">&quot;RAM&quot;</span>, <span class="st">&quot;CMSY&quot;</span>),</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">percentage =</span> <span class="fu">c</span>(perc_ram, <span class="dv">100</span> <span class="sc">-</span> perc_ram)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>)</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co"># visualize the distribution of RAM vs CMSY data used</span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="fu">ggplot</span>(compare_ram_cmsy, <span class="fu">aes</span>(<span class="at">x =</span> category, <span class="at">y =</span> percentage)) <span class="sc">+</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  <span class="fu">geom_bar</span>(<span class="at">stat =</span> <span class="st">&quot;identity&quot;</span>, <span class="at">width =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(<span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">100</span>), </span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>                     <span class="at">breaks =</span> <span class="fu">seq</span>(<span class="dv">0</span>, <span class="dv">100</span>, <span class="at">by =</span> <span class="dv">20</span>)) <span class="sc">+</span></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;RAM vs CMSY Data Usage for B/Bmsy (v2024)&quot;</span>,</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">&quot;&quot;</span>,</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">&quot;Percent of total catch&quot;</span>) <span class="sc">+</span></span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code></pre></div>
 <p>Save &amp; view duplicate stocks:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">duplicated</span>(<span class="fu">paste</span>(data<span class="sc">$</span>rgn_id, data<span class="sc">$</span>stock_id, data<span class="sc">$</span>year, <span class="at">sep=</span><span class="st">&quot;_&quot;</span>))) </span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="co"># 7773 regions with multiple RAM stocks (stockid_ram) for the same species (see scientific name in stockid) - v2019</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co"># 8028 regions with multiple RAM stocks (stockid_ram) for the same species - v2020 </span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co"># 5542 regions with multiple RAM stocks (stockid_ram) for the same species - v2021</span></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co"># 5608 regions with multiple RAM stocks (stockid_ram) for the same species - v2022</span></span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co"># 6254 regions with multiple RAM stocks (stockid_ram) for the same species - v2023</span></span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a></span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a></span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="do">## save the duplicate stock values to take a look at an example</span></span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>tmp <span class="ot">&lt;-</span> data[<span class="fu">duplicated</span>(<span class="fu">paste</span>(data<span class="sc">$</span>rgn_id, data<span class="sc">$</span>stock_id, data<span class="sc">$</span>year, <span class="at">sep=</span><span class="st">&quot;_&quot;</span>)), ]</span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a></span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="do">## Examples of a region with multiple RAM stocks of the same species</span></span>
-<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="fu">filter</span>(data, rgn_id <span class="sc">==</span> <span class="dv">9</span>, year <span class="sc">==</span> <span class="dv">2001</span>, stock_id <span class="sc">==</span> <span class="st">&quot;Thunnus_alalunga-71&quot;</span>) <span class="co"># stocks ALBANPAC and ALBASPAC are the same species; mean catch 1350.19 tonnes</span></span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">duplicated</span>(<span class="fu">paste</span>(data<span class="sc">$</span>rgn_id, data<span class="sc">$</span>stock_id, data<span class="sc">$</span>year, <span class="at">sep=</span><span class="st">&quot;_&quot;</span>))) </span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="co"># 7773 regions with multiple RAM stocks (stockid_ram) for the same species (see scientific name in stockid) - v2019</span></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co"># 8028 regions with multiple RAM stocks (stockid_ram) for the same species - v2020 </span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co"># 5542 regions with multiple RAM stocks (stockid_ram) for the same species - v2021</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co"># 5608 regions with multiple RAM stocks (stockid_ram) for the same species - v2022</span></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co"># 6254 regions with multiple RAM stocks (stockid_ram) for the same species - v2023</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="co"># 5513 regions with multiple RAM stocks (stockid_ram) for the same species - v2024</span></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="do">## save the duplicate stock values to take a look at an example</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>tmp <span class="ot">&lt;-</span> data[<span class="fu">duplicated</span>(<span class="fu">paste</span>(data<span class="sc">$</span>rgn_id, data<span class="sc">$</span>stock_id, data<span class="sc">$</span>year, <span class="at">sep=</span><span class="st">&quot;_&quot;</span>)), ]</span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="do">## Examples of a region with multiple RAM stocks of the same species</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a><span class="fu">filter</span>(data, rgn_id <span class="sc">==</span> <span class="dv">9</span>, year <span class="sc">==</span> <span class="dv">2001</span>, stock_id <span class="sc">==</span> <span class="st">&quot;Thunnus_alalunga-71&quot;</span>) <span class="co"># stocks ALBANPAC and ALBASPAC are the same species; mean catch 1350.19 tonnes</span></span></code></pre></div>
 <p>Regions with multiple stocks of the same species will have B/Bmsy
 values averaged, weighted by the area of the RAM stock within the
 region</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="do">## Group by location, year, and species before taking a weighted mean of the catch</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>data <span class="ot">&lt;-</span> data <span class="sc">%&gt;%</span></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, taxon_key, stock_id, year, mean_catch) <span class="sc">%&gt;%</span>   </span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">ram_bmsy =</span> <span class="fu">ifelse</span>(<span class="fu">all</span>(<span class="sc">!</span><span class="fu">is.na</span>(RAM_area_m2)), <span class="fu">weighted.mean</span>(ram_bmsy, RAM_area_m2, <span class="at">na.rm=</span><span class="cn">TRUE</span>), <span class="fu">mean</span>(ram_bmsy, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)),</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>            <span class="at">gapfilled =</span> <span class="fu">ifelse</span>(<span class="fu">all</span>(<span class="fu">is.na</span>(gapfilled)), <span class="cn">NA</span>, <span class="fu">max</span>(gapfilled, <span class="at">na.rm=</span><span class="cn">TRUE</span>)),</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>            <span class="at">method =</span> <span class="fu">paste</span>(method, <span class="at">collapse =</span> <span class="st">&quot;, &quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a></span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="do">## check that averaging went ok - compare with mean catch values earlier (1350.19)</span></span>
-<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>filter1 <span class="ot">&lt;-</span> <span class="fu">filter</span>(data, rgn_id <span class="sc">==</span> <span class="dv">9</span>, year <span class="sc">==</span> <span class="dv">2001</span>, stock_id <span class="sc">==</span> <span class="st">&quot;Thunnus_alalunga-71&quot;</span>) <span class="co"># all good</span></span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a></span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a></span>
-<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="do">## check example of duplicate stock catch with ram_bmsy but no RAM_area_m2 value, ram_bmsy should not be NA</span></span>
-<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>filter2 <span class="ot">&lt;-</span> <span class="fu">filter</span>(data, rgn_id <span class="sc">==</span> <span class="dv">224</span>, year <span class="sc">==</span> <span class="dv">2019</span>, stock_id <span class="sc">==</span>  <span class="st">&quot;Heterocarpus_reedi-87&quot;</span>) <span class="co"># all good</span></span>
-<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a></span>
-<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a><span class="co"># add in the B/Bmsy values from the CMSY approach</span></span>
-<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>data <span class="ot">&lt;-</span> data <span class="sc">%&gt;%</span></span>
-<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a>  <span class="fu">left_join</span>(cmsy, <span class="at">by=</span><span class="fu">c</span>(<span class="st">&quot;stock_id&quot;</span>, <span class="st">&quot;year&quot;</span>))</span>
-<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a></span>
-<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a><span class="fu">summary</span>(data)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="do">## Group by location, year, and species before taking a weighted mean of the catch</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>data <span class="ot">&lt;-</span> data <span class="sc">%&gt;%</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, taxon_key, stock_id, year, mean_catch) <span class="sc">%&gt;%</span>   </span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">ram_bmsy =</span> <span class="fu">ifelse</span>(<span class="fu">all</span>(<span class="sc">!</span><span class="fu">is.na</span>(RAM_area_m2)), <span class="fu">weighted.mean</span>(ram_bmsy, RAM_area_m2, <span class="at">na.rm=</span><span class="cn">TRUE</span>), <span class="fu">mean</span>(ram_bmsy, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)),</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>            <span class="at">gapfilled =</span> <span class="fu">ifelse</span>(<span class="fu">all</span>(<span class="fu">is.na</span>(gapfilled)), <span class="cn">NA</span>, <span class="fu">max</span>(gapfilled, <span class="at">na.rm=</span><span class="cn">TRUE</span>)),</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>            <span class="at">method =</span> <span class="fu">paste</span>(method, <span class="at">collapse =</span> <span class="st">&quot;, &quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="do">## check that averaging went ok - compare with mean catch values earlier (1350.19)</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>filter1 <span class="ot">&lt;-</span> <span class="fu">filter</span>(data, rgn_id <span class="sc">==</span> <span class="dv">9</span>, year <span class="sc">==</span> <span class="dv">2001</span>, stock_id <span class="sc">==</span> <span class="st">&quot;Thunnus_alalunga-71&quot;</span>) <span class="co"># v2024: all good, still 1350.19</span></span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a></span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="do">## check example of duplicate stock catch with ram_bmsy but no RAM_area_m2 value, ram_bmsy should not be NA</span></span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>filter2 <span class="ot">&lt;-</span> <span class="fu">filter</span>(data, rgn_id <span class="sc">==</span> <span class="dv">224</span>, year <span class="sc">==</span> <span class="dv">2019</span>, stock_id <span class="sc">==</span>  <span class="st">&quot;Heterocarpus_reedi-87&quot;</span>) <span class="co"># v2024: all good</span></span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a></span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="co"># add in the B/Bmsy values from the CMSY approach</span></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a>data <span class="ot">&lt;-</span> data <span class="sc">%&gt;%</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a>  <span class="fu">left_join</span>(cmsy, <span class="at">by=</span><span class="fu">c</span>(<span class="st">&quot;stock_id&quot;</span>, <span class="st">&quot;year&quot;</span>))</span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a></span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a><span class="fu">summary</span>(data)</span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a><span class="co"># v2024: </span></span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a><span class="co">#        rgn_id       taxon_key           stock_id              year        mean_catch       </span></span>
+<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a><span class="co">#  Min.   :  1.0   Length:648270      Length:648270      Min.   :2001   Min.   :      0.0  </span></span>
+<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a><span class="co">#  1st Qu.: 60.0   Class :character   Class :character   1st Qu.:2006   1st Qu.:      0.3  </span></span>
+<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a><span class="co">#  Median :137.0   Mode  :character   Mode  :character   Median :2011   Median :      9.6  </span></span>
+<span id="cb9-27"><a href="#cb9-27" tabindex="-1"></a><span class="co">#  Mean   :124.8                                         Mean   :2010   Mean   :   1800.8  </span></span>
+<span id="cb9-28"><a href="#cb9-28" tabindex="-1"></a><span class="co">#  3rd Qu.:183.0                                         3rd Qu.:2015   3rd Qu.:    162.8  </span></span>
+<span id="cb9-29"><a href="#cb9-29" tabindex="-1"></a><span class="co">#  Max.   :250.0                                         Max.   :2019   Max.   :2960647.0  </span></span>
+<span id="cb9-30"><a href="#cb9-30" tabindex="-1"></a><span class="co">#                                                                                          </span></span>
+<span id="cb9-31"><a href="#cb9-31" tabindex="-1"></a><span class="co">#     ram_bmsy        gapfilled         method            cmsy_bbmsy    </span></span>
+<span id="cb9-32"><a href="#cb9-32" tabindex="-1"></a><span class="co">#  Min.   : 0.0     Min.   :0.0      Length:648270      Min.   :0.0     </span></span>
+<span id="cb9-33"><a href="#cb9-33" tabindex="-1"></a><span class="co">#  1st Qu.: 0.7     1st Qu.:0.0      Class :character   1st Qu.:0.5     </span></span>
+<span id="cb9-34"><a href="#cb9-34" tabindex="-1"></a><span class="co">#  Median : 1.1     Median :0.0      Mode  :character   Median :1.1     </span></span>
+<span id="cb9-35"><a href="#cb9-35" tabindex="-1"></a><span class="co">#  Mean   : 1.2     Mean   :0.1                         Mean   :1.0     </span></span>
+<span id="cb9-36"><a href="#cb9-36" tabindex="-1"></a><span class="co">#  3rd Qu.: 1.6     3rd Qu.:0.0                         3rd Qu.:1.3     </span></span>
+<span id="cb9-37"><a href="#cb9-37" tabindex="-1"></a><span class="co">#  Max.   :21.7     Max.   :1.0                         Max.   :1.9     </span></span>
+<span id="cb9-38"><a href="#cb9-38" tabindex="-1"></a><span class="co">#  NA&#39;s   :605897   NA&#39;s   :605897                      NA&#39;s   :503545  </span></span></code></pre></div>
 <p>A lot of the NAs for both RAM-bmsy and CMSY are due to unmatched
-SAUP-RAM stocks</p>
+SAUP-RAM stocks.</p>
 <div id="formatting-and-saving-final-data" class="section level3">
 <h3>Formatting and saving final data</h3>
 <p>B/Bmsy values for each catch record are generated (for the species
 where this is possible) and saved. A corresponding gapfilling dataset is
 also saved.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a> data_gf <span class="ot">&lt;-</span> data <span class="sc">%&gt;%</span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>   <span class="fu">mutate</span>(<span class="at">bmsy_data_source =</span> <span class="fu">ifelse</span>(<span class="sc">!</span><span class="fu">is.na</span>(ram_bmsy), <span class="st">&quot;RAM&quot;</span>, <span class="cn">NA</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>   <span class="fu">mutate</span>(<span class="at">bmsy_data_source =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(bmsy_data_source) <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(cmsy_bbmsy), <span class="st">&quot;CMSY&quot;</span>, bmsy_data_source)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>   <span class="fu">mutate</span>(<span class="at">bbmsy =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(ram_bmsy), cmsy_bbmsy, ram_bmsy)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>   dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id, taxon_key, year, bbmsy, bmsy_data_source, <span class="at">RAM_gapfilled=</span>method, mean_catch) <span class="sc">%&gt;%</span></span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>   <span class="fu">filter</span>(year <span class="sc">&gt;=</span> <span class="dv">2001</span>)</span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a></span>
-<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;../v2022/output/fis_bbmsy_gf.csv&quot;</span>))</span>
-<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a></span>
-<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a><span class="fu">summary</span>(old)</span>
-<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="fu">summary</span>(data_gf)</span>
-<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(data_gf<span class="sc">$</span>rgn_id)) <span class="co"># 220</span></span>
-<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a></span>
-<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a><span class="fu">write.csv</span>(data_gf, <span class="st">&quot;output/fis_bbmsy_gf.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>) </span>
-<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a></span>
-<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>data_gf <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/fis_bbmsy_gf.csv&quot;</span>) </span>
-<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a></span>
-<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a>bbmsy <span class="ot">&lt;-</span> data_gf <span class="sc">%&gt;%</span></span>
-<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id, year, bbmsy) <span class="sc">%&gt;%</span></span>
-<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(bbmsy))</span>
-<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a>  </span>
-<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a>bbmsy_dups_fixed <span class="ot">&lt;-</span> bbmsy <span class="sc">%&gt;%</span></span>
-<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, stock_id, year) <span class="sc">%&gt;%</span></span>
-<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">bbmsy =</span> <span class="fu">mean</span>(bbmsy)) <span class="sc">%&gt;%</span> <span class="do">## account for the duplicated TaxonName/CommonName noted in &quot;catch_data_prep.Rmd&quot; (if there were any)...</span></span>
-<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
-<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a><span class="co">#old &lt;- read_csv(file.path(&quot;../v2020/output/fis_bbmsy.csv&quot;))</span></span>
-<span id="cb9-27"><a href="#cb9-27" tabindex="-1"></a></span>
-<span id="cb9-28"><a href="#cb9-28" tabindex="-1"></a><span class="fu">write.csv</span>(bbmsy_dups_fixed, <span class="st">&quot;output/fis_bbmsy.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>) </span>
-<span id="cb9-29"><a href="#cb9-29" tabindex="-1"></a></span>
-<span id="cb9-30"><a href="#cb9-30" tabindex="-1"></a></span>
-<span id="cb9-31"><a href="#cb9-31" tabindex="-1"></a><span class="do">## check against old </span></span>
-<span id="cb9-32"><a href="#cb9-32" tabindex="-1"></a>data_gf_old<span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;../v2022/output/fis_bbmsy_gf.csv&quot;</span>) </span>
-<span id="cb9-33"><a href="#cb9-33" tabindex="-1"></a></span>
-<span id="cb9-34"><a href="#cb9-34" tabindex="-1"></a>bbmsy <span class="ot">&lt;-</span> data_gf_old <span class="sc">%&gt;%</span></span>
-<span id="cb9-35"><a href="#cb9-35" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id, year, bbmsy) <span class="sc">%&gt;%</span></span>
-<span id="cb9-36"><a href="#cb9-36" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(bbmsy))</span>
-<span id="cb9-37"><a href="#cb9-37" tabindex="-1"></a>  </span>
-<span id="cb9-38"><a href="#cb9-38" tabindex="-1"></a>bbmsy_dups_fixed_old <span class="ot">&lt;-</span> bbmsy <span class="sc">%&gt;%</span></span>
-<span id="cb9-39"><a href="#cb9-39" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, stock_id, year) <span class="sc">%&gt;%</span></span>
-<span id="cb9-40"><a href="#cb9-40" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">bbmsy =</span> <span class="fu">mean</span>(bbmsy)) <span class="sc">%&gt;%</span> <span class="do">## account for the duplicated TaxonName/CommonName noted in &quot;catch_data_prep.Rmd&quot; (if there were any)...</span></span>
-<span id="cb9-41"><a href="#cb9-41" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
-<span id="cb9-42"><a href="#cb9-42" tabindex="-1"></a><span class="co">#old &lt;- read_csv(file.path(&quot;../v2020/output/fis_bbmsy.csv&quot;))</span></span></code></pre></div>
-<p>Data check</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="do">## check pitcairn</span></span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;../v2022/output/fis_bbmsy_gf.csv&quot;</span>))</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>new <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;../v2023/output/fis_bbmsy_gf.csv&quot;</span>))</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a></span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>old_pit <span class="ot">&lt;-</span> old <span class="sc">%&gt;%</span></span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">146</span>)</span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="fu">mean</span>(old_pit<span class="sc">$</span>bbmsy, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="co"># 1.07876</span></span>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a> data_gf <span class="ot">&lt;-</span> data <span class="sc">%&gt;%</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>   <span class="fu">mutate</span>(<span class="at">bmsy_data_source =</span> <span class="fu">ifelse</span>(<span class="sc">!</span><span class="fu">is.na</span>(ram_bmsy), <span class="st">&quot;RAM&quot;</span>, <span class="cn">NA</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>   <span class="fu">mutate</span>(<span class="at">bmsy_data_source =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(bmsy_data_source) <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(cmsy_bbmsy), <span class="st">&quot;CMSY&quot;</span>, bmsy_data_source)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>   <span class="fu">mutate</span>(<span class="at">bbmsy =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(ram_bmsy), cmsy_bbmsy, ram_bmsy)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>   dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id, taxon_key, year, bbmsy, bmsy_data_source, <span class="at">RAM_gapfilled=</span>method, mean_catch) <span class="sc">%&gt;%</span></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>   <span class="fu">filter</span>(year <span class="sc">&gt;=</span> <span class="dv">2001</span>)</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;fis&quot;</span>,<span class="st">&quot;v2023&quot;</span>,<span class="st">&quot;output&quot;</span>,<span class="st">&quot;fis_bbmsy_gf.csv&quot;</span>))</span>
 <span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a></span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>new_pit <span class="ot">&lt;-</span> new <span class="sc">%&gt;%</span></span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">146</span>)</span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="fu">mean</span>(new_pit<span class="sc">$</span>bbmsy, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="co"># 1.135239</span></span></code></pre></div>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="fu">summary</span>(old)</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="fu">summary</span>(data_gf)</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(data_gf<span class="sc">$</span>rgn_id)) <span class="co"># v2024: 220</span></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a></span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a><span class="fu">write_csv</span>(data_gf, <span class="fu">here</span>(output_dir,<span class="st">&quot;fis_bbmsy_gf.csv&quot;</span>)) </span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>data_gf <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(output_dir, <span class="st">&quot;fis_bbmsy_gf.csv&quot;</span>))</span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a></span>
+<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a>bbmsy <span class="ot">&lt;-</span> data_gf <span class="sc">%&gt;%</span></span>
+<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id, year, bbmsy) <span class="sc">%&gt;%</span></span>
+<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(bbmsy))</span>
+<span id="cb10-21"><a href="#cb10-21" tabindex="-1"></a>  </span>
+<span id="cb10-22"><a href="#cb10-22" tabindex="-1"></a>bbmsy_dups_fixed <span class="ot">&lt;-</span> bbmsy <span class="sc">%&gt;%</span></span>
+<span id="cb10-23"><a href="#cb10-23" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, stock_id, year) <span class="sc">%&gt;%</span></span>
+<span id="cb10-24"><a href="#cb10-24" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">bbmsy =</span> <span class="fu">mean</span>(bbmsy)) <span class="sc">%&gt;%</span> <span class="do">## account for the duplicated TaxonName/CommonName noted in &quot;catch_data_prep.Rmd&quot; (if there were any)...</span></span>
+<span id="cb10-25"><a href="#cb10-25" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
+<span id="cb10-26"><a href="#cb10-26" tabindex="-1"></a><span class="co">#old &lt;- read_csv(file.path(&quot;../v2020/output/fis_bbmsy.csv&quot;))</span></span>
+<span id="cb10-27"><a href="#cb10-27" tabindex="-1"></a></span>
+<span id="cb10-28"><a href="#cb10-28" tabindex="-1"></a><span class="fu">write_csv</span>(bbmsy_dups_fixed, <span class="fu">here</span>(output_dir, <span class="st">&quot;fis_bbmsy.csv&quot;</span>)) </span>
+<span id="cb10-29"><a href="#cb10-29" tabindex="-1"></a></span>
+<span id="cb10-30"><a href="#cb10-30" tabindex="-1"></a></span>
+<span id="cb10-31"><a href="#cb10-31" tabindex="-1"></a><span class="do">## check against old </span></span>
+<span id="cb10-32"><a href="#cb10-32" tabindex="-1"></a>data_gf_old<span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;fis&quot;</span>,<span class="st">&quot;v2023&quot;</span>,<span class="st">&quot;output&quot;</span>, <span class="st">&quot;fis_bbmsy_gf.csv&quot;</span>))</span>
+<span id="cb10-33"><a href="#cb10-33" tabindex="-1"></a></span>
+<span id="cb10-34"><a href="#cb10-34" tabindex="-1"></a>bbmsy <span class="ot">&lt;-</span> data_gf_old <span class="sc">%&gt;%</span></span>
+<span id="cb10-35"><a href="#cb10-35" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id, year, bbmsy) <span class="sc">%&gt;%</span></span>
+<span id="cb10-36"><a href="#cb10-36" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(bbmsy))</span>
+<span id="cb10-37"><a href="#cb10-37" tabindex="-1"></a>  </span>
+<span id="cb10-38"><a href="#cb10-38" tabindex="-1"></a>bbmsy_dups_fixed_old <span class="ot">&lt;-</span> bbmsy <span class="sc">%&gt;%</span></span>
+<span id="cb10-39"><a href="#cb10-39" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, stock_id, year) <span class="sc">%&gt;%</span></span>
+<span id="cb10-40"><a href="#cb10-40" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">bbmsy =</span> <span class="fu">mean</span>(bbmsy)) <span class="sc">%&gt;%</span> <span class="do">## account for the duplicated TaxonName/CommonName noted in &quot;catch_data_prep.Rmd&quot; (if there were any)...</span></span>
+<span id="cb10-41"><a href="#cb10-41" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
+<span id="cb10-42"><a href="#cb10-42" tabindex="-1"></a><span class="co">#old &lt;- read_csv(file.path(&quot;../v2020/output/fis_bbmsy.csv&quot;))</span></span></code></pre></div>
+<p>Data check</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="do">## check regions (pitcairn and usa) for changes</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;fis&quot;</span>,<span class="st">&quot;v2023&quot;</span>,<span class="st">&quot;output&quot;</span>,<span class="st">&quot;fis_bbmsy_gf.csv&quot;</span>))</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>new <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;fis&quot;</span>,<span class="st">&quot;v2024&quot;</span>,<span class="st">&quot;output&quot;</span>,<span class="st">&quot;fis_bbmsy_gf.csv&quot;</span>))</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>old_pit <span class="ot">&lt;-</span> old <span class="sc">%&gt;%</span></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">146</span>)</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="fu">mean</span>(old_pit<span class="sc">$</span>bbmsy, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="co"># 1.135239</span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>new_pit <span class="ot">&lt;-</span> new <span class="sc">%&gt;%</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">146</span>)</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a><span class="fu">mean</span>(new_pit<span class="sc">$</span>bbmsy, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="co"># 1.135239 -- the exact same in v2024</span></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a></span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>old_usa <span class="ot">&lt;-</span> old <span class="sc">%&gt;%</span></span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">163</span>)</span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a><span class="fu">mean</span>(old_usa<span class="sc">$</span>bbmsy, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="co"># 1.136894</span></span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a></span>
+<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a>new_usa <span class="ot">&lt;-</span> new <span class="sc">%&gt;%</span></span>
+<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">163</span>)</span>
+<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a><span class="fu">mean</span>(new_usa<span class="sc">$</span>bbmsy, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="co"># 1.150863 -- not the exact same, but close! v2024</span></span>
+<span id="cb11-21"><a href="#cb11-21" tabindex="-1"></a></span>
+<span id="cb11-22"><a href="#cb11-22" tabindex="-1"></a><span class="co"># v2024: plot differences for better understanding</span></span>
+<span id="cb11-23"><a href="#cb11-23" tabindex="-1"></a>compare <span class="ot">&lt;-</span> new <span class="sc">%&gt;%</span></span>
+<span id="cb11-24"><a href="#cb11-24" tabindex="-1"></a>  <span class="fu">left_join</span>(old, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>, <span class="st">&quot;stock_id&quot;</span>, <span class="st">&quot;taxon_key&quot;</span>, <span class="st">&quot;year&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-25"><a href="#cb11-25" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">diff =</span> bbmsy.x <span class="sc">-</span> bbmsy.y) <span class="sc">%&gt;%</span></span>
+<span id="cb11-26"><a href="#cb11-26" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">2016</span><span class="sc">:</span><span class="dv">2019</span>))</span>
+<span id="cb11-27"><a href="#cb11-27" tabindex="-1"></a></span>
+<span id="cb11-28"><a href="#cb11-28" tabindex="-1"></a><span class="co"># v2024: points above the red line indicate an increase in B/Bmsy from 2023 to 2024, while points below indicate a decrease</span></span>
+<span id="cb11-29"><a href="#cb11-29" tabindex="-1"></a>comparison_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(compare, <span class="fu">aes</span>(<span class="at">x =</span> bbmsy.x, <span class="at">y =</span> bbmsy.y)) <span class="sc">+</span></span>
+<span id="cb11-30"><a href="#cb11-30" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.5</span>) <span class="sc">+</span> </span>
+<span id="cb11-31"><a href="#cb11-31" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">color =</span> <span class="st">&quot;darkred&quot;</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>) <span class="sc">+</span>  <span class="co"># reference line</span></span>
+<span id="cb11-32"><a href="#cb11-32" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb11-33"><a href="#cb11-33" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;B/Bmsy Values: v2023 vs v2024&quot;</span>,</span>
+<span id="cb11-34"><a href="#cb11-34" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;v2023 B/Bmsy&quot;</span>,</span>
+<span id="cb11-35"><a href="#cb11-35" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;v2024 B/Bmsy&quot;</span></span>
+<span id="cb11-36"><a href="#cb11-36" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb11-37"><a href="#cb11-37" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb11-38"><a href="#cb11-38" tabindex="-1"></a>  <span class="fu">coord_fixed</span>(<span class="at">ratio =</span> <span class="dv">1</span>)  <span class="sc">+</span></span>
+<span id="cb11-39"><a href="#cb11-39" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">&quot;lm&quot;</span>, <span class="at">se =</span> <span class="cn">FALSE</span>, <span class="at">color =</span> <span class="st">&quot;lightblue&quot;</span>) <span class="co"># the trend is slightly downward, meaning there is a slight decrease in B/Bmsy values in 2024 compared to 2023.</span></span>
+<span id="cb11-40"><a href="#cb11-40" tabindex="-1"></a>comparison_plot</span>
+<span id="cb11-41"><a href="#cb11-41" tabindex="-1"></a></span>
+<span id="cb11-42"><a href="#cb11-42" tabindex="-1"></a><span class="co"># v2024: check for year 2019 only</span></span>
+<span id="cb11-43"><a href="#cb11-43" tabindex="-1"></a>compare_2019 <span class="ot">&lt;-</span> compare <span class="sc">%&gt;%</span></span>
+<span id="cb11-44"><a href="#cb11-44" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">%in%</span> <span class="dv">2019</span>)</span>
+<span id="cb11-45"><a href="#cb11-45" tabindex="-1"></a>  </span>
+<span id="cb11-46"><a href="#cb11-46" tabindex="-1"></a>comparison_plot_2019 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(compare_2019, <span class="fu">aes</span>(<span class="at">x =</span> bbmsy.x, <span class="at">y =</span> bbmsy.y)) <span class="sc">+</span></span>
+<span id="cb11-47"><a href="#cb11-47" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.5</span>) <span class="sc">+</span> </span>
+<span id="cb11-48"><a href="#cb11-48" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">color =</span> <span class="st">&quot;darkred&quot;</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>) <span class="sc">+</span>  <span class="co"># reference line</span></span>
+<span id="cb11-49"><a href="#cb11-49" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb11-50"><a href="#cb11-50" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;B/Bmsy Values in 2019: v2023 vs v2024&quot;</span>,</span>
+<span id="cb11-51"><a href="#cb11-51" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;v2023 B/Bmsy&quot;</span>,</span>
+<span id="cb11-52"><a href="#cb11-52" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;v2024 B/Bmsy&quot;</span></span>
+<span id="cb11-53"><a href="#cb11-53" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb11-54"><a href="#cb11-54" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb11-55"><a href="#cb11-55" tabindex="-1"></a>  <span class="fu">coord_fixed</span>(<span class="at">ratio =</span> <span class="dv">1</span>)  <span class="sc">+</span></span>
+<span id="cb11-56"><a href="#cb11-56" tabindex="-1"></a>  <span class="fu">xlim</span>(<span class="dv">0</span>, <span class="dv">12</span>) <span class="sc">+</span></span>
+<span id="cb11-57"><a href="#cb11-57" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">&quot;lm&quot;</span>, <span class="at">se =</span> <span class="cn">FALSE</span>, <span class="at">color =</span> <span class="st">&quot;lightblue&quot;</span>) <span class="co"># the trend is slightly downward, meaning there is a slight decrease in B/Bmsy values in 2024 compared to 2023.</span></span>
+<span id="cb11-58"><a href="#cb11-58" tabindex="-1"></a>comparison_plot_2019</span></code></pre></div>
+<p>For understanding results:</p>
+<p><a href="https://catchshareindicators.org/wp-content/uploads/2013/12/NE_Biomass_Feb-2014.pdf">When
+B/BMSY = 1, then biomass equals BMSY. If B/BMSY falls below 1, biomass
+is too low to provide maximum sustainable yield.</a>. This is also seen
+in Christopher Costello’s 2016 paper, <a href="https://www.pnas.org/doi/10.1073/pnas.1520420113">“Global fishery
+prospects under contrasting management regimes.”</a></p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># read in our final data frame saved earlier</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>final_b_bmsy <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(output_dir, <span class="st">&quot;fis_bbmsy.csv&quot;</span>))</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co"># interactive plotly of b/bmsy for each stock</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>fis_plot <span class="ot">&lt;-</span> final_b_bmsy <span class="sc">%&gt;%</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="fu">plot_ly</span>(<span class="at">x =</span> <span class="sc">~</span>year, <span class="at">y =</span> <span class="sc">~</span>bbmsy, <span class="at">color =</span> <span class="sc">~</span>stock_id, </span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>          <span class="at">type =</span> <span class="st">&quot;scatter&quot;</span>, <span class="at">mode =</span> <span class="st">&quot;lines&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  <span class="fu">layout</span>(<span class="at">title =</span> <span class="st">&quot;B/Bmsy by Stock ID&quot;</span>,</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>         <span class="at">xaxis =</span> <span class="fu">list</span>(<span class="at">title =</span> <span class="st">&quot;Year&quot;</span>),</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>         <span class="at">yaxis =</span> <span class="fu">list</span>(<span class="at">title =</span> <span class="st">&quot;B/Bmsy (overfished is &lt; 1)&quot;</span>))</span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>fis_plot</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a></span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a><span class="co"># comparison of how many stocks are over/underfished in total</span></span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>fish_status <span class="ot">&lt;-</span>final_b_bmsy <span class="sc">%&gt;%</span> </span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fish_status =</span> <span class="fu">case_when</span>(</span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>    bbmsy <span class="sc">&lt;</span> <span class="dv">1</span> <span class="sc">~</span> <span class="st">&quot;overfished&quot;</span>,</span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>    bbmsy <span class="sc">&gt;=</span> <span class="dv">1</span> <span class="sc">~</span> <span class="st">&quot;sustainable&quot;</span>,</span>
+<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>    <span class="at">.default =</span> <span class="cn">NA</span></span>
+<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>  ))</span>
+<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a></span>
+<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a>fish_status_summary_2019 <span class="ot">&lt;-</span> fish_status <span class="sc">%&gt;%</span></span>
+<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">%in%</span> <span class="dv">2019</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, fish_status) <span class="sc">%&gt;%</span></span>
+<span id="cb12-24"><a href="#cb12-24" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">count =</span> <span class="fu">n</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb12-25"><a href="#cb12-25" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(fish_status))</span>
+<span id="cb12-26"><a href="#cb12-26" tabindex="-1"></a></span>
+<span id="cb12-27"><a href="#cb12-27" tabindex="-1"></a><span class="fu">ggplot</span>(fish_status_summary_2019, <span class="fu">aes</span>(<span class="at">x =</span> fish_status, <span class="at">y =</span> count, <span class="at">fill =</span> fish_status)) <span class="sc">+</span></span>
+<span id="cb12-28"><a href="#cb12-28" tabindex="-1"></a>  <span class="fu">geom_bar</span>(<span class="at">position =</span> <span class="st">&quot;dodge&quot;</span>, <span class="at">stat =</span> <span class="st">&quot;identity&quot;</span>) <span class="sc">+</span></span>
+<span id="cb12-29"><a href="#cb12-29" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;Comparison of Overfished and Sustainable Stocks in 2019&quot;</span>,</span>
+<span id="cb12-30"><a href="#cb12-30" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">&quot;B/Bmsy Stock Status&quot;</span>,</span>
+<span id="cb12-31"><a href="#cb12-31" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">&quot;Number of stocks&quot;</span>) <span class="sc">+</span></span>
+<span id="cb12-32"><a href="#cb12-32" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span>
+<span id="cb12-33"><a href="#cb12-33" tabindex="-1"></a></span>
+<span id="cb12-34"><a href="#cb12-34" tabindex="-1"></a>fish_status_summary_all_time <span class="ot">&lt;-</span> fish_status <span class="sc">%&gt;%</span></span>
+<span id="cb12-35"><a href="#cb12-35" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, fish_status) <span class="sc">%&gt;%</span></span>
+<span id="cb12-36"><a href="#cb12-36" tabindex="-1"></a><span class="fu">summarise</span>(<span class="at">count =</span> <span class="fu">n</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb12-37"><a href="#cb12-37" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(fish_status))</span>
+<span id="cb12-38"><a href="#cb12-38" tabindex="-1"></a></span>
+<span id="cb12-39"><a href="#cb12-39" tabindex="-1"></a><span class="fu">ggplot</span>(fish_status_summary_all_time, <span class="fu">aes</span>(<span class="at">x =</span> fish_status, <span class="at">y =</span> count, <span class="at">fill =</span> fish_status)) <span class="sc">+</span></span>
+<span id="cb12-40"><a href="#cb12-40" tabindex="-1"></a>  <span class="fu">geom_bar</span>(<span class="at">stat =</span> <span class="st">&quot;identity&quot;</span>) <span class="sc">+</span></span>
+<span id="cb12-41"><a href="#cb12-41" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;Comparison of Overfished and Sustainable Stocks 2012 - 2019&quot;</span>,</span>
+<span id="cb12-42"><a href="#cb12-42" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">&quot;B/Bmsy Stock Status&quot;</span>,</span>
+<span id="cb12-43"><a href="#cb12-43" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">&quot;Number of stocks&quot;</span>) <span class="sc">+</span></span>
+<span id="cb12-44"><a href="#cb12-44" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span>
+<span id="cb12-45"><a href="#cb12-45" tabindex="-1"></a></span>
+<span id="cb12-46"><a href="#cb12-46" tabindex="-1"></a><span class="co"># ---- 10 most overfished stocks in 2019 (B/Bmsy &lt; 1) ----</span></span>
+<span id="cb12-47"><a href="#cb12-47" tabindex="-1"></a>overfished_2019 <span class="ot">&lt;-</span> fish_status <span class="sc">%&gt;%</span> </span>
+<span id="cb12-48"><a href="#cb12-48" tabindex="-1"></a>  <span class="fu">filter</span>(fish_status <span class="sc">%in%</span> <span class="st">&quot;overfished&quot;</span>) </span>
+<span id="cb12-49"><a href="#cb12-49" tabindex="-1"></a></span>
+<span id="cb12-50"><a href="#cb12-50" tabindex="-1"></a><span class="co"># interactive plotly of b/bmsy for each stock</span></span>
+<span id="cb12-51"><a href="#cb12-51" tabindex="-1"></a>over_fis_plot <span class="ot">&lt;-</span> overfished_2019 <span class="sc">%&gt;%</span></span>
+<span id="cb12-52"><a href="#cb12-52" tabindex="-1"></a>  <span class="fu">plot_ly</span>(<span class="at">x =</span> <span class="sc">~</span>year, <span class="at">y =</span> <span class="sc">~</span>bbmsy, <span class="at">color =</span> <span class="sc">~</span>stock_id, </span>
+<span id="cb12-53"><a href="#cb12-53" tabindex="-1"></a>          <span class="at">type =</span> <span class="st">&quot;scatter&quot;</span>, <span class="at">mode =</span> <span class="st">&quot;lines&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb12-54"><a href="#cb12-54" tabindex="-1"></a>  <span class="fu">layout</span>(<span class="at">title =</span> <span class="st">&quot;B/Bmsy by Stock ID&quot;</span>,</span>
+<span id="cb12-55"><a href="#cb12-55" tabindex="-1"></a>         <span class="at">xaxis =</span> <span class="fu">list</span>(<span class="at">title =</span> <span class="st">&quot;Year&quot;</span>),</span>
+<span id="cb12-56"><a href="#cb12-56" tabindex="-1"></a>         <span class="at">yaxis =</span> <span class="fu">list</span>(<span class="at">title =</span> <span class="st">&quot;B/Bmsy &lt; 1)&quot;</span>))</span>
+<span id="cb12-57"><a href="#cb12-57" tabindex="-1"></a>over_fis_plot</span>
+<span id="cb12-58"><a href="#cb12-58" tabindex="-1"></a></span>
+<span id="cb12-59"><a href="#cb12-59" tabindex="-1"></a><span class="co"># ---- all sustainable stocks in 2019 (B/Bmsy &gt; 1) ----</span></span>
+<span id="cb12-60"><a href="#cb12-60" tabindex="-1"></a></span>
+<span id="cb12-61"><a href="#cb12-61" tabindex="-1"></a></span>
+<span id="cb12-62"><a href="#cb12-62" tabindex="-1"></a><span class="co"># comparison of how many stocks are over/underfished by region</span></span></code></pre></div>
 </div>
 </div>
 </div>
