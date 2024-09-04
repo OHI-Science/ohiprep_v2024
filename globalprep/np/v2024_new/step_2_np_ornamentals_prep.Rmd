@@ -96,7 +96,7 @@ data_dir_year <- paste0("d", scen_year)
 prev_data_dir_year <- paste0("d", prev_scen_year)
 v_scen_year <- paste0("v", scen_year)
 
-current_np_dir <- here::here("globalprep", "np", paste0(v_scen_year, "_new"))
+current_np_dir <- here::here("globalprep", "np", paste0(v_scen_year, "_new")) # update this if name changes
 
 # ======== Source functions ===========
 source(here::here("workflow", "R", "common.R")) # directory locations
@@ -302,27 +302,6 @@ np_log_exposure_2 <- np_exp_log %>%
 ```
 
 
-```{r old-rescale}
-# # find max raw exposure value in the past 10 years
-# np_exp_max <- np_exp_raw %>%
-#   filter(year %in% c(exp_decade_range)) %>% 
-#   group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
-#   dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
-# #  dplyr::ungroup() %>% 
-#   dplyr::select(rgn_id, expos_prod_max) %>% 
-#   # keep 1 row with max value per region (values are the same across year range per region)
-#   dplyr::distinct()
-## calculate rescaled exposure [old]
-# np_exp_orn_rescale <- np_exp_raw %>%
-#   # bring in max (of the past 10 yrs) value, 
-#   # fill single value for each region across full time range
-#   dplyr::left_join(np_exp_max, by = "rgn_id") %>% 
-#   # rescale exposure using max value
-#   dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
-#                 exposure = ifelse(exposure > 1, 1, exposure)) %>%
-#   dplyr::select(-km2, -expos_raw, -expos_prod_max)
-```
-
 
 ```{r save-exposure}
 # ======== Save intermediate data products ==========
@@ -380,48 +359,6 @@ ggplot(data = np_exp_orn %>% filter(rgn_id == 163), aes(x = year, y = exposure))
   theme_bw()
 ```
 
-
-global-scaled exposure test:
-
-
-```{r archive-methods}
-np_global_max <- np_exp_raw %>%
-  filter(year %in% c(exp_decade_range)) %>% 
- # group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
-  dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>% # 143.385 for all...
-  dplyr::ungroup() %>% # without this, "ornamentals" column remains
-  dplyr::select(rgn_id, expos_prod_max) %>% 
-  # keep 1 row with max value per region (values are the same across year range per region)
-  dplyr::distinct()
-
-# calculate rescaled exposure
-global_exp_rescale <- np_exp_raw %>%
-  # bring in max (of the past 10 yrs) value, 
-  # fill single value for each region across full time range
-  dplyr::left_join(np_global_max, by = "rgn_id") %>% 
-  # rescale exposure using max value
-  dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
-                exposure = ifelse(exposure > 1, 1, exposure)) %>%
-  dplyr::select(-km2, -expos_raw, -expos_prod_max)
-
-
-np_exp_orn_global <- global_exp_rescale %>%
-  dplyr::group_by(product) %>% # not sure why they didn't have some georegion gapfill instead of gapfilling with mean global exposure??
-  dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
-  dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
-  dplyr::select(-mean_exp) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(product = as.character(product)) %>%
-  dplyr::select(rgn_id, year, product, exposure)
-
-
-ggplot(data = np_exp_orn_global %>% filter(rgn_id == 163), aes(x = year, y = exposure)) + 
-  geom_line() +
-  theme_bw()
-
-
-# exposure scale is much smaller now, as values are being compared to global max exposure, not regional...
-```
 
 
 
@@ -501,8 +438,7 @@ readr::write_csv(np_risk_orn, here(current_np_dir, "int", "np_risk_ornamentals.c
 
 ## Calculate Sustainability
 
-1 - mean(c(exposure, risk), na.rm = TRUE)
-
+`1 - mean(c(exposure, risk), na.rm = TRUE)`
 
 
 ```{r}
@@ -541,7 +477,7 @@ plotly::ggplotly(check_orn_sust_plot)
 
 ## Calculate Sustainable Harvest
 
-tonnes * sustainability
+`tonnes * sustainability`
 
 
 ```{r}
@@ -573,31 +509,8 @@ summary(sust_harvest_orn)
 
 ## Rolling Average of Sustainable Tonnes
 
-```{r}
-# Find max year in the summarized data table
-year_max <- max(sust_harvest_orn$year)
-
-sust_tonnes_rolling <- sust_harvest_orn %>%
-  arrange(rgn_id, product, year) %>%
-  group_by(rgn_id, product) %>%
-  mutate(
-      sust_tonnes_rollmean = zoo::rollapply(sust_tonnes, width = 4, FUN = mean, align = 'right', partial = TRUE, na.rm = FALSE) #,
-    #  usd_rollmean    = rollapply(   usd, width = 4, FUN = mean, align = 'right', partial = TRUE, na.rm = FALSE)
-    ) %>%
-  rename(
-      sust_tonnes_orig = sust_tonnes #, # prevent overwriting of reported and gapfilled values (ask Mel???)
-     # usd_orig    = usd
-      ) %>% 
-  mutate(
-      sust_tonnes = ifelse(!is.na(sust_tonnes_rollmean), sust_tonnes_rollmean, sust_tonnes_orig),
-  #    usd    = ifelse(!is.na(usd_rollmean),    usd_rollmean,    usd_orig)
-  ) %>%
-  dplyr::select(rgn_id, rgn_name, product, year, tonnes, usd, tonnes_orig, usd_orig)
 
 
-```
-
-cleaned:
 ```{r}
 # Find max year in the summarized data table
 year_max <- max(sust_harvest_orn$year)
