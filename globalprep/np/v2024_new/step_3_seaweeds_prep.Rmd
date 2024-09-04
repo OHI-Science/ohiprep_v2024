@@ -661,28 +661,76 @@ readr::write_csv(mar_sust_gf, here(current_np_dir, "output", "np_seaweed_sust_gf
 
 # Calculate Sustainable Tonnes
 
-tonnes * sustainability
+For each region and year, calculate total sustainable tonnes (of non-food seaweed harvested):
 
+`tonnes * sustainability`
 
 
 ```{r}
 # ==== Calculate sustainability ====
 
-# filter data to 2004 onwards
-
+# filter data to 2004 onwards ----
 mar_sw_sus_filter <- mar_sw_sus %>% 
   dplyr::filter(year >= 2004)
 
-#quick check
+# quick check
 #mar_sw_sus_filter %>% arrange(rgn_id, year)
-min(mar_sw_sus_filter$year)
+
+begin_data_year <- min(mar_sw_sus_filter$year)
 end_data_year <- max(mar_sw_sus_filter$year)
+
+#mar_sw_sus_filter
+
+# Group by region and year to get summary (total tonnes) ----
+mar_seaweed_total_tonnes <- mar_sw_sus_filter %>% 
+  dplyr::group_by(rgn_id, year) %>% 
+  summarise(tonnes = sum(tonnes, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  dplyr::arrange(rgn_id, year)
+
+#summary(mar_seaweed_total_tonnes)
+#head(mar_seaweed_total_tonnes)
+
+
+# Multiply total tonnes by 0.67 (sustainability coefficient) ----
+mar_sw_sust_tonnes <- mar_seaweed_total_tonnes %>% 
+  dplyr::mutate(sustainability = 0.67) %>% 
+  dplyr::mutate(sust_tonnes = tonnes * sustainability)
+
+summary(mar_sw_sust_tonnes)
+#str(mar_sw_sust_tonnes)
+
+
+# write out raw sust_tonnes to int
+readr::write_csv(mar_sw_sust_tonnes, here(current_np_dir, "int", "seaweed_sust_tonnes_raw.csv"))
+
 ```
 
 
 
 
 ## Rolling average of sustainable tonnes
+
+
+```{r}
+
+
+# for each region and year, calculate rolling mean in a 5 year window (year + 4 years, right-aligned (year, look at the 4 years previous))
+seaweed_st_rolling <- mar_sw_sust_tonnes %>%
+  dplyr::ungroup() %>% 
+  dplyr::arrange(rgn_id, year) %>%
+  dplyr::group_by(rgn_id) %>%
+  dplyr::mutate(
+      sust_tonnes_rollmean = zoo::rollapply(sust_tonnes, width = 4,
+                                            FUN = mean, align = 'right',
+                                            partial = TRUE, na.rm = FALSE)) %>%
+  dplyr::rename(sust_tonnes_orig = sust_tonnes) %>% 
+  dplyr::mutate(sust_tonnes = ifelse(!is.na(sust_tonnes_rollmean), sust_tonnes_rollmean, sust_tonnes_orig)) %>%
+  dplyr::select(rgn_id, year, tonnes, sust_tonnes, sust_tonnes_orig)
+
+summary(seaweed_st_rolling)
+```
+
 
 
 ## Peak sustainable tonnes
@@ -693,21 +741,51 @@ Identify max value from rolling average of sustainable tonnes (maybe limit to mo
 ```{r}
 # define decade range for max value 
 
-# end_data_year <- max(mar_sw_sus_filter$year)
+#end_data_year <- max(mar_sw_sus_filter$year)
 seaweed_decade <- c((end_data_year - 10):end_data_year)
 
 
+# find peak sustainable tonnes 
+seaweed_st_max <- seaweed_st_rolling %>% 
+  filter(year %in% c(seaweed_decade)) %>% 
+  ungroup() %>% 
+  group_by(rgn_id) %>% 
+  mutate(peak_sust_tonnes = max(sust_tonnes, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  # keep first value for each 
+  # (it's copied a few times otherwise which causes issues down the line)
+  dplyr::distinct(rgn_id, peak_sust_tonnes) %>% 
+  dplyr::select(rgn_id, peak_sust_tonnes)
 
 
+head(seaweed_st_max)
 ```
 
 
 ## Relative sustainable tonnes
 
-get relative tonnes by dividing the rolling average of sustainable tonnes by max(rolling average of sustainable tonnes)
+Bring max sustainable tonnes value back into sustainable tonnes full dataframe. Use this value to calculate relative sustainable tonnes: if `sust_tonnes >= peak_sust_tonnes`, then set to 1. Else, `tonnes_rollmean / peak_sust_tonnes`.  
+
 
 ```{r}
+# ---- Determine relative sustainable tonnes ----
+seaweed_relative_sust_tonnes <- 
+  # join peak sustainable tonnes with full sustainable tonnes df
+  seaweed_st_rolling %>% 
+  ungroup() %>% 
+  ## filling in peak value per region ID across full year range
+  full_join(seaweed_st_max, by = join_by("rgn_id")) %>% 
+  # rescale to find relative sustainable tonnes
+  mutate(rel_sust_tonnes = ifelse(sust_tonnes > peak_sust_tonnes, 1,
+                             sust_tonnes / peak_sust_tonnes)) %>% 
+  mutate(product = "seaweeds")
+ 
+# check
+summary(seaweed_relative_sust_tonnes)
 
 
+# save to output folder
+readr::write_csv(seaweed_relative_sust_tonnes, here(current_np_dir, "output", "np_relative_sust_tonnes_seaweeds.csv"))
 ```
+
 

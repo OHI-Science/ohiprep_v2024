@@ -570,7 +570,7 @@ orn_relative_sust_tonnes <-
   ## filling in peak value per region ID across full year range
   full_join(max_sust_tonnes, by = join_by("rgn_id")) %>% 
   # rescale to find relative sustainable tonnes
-  mutate(tonnes_rel = ifelse(sust_tonnes >= peak_sust_tonnes, 1,
+  mutate(rel_sust_tonnes = ifelse(sust_tonnes > peak_sust_tonnes, 1,
                              sust_tonnes / peak_sust_tonnes))
  
 # check
