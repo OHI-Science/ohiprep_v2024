@@ -9,10 +9,10 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Wed Sep 4 17:00:06 2024 by lecuona" />
+<meta name="author" content="Compiled on Wed Sep 4 17:06:19 2024 by lecuona" />
 
 
-<title>OHI 2024: Food Provision, Preparing catch data for BBmsy calculations and mean catch (weights in FIS model) and FP weights</title>
+<title>OHI 2024: FP, SAUP Species Resilience Lookup Table</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1645,10 +1645,9 @@ border-radius: 0px;
 
 
 
-<h1 class="title toc-ignore">OHI 2024: Food Provision, Preparing catch
-data for BBmsy calculations and mean catch (weights in FIS model) and FP
-weights</h1>
-<h4 class="author"><em>Compiled on Wed Sep 4 17:00:06 2024 by
+<h1 class="title toc-ignore">OHI 2024: FP, SAUP Species Resilience
+Lookup Table</h1>
+<h4 class="author"><em>Compiled on Wed Sep 4 17:06:19 2024 by
 lecuona</em></h4>
 
 </div>
@@ -1656,838 +1655,109 @@ lecuona</em></h4>
 
 <div id="summary" class="section level1">
 <h1>Summary</h1>
-<p>This script takes the SAUP 2022 catch data, provided at a resolution
-of per SAUP region/year/species totals, and creates 3 data layers:</p>
-<ol style="list-style-type: decimal">
-<li>Catch data aggregated to <strong>stock levels</strong> to calculate
-B/Bmsy values. For the Ocean Health Index, we assume a stock is
-represented by the FAO region in which the species is caught. We also
-use these data to aggregate to OHI/FAO region to weight the B/Bmsy
-values. In order to aggregate to FAO regions, we associate each cell to
-the FAO region and the OHI region in which it is located.</li>
-</ol>
-<p>An example of our aggregation process: New Zealand is located
-entirely in FAO region 81. All catch reported by New Zealand will be
-aggregated by species to the FAO region. If a species was reported as
-caught in both New Zealand waters and in the High Seas of area 81, these
-two records will be combined into one by summing the catch.</p>
-<ol start="2" style="list-style-type: decimal">
-<li><p>An average catch dataset used to weight B/Bmsy values in the
-fisheries model. For this dataset, the catch is assigned to FAO and OHI
-regions.</p></li>
-<li><p>Average catch over time for each region for food provision
-weighting.</p></li>
-</ol>
-<p>First, we need to match SAUP EEZ regions to OHI regions, and
-summarize per region, year, and species.</p>
-<div id="updates-from-previous-assessment" class="section level2">
-<h2>Updates from previous assessment</h2>
+<p>This script uses FishBase to find the Resilience for each of the
+species in the SAUP database. The Resilience information is needed for
+running catch-MSY to estimate B/Bmsy.</p>
+</div>
+<div id="updates-from-previous-scenario-year" class="section level1">
+<h1>Updates from previous scenario year</h1>
 <ul>
 <li>None. This script wasn’t run in v2024. Associated data files within
 the repo were copied from v2023 to v2024.</li>
 </ul>
-<hr />
-</div>
-</div>
-<div id="data-source" class="section level1">
-<h1>Data Source</h1>
-<p><strong>Reference</strong>: Pauly D., Zeller D., Palomares M.L.D.
-(Editors), 2020. Sea Around Us Concepts, Design and Data
-(seaaroundus.org).</p>
-<p><strong>Downloaded</strong>: September 27, 2022</p>
-<p><strong>Description</strong>: Tons per year and SAUP region with
-information on sector type, industry type, fishing entitity, reporting
-status and taxonomic information.</p>
-<p><strong>Time range</strong>: 1950 - 2019</p>
-<p><strong>Format</strong>: CSV</p>
-<p><strong>Additional Information</strong>: <a href="http://www.seaaroundus.org/sea-around-us-methods-index/">Methods</a></p>
-<hr />
 </div>
 <div id="setup" class="section level1">
 <h1>Setup</h1>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>knitr<span class="sc">::</span>opts_chunk<span class="sc">$</span><span class="fu">set</span>(<span class="at">fig.width =</span> <span class="dv">6</span>, <span class="at">fig.height =</span> <span class="dv">4</span>, <span class="at">fig.path =</span> <span class="st">&#39;figs/&#39;</span>,<span class="at">message =</span> <span class="cn">FALSE</span>, <span class="at">warning =</span> <span class="cn">FALSE</span>, <span class="at">echo =</span> <span class="cn">TRUE</span>, <span class="at">eval=</span><span class="cn">FALSE</span>)</span></code></pre></div>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="do">## Libraries</span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">library</span>(readr)</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">library</span>(parallel)</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">library</span>(purrr)</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">library</span>(stringr)</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">library</span>(tidyr)</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="fu">library</span>(foreach)</span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="fu">library</span>(here)</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="fu">library</span>(readxl)</span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="fu">library</span>(data.table)</span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a></span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;workflow&quot;</span>, <span class="st">&quot;R&quot;</span>, <span class="st">&quot;common.R&quot;</span>)) <span class="co"># file creates objects to process data</span></span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a></span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="do">## Paths for data</span></span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>fis_path <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(dir_M,<span class="st">&quot;git-annex&quot;</span>, <span class="st">&quot;globalprep&quot;</span>, <span class="st">&quot;fis&quot;</span>, <span class="st">&quot;v2022&quot;</span>, <span class="st">&quot;int&quot;</span>) </span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>SAUP_path <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(dir_M, <span class="st">&quot;git-annex&quot;</span>, <span class="st">&quot;globalprep&quot;</span>,<span class="st">&quot;fis&quot;</span>,<span class="st">&quot;v2022&quot;</span>)</span></code></pre></div>
-<hr />
 </div>
-<div id="create-lookup-tables-to-match-ohi-region-names-to-saup-area_name-eez" class="section level1">
-<h1>Create lookup tables to match OHI region names to SAUP area_name
-(EEZ)</h1>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>fao_eez_prod <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(SAUP_path, <span class="st">&quot;eez_fao_ids_prod.csv&quot;</span>))</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>fao_high_seas <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">here</span>(SAUP_path, <span class="st">&quot;high_seas_fao_ids_prod.csv&quot;</span>))</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a></span>
+<div id="read-in-saup-catch-data-and-match-common-names-to-scientific-names" class="section level1">
+<h1>Read in SAUP catch data and match common names to scientific
+names</h1>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>taxon <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&#39;output/stock_catch_no_res.csv&#39;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>          dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">sciname =</span> TaxonName,</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>                 <span class="at">species =</span> CommonName,</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>                 TaxonKey) <span class="sc">%&gt;%</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>            <span class="fu">filter</span>(TaxonKey <span class="sc">&gt;</span> <span class="dv">599999</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>            <span class="fu">distinct</span>()</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co"># validate scientific names with fishbase</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>sp <span class="ot">&lt;-</span> taxon<span class="sc">$</span>sciname</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>fb <span class="ot">&lt;-</span> <span class="fu">validate_names</span>(sp)</span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>resil <span class="ot">&lt;-</span> <span class="fu">mclapply</span>(fb, rfishbase<span class="sc">::</span>stocks, <span class="at">fields =</span> <span class="fu">c</span>(<span class="st">&quot;Resilience&quot;</span>, <span class="st">&quot;Species&quot;</span>, <span class="st">&quot;SpecCode&quot;</span>), <span class="at">mc.cores=</span><span class="dv">1</span>) <span class="co"># more than one core was failing</span></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind.data.frame, resil) <span class="sc">%&gt;%</span> </span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>  <span class="fu">distinct</span>() </span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>res <span class="ot">&lt;-</span> res <span class="sc">%&gt;%</span></span>
+<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">sciname =</span> Species)</span>
+<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a></span>
+<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a>taxon_res <span class="ot">&lt;-</span> taxon <span class="sc">%&gt;%</span></span>
+<span id="cb1-25"><a href="#cb1-25" tabindex="-1"></a>            <span class="fu">left_join</span>(res, <span class="at">by=</span><span class="st">&#39;sciname&#39;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb1-26"><a href="#cb1-26" tabindex="-1"></a>            dplyr<span class="sc">::</span><span class="fu">select</span>(sciname, <span class="at">common =</span> species, Resilience, SpecCode)</span>
+<span id="cb1-27"><a href="#cb1-27" tabindex="-1"></a></span>
+<span id="cb1-28"><a href="#cb1-28" tabindex="-1"></a></span>
+<span id="cb1-29"><a href="#cb1-29" tabindex="-1"></a><span class="fu">write.csv</span>(taxon_res, <span class="st">&quot;int/taxon_res_int.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-30"><a href="#cb1-30" tabindex="-1"></a></span>
+<span id="cb1-31"><a href="#cb1-31" tabindex="-1"></a>taxon_res <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;int/taxon_res_int.csv&quot;</span>)</span></code></pre></div>
+<p>There are some duplicated species since fishbase provides resilience
+per stock…we’ll want to remove the duplicates</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>dup <span class="ot">&lt;-</span> taxon_res<span class="sc">$</span>sciname[<span class="fu">duplicated</span>(taxon_res<span class="sc">$</span>sciname)]</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>d <span class="ot">&lt;-</span> taxon_res <span class="sc">%&gt;%</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>      <span class="fu">filter</span>(sciname <span class="sc">%in%</span> dup)<span class="sc">%&gt;%</span> <span class="co">#select those species that are duplicated</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>      <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(Resilience)) <span class="co">#remove rows where one of those species has an NA for Resilience (this is most species)</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>dup_sp <span class="ot">&lt;-</span> d<span class="sc">$</span>sciname[<span class="fu">duplicated</span>(d<span class="sc">$</span>sciname)]</span></code></pre></div>
+<p>Now we have 2 species that have stocks with 2 different resiliences:
+“Clupea harengus” “Platichthys flesus”</p>
+<p>For these three species, we will remove all resilience’s except for
+Medium since Medium is the default resilience when there isn’t one for
+catch-MSY.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>three_sp <span class="ot">&lt;-</span> d <span class="sc">%&gt;%</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>            <span class="fu">filter</span>(sciname <span class="sc">%in%</span> dup_sp,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>                   Resilience <span class="sc">==</span> <span class="st">&quot;Medium&quot;</span>)</span>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a></span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>high_seas_regions <span class="ot">&lt;-</span> fao_high_seas <span class="sc">%&gt;%</span></span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="fu">distinct</span>(area_name) <span class="sc">%&gt;%</span></span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">area_name_ohi =</span> <span class="fu">case_when</span>(</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    area_name <span class="sc">==</span> <span class="st">&quot;Atlantic, Western Central&quot;</span> <span class="sc">~</span> <span class="st">&quot;Atlantic, Western-Central&quot;</span>,</span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    <span class="fu">str_detect</span>(area_name, <span class="st">&quot;Antarctic&quot;</span>) <span class="sc">~</span> <span class="st">&quot;Antarctica&quot;</span>,</span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> area_name</span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>  )) <span class="co"># fix some names</span></span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="fu">region_data</span>()</span>
-<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a></span>
-<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>high_seas_ohi <span class="ot">&lt;-</span> rgns_all <span class="sc">%&gt;%</span></span>
-<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_ant_id <span class="sc">&gt;=</span><span class="dv">260</span>)</span>
-<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a></span>
-<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="fu">sort</span>(<span class="fu">unique</span>(high_seas_regions<span class="sc">$</span>area_name))</span>
-<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a></span>
-<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="fu">setdiff</span>(high_seas_regions<span class="sc">$</span>area_name_ohi, high_seas_ohi<span class="sc">$</span>rgn_name) <span class="co">#    </span></span>
-<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a></span>
-<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="fu">setdiff</span>(high_seas_ohi<span class="sc">$</span>rgn_name, high_seas_regions<span class="sc">$</span>area_name_ohi)</span>
-<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a> </span>
-<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a></span>
-<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a>matched_high_seas_names <span class="ot">&lt;-</span> <span class="fu">left_join</span>(high_seas_regions, rgns_all, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;area_name_ohi&quot;</span> <span class="ot">=</span> <span class="st">&quot;rgn_name&quot;</span>), <span class="at">all =</span> <span class="cn">TRUE</span>) </span>
-<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a></span>
-<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a><span class="fu">write.csv</span>(matched_high_seas_names, <span class="st">&quot;int/high_seas_regions_lookup.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>) </span>
-<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a></span>
-<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a></span>
-<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a><span class="do">#### Now manually match all distinct &quot;area_name&quot;&#39;s in the SAUP EEZ dataset</span></span>
-<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a></span>
-<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a><span class="fu">region_data</span>()</span>
-<span id="cb3-32"><a href="#cb3-32" tabindex="-1"></a>rgns_eez <span class="ot">&lt;-</span> rgns_eez <span class="sc">%&gt;%</span></span>
-<span id="cb3-33"><a href="#cb3-33" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">rgn_name_2 =</span> rgn_name) <span class="sc">%&gt;%</span></span>
-<span id="cb3-34"><a href="#cb3-34" tabindex="-1"></a>  <span class="fu">distinct</span>(rgn_name, rgn_id, rgn_name_2)</span>
-<span id="cb3-35"><a href="#cb3-35" tabindex="-1"></a></span>
-<span id="cb3-36"><a href="#cb3-36" tabindex="-1"></a>eez_area_names <span class="ot">&lt;-</span> fao_eez_prod <span class="sc">%&gt;%</span></span>
-<span id="cb3-37"><a href="#cb3-37" tabindex="-1"></a>  <span class="fu">distinct</span>(area_name, rgn_num)</span>
-<span id="cb3-38"><a href="#cb3-38" tabindex="-1"></a></span>
-<span id="cb3-39"><a href="#cb3-39" tabindex="-1"></a>matched_area_names <span class="ot">&lt;-</span> <span class="fu">left_join</span>(eez_area_names, rgns_eez, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;area_name&quot;</span> <span class="ot">=</span> <span class="st">&quot;rgn_name&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb3-40"><a href="#cb3-40" tabindex="-1"></a>  <span class="fu">arrange</span>(area_name)</span>
-<span id="cb3-41"><a href="#cb3-41" tabindex="-1"></a><span class="fu">write.csv</span>(matched_area_names, <span class="st">&quot;int/area_name_lookup_raw.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb3-42"><a href="#cb3-42" tabindex="-1"></a></span>
-<span id="cb3-43"><a href="#cb3-43" tabindex="-1"></a></span>
-<span id="cb3-44"><a href="#cb3-44" tabindex="-1"></a>area_name_matched <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;int/area_name_lookup_manual.csv&quot;</span>) <span class="co"># perfect</span></span>
-<span id="cb3-45"><a href="#cb3-45" tabindex="-1"></a></span>
-<span id="cb3-46"><a href="#cb3-46" tabindex="-1"></a><span class="do">## gibraltar, monaco, oecussi ambeno are not included - will gapfill at the end.. assign them the scores of their admin regions (Spain, France, East Timor (?))</span></span></code></pre></div>
-</div>
-<div id="join-eez-and-high-seas-production-to-ohi-lookup-tables" class="section level1">
-<h1>Join EEZ and high seas production to OHI lookup tables</h1>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="do">#### Join high seas fishing entities and split appropriate regions</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>high_seas_matched <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;int/high_seas_regions_lookup.csv&quot;</span>) <span class="co"># perfect</span></span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>fao_high_seas <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">file.path</span>(SAUP_path, <span class="st">&quot;high_seas_fao_ids_prod.csv&quot;</span>))</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#all other duplicated species with the NA resilience&#39;s removed</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>other_sp <span class="ot">&lt;-</span> d <span class="sc">%&gt;%</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>            <span class="fu">filter</span>(<span class="sc">!</span>sciname <span class="sc">%in%</span> dup_sp)</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>taxon_res2 <span class="ot">&lt;-</span> taxon_res <span class="sc">%&gt;%</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>              <span class="fu">filter</span>(<span class="sc">!</span>sciname <span class="sc">%in%</span> dup) <span class="sc">%&gt;%</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>              <span class="fu">rbind</span>(other_sp) <span class="sc">%&gt;%</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>              <span class="fu">rbind</span>(three_sp)</span></code></pre></div>
+<p>We still have species with NA for Resilience. This is likely for
+non-fish species. We can try to get resilience for these species by
+setting the URL to SeaLifeBase in the stocks call.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>sp_w_nas <span class="ot">&lt;-</span> taxon_res2 <span class="sc">%&gt;%</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>            <span class="fu">filter</span>(<span class="fu">is.na</span>(Resilience)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>            .<span class="sc">$</span>sciname</span>
 <span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a></span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co"># check to see if any are missing (none should be...)</span></span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="fu">sort</span>(<span class="fu">setdiff</span>(high_seas_matched<span class="sc">$</span>area_name, fao_high_seas<span class="sc">$</span>area_name))</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="fu">write.csv</span>(sp_w_nas, <span class="st">&quot;int/sp_w_nas.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>resil <span class="ot">&lt;-</span> <span class="fu">mclapply</span>(sp_w_nas, stocks, <span class="at">fields =</span> <span class="fu">c</span>(<span class="st">&quot;Resilience&quot;</span>,<span class="st">&quot;Species&quot;</span>), <span class="at">mc.cores=</span><span class="dv">1</span>, <span class="at">server =</span> <span class="st">&quot;sealifebase&quot;</span>)</span>
 <span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a></span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co"># test &lt;- stocks(sp_w_nas[2], fields = c(&quot;Resilience&quot;, &quot;Species&quot;), server = &quot;sealifebase&quot;)</span></span>
 <span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>high_seas_ohi <span class="ot">&lt;-</span> fao_high_seas <span class="sc">%&gt;%</span></span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>  <span class="fu">left_join</span>(high_seas_matched, <span class="at">by =</span> <span class="st">&quot;area_name&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">tonnes =</span> <span class="fu">ifelse</span>(rgn_id <span class="sc">==</span> <span class="dv">213</span>, tonnes<span class="sc">/</span><span class="dv">19</span>, tonnes)) <span class="sc">%&gt;%</span> <span class="co"># split antartica regions since they have 19 duplicates...</span></span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>rgn_ant_id, <span class="sc">-</span>type_w_ant, <span class="sc">-</span>rgn_type) <span class="sc">%&gt;%</span></span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">rgn_name =</span> area_name_ohi)</span>
-<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a></span>
-<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="fu">unique</span>(high_seas_ohi<span class="sc">$</span>fishing_entity)</span>
-<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="fu">unique</span>(high_seas_ohi<span class="sc">$</span>notes)</span>
-<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a><span class="fu">sum</span>(high_seas_ohi<span class="sc">$</span>tonnes) <span class="co"># 122230592</span></span>
-<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="fu">sum</span>(fao_high_seas<span class="sc">$</span>tonnes) <span class="co"># 122230592 ; good they are the same </span></span>
-<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a></span>
-<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a></span>
-<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="co">#save file </span></span>
-<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="fu">write.csv</span>(high_seas_ohi, <span class="fu">file.path</span>(fis_path, <span class="st">&quot;ohi_rgn_high_seas_prod.csv&quot;</span>), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a></span>
-<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a> <span class="co"># high_seas_ohi &lt;- read.csv(file.path(fis_path, &quot;ohi_rgn_high_seas_prod.csv&quot;))</span></span>
-<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a></span>
-<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a><span class="do">#### Now match the EEZ production data to OHI regions using the lookup table </span></span>
-<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a></span>
-<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a>fao_eez_prod <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(SAUP_path, <span class="st">&quot;eez_fao_ids_prod.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>Area_km., <span class="sc">-</span>total_area, <span class="sc">-</span>area_prop, <span class="sc">-</span>tonnes) <span class="sc">%&gt;%</span></span>
-<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="st">&quot;tonnes&quot;</span> <span class="ot">=</span> <span class="st">&quot;tonnes_fix&quot;</span>, <span class="st">&quot;fao_id&quot;</span> <span class="ot">=</span> <span class="st">&quot;F_AREA&quot;</span>)</span>
-<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a></span>
-<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a>test <span class="ot">&lt;-</span> fao_eez_prod <span class="sc">%&gt;%</span></span>
-<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(area_name, <span class="st">&quot;Korea&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a>  <span class="fu">distinct</span>(area_name, rgn_num)</span>
-<span id="cb4-37"><a href="#cb4-37" tabindex="-1"></a><span class="fu">unique</span>(test<span class="sc">$</span>area_name)</span>
-<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a><span class="fu">unique</span>(test<span class="sc">$</span>rgn_num)</span>
-<span id="cb4-39"><a href="#cb4-39" tabindex="-1"></a></span>
-<span id="cb4-40"><a href="#cb4-40" tabindex="-1"></a>area_name_matched <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;int/area_name_lookup_manual.csv&quot;</span>)</span>
-<span id="cb4-41"><a href="#cb4-41" tabindex="-1"></a></span>
-<span id="cb4-42"><a href="#cb4-42" tabindex="-1"></a></span>
-<span id="cb4-43"><a href="#cb4-43" tabindex="-1"></a>eez_ohi <span class="ot">&lt;-</span> fao_eez_prod <span class="sc">%&gt;%</span></span>
-<span id="cb4-44"><a href="#cb4-44" tabindex="-1"></a>  <span class="fu">left_join</span>(area_name_matched, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;area_name&quot;</span>, <span class="st">&quot;rgn_num&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb4-45"><a href="#cb4-45" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">is.na</span>(notes) <span class="sc">|</span> <span class="fu">str_detect</span>(notes, <span class="st">&quot;Need to&quot;</span>)) <span class="do">## filter out regions that aren&#39;t OHI </span></span>
-<span id="cb4-46"><a href="#cb4-46" tabindex="-1"></a></span>
-<span id="cb4-47"><a href="#cb4-47" tabindex="-1"></a>test <span class="ot">&lt;-</span> eez_ohi <span class="sc">%&gt;%</span></span>
-<span id="cb4-48"><a href="#cb4-48" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">21</span>)</span>
-<span id="cb4-49"><a href="#cb4-49" tabindex="-1"></a></span>
-<span id="cb4-50"><a href="#cb4-50" tabindex="-1"></a><span class="fu">summary</span>(eez_ohi)</span>
-<span id="cb4-51"><a href="#cb4-51" tabindex="-1"></a></span>
-<span id="cb4-52"><a href="#cb4-52" tabindex="-1"></a>not_ohi_regions <span class="ot">&lt;-</span> fao_eez_prod <span class="sc">%&gt;%</span></span>
-<span id="cb4-53"><a href="#cb4-53" tabindex="-1"></a>    <span class="fu">left_join</span>(area_name_matched, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;area_name&quot;</span>, <span class="st">&quot;rgn_num&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb4-54"><a href="#cb4-54" tabindex="-1"></a>  <span class="fu">filter</span>(notes <span class="sc">==</span> <span class="st">&quot;Not an OHI region&quot;</span>)</span>
-<span id="cb4-55"><a href="#cb4-55" tabindex="-1"></a></span>
-<span id="cb4-56"><a href="#cb4-56" tabindex="-1"></a><span class="fu">nrow</span>(eez_ohi) <span class="sc">+</span> <span class="fu">nrow</span>(not_ohi_regions) <span class="sc">==</span> <span class="fu">nrow</span>(fao_eez_prod) <span class="co"># TRUE ; perfect</span></span>
-<span id="cb4-57"><a href="#cb4-57" tabindex="-1"></a></span>
-<span id="cb4-58"><a href="#cb4-58" tabindex="-1"></a>not_rgn <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">unique</span>(not_ohi_regions<span class="sc">$</span>area_name))</span>
-<span id="cb4-59"><a href="#cb4-59" tabindex="-1"></a></span>
-<span id="cb4-60"><a href="#cb4-60" tabindex="-1"></a>fao_eez_prod_fix <span class="ot">&lt;-</span> fao_eez_prod <span class="sc">%&gt;%</span></span>
-<span id="cb4-61"><a href="#cb4-61" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>(area_name <span class="sc">%in%</span> <span class="fu">c</span>(not_rgn)))</span>
-<span id="cb4-62"><a href="#cb4-62" tabindex="-1"></a></span>
-<span id="cb4-63"><a href="#cb4-63" tabindex="-1"></a><span class="fu">unique</span>(eez_ohi<span class="sc">$</span>area_name)</span>
-<span id="cb4-64"><a href="#cb4-64" tabindex="-1"></a><span class="fu">unique</span>(eez_ohi<span class="sc">$</span>rgn_name)</span>
-<span id="cb4-65"><a href="#cb4-65" tabindex="-1"></a><span class="fu">unique</span>(eez_ohi<span class="sc">$</span>notes)</span>
-<span id="cb4-66"><a href="#cb4-66" tabindex="-1"></a><span class="fu">unique</span>(area_name_matched<span class="sc">$</span>notes)</span>
-<span id="cb4-67"><a href="#cb4-67" tabindex="-1"></a><span class="fu">sum</span>(eez_ohi<span class="sc">$</span>tonnes) <span class="sc">==</span> <span class="fu">sum</span>(fao_eez_prod_fix<span class="sc">$</span>tonnes) <span class="co"># TRUE ; good </span></span>
-<span id="cb4-68"><a href="#cb4-68" tabindex="-1"></a></span>
-<span id="cb4-69"><a href="#cb4-69" tabindex="-1"></a><span class="co"># Now lets split the regions that need to be split. For these we will equally split the catch between the 2/3 regions for every observation ;</span></span>
-<span id="cb4-70"><a href="#cb4-70" tabindex="-1"></a></span>
-<span id="cb4-71"><a href="#cb4-71" tabindex="-1"></a><span class="co"># &quot;Channel Isl. (UK)&quot; ; split into 1) Guernsey 2) Jersey</span></span>
-<span id="cb4-72"><a href="#cb4-72" tabindex="-1"></a><span class="co"># &quot;Kiribati&quot; ; split into 1) Saba 2) Sint Eustatius</span></span>
-<span id="cb4-73"><a href="#cb4-73" tabindex="-1"></a><span class="co"># Mozambique Channel Isl. (France); split into 1) Juan de Nova Island 2) Bassas da India 3) Ile Europa</span></span>
-<span id="cb4-74"><a href="#cb4-74" tabindex="-1"></a></span>
-<span id="cb4-75"><a href="#cb4-75" tabindex="-1"></a></span>
-<span id="cb4-76"><a href="#cb4-76" tabindex="-1"></a>split_eez <span class="ot">&lt;-</span> eez_ohi <span class="sc">%&gt;%</span></span>
-<span id="cb4-77"><a href="#cb4-77" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(notes))</span>
-<span id="cb4-78"><a href="#cb4-78" tabindex="-1"></a></span>
-<span id="cb4-79"><a href="#cb4-79" tabindex="-1"></a><span class="fu">unique</span>(split_eez<span class="sc">$</span>area_name)</span>
-<span id="cb4-80"><a href="#cb4-80" tabindex="-1"></a></span>
-<span id="cb4-81"><a href="#cb4-81" tabindex="-1"></a>split_saba_sint <span class="ot">&lt;-</span> split_eez <span class="sc">%&gt;%</span></span>
-<span id="cb4-82"><a href="#cb4-82" tabindex="-1"></a>  <span class="fu">filter</span>(area_name <span class="sc">==</span> <span class="st">&quot;Saba and Sint Eustatius (Netherlands)&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-83"><a href="#cb4-83" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">split_col =</span> <span class="st">&quot;Saba;Sint Eustatius&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-84"><a href="#cb4-84" tabindex="-1"></a>  <span class="fu">separate_rows</span>(split_col, <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-85"><a href="#cb4-85" tabindex="-1"></a>  <span class="fu">group_by</span>(area_name, area_type, year, scientific_name, common_name, </span>
-<span id="cb4-86"><a href="#cb4-86" tabindex="-1"></a>functional_group, commercial_group, fishing_entity, fishing_sector, </span>
-<span id="cb4-87"><a href="#cb4-87" tabindex="-1"></a>catch_type, reporting_status, gear_type, end_use_type, </span>
-<span id="cb4-88"><a href="#cb4-88" tabindex="-1"></a>tonnes, fao_id) <span class="sc">%&gt;%</span></span>
-<span id="cb4-89"><a href="#cb4-89" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">tonnes =</span> tonnes<span class="sc">/</span><span class="dv">2</span>) <span class="sc">%&gt;%</span> <span class="co"># now we will divide each observation by 3, to equally split the tonnes of catch</span></span>
-<span id="cb4-90"><a href="#cb4-90" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
-<span id="cb4-91"><a href="#cb4-91" tabindex="-1"></a><span class="fu">sum</span>(split_saba_sint<span class="sc">$</span>tonnes) <span class="co"># 14362.37 ; perfect</span></span>
-<span id="cb4-92"><a href="#cb4-92" tabindex="-1"></a></span>
-<span id="cb4-93"><a href="#cb4-93" tabindex="-1"></a>split_channel <span class="ot">&lt;-</span> split_eez <span class="sc">%&gt;%</span></span>
-<span id="cb4-94"><a href="#cb4-94" tabindex="-1"></a>  <span class="fu">filter</span>(area_name <span class="sc">==</span> <span class="st">&quot;Channel Isl. (UK)&quot;</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb4-95"><a href="#cb4-95" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">split_col =</span> <span class="st">&quot;Guernsey;Jersey&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-96"><a href="#cb4-96" tabindex="-1"></a>  <span class="fu">separate_rows</span>(split_col, <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-97"><a href="#cb4-97" tabindex="-1"></a>  <span class="fu">group_by</span>(area_name, area_type, year, scientific_name, common_name, </span>
-<span id="cb4-98"><a href="#cb4-98" tabindex="-1"></a>functional_group, commercial_group, fishing_entity, fishing_sector, </span>
-<span id="cb4-99"><a href="#cb4-99" tabindex="-1"></a>catch_type, reporting_status, gear_type, end_use_type, </span>
-<span id="cb4-100"><a href="#cb4-100" tabindex="-1"></a>tonnes, fao_id) <span class="sc">%&gt;%</span></span>
-<span id="cb4-101"><a href="#cb4-101" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">tonnes =</span> tonnes<span class="sc">/</span><span class="dv">2</span>) <span class="sc">%&gt;%</span> <span class="co"># now we will divide each observation by 2, to equally split the tonnes of catch</span></span>
-<span id="cb4-102"><a href="#cb4-102" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
-<span id="cb4-103"><a href="#cb4-103" tabindex="-1"></a><span class="fu">sum</span>(split_channel<span class="sc">$</span>tonnes) <span class="co"># 959896.5 ; perfect </span></span>
-<span id="cb4-104"><a href="#cb4-104" tabindex="-1"></a></span>
-<span id="cb4-105"><a href="#cb4-105" tabindex="-1"></a>split_channel_moz <span class="ot">&lt;-</span> split_eez <span class="sc">%&gt;%</span></span>
-<span id="cb4-106"><a href="#cb4-106" tabindex="-1"></a>  <span class="fu">filter</span>(area_name <span class="sc">==</span> <span class="st">&quot;Mozambique Channel Isl. (France)&quot;</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb4-107"><a href="#cb4-107" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">split_col =</span> <span class="st">&quot;Juan de Nova Island;Bassas da India;Ile Europa&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-108"><a href="#cb4-108" tabindex="-1"></a>  <span class="fu">separate_rows</span>(split_col, <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-109"><a href="#cb4-109" tabindex="-1"></a>  <span class="fu">group_by</span>(area_name, area_type, year, scientific_name, common_name, </span>
-<span id="cb4-110"><a href="#cb4-110" tabindex="-1"></a>functional_group, commercial_group, fishing_entity, fishing_sector, </span>
-<span id="cb4-111"><a href="#cb4-111" tabindex="-1"></a>catch_type, reporting_status, gear_type, end_use_type, </span>
-<span id="cb4-112"><a href="#cb4-112" tabindex="-1"></a>tonnes, fao_id) <span class="sc">%&gt;%</span></span>
-<span id="cb4-113"><a href="#cb4-113" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">tonnes =</span> tonnes<span class="sc">/</span><span class="dv">3</span>) <span class="sc">%&gt;%</span> <span class="co"># now we will divide each observation by 3, to equally split the tonnes of catch</span></span>
-<span id="cb4-114"><a href="#cb4-114" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
-<span id="cb4-115"><a href="#cb4-115" tabindex="-1"></a><span class="fu">sum</span>(split_channel_moz<span class="sc">$</span>tonnes) <span class="co"># 328292.1 ; perfect </span></span>
-<span id="cb4-116"><a href="#cb4-116" tabindex="-1"></a></span>
-<span id="cb4-117"><a href="#cb4-117" tabindex="-1"></a><span class="co">#rbind splits </span></span>
-<span id="cb4-118"><a href="#cb4-118" tabindex="-1"></a>split_eez_df <span class="ot">&lt;-</span> <span class="fu">rbind</span>(split_channel, split_saba_sint, split_channel_moz) <span class="sc">%&gt;%</span></span>
-<span id="cb4-119"><a href="#cb4-119" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>rgn_name, <span class="sc">-</span>rgn_id) <span class="sc">%&gt;%</span></span>
-<span id="cb4-120"><a href="#cb4-120" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="st">&quot;rgn_name&quot;</span> <span class="ot">=</span> <span class="st">&quot;split_col&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-121"><a href="#cb4-121" tabindex="-1"></a>  <span class="fu">left_join</span>(rgns_eez, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_name&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb4-122"><a href="#cb4-122" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>rgn_name_2)</span>
-<span id="cb4-123"><a href="#cb4-123" tabindex="-1"></a></span>
-<span id="cb4-124"><a href="#cb4-124" tabindex="-1"></a><span class="co"># rbind back to final high seas matched df</span></span>
-<span id="cb4-125"><a href="#cb4-125" tabindex="-1"></a>final_eez_matched <span class="ot">&lt;-</span> eez_ohi <span class="sc">%&gt;%</span></span>
-<span id="cb4-126"><a href="#cb4-126" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">is.na</span>(notes)) <span class="sc">%&gt;%</span></span>
-<span id="cb4-127"><a href="#cb4-127" tabindex="-1"></a>  <span class="fu">rbind</span>(split_eez_df) <span class="sc">%&gt;%</span></span>
-<span id="cb4-128"><a href="#cb4-128" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>rgn_num)</span>
-<span id="cb4-129"><a href="#cb4-129" tabindex="-1"></a><span class="fu">sum</span>(final_eez_matched<span class="sc">$</span>tonnes) <span class="sc">==</span> <span class="fu">sum</span>(fao_eez_prod_fix<span class="sc">$</span>tonnes) <span class="co"># TRUE perfect</span></span>
-<span id="cb4-130"><a href="#cb4-130" tabindex="-1"></a></span>
-<span id="cb4-131"><a href="#cb4-131" tabindex="-1"></a><span class="co">#save file </span></span>
-<span id="cb4-132"><a href="#cb4-132" tabindex="-1"></a><span class="fu">write.csv</span>(final_eez_matched, <span class="fu">file.path</span>(fis_path, <span class="st">&quot;ohi_rgn_eez_prod.csv&quot;</span>), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
-</div>
-<div id="aggregate-catch" class="section level1">
-<h1>Aggregate catch</h1>
-<p>Aggregate catch per OHI region and FAO area. This catch will be used
-twice.</p>
-<ol style="list-style-type: decimal">
-<li><p>The catch is used to weight scores per region. For this we need
-to use catch records, including those not reported at the species level.
-See note below.</p></li>
-<li><p>The catch data at species level is used to calculate stock status
-(BBmsy) per stock (remember that our definition of a stock is a species
-caught within a single FAO area) For this, we will include discards and
-“Other” end use type, as well as FOFM species.</p></li>
-</ol>
-<p>Note: Save IUU and Reported landings only (<code>CatchTotal</code>)
-as the catch sum. This is different from v2018, which saved it as IUU,
-Reported, and Discards.</p>
-<p><strong>Total Catch</strong></p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="do">## Read in data files </span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>eez_ohi_prod <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">file.path</span>(fis_path, <span class="st">&quot;ohi_rgn_eez_prod.csv&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>notes, <span class="sc">-</span>column_label)</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a></span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>high_seas_ohi_prod <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">file.path</span>(fis_path, <span class="st">&quot;ohi_rgn_high_seas_prod.csv&quot;</span>))</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a></span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>all_saup_ohi_prod <span class="ot">&lt;-</span> <span class="fu">rbind</span>(eez_ohi_prod, high_seas_ohi_prod)</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a></span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(eez_ohi_prod<span class="sc">$</span>rgn_id))</span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="fu">sort</span>(<span class="fu">unique</span>(eez_ohi_prod<span class="sc">$</span>rgn_id))</span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a></span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co"># test &lt;- all_saup_ohi_prod %&gt;%</span></span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#   filter(end_use_type == &quot;Fishmeal and fish oil&quot;) %&gt;%</span></span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#   group_by(year) %&gt;%</span></span>
-<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#   summarise(tonnes = sum(tonnes)) ##  Keep identifiers for discards, other, fofm, and fishing_sector. Eventually we will filter some of these out, but for now we will keep them and save a version with everything, to use in our B/Bmsy calculations.</span></span>
-<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co"># sum(test$tonnes)</span></span>
-<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a></span>
-<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="do">## wrangle data into what we need (total catch per OHI region per stock)</span></span>
-<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a></span>
-<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a>output_df <span class="ot">&lt;-</span> all_saup_ohi_prod <span class="sc">%&gt;%</span></span>
-<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a>  <span class="co"># filter(catch_type != &quot;Discards&quot;) %&gt;% # filter out discards, so that we only keep reported and IUU</span></span>
-<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">fofm_id =</span> <span class="fu">ifelse</span>(end_use_type <span class="sc">==</span> <span class="st">&quot;Fishmeal and fish oil&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>),</span>
-<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a>                <span class="at">discard_id =</span> <span class="fu">ifelse</span>(catch_type <span class="sc">==</span> <span class="st">&quot;Discards&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>),</span>
-<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a>                <span class="at">other_id =</span> <span class="fu">ifelse</span>(end_use_type <span class="sc">==</span> <span class="st">&quot;Other&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>),</span>
-<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a>                <span class="at">human_use_id =</span> <span class="fu">ifelse</span>(end_use_type <span class="sc">==</span> <span class="st">&quot;Direct human consumption&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">TaxonName =</span> scientific_name, <span class="at">CommonName =</span> common_name, <span class="at">CatchTotal =</span> tonnes) <span class="sc">%&gt;%</span></span>
-<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(year, rgn_id, fao_id, TaxonName, CommonName, fofm_id, discard_id, other_id, human_use_id, fishing_sector) <span class="sc">%&gt;%</span></span>
-<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarise</span>(<span class="at">catch =</span> <span class="fu">sum</span>(CatchTotal)) <span class="sc">%&gt;%</span></span>
-<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">stock_id =</span> <span class="fu">gsub</span>(<span class="st">&quot; &quot;</span>, <span class="st">&quot;_&quot;</span>, <span class="fu">paste</span>(TaxonName, fao_id, <span class="at">sep=</span><span class="st">&quot;-&quot;</span>), <span class="at">fixed=</span><span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">fao_rgn =</span> fao_id,</span>
-<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a>                <span class="at">tons =</span> catch) </span>
-<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a> </span>
-<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a><span class="co"># test &lt;- output_df %&gt;%</span></span>
-<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a><span class="co">#   filter(rgn_id &lt; 255) %&gt;%</span></span>
-<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a><span class="co">#   filter(rgn_id != 213) %&gt;%</span></span>
-<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a><span class="co">#   filter(rgn_id == 21)</span></span>
-<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a></span>
-<span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(test<span class="sc">$</span>rgn_id)) <span class="co"># 217.. missing oecussi ambeno, gibraltar, and monaco. These are expected, and we will gapfill them in functions.R. </span></span>
-<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a></span>
-<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a><span class="fu">write.csv</span>(output_df, <span class="at">file =</span> <span class="fu">file.path</span>(dir_M,<span class="st">&#39;git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn.csv&#39;</span>), <span class="at">row.names=</span><span class="cn">FALSE</span>)</span>
-<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a></span>
-<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a><span class="fu">unique</span>(output_df<span class="sc">$</span>year)</span>
-<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a><span class="fu">unique</span>(output_df<span class="sc">$</span>rgn_id)</span>
-<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a><span class="fu">unique</span>(output_df<span class="sc">$</span>fao_rgn)</span>
-<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a><span class="fu">sort</span>(<span class="fu">unique</span>(output_df<span class="sc">$</span>stock_id))</span>
-<span id="cb5-47"><a href="#cb5-47" tabindex="-1"></a><span class="fu">unique</span>(output_df<span class="sc">$</span>fishing_sector)</span>
-<span id="cb5-48"><a href="#cb5-48" tabindex="-1"></a></span>
-<span id="cb5-49"><a href="#cb5-49" tabindex="-1"></a><span class="do">## compare to last year</span></span>
-<span id="cb5-50"><a href="#cb5-50" tabindex="-1"></a></span>
-<span id="cb5-51"><a href="#cb5-51" tabindex="-1"></a>old_output_df <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">file.path</span>(dir_M,<span class="st">&#39;git-annex/globalprep/fis/v2021/int/stock_catch_by_rgn.csv&#39;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb5-52"><a href="#cb5-52" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">&lt;</span> <span class="dv">255</span>)</span>
-<span id="cb5-53"><a href="#cb5-53" tabindex="-1"></a></span>
-<span id="cb5-54"><a href="#cb5-54" tabindex="-1"></a>test_old <span class="ot">&lt;-</span> old_output_df <span class="sc">%&gt;%</span></span>
-<span id="cb5-55"><a href="#cb5-55" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
-<span id="cb5-56"><a href="#cb5-56" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">sum =</span> <span class="fu">sum</span>(tons))</span>
-<span id="cb5-57"><a href="#cb5-57" tabindex="-1"></a></span>
-<span id="cb5-58"><a href="#cb5-58" tabindex="-1"></a><span class="fu">unique</span>(old_output_df<span class="sc">$</span>year)</span>
-<span id="cb5-59"><a href="#cb5-59" tabindex="-1"></a><span class="fu">unique</span>(old_output_df<span class="sc">$</span>rgn_id)</span>
-<span id="cb5-60"><a href="#cb5-60" tabindex="-1"></a><span class="fu">unique</span>(old_output_df<span class="sc">$</span>fao_rgn)</span>
-<span id="cb5-61"><a href="#cb5-61" tabindex="-1"></a><span class="fu">sort</span>(<span class="fu">unique</span>(old_output_df<span class="sc">$</span>stock_id))</span>
-<span id="cb5-62"><a href="#cb5-62" tabindex="-1"></a></span>
-<span id="cb5-63"><a href="#cb5-63" tabindex="-1"></a>test_old_2018 <span class="ot">&lt;-</span> old_output_df <span class="sc">%&gt;%</span></span>
-<span id="cb5-64"><a href="#cb5-64" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2018</span>)</span>
-<span id="cb5-65"><a href="#cb5-65" tabindex="-1"></a><span class="fu">sum</span>(test_old_2018<span class="sc">$</span>tons) <span class="co"># 105959436</span></span>
-<span id="cb5-66"><a href="#cb5-66" tabindex="-1"></a></span>
-<span id="cb5-67"><a href="#cb5-67" tabindex="-1"></a>test_saup_2018 <span class="ot">&lt;-</span> output_df <span class="sc">%&gt;%</span></span>
-<span id="cb5-68"><a href="#cb5-68" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2018</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb5-69"><a href="#cb5-69" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">&lt;</span> <span class="dv">255</span>)</span>
-<span id="cb5-70"><a href="#cb5-70" tabindex="-1"></a><span class="fu">sum</span>(test_saup_2018<span class="sc">$</span>tons) <span class="co"># 103167419 - a little less this year</span></span>
-<span id="cb5-71"><a href="#cb5-71" tabindex="-1"></a></span>
-<span id="cb5-72"><a href="#cb5-72" tabindex="-1"></a>test <span class="ot">&lt;-</span> all_saup_ohi_prod <span class="sc">%&gt;%</span></span>
-<span id="cb5-73"><a href="#cb5-73" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2018</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb5-74"><a href="#cb5-74" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">&lt;</span> <span class="dv">255</span>)</span>
-<span id="cb5-75"><a href="#cb5-75" tabindex="-1"></a><span class="fu">sum</span>(test<span class="sc">$</span>tonnes) <span class="co"># 103167419</span></span>
-<span id="cb5-76"><a href="#cb5-76" tabindex="-1"></a></span>
-<span id="cb5-77"><a href="#cb5-77" tabindex="-1"></a><span class="fu">setdiff</span>(test_saup_2018<span class="sc">$</span>stock_id, test_old_2018<span class="sc">$</span>stock_id)</span>
-<span id="cb5-78"><a href="#cb5-78" tabindex="-1"></a><span class="fu">setdiff</span>(test_old_2018<span class="sc">$</span>stock_id, test_saup_2018<span class="sc">$</span>stock_id) <span class="co"># lots of stock_id differences. Expected given the new data.</span></span></code></pre></div>
-<div id="add-taxon-key-information" class="section level2">
-<h2>Add Taxon Key Information</h2>
-<p>Need taxon key to easily remove higher level (e.g. genus) taxonomic
-catch data. Unique taxon key was extracted from Watson 2019 (v5)
-Codes.xlsx, sheet name “Taxa” and from our old (v2016/v2017) SAUP data
-(taxon keys were provided directly from SAUP).</p>
-<p>Must have taxon key match for every stock. If some are not matched,
-do it manually by searching the SAUP website.</p>
-<p>Look at which entries that don’t have a Taxon key match. Search taxon
-in <a href="http://www.seaaroundus.org/data/#/topic/biodiversity">Sea
-Around Us</a> website. Click on “View graph for catches of <em>Taxon
-Name</em>” link in the results. It’ll take you to a new page. The Taxon
-key is the six digit code in the url.</p>
-<p><strong>Note:</strong> for v2022, all we will need to do is to grab
-v2021’s taxon_key_v2021.csv, and use that as our taxonkey lookup df
-(i.e. the “taxon_key_SAUP_watson” dataframe)</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>stock_rgn <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">file.path</span>(dir_M,<span class="st">&#39;git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn.csv&#39;</span>))</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>taxon_key_SAUP <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;int/taxon_key_v2021.csv&quot;</span>)</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a></span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>duplicated_taxa <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="fu">cbind</span>(taxon_key_SAUP, <span class="at">dups =</span> <span class="fu">duplicated</span>(taxon_key_SAUP<span class="sc">$</span>TaxonKey))) <span class="sc">%&gt;%</span></span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="fu">filter</span>(dups <span class="sc">==</span> <span class="cn">TRUE</span>) <span class="co"># no dups</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="fu">setdiff</span>(<span class="fu">paste</span>(taxon_key_SAUP<span class="sc">$</span>TaxonName, taxon_key_SAUP<span class="sc">$</span>CommonName), </span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>        <span class="fu">paste</span>(stock_rgn<span class="sc">$</span>TaxonName, stock_rgn<span class="sc">$</span>CommonName))</span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>no_taxonkey <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="fu">paste</span>(stock_rgn<span class="sc">$</span>TaxonName,stock_rgn<span class="sc">$</span>CommonName), </span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>                       <span class="fu">paste</span>(taxon_key_SAUP<span class="sc">$</span>TaxonName, taxon_key_SAUP<span class="sc">$</span>CommonName)) <span class="co"># 298 do not match... We need to look these up manually on the SAUP website. I emailed SAUP about obtaining all of the keys, so hopefully that will happen so we can make this prep more tidy. For now, lets write the list of no taxon keys to a csv, and start manually looking them up on SAUPs website...</span></span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a></span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="fu">write.csv</span>(<span class="fu">sort</span>(no_taxonkey), <span class="st">&quot;int/no_taxon_key.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a></span>
-<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="co"># Once you fill out the csv file with the taxon keys obtained from SAUP website, reupload as &quot;no_taxon_key_fix.csv&quot;</span></span>
-<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a></span>
-<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>no_taxon_key_fix <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;int/no_taxon_key_fix.csv&quot;</span>)</span>
-<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a></span>
-<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a><span class="fu">duplicated</span>(no_taxon_key_fix<span class="sc">$</span>TaxonKey)</span>
-<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a></span>
-<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a>new_taxa <span class="ot">&lt;-</span> stock_rgn <span class="sc">%&gt;%</span> </span>
-<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">stock =</span> <span class="fu">paste</span>(stock_rgn<span class="sc">$</span>TaxonName, stock_rgn<span class="sc">$</span>CommonName)) <span class="sc">%&gt;%</span></span>
-<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>  <span class="fu">left_join</span>(no_taxon_key_fix, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;stock&quot;</span> <span class="ot">=</span> <span class="st">&quot;x&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(TaxonKey)) <span class="sc">%&gt;%</span></span>
-<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(TaxonName, CommonName, TaxonKey, stock) <span class="sc">%&gt;%</span></span>
-<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a>  <span class="fu">unique</span>() </span>
-<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a></span>
-<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a>taxonkey <span class="ot">&lt;-</span> <span class="fu">rbind</span>(taxon_key_SAUP, new_taxa) </span>
-<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a></span>
-<span id="cb6-31"><a href="#cb6-31" tabindex="-1"></a>duplicated_stocks <span class="ot">&lt;-</span> <span class="fu">cbind</span>(taxonkey, <span class="at">dups =</span> <span class="fu">duplicated</span>(taxonkey<span class="sc">$</span>TaxonKey)) <span class="sc">%&gt;%</span></span>
-<span id="cb6-32"><a href="#cb6-32" tabindex="-1"></a>  <span class="fu">filter</span>(dups <span class="sc">==</span> <span class="cn">TRUE</span>) <span class="do">## there are some duplicated stocks for some reason, we need to remove these.  </span></span>
-<span id="cb6-33"><a href="#cb6-33" tabindex="-1"></a></span>
-<span id="cb6-34"><a href="#cb6-34" tabindex="-1"></a>all_duplicated_stocks <span class="ot">&lt;-</span> taxonkey <span class="sc">%&gt;%</span></span>
-<span id="cb6-35"><a href="#cb6-35" tabindex="-1"></a>  <span class="fu">filter</span>(TaxonKey <span class="sc">%in%</span> duplicated_stocks<span class="sc">$</span>TaxonKey) <span class="sc">%&gt;%</span> </span>
-<span id="cb6-36"><a href="#cb6-36" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">stock =</span> <span class="fu">paste</span>(TaxonName, CommonName))</span>
-<span id="cb6-37"><a href="#cb6-37" tabindex="-1"></a></span>
-<span id="cb6-38"><a href="#cb6-38" tabindex="-1"></a><span class="co"># stock_rgn &lt;- read_csv(file.path(dir_M,&#39;git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn.csv&#39;))</span></span>
-<span id="cb6-39"><a href="#cb6-39" tabindex="-1"></a></span>
-<span id="cb6-40"><a href="#cb6-40" tabindex="-1"></a>stock_rgn_test <span class="ot">&lt;-</span> stock_rgn <span class="sc">%&gt;%</span></span>
-<span id="cb6-41"><a href="#cb6-41" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">stock =</span> <span class="fu">paste</span>(TaxonName, CommonName))</span>
-<span id="cb6-42"><a href="#cb6-42" tabindex="-1"></a></span>
-<span id="cb6-43"><a href="#cb6-43" tabindex="-1"></a>dups_not_in_SAUP <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">setdiff</span>(all_duplicated_stocks<span class="sc">$</span>stock, stock_rgn_test<span class="sc">$</span>stock))</span>
-<span id="cb6-44"><a href="#cb6-44" tabindex="-1"></a></span>
-<span id="cb6-45"><a href="#cb6-45" tabindex="-1"></a><span class="co"># now filter out the duplicated stocks that are NOT in SAUP production data</span></span>
-<span id="cb6-46"><a href="#cb6-46" tabindex="-1"></a></span>
-<span id="cb6-47"><a href="#cb6-47" tabindex="-1"></a>taxonkey_no_dups <span class="ot">&lt;-</span> taxonkey <span class="sc">%&gt;%</span></span>
-<span id="cb6-48"><a href="#cb6-48" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">stock =</span> <span class="fu">paste</span>(TaxonName, CommonName)) <span class="sc">%&gt;%</span></span>
-<span id="cb6-49"><a href="#cb6-49" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>(stock <span class="sc">%in%</span> <span class="fu">c</span>(dups_not_in_SAUP))) </span>
-<span id="cb6-50"><a href="#cb6-50" tabindex="-1"></a></span>
-<span id="cb6-51"><a href="#cb6-51" tabindex="-1"></a>duplicated_stocks_2 <span class="ot">&lt;-</span> <span class="fu">cbind</span>(taxonkey_no_dups, <span class="at">dups =</span> <span class="fu">duplicated</span>(taxonkey_no_dups<span class="sc">$</span>stock)) <span class="sc">%&gt;%</span></span>
-<span id="cb6-52"><a href="#cb6-52" tabindex="-1"></a>  <span class="fu">filter</span>(dups <span class="sc">==</span> <span class="cn">TRUE</span>) <span class="co"># there are still 2 stocks which have hte same names but different numbers. This will cause a problem with the join. Get rid of these taxonkeys... as long as we retain one of each in the taxonkey df then we are fine. </span></span>
-<span id="cb6-53"><a href="#cb6-53" tabindex="-1"></a></span>
-<span id="cb6-54"><a href="#cb6-54" tabindex="-1"></a>taxonkey_no_dups <span class="ot">&lt;-</span> taxonkey_no_dups <span class="sc">%&gt;%</span></span>
-<span id="cb6-55"><a href="#cb6-55" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>(TaxonKey <span class="sc">%in%</span> duplicated_stocks_2<span class="sc">$</span>TaxonKey))</span>
-<span id="cb6-56"><a href="#cb6-56" tabindex="-1"></a></span>
-<span id="cb6-57"><a href="#cb6-57" tabindex="-1"></a><span class="fu">write.csv</span>(taxonkey_no_dups, <span class="st">&quot;int/taxon_key_v2022.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>)</span></code></pre></div>
-<p>Add taxa to the stock catch by region.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="do">## read in modified taxon key table</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>taxonkey <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;int/taxon_key_v2022.csv&quot;</span>, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>stock_rgn <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(dir_M,<span class="st">&#39;git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn.csv&#39;</span>))</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>duplicated <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="fu">cbind</span>(taxonkey, <span class="fu">duplicated</span>(taxonkey<span class="sc">$</span>stock))) <span class="co"># no dups</span></span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>duplicated <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="fu">cbind</span>(taxonkey, <span class="fu">duplicated</span>(taxonkey<span class="sc">$</span>TaxonKey))) <span class="co"># no dups</span></span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a></span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co"># check</span></span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="fu">setdiff</span>(<span class="fu">paste</span>(taxonkey<span class="sc">$</span>TaxonName, taxonkey_no_dups<span class="sc">$</span>CommonName), </span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>        <span class="fu">paste</span>(stock_rgn<span class="sc">$</span>TaxonName, stock_rgn<span class="sc">$</span>CommonName)) <span class="co"># lots of diffs... that is ok. These are probably left-over stocks and taxonkeys from former versions of OHI that are no longer represented in the fisheries data, or decommissioned stocks. </span></span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="fu">setdiff</span>(<span class="fu">paste</span>(stock_rgn<span class="sc">$</span>TaxonName, stock_rgn<span class="sc">$</span>CommonName), </span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  <span class="fu">paste</span>(taxonkey<span class="sc">$</span>TaxonName, taxonkey<span class="sc">$</span>CommonName)) <span class="co"># any diffs here will need to be corrected; there are none!</span></span>
-<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a></span>
-<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a></span>
-<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>stock_rgn_taxa <span class="ot">&lt;-</span> stock_rgn <span class="sc">%&gt;%</span> </span>
-<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>  <span class="fu">left_join</span>(taxonkey, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;TaxonName&quot;</span>,<span class="st">&quot;CommonName&quot;</span>)) <span class="sc">%&gt;%</span> <span class="do">### it worked</span></span>
-<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>stock)</span>
-<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a></span>
-<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a></span>
-<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a><span class="fu">sum</span>(stock_rgn<span class="sc">$</span>tons)</span>
-<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a><span class="fu">sum</span>(stock_rgn_taxa<span class="sc">$</span>tons)</span>
-<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a></span>
-<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a><span class="fu">summary</span>(stock_rgn_taxa) <span class="co"># there should be no NAs for TaxonKey</span></span>
-<span id="cb7-24"><a href="#cb7-24" tabindex="-1"></a></span>
-<span id="cb7-25"><a href="#cb7-25" tabindex="-1"></a><span class="fu">write.csv</span>(stock_rgn_taxa, <span class="fu">file.path</span>(dir_M,<span class="st">&#39;git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv&#39;</span>), <span class="at">row.names=</span><span class="cn">FALSE</span>)</span>
-<span id="cb7-26"><a href="#cb7-26" tabindex="-1"></a></span>
-<span id="cb7-27"><a href="#cb7-27" tabindex="-1"></a></span>
-<span id="cb7-28"><a href="#cb7-28" tabindex="-1"></a><span class="co"># test &lt;- stock_rgn_taxa %&gt;%</span></span>
-<span id="cb7-29"><a href="#cb7-29" tabindex="-1"></a><span class="co">#   filter(rgn_id &lt; 255) %&gt;%</span></span>
-<span id="cb7-30"><a href="#cb7-30" tabindex="-1"></a><span class="co">#   distinct(rgn_id) %&gt;%</span></span>
-<span id="cb7-31"><a href="#cb7-31" tabindex="-1"></a><span class="co">#   left_join(rgns_eez)</span></span></code></pre></div>
-</div>
-<div id="wrangle" class="section level2">
-<h2>Wrangle</h2>
-<p>Filter out all stocks that don’t meet our conditions. This prep will
-be used for B/Bmsy calculations. We will include ALL catch here
-(including discards):</p>
-<ol style="list-style-type: decimal">
-<li>Keep all stocks that have at least an average annual harvest of 1000
-tons</li>
-<li>Keep all stocks with time series of 20 years or more</li>
-</ol>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="do">## KEEP DISCARDS, FOFM, and OTHER FOR THIS DF (THIS DF IS FOR BBMSY CALCS)</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="do">## set variables to filter by</span></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>min_yrs <span class="ot">=</span> <span class="dv">20</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>min_tons <span class="ot">=</span> <span class="dv">1000</span></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="do">## read in catch data created above</span></span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(dir_M,<span class="st">&#39;git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv&#39;</span>))</span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a></span>
-<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>test <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span></span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">21</span>)</span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a></span>
-<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="do">## create dataset ready to run through catch-only models</span></span>
-<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>stks <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span></span>
-<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>              <span class="fu">filter</span>(TaxonKey <span class="sc">&gt;=</span> <span class="dv">600000</span>,               <span class="co">#remove all records of catch reported at higher taxonomic levels than species</span></span>
-<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a>                     tons     <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span>                  <span class="co">#remove records of 0 catch</span></span>
-<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>rgn_id) <span class="sc">%&gt;%</span>                       <span class="co">#remove rgn_id since we aggregate stocks to the FAO level   </span></span>
-<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">group_by</span>(stock_id, year, fao_rgn, TaxonName, CommonName, TaxonKey) <span class="sc">%&gt;%</span></span>
-<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">summarise</span>(<span class="at">tons =</span> <span class="fu">sum</span>(tons)) <span class="sc">%&gt;%</span>           <span class="co">#calculate total tons per stock and year</span></span>
-<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a>              <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">group_by</span>(stock_id) <span class="sc">%&gt;%</span></span>
-<span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">nyrs =</span> <span class="fu">n</span>(),                       <span class="co">#get the total number of years the stock has records for   </span></span>
-<span id="cb8-23"><a href="#cb8-23" tabindex="-1"></a>                     <span class="at">avg_ann_catch =</span> <span class="fu">mean</span>(tons)) <span class="sc">%&gt;%</span>    <span class="co">#calculate the mean catch over all catch years for each stock</span></span>
-<span id="cb8-24"><a href="#cb8-24" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb8-25"><a href="#cb8-25" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">filter</span>(avg_ann_catch <span class="sc">&gt;=</span> min_tons,        <span class="co">#keep only those stocks that meet our conditions</span></span>
-<span id="cb8-26"><a href="#cb8-26" tabindex="-1"></a>                              nyrs <span class="sc">&gt;=</span> min_yrs) <span class="sc">%&gt;%</span></span>
-<span id="cb8-27"><a href="#cb8-27" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">select</span>(year, TaxonName, CommonName, fao_rgn, stock_id, TaxonKey, tons) <span class="co">#Resilience</span></span>
-<span id="cb8-28"><a href="#cb8-28" tabindex="-1"></a></span>
-<span id="cb8-29"><a href="#cb8-29" tabindex="-1"></a><span class="fu">write.csv</span>(stks, <span class="at">file =</span> <span class="st">&#39;output/stock_catch_no_res.csv&#39;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
-</div>
-</div>
-<div id="prep-data-for-bbmsy-calculations" class="section level1">
-<h1>Prep data for B/Bmsy calculations</h1>
-<p>Catch-MSY is the model we use to estimate stock status for all global
-stocks. This model requires information about the resilience of each
-species in addition to the catch data for each year.</p>
-<p><strong>NOW WE RUN THE
-<code>species_resilience_lookup_table.Rmd</code> SCRIPT</strong></p>
-<p>Load taxonomic resilience information, created in
-<code>species_resilience_lookup_table.Rmd</code>. The species resilience
-prep (species_resilience_lookup_table.Rmd) resulted 10 more resilience
-information rows this year than in 2019.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="do">## add the taxon_resilence data to catch for b/bmsy calculations</span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>taxon_res <span class="ot">=</span> <span class="fu">read_csv</span>(<span class="st">&#39;output/taxon_resilience_lookup.csv&#39;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="at">CommonName=</span>common, Resilience)</span></code></pre></div>
-<div id="more-wrangling" class="section level2">
-<h2>More Wrangling</h2>
-<ul>
-<li>Add the resilience information to the stks dataframe created above,
-and re-write it to the output folder.</li>
-</ul>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>stks <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;output/stock_catch_no_res.csv&quot;</span>)</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>stks_res <span class="ot">&lt;-</span> stks <span class="sc">%&gt;%</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">left_join</span>(taxon_res, <span class="at">by =</span> <span class="st">&quot;CommonName&quot;</span>) <span class="sc">%&gt;%</span>                  <span class="co">#add resilience information</span></span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>              dplyr<span class="sc">::</span><span class="fu">select</span>(year, TaxonName, CommonName, Resilience, fao_rgn, stock_id, TaxonKey, tons) </span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a></span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="do">## check on stocks that don&#39;t have a resilience</span></span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>no_res <span class="ot">&lt;-</span> <span class="fu">filter</span>(stks_res, <span class="fu">is.na</span>(Resilience)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>          dplyr<span class="sc">::</span><span class="fu">select</span>(TaxonName, CommonName) <span class="sc">%&gt;%</span></span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>          <span class="fu">distinct</span>()</span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>    </span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="fu">nrow</span>(no_res) <span class="co"># 171 species do not have a Resilience. These will get assigned a Medium Resilience by default by the CMSY model.</span></span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a></span>
-<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a><span class="fu">write.csv</span>(stks_res, <span class="at">file =</span> <span class="st">&#39;output/stock_catch.csv&#39;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
-</div>
-<div id="data-check" class="section level2">
-<h2>Data Check</h2>
-<p>Take a look at the stock data datatable</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>stks <span class="ot">=</span> <span class="fu">read_csv</span>(<span class="st">&#39;output/stock_catch.csv&#39;</span>)</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a></span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>DT<span class="sc">::</span><span class="fu">datatable</span>(<span class="fu">head</span>(stks,<span class="at">n=</span><span class="dv">100</span>))</span></code></pre></div>
-<hr />
-</div>
-</div>
-<div id="prep-data-for-mean-catch" class="section level1">
-<h1>Prep data for mean catch</h1>
-<div id="wrangle-1" class="section level2">
-<h2>Wrangle</h2>
-<p>Mean catch data is used to weight the B/Bmsy values in the fishery
-subgoal.</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="do">## FOR THIS WE WILL EXCLUDE DISCARDS, FOFM, and OTHER </span></span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>file <span class="ot">&lt;-</span> <span class="fu">file.path</span>(dir_M,<span class="st">&#39;git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv&#39;</span>)</span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a></span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>catch <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(file) <span class="sc">%&gt;%</span></span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">common =</span> CommonName, <span class="at">fao_id =</span> fao_rgn, <span class="at">species=</span>TaxonName) </span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a></span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a></span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a><span class="fu">summary</span>(catch)</span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a></span>
-<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>test <span class="ot">&lt;-</span> catch <span class="sc">%&gt;%</span></span>
-<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">21</span>)</span>
-<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a></span>
-<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a></span>
-<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a><span class="do">## filter out non ohi eez regions </span></span>
-<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>catch <span class="ot">&lt;-</span> catch <span class="sc">%&gt;%</span></span>
-<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(rgn_id)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(fao_id)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">&lt;=</span> <span class="dv">250</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">!=</span> <span class="dv">213</span>)</span>
-<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a></span>
-<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a><span class="fu">sum</span>(catch<span class="sc">$</span>tons) <span class="co"># 6095900083</span></span>
-<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a></span>
-<span id="cb12-24"><a href="#cb12-24" tabindex="-1"></a><span class="do">## exclude discards and &quot;other&quot; end use type</span></span>
-<span id="cb12-25"><a href="#cb12-25" tabindex="-1"></a>catch <span class="ot">&lt;-</span> catch <span class="sc">%&gt;%</span> </span>
-<span id="cb12-26"><a href="#cb12-26" tabindex="-1"></a>  <span class="fu">filter</span>(discard_id <span class="sc">==</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb12-27"><a href="#cb12-27" tabindex="-1"></a>  <span class="fu">filter</span>(other_id <span class="sc">==</span> <span class="dv">0</span>)</span>
-<span id="cb12-28"><a href="#cb12-28" tabindex="-1"></a></span>
-<span id="cb12-29"><a href="#cb12-29" tabindex="-1"></a><span class="fu">sum</span>(catch<span class="sc">$</span>tons) <span class="co"># 5268820702</span></span>
-<span id="cb12-30"><a href="#cb12-30" tabindex="-1"></a><span class="dv">5268820702</span><span class="sc">/</span><span class="dv">6095900083</span> <span class="co"># makes sense.</span></span>
-<span id="cb12-31"><a href="#cb12-31" tabindex="-1"></a></span>
-<span id="cb12-32"><a href="#cb12-32" tabindex="-1"></a></span>
-<span id="cb12-33"><a href="#cb12-33" tabindex="-1"></a><span class="do">## calculate total annual catch for each stock</span></span>
-<span id="cb12-34"><a href="#cb12-34" tabindex="-1"></a>catch <span class="ot">&lt;-</span> catch <span class="sc">%&gt;%</span></span>
-<span id="cb12-35"><a href="#cb12-35" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(year, rgn_id, fao_id, stock_id, TaxonKey, tons) <span class="sc">%&gt;%</span> <span class="co"># this is where we would add fofm_id, but I&#39;m not doing it for 2021, because the fofm_id numbers look very wrong for 2016-2018</span></span>
-<span id="cb12-36"><a href="#cb12-36" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, fao_id, TaxonKey, stock_id, year) <span class="sc">%&gt;%</span></span>
-<span id="cb12-37"><a href="#cb12-37" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">catch =</span> <span class="fu">sum</span>(tons)) <span class="sc">%&gt;%</span></span>
-<span id="cb12-38"><a href="#cb12-38" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span></code></pre></div>
-<p>Take a look at a few stocks.</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">data.frame</span>(dplyr<span class="sc">::</span><span class="fu">filter</span>(catch, stock_id <span class="sc">==</span> <span class="st">&quot;Zygochlamys_patagonica-87&quot;</span> <span class="sc">&amp;</span> rgn_id<span class="sc">==</span><span class="dv">172</span>))</span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">data.frame</span>(dplyr<span class="sc">::</span><span class="fu">filter</span>(catch, stock_id <span class="sc">==</span> <span class="st">&quot;Marine_fishes_not_identified-57&quot;</span> <span class="sc">&amp;</span> rgn_id<span class="sc">==</span><span class="dv">1</span>))</span></code></pre></div>
-</div>
-<div id="fill-in-zeros" class="section level2">
-<h2>Fill in Zeros</h2>
-<p>For years with no reported catch, add zero values (after first
-reported catch)</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="do">## these data have no zero catch values, so add years with no reported catch to data table:</span></span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>catch_zeros <span class="ot">&lt;-</span> catch <span class="sc">%&gt;%</span></span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="fu">spread</span>(year, catch) <span class="sc">%&gt;%</span></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="fu">data.frame</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>  <span class="fu">gather</span>(<span class="st">&quot;year&quot;</span>, <span class="st">&quot;catch&quot;</span>, <span class="fu">num_range</span>(<span class="st">&quot;X&quot;</span>, <span class="fu">min</span>(catch<span class="sc">$</span>year)<span class="sc">:</span><span class="fu">max</span>(catch<span class="sc">$</span>year))) <span class="sc">%&gt;%</span></span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">as.numeric</span>(<span class="fu">gsub</span>(<span class="st">&quot;X&quot;</span>, <span class="st">&quot;&quot;</span>, year))) <span class="sc">%&gt;%</span></span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">catch =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(catch), <span class="dv">0</span>, catch))</span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a></span>
-<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a><span class="do">## this part eliminates the zero catch values prior to the first reported non-zero catch   </span></span>
-<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>catch_zeros <span class="ot">&lt;-</span> catch_zeros <span class="sc">%&gt;%</span></span>
-<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a>  <span class="fu">group_by</span>(fao_id, TaxonKey, stock_id, rgn_id) <span class="sc">%&gt;%</span></span>
-<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a>  <span class="fu">arrange</span>(year) <span class="sc">%&gt;%</span></span>
-<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">cum_catch =</span> <span class="fu">cumsum</span>(catch)) <span class="sc">%&gt;%</span></span>
-<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a>  <span class="fu">filter</span>(cum_catch <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>cum_catch) <span class="sc">%&gt;%</span></span>
-<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
-<span id="cb14-17"><a href="#cb14-17" tabindex="-1"></a></span>
-<span id="cb14-18"><a href="#cb14-18" tabindex="-1"></a>test <span class="ot">&lt;-</span> catch_zeros <span class="sc">%&gt;%</span></span>
-<span id="cb14-19"><a href="#cb14-19" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
-<span id="cb14-20"><a href="#cb14-20" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">sum =</span> <span class="fu">sum</span>(catch))</span></code></pre></div>
-</div>
-<div id="calculate-mean-catch" class="section level2">
-<h2>Calculate Mean Catch</h2>
-<p>Calculate mean catch for ohi regions (using data from 1980 onward).
-These data are used to weight the RAM b/bmsy values. We will also
-correct for the forage fish used for feed/fish oil by excluding the
-proportion used for non-human purposes, like animal feed (90% of forage
-fish catch).</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="do">## correcting for forage fish used as feed/fish oil</span></span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="do">## We have traditionally included all fisheries catch in the Food Provision goal. However, a substantial portion of catch is used in animal feed. Our plan is to remove a portion of catch of these species from the fisheries goal.</span></span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="do">## read in list of species used for feed</span></span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>forage_fish_taxa_list <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;raw/forage_fish_taxa_list.csv&quot;</span>))</span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a></span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>taxon_key_info <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(dir_M,<span class="st">&#39;git-annex/globalprep/fis/v2022/int/stock_catch_by_rgn_taxa.csv&#39;</span>))</span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a></span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a><span class="do">## need to get TaxonKey&#39;s for each species to join with catch_zeros</span></span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>forage_fish_taxa_list <span class="ot">&lt;-</span> forage_fish_taxa_list <span class="sc">%&gt;%</span></span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>  <span class="fu">left_join</span>(taxon_key_info, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;forage_fish&quot;</span> <span class="ot">=</span> <span class="st">&quot;TaxonName&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(forage_fish, inWatson, TaxonKey) <span class="sc">%&gt;%</span></span>
-<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>  <span class="fu">unique</span>()</span>
-<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a></span>
-<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a> </span>
-<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a>prop_human_cons <span class="ot">&lt;-</span> <span class="fl">0.1</span> <span class="do">## source from https://www.nature.com/articles/s41893-018-0077-1#Sec11: &quot;Currently, it is estimated about 10% of forage fish enter the human diet directly, but the notoriously tiny-boned fish are labour intensive (thus expensive) to process for human consumption, are the foundation of several industries and thus jobs (creating inertia to change) and are not the preferred fish type for most people&quot;</span></span>
-<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a></span>
-<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="do">## join this with catch_zeros by species, and multiply by 0.1... this is the proportion of catch used for humans </span></span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a>catch_zero_minus_fish_feed <span class="ot">&lt;-</span> forage_fish_taxa_list <span class="sc">%&gt;%</span></span>
-<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a>  <span class="fu">left_join</span>(catch_zeros, <span class="at">by =</span> <span class="st">&quot;TaxonKey&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">catch_human =</span> prop_human_cons<span class="sc">*</span>catch,</span>
-<span id="cb15-22"><a href="#cb15-22" tabindex="-1"></a>         <span class="at">catch_fish_feed =</span> catch<span class="sc">*</span>(<span class="dv">1</span><span class="sc">-</span>prop_human_cons))</span>
-<span id="cb15-23"><a href="#cb15-23" tabindex="-1"></a><span class="fu">write_csv</span>(catch_zero_minus_fish_feed, <span class="st">&quot;int/catch_fish_feed.csv&quot;</span>)</span>
-<span id="cb15-24"><a href="#cb15-24" tabindex="-1"></a></span>
-<span id="cb15-25"><a href="#cb15-25" tabindex="-1"></a></span>
-<span id="cb15-26"><a href="#cb15-26" tabindex="-1"></a><span class="co">#join catch_zeros with catch_zero_minus_fish_feed</span></span>
-<span id="cb15-27"><a href="#cb15-27" tabindex="-1"></a>catch_zeros <span class="ot">&lt;-</span> catch_zeros <span class="sc">%&gt;%</span></span>
-<span id="cb15-28"><a href="#cb15-28" tabindex="-1"></a>  <span class="fu">left_join</span>(catch_zero_minus_fish_feed) <span class="sc">%&gt;%</span></span>
-<span id="cb15-29"><a href="#cb15-29" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">catch_human =</span> <span class="fu">case_when</span>(</span>
-<span id="cb15-30"><a href="#cb15-30" tabindex="-1"></a>    <span class="fu">is.na</span>(catch_human) <span class="sc">~</span> catch,</span>
-<span id="cb15-31"><a href="#cb15-31" tabindex="-1"></a>    <span class="sc">!</span><span class="fu">is.na</span>(catch_human) <span class="sc">~</span> catch_human</span>
-<span id="cb15-32"><a href="#cb15-32" tabindex="-1"></a>  )) <span class="sc">%&gt;%</span></span>
-<span id="cb15-33"><a href="#cb15-33" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>forage_fish, <span class="sc">-</span>inWatson)</span>
-<span id="cb15-34"><a href="#cb15-34" tabindex="-1"></a></span>
-<span id="cb15-35"><a href="#cb15-35" tabindex="-1"></a>test <span class="ot">&lt;-</span> catch_zeros <span class="sc">%&gt;%</span></span>
-<span id="cb15-36"><a href="#cb15-36" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id) <span class="sc">%&gt;%</span></span>
-<span id="cb15-37"><a href="#cb15-37" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
-<span id="cb15-38"><a href="#cb15-38" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">tons_sum =</span> <span class="fu">sum</span>(catch_human)) <span class="sc">%&gt;%</span></span>
-<span id="cb15-39"><a href="#cb15-39" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">tons_mean =</span> <span class="fu">mean</span>(tons_sum))</span>
-<span id="cb15-40"><a href="#cb15-40" tabindex="-1"></a></span>
-<span id="cb15-41"><a href="#cb15-41" tabindex="-1"></a><span class="fu">sum</span>(catch_zeros<span class="sc">$</span>catch_fish_feed, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)<span class="sc">/</span>(<span class="fu">sum</span>(catch_zeros<span class="sc">$</span>catch_human, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">sum</span>(catch_zeros<span class="sc">$</span>catch_fish_feed, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="co"># 0.354365; seems right. This states that forage fish account for more than a third of fish catch every year: https://www.pewtrusts.org/-/media/assets/2013/pffforagefishfaq.pdf</span></span>
-<span id="cb15-42"><a href="#cb15-42" tabindex="-1"></a></span>
-<span id="cb15-43"><a href="#cb15-43" tabindex="-1"></a>mean_catch <span class="ot">&lt;-</span> catch_zeros <span class="sc">%&gt;%</span></span>
-<span id="cb15-44"><a href="#cb15-44" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">&gt;=</span> <span class="dv">1980</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb15-45"><a href="#cb15-45" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, fao_id, TaxonKey, stock_id) <span class="sc">%&gt;%</span></span>
-<span id="cb15-46"><a href="#cb15-46" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean_catch =</span> <span class="fu">mean</span>(catch, <span class="at">na.rm=</span><span class="cn">TRUE</span>),</span>
-<span id="cb15-47"><a href="#cb15-47" tabindex="-1"></a>         <span class="at">mean_catch_human =</span> <span class="fu">mean</span>(catch_human, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span> <span class="co"># mean catch for each stock (in a specific ohi-fao region)</span></span>
-<span id="cb15-48"><a href="#cb15-48" tabindex="-1"></a>  <span class="fu">filter</span>(mean_catch <span class="sc">!=</span> <span class="dv">0</span>,</span>
-<span id="cb15-49"><a href="#cb15-49" tabindex="-1"></a>         mean_catch_human <span class="sc">!=</span> <span class="dv">0</span>)  <span class="sc">%&gt;%</span>      <span class="do">## some stocks have no reported catch for time period</span></span>
-<span id="cb15-50"><a href="#cb15-50" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
-<span id="cb15-51"><a href="#cb15-51" tabindex="-1"></a></span>
-<span id="cb15-52"><a href="#cb15-52" tabindex="-1"></a><span class="fu">sum</span>(mean_catch<span class="sc">$</span>mean_catch)</span>
-<span id="cb15-53"><a href="#cb15-53" tabindex="-1"></a></span>
-<span id="cb15-54"><a href="#cb15-54" tabindex="-1"></a>test <span class="ot">&lt;-</span> mean_catch <span class="sc">%&gt;%</span></span>
-<span id="cb15-55"><a href="#cb15-55" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
-<span id="cb15-56"><a href="#cb15-56" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">sum =</span> <span class="fu">sum</span>(mean_catch))</span>
-<span id="cb15-57"><a href="#cb15-57" tabindex="-1"></a></span>
-<span id="cb15-58"><a href="#cb15-58" tabindex="-1"></a><span class="do">## now lets gapfill the 3 missing fishing regions with their high admin regions, Monaco, Gibraltar, Oecussi Ambeno. This is the same as giving them the same score as their admin region. Doing it here is easier than doing it in ohi-global.</span></span>
-<span id="cb15-59"><a href="#cb15-59" tabindex="-1"></a>mean_catch_gf <span class="ot">&lt;-</span> mean_catch <span class="sc">%&gt;%</span></span>
-<span id="cb15-60"><a href="#cb15-60" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">182</span>, <span class="dv">179</span>, <span class="dv">231</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb15-61"><a href="#cb15-61" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">rgn_id =</span> <span class="fu">case_when</span>(rgn_id <span class="sc">==</span> <span class="dv">182</span> <span class="sc">~</span> <span class="dv">60</span>,</span>
-<span id="cb15-62"><a href="#cb15-62" tabindex="-1"></a>                            rgn_id <span class="sc">==</span> <span class="dv">179</span> <span class="sc">~</span> <span class="dv">185</span>,</span>
-<span id="cb15-63"><a href="#cb15-63" tabindex="-1"></a>                            rgn_id <span class="sc">==</span> <span class="dv">231</span> <span class="sc">~</span> <span class="dv">237</span>))</span>
-<span id="cb15-64"><a href="#cb15-64" tabindex="-1"></a></span>
-<span id="cb15-65"><a href="#cb15-65" tabindex="-1"></a>mean_catch <span class="ot">&lt;-</span> <span class="fu">rbind</span>(mean_catch, mean_catch_gf)</span>
-<span id="cb15-66"><a href="#cb15-66" tabindex="-1"></a></span>
-<span id="cb15-67"><a href="#cb15-67" tabindex="-1"></a><span class="fu">setdiff</span>(rgns_eez<span class="sc">$</span>rgn_id, mean_catch<span class="sc">$</span>rgn_id) <span class="co"># only missing antarctica... good</span></span>
-<span id="cb15-68"><a href="#cb15-68" tabindex="-1"></a></span>
-<span id="cb15-69"><a href="#cb15-69" tabindex="-1"></a></span>
-<span id="cb15-70"><a href="#cb15-70" tabindex="-1"></a><span class="fu">length</span>(<span class="fu">unique</span>(mean_catch<span class="sc">$</span>rgn_id)) <span class="co"># 220.. all regions are included now. </span></span>
-<span id="cb15-71"><a href="#cb15-71" tabindex="-1"></a></span>
-<span id="cb15-72"><a href="#cb15-72" tabindex="-1"></a>test <span class="ot">&lt;-</span> mean_catch <span class="sc">%&gt;%</span></span>
-<span id="cb15-73"><a href="#cb15-73" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
-<span id="cb15-74"><a href="#cb15-74" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">sum_fofm =</span> <span class="fu">sum</span>(catch_fish_feed, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb15-75"><a href="#cb15-75" tabindex="-1"></a>            <span class="at">sum_total =</span> <span class="fu">sum</span>(mean_catch, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb15-76"><a href="#cb15-76" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fofm_percent =</span> sum_fofm<span class="sc">/</span>sum_total) <span class="co"># around 30% per year are fofm... perfect.</span></span>
-<span id="cb15-77"><a href="#cb15-77" tabindex="-1"></a></span>
-<span id="cb15-78"><a href="#cb15-78" tabindex="-1"></a>test <span class="ot">&lt;-</span> mean_catch <span class="sc">%&gt;%</span></span>
-<span id="cb15-79"><a href="#cb15-79" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">==</span> <span class="dv">60</span>)</span></code></pre></div>
-<p>Check out the data</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">data.frame</span>(dplyr<span class="sc">::</span><span class="fu">filter</span>(catch, stock_id <span class="sc">==</span> <span class="st">&quot;Zygochlamys_patagonica-87&quot;</span> <span class="sc">&amp;</span> rgn_id<span class="sc">==</span><span class="dv">172</span>))</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="fu">data.frame</span>(<span class="fu">filter</span>(mean_catch, stock_id <span class="sc">==</span> <span class="st">&quot;Marine_fishes_not_identified-57&quot;</span> <span class="sc">&amp;</span> rgn_id<span class="sc">==</span><span class="dv">1</span>)) <span class="co"># includes finfishes (100139) and other marine fishes (100039)</span></span></code></pre></div>
-</div>
-<div id="toolbox-formatting-and-save" class="section level2">
-<h2>Toolbox formatting and save</h2>
-<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="fu">options</span>(<span class="at">scipen =</span> <span class="dv">999</span>) <span class="co"># to prevent taxonkey from turning into scientific notation</span></span>
-<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a></span>
-<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>mean_catch_toolbox <span class="ot">&lt;-</span> mean_catch <span class="sc">%&gt;%</span></span>
-<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">stock_id_taxonkey =</span> <span class="fu">paste</span>(stock_id, TaxonKey, <span class="at">sep=</span><span class="st">&quot;_&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id_taxonkey, year, mean_catch) <span class="sc">%&gt;%</span></span>
-<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">&gt;=</span> <span class="dv">2001</span>) <span class="sc">%&gt;%</span>  <span class="co"># filter to include only analysis years</span></span>
-<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>  <span class="fu">data.frame</span>()</span>
-<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a></span>
-<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a><span class="fu">write.csv</span>(mean_catch_toolbox, <span class="st">&quot;int/mean_catch.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>) <span class="do">## save the total mean catch csv for reference if needed</span></span>
-<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a></span>
-<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a>mean_catch_toolbox_human <span class="ot">&lt;-</span> mean_catch <span class="sc">%&gt;%</span></span>
-<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">stock_id_taxonkey =</span> <span class="fu">paste</span>(stock_id, TaxonKey, <span class="at">sep=</span><span class="st">&quot;_&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id_taxonkey, year, <span class="at">mean_catch =</span> mean_catch_human) <span class="sc">%&gt;%</span></span>
-<span id="cb17-14"><a href="#cb17-14" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">&gt;=</span> <span class="dv">2001</span>) <span class="sc">%&gt;%</span>  <span class="co"># filter to include only analysis years</span></span>
-<span id="cb17-15"><a href="#cb17-15" tabindex="-1"></a>  <span class="fu">data.frame</span>()</span>
-<span id="cb17-16"><a href="#cb17-16" tabindex="-1"></a><span class="co"># length(unique(mean_catch_toolbox_human$rgn_id))</span></span>
-<span id="cb17-17"><a href="#cb17-17" tabindex="-1"></a><span class="co"># test &lt;- mean_catch_toolbox_human %&gt;%</span></span>
-<span id="cb17-18"><a href="#cb17-18" tabindex="-1"></a><span class="co">#   filter(rgn_id == 105)</span></span>
-<span id="cb17-19"><a href="#cb17-19" tabindex="-1"></a></span>
-<span id="cb17-20"><a href="#cb17-20" tabindex="-1"></a><span class="fu">write.csv</span>(mean_catch_toolbox_human, <span class="st">&quot;output/mean_catch_minus_feed.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb17-21"><a href="#cb17-21" tabindex="-1"></a></span>
-<span id="cb17-22"><a href="#cb17-22" tabindex="-1"></a><span class="co"># length(unique(mean_catch_toolbox_human$rgn_id)) # 220</span></span>
-<span id="cb17-23"><a href="#cb17-23" tabindex="-1"></a><span class="co"># mean_catch_toolbox_human_watson &lt;- read_csv(file.path(&quot;../v2017/data/mean_catch.csv&quot;))</span></span></code></pre></div>
-</div>
-<div id="data-check-1" class="section level2">
-<h2>Data check</h2>
-<p>Compare v2022 with last year v2021</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">library</span>(plotly)</span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a></span>
-<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>new <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/mean_catch_minus_feed.csv&quot;</span>)</span>
-<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>new_filt <span class="ot">&lt;-</span> new <span class="sc">%&gt;%</span> </span>
-<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a>  <span class="co">#filter(stock_id_taxonkey == &quot;Carangidae-31_400314&quot;) %&gt;% </span></span>
-<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">new_log_catch =</span> <span class="fu">log</span>(mean_catch<span class="sc">+</span><span class="dv">1</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2014</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id_taxonkey, new_log_catch, mean_catch) </span>
-<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a></span>
-<span id="cb18-10"><a href="#cb18-10" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;../v2021/output/mean_catch_minus_feed.csv&quot;</span>)</span>
-<span id="cb18-11"><a href="#cb18-11" tabindex="-1"></a>old_filt <span class="ot">&lt;-</span> old <span class="sc">%&gt;%</span> </span>
-<span id="cb18-12"><a href="#cb18-12" tabindex="-1"></a>  <span class="co">#filter(stock_id_taxonkey == &quot;Carangidae-31_400314&quot;) %&gt;% </span></span>
-<span id="cb18-13"><a href="#cb18-13" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">year =</span> year) <span class="sc">%&gt;%</span> </span>
-<span id="cb18-14"><a href="#cb18-14" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">old_log_catch =</span> <span class="fu">log</span>(mean_catch<span class="sc">+</span><span class="dv">1</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb18-15"><a href="#cb18-15" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2014</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb18-16"><a href="#cb18-16" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, stock_id_taxonkey, old_log_catch, mean_catch)</span>
-<span id="cb18-17"><a href="#cb18-17" tabindex="-1"></a>  </span>
-<span id="cb18-18"><a href="#cb18-18" tabindex="-1"></a>check <span class="ot">&lt;-</span> old_filt <span class="sc">%&gt;%</span> </span>
-<span id="cb18-19"><a href="#cb18-19" tabindex="-1"></a>  <span class="fu">left_join</span>(new_filt, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>,<span class="st">&quot;stock_id_taxonkey&quot;</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb18-20"><a href="#cb18-20" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">new_log_catch =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(new_log_catch), <span class="dv">0</span>, new_log_catch)) <span class="sc">%&gt;%</span> </span>
-<span id="cb18-21"><a href="#cb18-21" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">old_log_catch =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(old_log_catch), <span class="dv">0</span>, old_log_catch))</span>
-<span id="cb18-22"><a href="#cb18-22" tabindex="-1"></a></span>
-<span id="cb18-23"><a href="#cb18-23" tabindex="-1"></a><span class="do">## For quick plot</span></span>
-<span id="cb18-24"><a href="#cb18-24" tabindex="-1"></a><span class="fu">plot</span>(check<span class="sc">$</span>old_log_catch,check<span class="sc">$</span>new_log_catch)</span>
-<span id="cb18-25"><a href="#cb18-25" tabindex="-1"></a><span class="fu">abline</span>(<span class="at">col=</span><span class="st">&quot;red&quot;</span>, <span class="dv">0</span>,<span class="dv">1</span>)</span>
-<span id="cb18-26"><a href="#cb18-26" tabindex="-1"></a></span>
-<span id="cb18-27"><a href="#cb18-27" tabindex="-1"></a><span class="do">## Plot with plotly to see region id when hovering over points (takes a while)</span></span>
-<span id="cb18-28"><a href="#cb18-28" tabindex="-1"></a>plot_check <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(check, <span class="fu">aes</span>(old_log_catch, new_log_catch, <span class="at">col =</span> rgn_id)) <span class="sc">+</span></span>
-<span id="cb18-29"><a href="#cb18-29" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.4</span>) <span class="sc">+</span></span>
-<span id="cb18-30"><a href="#cb18-30" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">col=</span><span class="st">&quot;red&quot;</span>) <span class="sc">+</span></span>
-<span id="cb18-31"><a href="#cb18-31" tabindex="-1"></a>  <span class="fu">ggtitle</span>(<span class="st">&quot;Catch Comparison for 2014 (v2021, v2022)&quot;</span>)</span>
-<span id="cb18-32"><a href="#cb18-32" tabindex="-1"></a></span>
-<span id="cb18-33"><a href="#cb18-33" tabindex="-1"></a>plot_check</span>
-<span id="cb18-34"><a href="#cb18-34" tabindex="-1"></a></span>
-<span id="cb18-35"><a href="#cb18-35" tabindex="-1"></a> <span class="co">#ggplotly(plot_check) #might crash RStudio</span></span></code></pre></div>
-</div>
-</div>
-<div id="prep-data-for-food-provision-weights" class="section level1">
-<h1>Prep data for food provision weights</h1>
-<p>These data determine the tonnes of food provided by fisheries.
-Ultimately, the proportion of food from fisheries relative to
-mariculture will be calculated to weight the contributions of fishery
-and mariculture scores to final food provision scores.</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>rgns_eez_gf <span class="ot">&lt;-</span> rgns_eez <span class="sc">%&gt;%</span></span>
-<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">!=</span> <span class="dv">213</span>)</span>
-<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a></span>
-<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a></span>
-<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>total_catch_FP <span class="ot">&lt;-</span> mean_catch <span class="sc">%&gt;%</span></span>
-<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>  <span class="fu">group_by</span>(rgn_id, year) <span class="sc">%&gt;%</span></span>
-<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">fis_catch =</span> <span class="fu">sum</span>(catch_human)) <span class="sc">%&gt;%</span></span>
-<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, fis_catch) <span class="sc">%&gt;%</span></span>
-<span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">&gt;=</span> <span class="dv">2005</span>) <span class="co"># filter to include only the relevant analysis years</span></span>
-<span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a></span>
-<span id="cb19-11"><a href="#cb19-11" tabindex="-1"></a><span class="do">## now lets gapfill the 3 missing fishing regions with their high admin regions, Monaco, Gibraltar, Oecussi Ambeno</span></span>
-<span id="cb19-12"><a href="#cb19-12" tabindex="-1"></a>total_catch_FP_gf <span class="ot">&lt;-</span> total_catch_FP <span class="sc">%&gt;%</span></span>
-<span id="cb19-13"><a href="#cb19-13" tabindex="-1"></a>  <span class="fu">filter</span>(rgn_id <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">182</span>, <span class="dv">179</span>, <span class="dv">231</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb19-14"><a href="#cb19-14" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">rgn_id =</span> <span class="fu">case_when</span>(rgn_id <span class="sc">==</span> <span class="dv">182</span> <span class="sc">~</span> <span class="dv">60</span>,</span>
-<span id="cb19-15"><a href="#cb19-15" tabindex="-1"></a>                            rgn_id <span class="sc">==</span> <span class="dv">179</span> <span class="sc">~</span> <span class="dv">185</span>,</span>
-<span id="cb19-16"><a href="#cb19-16" tabindex="-1"></a>                            rgn_id <span class="sc">==</span> <span class="dv">231</span> <span class="sc">~</span> <span class="dv">237</span>))</span>
-<span id="cb19-17"><a href="#cb19-17" tabindex="-1"></a></span>
-<span id="cb19-18"><a href="#cb19-18" tabindex="-1"></a>total_catch_FP_final <span class="ot">&lt;-</span> <span class="fu">rbind</span>(total_catch_FP, total_catch_FP_gf)</span>
-<span id="cb19-19"><a href="#cb19-19" tabindex="-1"></a></span>
-<span id="cb19-20"><a href="#cb19-20" tabindex="-1"></a><span class="fu">write.csv</span>(total_catch_FP, <span class="st">&quot;output/FP_fis_catch.csv&quot;</span>, <span class="at">row.names=</span><span class="cn">FALSE</span>)</span></code></pre></div>
-<p>Check differences in data for food provision weights</p>
-<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>new <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;output/FP_fis_catch.csv&quot;</span>)</span>
-<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>new_filt <span class="ot">&lt;-</span> new <span class="sc">%&gt;%</span> </span>
-<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>  <span class="co">#filter(stock_id_taxonkey == &quot;Carangidae-31_400314&quot;) %&gt;% </span></span>
-<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2014</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">new_fis_catch =</span> fis_catch) <span class="sc">%&gt;%</span></span>
-<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, new_fis_catch) </span>
-<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a></span>
-<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;../v2021/output/FP_fis_catch.csv&quot;</span>)</span>
-<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a>old_filt <span class="ot">&lt;-</span> old <span class="sc">%&gt;%</span> </span>
-<span id="cb20-10"><a href="#cb20-10" tabindex="-1"></a>  <span class="co">#filter(stock_id_taxonkey == &quot;Carangidae-31_400314&quot;) %&gt;% </span></span>
-<span id="cb20-11"><a href="#cb20-11" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">year =</span> year) <span class="sc">%&gt;%</span> </span>
-<span id="cb20-12"><a href="#cb20-12" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2014</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb20-13"><a href="#cb20-13" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">old_fis_catch =</span> fis_catch) <span class="sc">%&gt;%</span></span>
-<span id="cb20-14"><a href="#cb20-14" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(rgn_id, year, old_fis_catch)</span>
-<span id="cb20-15"><a href="#cb20-15" tabindex="-1"></a>  </span>
-<span id="cb20-16"><a href="#cb20-16" tabindex="-1"></a>check <span class="ot">&lt;-</span> old_filt <span class="sc">%&gt;%</span> </span>
-<span id="cb20-17"><a href="#cb20-17" tabindex="-1"></a>  <span class="fu">left_join</span>(new_filt, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;rgn_id&quot;</span>,<span class="st">&quot;year&quot;</span>))</span>
-<span id="cb20-18"><a href="#cb20-18" tabindex="-1"></a></span>
-<span id="cb20-19"><a href="#cb20-19" tabindex="-1"></a><span class="do">## For quick plot</span></span>
-<span id="cb20-20"><a href="#cb20-20" tabindex="-1"></a><span class="fu">plot</span>(check<span class="sc">$</span>old_fis_catch,check<span class="sc">$</span>new_fis_catch)</span>
-<span id="cb20-21"><a href="#cb20-21" tabindex="-1"></a><span class="fu">abline</span>(<span class="at">col=</span><span class="st">&quot;red&quot;</span>, <span class="dv">1</span>,<span class="dv">1</span>)</span>
-<span id="cb20-22"><a href="#cb20-22" tabindex="-1"></a></span>
-<span id="cb20-23"><a href="#cb20-23" tabindex="-1"></a><span class="do">## Plot with plotly to see region id when hovering over points (takes a while)</span></span>
-<span id="cb20-24"><a href="#cb20-24" tabindex="-1"></a>plot_check <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(check, <span class="fu">aes</span>(old_fis_catch, new_fis_catch, <span class="at">col =</span> rgn_id)) <span class="sc">+</span></span>
-<span id="cb20-25"><a href="#cb20-25" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.4</span>) <span class="sc">+</span></span>
-<span id="cb20-26"><a href="#cb20-26" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">col=</span><span class="st">&quot;red&quot;</span>) <span class="sc">+</span></span>
-<span id="cb20-27"><a href="#cb20-27" tabindex="-1"></a>  <span class="fu">ggtitle</span>(<span class="st">&quot;Food Provision Comparison for 2014 (v2021, v2022)&quot;</span>)</span>
-<span id="cb20-28"><a href="#cb20-28" tabindex="-1"></a></span>
-<span id="cb20-29"><a href="#cb20-29" tabindex="-1"></a>plot_check</span></code></pre></div>
-<hr />
-</div>
-<div id="citation-information" class="section level1">
-<h1>Citation information</h1>
-<p>Pauly D. and Zeller D. (Editors), 2015. Sea Around Us Concepts,
-Design and Data (seaaroundus.org)</p>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind.data.frame, resil)<span class="sc">%&gt;%</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>        <span class="fu">distinct</span>()</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>DT<span class="sc">::</span><span class="fu">datatable</span>(res)</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>res_info_na <span class="ot">&lt;-</span> res <span class="sc">%&gt;%</span></span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(Resilience)) <span class="do">## These are the species which have resilience info in SeaLifeBase, but not in our taxon_res2 dataframe. Join these with that df and wrangle to fill in these missing data. </span></span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a></span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>taxon_res3 <span class="ot">&lt;-</span> taxon_res2 <span class="sc">%&gt;%</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>  <span class="fu">left_join</span>(res_info_na, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;sciname&quot;</span> <span class="ot">=</span> <span class="st">&quot;Species&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">Resilience =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(Resilience.x), Resilience.y, Resilience.x)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>Resilience.x, <span class="sc">-</span>Resilience.y)</span></code></pre></div>
+<p>We will have to leave the rest as NA (there aren’t very many). This
+will cause the CMSY model to default to Medium resilience but will not
+remove them from assessment.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">write.csv</span>(taxon_res3,<span class="at">file =</span> <span class="st">&#39;output/taxon_resilience_lookup.csv&#39;</span>)</span></code></pre></div>
 </div>
 
 

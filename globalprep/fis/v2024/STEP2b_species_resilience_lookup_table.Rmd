@@ -3,14 +3,19 @@ title: "OHI 2024: FP, SAUP Species Resilience Lookup Table"
 author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
 output: 
   html_document:
-  toc: true
-number_sections: true
-theme: cerulean
-highlight: haddock
-includes: 
-  in_header: '../../../workflow/templates/ohi_hdr.html'
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
 pdf_document:
   toc: true
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Summary
@@ -23,11 +28,12 @@ This script uses FishBase to find the Resilience for each of the species in the 
 
 # Setup
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, eval = FALSE}
 
 knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
 
 library(dplyr)
+# install.packages("rfishbase", repos = "http://cran.us.r-project.org")
 library(rfishbase)
 library(parallel)
 
