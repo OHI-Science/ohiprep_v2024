@@ -491,8 +491,8 @@ sust_harvest_join <- np_harvest_ornamentals %>%
 
 # check summary
 summary(sust_harvest_join)
-# note: 2150 -- 495 after filtering!!! [COME BACK] NAs in exposure, 1655 -- NONE?? NAs in risk 
-# (and 1655  -- NO NAS NOW?? in sustainability, since we took the mean and set na.rm = TRUE) 
+# note: 495 NAs in exposure, 0 NAs in risk 
+# (and none in sustainability, since we took the mean and set na.rm = TRUE) 
 #str(sust_tonnes) # checking datatypes
 
 # calculate sustainable harvest
@@ -502,7 +502,7 @@ sust_harvest_orn <- sust_harvest_join %>%
 
 # check
 summary(sust_harvest_orn)
-# 1747 -- now only 92 --  [[[COME BACK]]]  NAs in sust_harvest ~~ v2024
+# only 92 NAs in sust_harvest ~~ v2024
 ```
 
 
