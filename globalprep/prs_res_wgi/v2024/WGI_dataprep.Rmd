@@ -18,7 +18,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-[REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2022/globalprep/prs_res_wgi/v2023/WGI_dataprep.html)
+[REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2024/globalprep/prs_res_wgi/v2024/WGI_dataprep.html)
 
 # Summary
 This script downloads WGI data and prepares it for a pressures (1 - WGI) and resilience data layer.  
@@ -33,7 +33,7 @@ This script downloads WGI data and prepares it for a pressures (1 - WGI) and res
 
 **Downloaded**: 
 
-October 2, 2023 (source data updated Sep 2023)
+August 28, 2024 (source data updated Sep 2023)
 
 **Description**:  
 The Worldwide Governance Indicators (WGI) project reports aggregate and individual governance indicators for 215 economies over the period 1996–2022, for six dimensions of governance:
@@ -125,8 +125,8 @@ key_corrp = WDI(
 
 Combine the indicators into a single table, with a column for each indicator, and rows for each country-year pair.
 
-```{r}
-wgi_raw <- read.csv(here("globalprep/prs_res_wgi/v2023/raw/P_Data_Extract_From_Worldwide_Governance_Indicators.csv"))
+```{r, eval=FALSE}
+wgi_raw <- read.csv(here::here("globalprep/prs_res_wgi/v2023/raw/P_Data_Extract_From_Worldwide_Governance_Indicators.csv"))
 
 d <- wgi_raw %>%
   clean_names() %>%
