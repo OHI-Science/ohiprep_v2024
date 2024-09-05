@@ -376,22 +376,6 @@ Melanie Frazier. Secondary contact: Anna Ramji.</p>
 and 5 were not completed and only contained basic YAML and setup code.
 Future years’ efforts should begin with reviewing the <a href="https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit?usp=sharing">New
 NP Plan document</a>, then complete steps 4 and 5.</p>
-<p><strong>The <code>functions.R</code> script and multiple data layer
-files in ohi-global MUST be updated in order for this new approach to
-work, as data layer outputs have been restructured or deleted. Please
-read through the <a href="https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L467">NP
-section of <code>ohi-global/eez/conf/functions.R</code></a></strong></p>
-<p>When future fellows move on to update step 4 (fish oil/fish meal, or
-FOFM) data prep, it may be helpful to adapt as much of the content from
-the former approach’s <code>STEP1c_np_fishfeed_pred.Rmd</code> as
-possible. The output of that step is a “score” (please review the NP
-section of <code>functions.R</code>, including the <a href="https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L590">FOFM
-scores section</a>. It may make more sense to name this “status”, as the
-status for each product (FOFM, ornamentals, and seaweeds) and their
-weights (based on the relative value of each product per region) are
-used to calculate the score.</p>
-<p>The score calculation will also need to be adjusted in
-<code>functions.R</code>, as discussed in the NP Plan document.</p>
 <div id="sustainability" class="section level3">
 <h3>Sustainability</h3>
 <p>A key element of this new NP approach is that sustainability is
@@ -416,16 +400,37 @@ ohi-global’s functions.R.</p>
 please refer to the <a href="https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit?usp=sharing">2024
 New NP Plan: outline and notes</a> for a comprehensive outline of the
 approach and details on next steps.</p>
+<p><strong>The <code>functions.R</code> script and multiple data layer
+files in ohi-global MUST be updated in order for this new approach to
+work, as data layer outputs have been restructured or deleted. Please
+read through the <a href="https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L467">NP
+section of <code>ohi-global/eez/conf/functions.R</code></a></strong></p>
+<p>When future fellows move on to update step 4 (fish oil/fish meal, or
+FOFM) data prep, it may be helpful to adapt as much of the content from
+the former approach’s <code>STEP1c_np_fishfeed_pred.Rmd</code> as
+possible. The output of that step is a “score” (please review the NP
+section of <code>functions.R</code>, including the <a href="https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L590">FOFM
+scores section</a>. It may make more sense to name this “status”, as the
+status for each product (FOFM, ornamentals, and seaweeds) and their
+weights (based on the relative value of each product per region) are
+used to calculate the score.</p>
+<p>The score calculation will also need to be adjusted in
+<code>functions.R</code>, as discussed in the NP Plan document.</p>
 <p>Some key things to keep in mind as you consider updating this goal’s
 data prep process:</p>
-<p>You would need to change in <code>ohi-global</code>’s
+<ul>
+<li><p>You would need to change in <code>ohi-global</code>’s
 <code>functions.R</code> significantly to account for changes in how
 exposure and risk are handled (please look into this in-depth and
-consult Melanie Frazier). You would need to update the
-<code>layers_eez_base.csv</code> (and all layer CSV files in the
-ohi-global metadata folder) with updated layers (no longer using
-exposure and risk separately, changing how seaweeds sustainability is
-handled, etc.)</p>
+consult Melanie Frazier).</p></li>
+<li><p>As stated earlier, the way that the NP scores are calculated
+would need to change significantly to account for the new
+approach.</p></li>
+<li><p>You would need to update the <code>layers_eez_base.csv</code>
+(and all layer CSV files in the ohi-global metadata folder) with updated
+layers (no longer using exposure and risk separately, changing how
+seaweeds sustainability is handled, etc.)</p></li>
+</ul>
 <div id="layers-created" class="section level3">
 <h3>Layers Created</h3>
 <p><em>Previously:</em></p>
@@ -526,7 +531,7 @@ usd/tonne values calculated in new step 1.
 <li><code>output/np_product_weights</code>: NA, did not create.</li>
 </ul></li>
 </ul>
-<p>—————————————————————————————————————-</p>
+<p>————————————————————————————————————————-</p>
 </div>
 <div id="additional-information" class="section level3">
 <h3>Additional information</h3>
