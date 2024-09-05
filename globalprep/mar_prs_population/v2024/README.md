@@ -8,7 +8,7 @@ Find more information on dataprep [here](https://ohi-science.github.io/ohiprep_v
 * hd_intertidal
 * mar_coastalpopn_inland25mi
 
-## Changes from v2021:
+## Changes from v2021 in v2024:
 
 * The major changes from v2021 are 
   * The population data is no longer reprojected and resampled, but the eez_plus25mi_inland raster is  

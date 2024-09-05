@@ -1,0 +1,86 @@
+---
+title: 'OHI `r format(Sys.time(), "%Y")`: Natural Products, Preparing catch and B/Bmsy data for forage fish species'
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_float: yes
+    number_sections: false
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html'
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+[REFERENCE RMD FILE: <http://ohi-science.org/ohiprep_v2024/globalprep/np/v2024/STEP1c_np_fishfeed_prep.html>]
+
+
+
+------------------------------------------------------------------------
+
+# Methods
+
+INCOMPLETE. See this folder's `README.md` for details. 
+
+
+- copy over from original Step1C and adapt as necessary
+
+
+## Setup
+
+```{r}
+
+knitr::opts_chunk$set(eval = FALSE)
+
+# ======= Load packages ============
+if (!require(librarian)) {
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  ohicore, #devtools::install_github('ohi-science/ohicore@dev') #if relevant: restart session after reinstalling
+  dplyr,
+  stringr,
+  tidyr,
+  here,
+  tidyverse,
+  zoo,
+  ggplot2,
+  plotly,
+  tictoc,
+  RColorBrewer
+)
+
+# ======= Set directories ===========
+# Update scenario year, set up programmatic scenario year updates
+scen_year_number <- 2024 # update this!!
+scen_year <- as.character(scen_year_number)
+prev_scen_year <- as.character(scen_year_number - 1)
+data_dir_year <- paste0("d", scen_year)
+prev_data_dir_year <- paste0("d", prev_scen_year)
+v_scen_year <- paste0("v", scen_year)
+
+data_years <- c("1950", "2022") # update to correct data years
+
+# Natural Products directory on GitHub
+current_np_dir <- here::here("globalprep", "np", paste0(v_scen_year, "_new")) # update this if name changes
+# Mariculture directory on GitHub
+current_mar_dir <- here::here("globalprep", "mar", v_scen_year)
+
+# ======== Source functions ===========
+source(here::here("workflow", "R", "common.R")) # directory locations
+# Load FAO-specific user-defined functions
+source(here::here("workflow", "R", "fao_fxn.R")) # function for cleaning FAO files
+# function for handling FAO commodity data specific to NP
+source(here::here(current_np_dir, "R", "np_fxn.R")) 
+# functions specific to mariculture dealing with compound countries
+source(here("globalprep", "mar", v_scen_year, "mar_fxs.R"))
+```
+
+
+

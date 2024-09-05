@@ -255,8 +255,11 @@ np_exposure_new <- np_exp_raw %>%
 #summary(np_exposure_new$exposure)
 # v2024:
 #     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-# 0.000000 0.000000 0.009503 0.128015 0.082771 1.000000 
+# 0.000000 0.000000 0.009503 0.128015 0.082771 1.000000
+```
 
+
+```{r}
 # datacheck:
 # plot histogram to show distribution of rescaled points
 
@@ -267,38 +270,38 @@ ggplot(data = np_exposure_new) +
   theme_bw()
 ```
 
-
+The following chunk was scrapped. Leaving it here in case folks change their mind about log-transformations. 
 ```{r test-new-log-rescale}
-# find max raw exposure value in the past 10 years
-np_exp_max <- np_exp_raw %>%
-  filter(year %in% c(exp_decade_range)) %>% 
-  group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
-  dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
-#  dplyr::ungroup() %>% 
-  dplyr::select(rgn_id, expos_prod_max) %>% 
-  # keep 1 row with max value per region (values are the same across year range per region)
-  dplyr::distinct()
-
-
-# log-transform: ----
-np_exp_log <- np_exp_raw %>% 
-  dplyr::mutate(log_exp = log(expos_raw))
-
-log_exp_recent_decade <- np_exp_log %>% 
-  dplyr::filter(year %in% c(exp_decade_range))
-
-log_global_95th_exp <- stats::quantile(log_exp_recent_decade$log_exp, probs = c(0.95))
-# -1.889
-
-np_log_exposure <- np_exp_log %>% 
-  dplyr::mutate(log_global_95th = log_global_95th_exp) %>% 
-  dplyr::mutate(log_exposure = log_exp / log_global_95th)
-
-
-np_log_exposure_2 <- np_exp_log %>% 
-  dplyr::mutate(log_global_95th = log_global_95th_exp) %>% 
-  dplyr::mutate(log_exposure = (log_exp + 1) / (log_global_95th + 1),
-                log_exposure = ifelse(log_exposure > 1, 1, log_exposure))
+# # find max raw exposure value in the past 10 years
+# np_exp_max <- np_exp_raw %>%
+#   filter(year %in% c(exp_decade_range)) %>% 
+#   group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
+#   dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
+# #  dplyr::ungroup() %>% 
+#   dplyr::select(rgn_id, expos_prod_max) %>% 
+#   # keep 1 row with max value per region (values are the same across year range per region)
+#   dplyr::distinct()
+# 
+# 
+# # log-transform: ----
+# np_exp_log <- np_exp_raw %>% 
+#   dplyr::mutate(log_exp = log(expos_raw))
+# 
+# log_exp_recent_decade <- np_exp_log %>% 
+#   dplyr::filter(year %in% c(exp_decade_range))
+# 
+# log_global_95th_exp <- stats::quantile(log_exp_recent_decade$log_exp, probs = c(0.95))
+# # -1.889
+# 
+# np_log_exposure <- np_exp_log %>% 
+#   dplyr::mutate(log_global_95th = log_global_95th_exp) %>% 
+#   dplyr::mutate(log_exposure = log_exp / log_global_95th)
+# 
+# 
+# np_log_exposure_2 <- np_exp_log %>% 
+#   dplyr::mutate(log_global_95th = log_global_95th_exp) %>% 
+#   dplyr::mutate(log_exposure = (log_exp + 1) / (log_global_95th + 1),
+#                 log_exposure = ifelse(log_exposure > 1, 1, log_exposure))
 ```
 
 
@@ -491,8 +494,8 @@ sust_harvest_join <- np_harvest_ornamentals %>%
 
 # check summary
 summary(sust_harvest_join)
-# note: 2150 -- 495 after filtering!!! [COME BACK] NAs in exposure, 1655 -- NONE?? NAs in risk 
-# (and 1655  -- NO NAS NOW?? in sustainability, since we took the mean and set na.rm = TRUE) 
+# note: 495 NAs in exposure, 0 NAs in risk 
+# (and none in sustainability, since we took the mean and set na.rm = TRUE) 
 #str(sust_tonnes) # checking datatypes
 
 # calculate sustainable harvest
@@ -502,7 +505,7 @@ sust_harvest_orn <- sust_harvest_join %>%
 
 # check
 summary(sust_harvest_orn)
-# 1747 -- now only 92 --  [[[COME BACK]]]  NAs in sust_harvest ~~ v2024
+# only 92 NAs in sust_harvest ~~ v2024
 ```
 
 
@@ -525,7 +528,7 @@ sust_tonnes_rolling <- sust_harvest_orn %>%
                                             partial = TRUE, na.rm = FALSE)) %>%
   rename(sust_tonnes_orig = sust_tonnes) %>% 
   mutate(sust_tonnes = ifelse(!is.na(sust_tonnes_rollmean), sust_tonnes_rollmean, sust_tonnes_orig)) %>%
-  dplyr::select(rgn_id, rgn_name, product, year, tonnes, sust_tonnes, sust_tonnes_orig)
+  dplyr::select(rgn_id, rgn_name, year, product, tonnes, sustainability, sust_tonnes, sust_tonnes_orig)
 
 
 ```
@@ -577,8 +580,15 @@ orn_relative_sust_tonnes <-
 summary(orn_relative_sust_tonnes)
 
 
-# save to output folder
-readr::write_csv(orn_relative_sust_tonnes, here(current_np_dir, "output", "np_relative_sust_tonnes_ornamentals.csv"))
+# save full df to int folder
+readr::write_csv(orn_relative_sust_tonnes, here(current_np_dir, "int", "np_relative_sust_tonnes_ornamentals_full.csv"))
+
+
+# save selected columns to output folder
+final_orn_relative_sust_tonnes <- orn_relative_sust_tonnes %>% 
+  dplyr::select(rgn_id, product, year, rel_sust_tonnes)
+
+readr::write_csv(final_orn_relative_sust_tonnes, here(current_np_dir, "output", "np_relative_sust_tonnes_ornamentals.csv"))
 ```
 
 
