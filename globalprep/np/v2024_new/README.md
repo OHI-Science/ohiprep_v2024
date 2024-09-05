@@ -11,9 +11,9 @@ We decided to change how the NP goal is processed in v2024. Previously, there we
 
 Please review the NP Plan document linked above before running any of the scripts or moving on to update any scripts in this directory or `ohi-global`. Primary contact for this updated methodology: Melanie Frazier. Secondary contact: Anna Ramji. 
 
-By the end of v2024, we finished writing the new steps 1-3. Steps 4 and 5 were not completed and only contained basic YAML and setup code. Future years’ efforts should begin with reviewing the Plan document, then complete steps 4 and 5. 
+By the end of v2024, we finished writing the new steps 1-3. Steps 4 and 5 were not completed and only contained basic YAML and setup code. Future years’ efforts should begin with reviewing the [New NP Plan document](https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit?usp=sharing), then complete steps 4 and 5. 
 
-**The `functions.R` script and multiple data layer files in ohi-global MUST be updated in order for this new approach to work, as data layer outputs have been restructured or deleted. Please read through the [NP section of `ohi-global`’s `functions.R`](https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L467)**
+**The `functions.R` script and multiple data layer files in ohi-global MUST be updated in order for this new approach to work, as data layer outputs have been restructured or deleted. Please read through the [NP section of `ohi-global/eez/conf/functions.R`](https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L467)**
 
 
 When future fellows move on to update step 4 (fish oil/fish meal, or FOFM) data prep, it may be helpful to adapt as much of the content from the former approach’s `STEP1c_np_fishfeed_pred.Rmd` as possible. The output of that step is a “score” (please review the NP section of `functions.R`, including the [FOFM scores section](https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L590). It may make more sense to name this “status”, as the status for each product (FOFM, ornamentals, and seaweeds) and their weights (based on the relative value of each product per region) are used to calculate the score. 
@@ -23,19 +23,18 @@ The score calculation will also need to be adjusted in `functions.R`, as discuss
 
 ### Sustainability
 
-A key element of this new NP approach is that sustainability is incorporated in the model in a new/different way. Previously, ornamentals’ exposure and risk and seaweed sustainability were exported separately, read into ohi-global functions.R and used along with many other pieces and steps in and out of ohi-global to calculate score. In the new approach, we incorporate sustainability in our ohiprep processing to yield statuses for each product. For ornamentals, we use exposure and risk to calculate sustainability, which we then use to calculate relative sustainable harvest – all occurring in step 2. For seaweeds, we “calculate” (define) sustainability (from Seafood Watch data) to calculate relative sustainable harvest in step 3. We do not write out sustainability components separately and use them to calculate status in ohi-global’s functions.R. 
-
-
-You would need to change in ohi-global functions.R significantly to account for changes in how exposure and risk are handled (please look into this in-depth and consult Melanie Frazier).
-You would need to update the layers_eez_base.csv (and all layer csv files in the ohi-global metadata folder) with updated layers (no longer using exposure and risk separately, changing how seaweeds sustainability is handled, etc.)
+A key element of this new NP approach is that sustainability is incorporated in the model in a different way. Previously, ornamentals’ exposure and risk and seaweed sustainability were exported separately, read into `functions.R` in `ohi-global` and used along with many other pieces and steps in and out of ohi-global to calculate score. In the new approach, we incorporate sustainability in our `ohiprep` processing to yield statuses for each product. For ornamentals, we use exposure and risk to calculate sustainability, which we then use to calculate relative sustainable harvest – all occurring in step 2. For seaweeds, we “calculate” (define) sustainability using Seafood Watch data to calculate relative sustainable harvest in step 3. We *do not* write out sustainability components separately to use them to calculate status in ohi-global’s functions.R. 
 
 
 
-## Outline of New NP Dataprep Process and Methodology (v2024):
+## Next Steps 
 
+To continue to develop the new NP data prep process and methodology, please refer to the [2024 New NP Plan: outline and notes](https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit?usp=sharing) for a comprehensive outline of the approach and details on next steps. 
 
-For a comprehensive outline of the new NP data prep process and methodology (v2024), please refer to the [2024 New NP Plan: outline and notes](https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit?usp=sharing)
+Some key things to keep in mind as you consider updating this goal’s data prep process:
 
+You would need to change in `ohi-global`’s `functions.R` significantly to account for changes in how exposure and risk are handled (please look into this in-depth and consult Melanie Frazier).
+You would need to update the `layers_eez_base.csv` (and all layer CSV files in the ohi-global metadata folder) with updated layers (no longer using exposure and risk separately, changing how seaweeds sustainability is handled, etc.)
 
 
 ### Layers Created
@@ -126,4 +125,3 @@ FAO metadata for Mariculture data are found [here](http://www.fao.org/fishery/st
 RAM data can be found here: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.491
 
 Fisheries data can be found here: [IMAS portal](http://data.imas.utas.edu.au/portal/search?uuid=ff1274e1-c0ab-411b-a8a2-5a12eb27f2c0)
-
