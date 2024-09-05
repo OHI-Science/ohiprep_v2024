@@ -55,7 +55,7 @@ Files can be found on Mazu: `home/shares/ohi/git-annex/globalprep/_raw_data/FAO_
 
 ------------------------------------------------------------------------
 
-# Methods
+# New Methods Outline
 
 
 STEP 1: Value data (used for weighting)
@@ -72,7 +72,6 @@ USD per tonne for FOFM and non-food seaweeds (and ornamentals) to use for calcul
 # Methods
 
 ```{r setup, warning=FALSE, message=FALSE}
-
 knitr::opts_chunk$set(eval = FALSE)
 
 # ======= Load packages ============
@@ -103,7 +102,7 @@ data_dir_year <- paste0("d", scen_year)
 prev_data_dir_year <- paste0("d", prev_scen_year)
 v_scen_year <- paste0("v", scen_year)
 
-current_np_dir <- here::here("globalprep", "np", v_scen_year)
+current_np_dir <- here::here("globalprep", "np", paste0(v_scen_year, "_new")) # update this if name changes
 
 # ======== Source functions ===========
 source(here::here("workflow", "R", "common.R")) # directory locations
@@ -403,7 +402,7 @@ h_gap_ornamentals <- h_gap %>%
   filter(product == "ornamentals")
 
 # save record of gapfilling methods
-readr::write_csv(h_gap, # not sure why this isn't h_gap_ornamentals when the file name specifies ornamentals...
+readr::write_csv(h_gap, # not sure why this isn't h_gap_ornamentals when the file name specifies ornamentals... (legacy from old step 1a...)
                  here(current_np_dir, "output", "np_ornamentals_harvest_tonnes_gf.csv"), na = '')
 
 ```
@@ -432,7 +431,7 @@ To complete the first component of step 1 in Mel's new NP plan, we'll save these
 
 ```{r}
 # save data frame with gap-filled usd and tonnes for all products to int dir
-readr::write_csv(h_prod, here::here(current_np_dir, "int", "np_harvest_usd_tonnes_gf.csv"))
+readr::write_csv(h_prod, here::here(current_np_dir, "int", "np_harvest_usd_tonnes.csv"))
 
 ```
 

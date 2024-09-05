@@ -43,15 +43,15 @@ For v2023 and v2024 the Sea Around us Project (SAUP) data used in the ao_catch_p
 **Additional Information**: [Methods](http://www.seaaroundus.org/sea-around-us-methods-index/)
 
 
-**Reference**: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.495
+**Reference**: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.65
 
-**Downloaded**: 07/06/2023
+**Downloaded**: 08/07/2024
 
 **Description**: B/Bmsy value by stock and year (other data, which we do not use, are also available in the database)
 
 **Native data resolution**: stock (fish stock, species and region specific)
 
-**Time range**: 1800 - 2022 (we only use the year which matches our fisheries catch data (2019 for v2023))
+**Time range**: 1800 - 2023 (we only use the year which matches our fisheries catch data (2019 for v2024))
 
 **Format**: CSV format 
 
@@ -65,7 +65,9 @@ For v2023 and v2024 the Sea Around us Project (SAUP) data used in the ao_catch_p
 2. Convert the B/Bmsy values to scores (cap them at 1.. we wont penalize for underharvesting).
 3. Take a catch weighted average of B/Bmsy scores for each region/year and gapfill those regions that are missing.
 
-```{r, eval = FALSE}
+```{r setup, eval = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, eval=FALSE)
+
 library(tidyverse)
 library(here)
 library(htmlwidgets)
@@ -284,7 +286,7 @@ compare <- new %>%
 ```
 
 
-```{r, eval = FALSE}
+```{r, eval=FALSE}
 library(plotly)
 library(ggplot2)
 
@@ -297,12 +299,17 @@ compare_plotly <- ggplotly(compare_plot, tooltip = c("text", "score", "old_score
 compare_plotly
 
 htmlwidgets::saveWidget(compare_plotly, here::here("globalprep","ao", version_year, "figs","v2023_v2024_compare_plot.html"))
-```
 
-```{r}
+#look at the difference between this year and last
+new <- read_csv(here::here("globalprep","ao",version_year, "output","ao_nind_scores.csv")) %>%
+  left_join(rgns_eez)
+
+old <- read_csv(here::here("globalprep","ao",previous_version_year, "output","ao_nind_scores.csv")) %>% 
+  select(rgn_id, year, old_score = score)
+
 # ==== Percent change between this year and last year =====
 compare_diff <- new %>% 
-  left_join(old, by = c("year", "rgn_id")) %>% 
+  dplyr::left_join(old, by = c("year", "rgn_id")) %>% 
   filter(year == previous_assessment_latest_data_year) %>%  # filter the data to only 2019
   mutate(diff = ((score - old_score)/old_score)*100) # using percent change equation
 
@@ -357,7 +364,8 @@ patch_rgn_3
 # saveWidget(patch_rgn_3, here::here("globalprep","ao", version_year, "figs","rgn_3_score_comparison.html"))
 ```
 
-```{r}
+```{r, eval = FALSE}
+
 region_data() # to have access to rgns_all and rgns_eez
 
 fis_bbmsy <- read_csv(here::here("globalprep","fis", version_year, "output","fis_bbmsy.csv")) # v2024

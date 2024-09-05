@@ -77,10 +77,8 @@ The iconic species list was updated by adding species from [Reyes-García et al.
 ## Setup
 
 ```{r setup, echo = FALSE, message = FALSE, warning = FALSE, eval=FALSE}
-knitr::opts_chunk$set(fig.width = 6, fig.height = 4, fig.path = 'Figs/', echo = FALSE, message = FALSE, warning = FALSE)
-```
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, eval=FALSE)
 
-```{r setup, echo = FALSE, message = FALSE, warning = FALSE, eval=FALSE}
 ### Load required libraries:
 if (!require(librarian)){install.packages("librarian")}
 if (!require(ohicore)){devtools::install_github('ohi-science/ohicore@dev')}
@@ -93,7 +91,8 @@ librarian::shelf(
   parallel,
   devtools,
   ohicore,
-  kableExtra
+  kableExtra,
+  magrittr
 )  
 ### directory paths and relevant files
 current_year  <- 2024
@@ -544,7 +543,22 @@ NE & & \longleftarrow \text{"Not recognized ($NR$)"}
 \end{eqnarray*}
 ```
 
-```{r}
+```{r echo=TRUE, message=FALSE}
+if (!require(librarian)){install.packages("librarian")}
+if (!require(ohicore)){devtools::install_github('ohi-science/ohicore@dev')}
+librarian::shelf(
+  tidyverse,
+  here,
+  janitor,
+  jsonlite,
+  plotly,
+  parallel,
+  devtools,
+  ohicore,
+  kableExtra,
+  magrittr
+)  # repasted for knitting
+
 # use `kableExtra` to create a table that depicts the same information
 classification_df <- data.frame(
   Original = c(

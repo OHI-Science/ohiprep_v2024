@@ -96,7 +96,7 @@ data_dir_year <- paste0("d", scen_year)
 prev_data_dir_year <- paste0("d", prev_scen_year)
 v_scen_year <- paste0("v", scen_year)
 
-current_np_dir <- here::here("globalprep", "np", paste0(v_scen_year, "_new"))
+current_np_dir <- here::here("globalprep", "np", paste0(v_scen_year, "_new")) # update this if name changes
 
 # ======== Source functions ===========
 source(here::here("workflow", "R", "common.R")) # directory locations
@@ -134,6 +134,8 @@ Then, in final data, save `rgn_id`, `product`, `year`, `rel_sust_tonnes`
 
 
 ```{r}
+# ---- Subset np harvest ornamentals ----
+
 # read in FAO commodities usd tonnes int data
 np_harvest_usd_tonnes <- read_csv(here(current_np_dir, "int", "np_harvest_usd_tonnes_gf.csv"))
 
@@ -144,6 +146,28 @@ np_ornamentals_base <- np_harvest_usd_tonnes %>%
 # check
 table(np_ornamentals_base$product)
 # 3938 -- v2024
+
+# ---- tonnes only ----
+# select relevant columns
+np_harvest_orn <- np_ornamentals_base %>%
+  dplyr::select(rgn_id, rgn_name, year, product, tonnes) %>% 
+  # hard-coded year cutoff point to ensure just enough years of data for rolling average calculations
+  dplyr::filter(year >= 2004) %>% 
+  arrange(rgn_id)
+
+# write out tonnes subset to int
+readr::write_csv(np_harvest_orn, here(current_np_dir, "int", "np_harvest_ornamentals_tonnes.csv"))
+
+# ---- usd and tonnes ----
+# select relevant columns (including usd this time)
+np_harvest_orn_full <- np_ornamentals_base %>%
+  dplyr::select(rgn_id, rgn_name, year, product, tonnes, usd) %>% 
+  # hard-coded year cutoff point to ensure just enough years of data for rolling average calculations
+  dplyr::filter(year >= 2004) %>% 
+  arrange(rgn_id)
+
+# write out tonnes subset to int
+readr::write_csv(np_harvest_orn_full, here(current_np_dir, "int", "np_harvest_ornamentals_tonnes_usd.csv"))
 
 ```
 
@@ -158,12 +182,6 @@ Returns the first input data frame with a new column for exposure:
 [`rgn_id` `year` `product` `exposure`]
 
 ```{r}
-    
-# ---- Subset np harvest ornamentals ----
-np_harvest_orn <- np_ornamentals_base %>%
-  dplyr::select(rgn_id, year, product, tonnes) %>% 
-  arrange(rgn_id)
-
 # ====== Determine Habitat Areas for Exposure ========
 # rocky reef habitat area
 hab_rocky <- readr::read_csv(here::here("globalprep", "hab_rockyreef", "v2012", # hasn't been updated since 2012
@@ -193,44 +211,105 @@ area_dual_hab <- np_harvest_orn %>%
   
 
 # ======== Determine Exposure ========
-### exposure: get tonnes / area, find max in past 10 years, use max to rescale with log transform
+### exposure: get tonnes / area, find global 95th quantile from past 10 years, 
+#### use 95th quantile value to rescale exposure from 0-1
 
-# calculate raw exposure (tonnes / area)
+# calculate raw exposure (tonnes / area) ----
 np_exp_raw <- area_dual_hab %>%
   # find regions and years with harvest in rocky reef and coral habitat
   dplyr::mutate(expos_raw = ifelse(tonnes > 0 & km2 > 0,
                                    (tonnes / km2), # raw exposure: harvest tonnes / habitat area
                                    0)) %>% # 0 exposure if no harvest or no special habitat
   dplyr::group_by(product) 
+ 
 
-# define most recent 10 year range
+# define most recent 10 year range ----
 max_exp_year <- max(np_exp_raw$year)
 exp_decade_range <- seq((max_exp_year - 10), max_exp_year, 1)
 
-# find max raw exposure value in the past 10 years
-np_exp_max <- np_exp_raw %>%
-  filter(year %in% c(exp_decade_range)) %>% 
-  group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
-  dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
-#  dplyr::ungroup() %>% 
-  dplyr::select(rgn_id, expos_prod_max) %>% 
-  # keep 1 row with max value per region (values are the same across year range per region)
-  dplyr::distinct()
 
-# calculate rescaled exposure
-np_exp_orn_rescale <- np_exp_raw %>%
-  # bring in max (of the past 10 yrs) value, 
-  # fill single value for each region across full time range
-  dplyr::left_join(np_exp_max, by = "rgn_id") %>% 
-  # rescale exposure using max value
-  dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
-                exposure = ifelse(exposure > 1, 1, exposure)) %>%
-  dplyr::select(-km2, -expos_raw, -expos_prod_max)
+# ---- find 95th quantile of the past 10 years ----
+
+# subset of past 10 years
+np_exp_recent_decade <- np_exp_raw %>% 
+  dplyr::filter(year %in% c(exp_decade_range))
+
+global_95th_quantile <- stats::quantile(np_exp_recent_decade$expos_raw, probs = c(0.95))
+# v2024: 95th is 0.1511856; 99th is 45.90351 
 
 
+# ---- calculate rescaled exposure ----
+# new rescale method: 
+# if raw exposure >= 95th quantile, exposure = 1
+# else, exposure = raw exposure / global 95th quantile
+
+np_exposure_new <- np_exp_raw %>% 
+  # bring in global 95th quantile value 
+  dplyr::mutate(global_95th = global_95th_quantile) %>% 
+  # rescale following new method outlined above
+  dplyr::mutate(exposure = case_when(
+    expos_raw >= global_95th ~ 1,
+    expos_raw < global_95th ~ (expos_raw / global_95th))
+  )
+
+#summary(np_exposure_new$exposure)
+# v2024:
+#     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+# 0.000000 0.000000 0.009503 0.128015 0.082771 1.000000
+```
+
+
+```{r}
+# datacheck:
+# plot histogram to show distribution of rescaled points
+
+ggplot(data = np_exposure_new) +
+  geom_histogram(aes(x = exposure),
+                 color = "blue",
+                 fill = "cornflowerblue") +
+  theme_bw()
+```
+
+The following chunk was scrapped. Leaving it here in case folks change their mind about log-transformations. 
+```{r test-new-log-rescale}
+# # find max raw exposure value in the past 10 years
+# np_exp_max <- np_exp_raw %>%
+#   filter(year %in% c(exp_decade_range)) %>% 
+#   group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
+#   dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>%
+# #  dplyr::ungroup() %>% 
+#   dplyr::select(rgn_id, expos_prod_max) %>% 
+#   # keep 1 row with max value per region (values are the same across year range per region)
+#   dplyr::distinct()
+# 
+# 
+# # log-transform: ----
+# np_exp_log <- np_exp_raw %>% 
+#   dplyr::mutate(log_exp = log(expos_raw))
+# 
+# log_exp_recent_decade <- np_exp_log %>% 
+#   dplyr::filter(year %in% c(exp_decade_range))
+# 
+# log_global_95th_exp <- stats::quantile(log_exp_recent_decade$log_exp, probs = c(0.95))
+# # -1.889
+# 
+# np_log_exposure <- np_exp_log %>% 
+#   dplyr::mutate(log_global_95th = log_global_95th_exp) %>% 
+#   dplyr::mutate(log_exposure = log_exp / log_global_95th)
+# 
+# 
+# np_log_exposure_2 <- np_exp_log %>% 
+#   dplyr::mutate(log_global_95th = log_global_95th_exp) %>% 
+#   dplyr::mutate(log_exposure = (log_exp + 1) / (log_global_95th + 1),
+#                 log_exposure = ifelse(log_exposure > 1, 1, log_exposure))
+```
+
+
+
+```{r save-exposure}
 # ======== Save intermediate data products ==========
 # clean up columns
-np_exp_gf <- np_exp_orn_rescale %>%
+np_exp_gf <- np_exposure_new %>%
   dplyr::mutate(gapfilled = ifelse(is.na(exposure), 1, 0)) %>%
   dplyr::mutate(method = ifelse(is.na(exposure), "prod_average", NA)) %>%
   dplyr::select(rgn_id = rgn_id, product, year, gapfilled, method)
@@ -239,16 +318,22 @@ np_exp_gf <- np_exp_orn_rescale %>%
 readr::write_csv(np_exp_gf, here(current_np_dir, 
                                  "int", # used to be output, moved to int
                                  # because exposure is no longer an output
-                                 "np_exposure_ornamentals_gf_record.csv"))
+                                 "np_exposure_ornamentals_gf.csv"))
 
 # add exposure for countries with (habitat extent == NA)
-np_exp_orn <- np_exp_orn_rescale %>%
-  dplyr::group_by(product) %>% # not sure why they didn't have some georegion gapfill instead of gapfilling with mean global exposure??
+np_exp_orn <- np_exposure_new %>% # `was np_exp_orn_rescale`
+  dplyr::group_by(product) %>% 
+  # not gapfilling by georegion, gapfilling with mean global exposure.
+  # ^ room for improvement/development next year! (we really ran out of time...)
   dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
+  # if NA, fill with global mean exposure
   dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
+  # drop temp column
   dplyr::select(-mean_exp) %>%
   dplyr::ungroup() %>%
+  # coerce data type
   dplyr::mutate(product = as.character(product)) %>%
+  # select relevant columns
   dplyr::select(rgn_id, year, product, exposure)
 
 # save ornamentals exposure to int 
@@ -257,8 +342,16 @@ readr::write_csv(np_exp_orn, here(current_np_dir,
                                  # because exposure is no longer an output
                                   "np_exposure_ornamentals.csv"))
 
-# potentially filter to past 20 years (or hardcode from 2004 onward)
+# updated to filter to past 20 years (hardcoded data filter from 2004 onward)
 
+# datacheck:
+library(RColorBrewer)
+np_orn_exposure_plot <- ggplot(data = np_exp_orn, aes(x = year, y = exposure)) +
+  geom_line(aes(color = as.character(rgn_id))) +
+  #geom_line(aes(color = (rgn_id))) +
+  theme_bw()
+
+plotly::ggplotly(np_orn_exposure_plot)
 ```
 
 
@@ -271,51 +364,15 @@ ggplot(data = np_exp_orn %>% filter(rgn_id == 163), aes(x = year, y = exposure))
 
 
 
-global-scaled exposure test:
-
-
-```{r}
-np_global_max <- np_exp_raw %>%
-  filter(year %in% c(exp_decade_range)) %>% 
- # group_by(rgn_id) %>% # not sure why they didn't group by rgn_id before... 
-  dplyr::mutate(expos_prod_max = max(expos_raw, na.rm = TRUE)) %>% # 143.385 for all...
-  dplyr::ungroup() %>% # without this, "ornamentals" column remains
-  dplyr::select(rgn_id, expos_prod_max) %>% 
-  # keep 1 row with max value per region (values are the same across year range per region)
-  dplyr::distinct()
-
-# calculate rescaled exposure
-global_exp_rescale <- np_exp_raw %>%
-  # bring in max (of the past 10 yrs) value, 
-  # fill single value for each region across full time range
-  dplyr::left_join(np_global_max, by = "rgn_id") %>% 
-  # rescale exposure using max value
-  dplyr::mutate(exposure = (log(expos_raw + 1) / log(expos_prod_max + 1)),
-                exposure = ifelse(exposure > 1, 1, exposure)) %>%
-  dplyr::select(-km2, -expos_raw, -expos_prod_max)
-
-
-np_exp_orn_global <- global_exp_rescale %>%
-  dplyr::group_by(product) %>% # not sure why they didn't have some georegion gapfill instead of gapfilling with mean global exposure??
-  dplyr::mutate(mean_exp = mean(exposure, na.rm = TRUE)) %>%
-  dplyr::mutate(exposure = ifelse(is.na(exposure), mean_exp, exposure)) %>%
-  dplyr::select(-mean_exp) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(product = as.character(product)) %>%
-  dplyr::select(rgn_id, year, product, exposure)
-
-
-ggplot(data = np_exp_orn_global %>% filter(rgn_id == 163), aes(x = year, y = exposure)) + 
-  geom_line() +
-  theme_bw()
-
-
-# exposure scale is much smaller now, as values are being compared to global max exposure, not regional...
-```
-
-
 
 ## Calculate Risk
+
+
+Calculate NP risk based on blast fishing and cyanide fishing. For ornamentals:
+
+risk = 1 if blast fishing or cyanide fishing 
+
+Create a dataframe of risk per product per region.
 
 ```{r}
 
@@ -326,63 +383,130 @@ ggplot(data = np_exp_orn_global %>% filter(rgn_id == 163), aes(x = year, y = exp
 #########################################.
 
 
-### Determine Risk
+# ----- Determine Risk --------
 
-r_cyanide <- 
-  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_poison_3nm_rgn2013.csv")) %>%
+r_cyanide <- read_csv(here("globalprep", "np_prs_poison_blast_fishing",
+                           "v2013", "data", "gl_thr_poison_3nm_rgn2013.csv")) %>%
   #AlignDataYears(layer_nm = "np_cyanide", layers_obj = layers) %>%
   dplyr::filter(!is.na(score) & score > 0) %>%
   dplyr::select(rgn_id,
                 #year = scenario_year,
                 cyanide = score)
 
-r_blast <-
-  read_csv(here("globalprep", "np_prs_poison_blast_fishing", "v2013", "data", "gl_thr_blast_3nm_rgn2013.csv")) %>%
+r_blast <- read_csv(here("globalprep", "np_prs_poison_blast_fishing",
+                         "v2013", "data", "gl_thr_blast_3nm_rgn2013.csv")) %>%
   #AlignDataYears(layer_nm = "np_blast", layers_obj = layers)  %>%
-  filter(!is.na(score) & score > 0) %>%
+  dplyr::filter(!is.na(score) & score > 0) %>%
   dplyr::select(rgn_id,
          #year = scenario_year,
          blast = score)
 
 
-### risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code
-###  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the "relative intensity of cyanide fishing"
+# risk for ornamentals set to 1 if blast or cyanide fishing present, based on Nature 2012 code
+##  despite Nature 2012 Suppl saying Risk for ornamental fish is set to the "relative intensity of cyanide fishing"
 risk_orn <- r_cyanide %>%
   full_join(r_blast, by = c("rgn_id")) %>%
   mutate(ornamentals = 1) %>%
   dplyr::select(rgn_id, ornamentals)
 
-### risk as binary
+# define risk as binary if blast or cyanide fishing
 np_risk_orn <-
+  # create a dataframe from all combinations of rgn ID and year
   expand.grid(
     rgn_id  = unique(np_harvest_orn$rgn_id),
     year = unique(np_harvest_orn$year)
   ) %>%
-  ### ornamentals
+  # join with ornamentals
   left_join(risk_orn, by = c("rgn_id"))  %>%
   mutate(ornamentals = ifelse(is.na(ornamentals), 0, ornamentals)) %>%
-  gather(product, risk, -rgn_id, -year) %>%
-  mutate(product = as.character(product))
+#  gather(product, risk, -rgn_id, -year) %>%
+#  mutate(product = as.character(product))
+  mutate(product = "ornamentals") %>% 
+  rename(risk = ornamentals) %>% 
+  dplyr::select(rgn_id, year, product, risk)
 
+# track gapfilling for records
 np_risk_gf <- np_risk_orn %>%
   mutate(gapfilled = 0, method = NA) %>%
   dplyr::select(-risk)
 
-readr::write_csv(np_risk_gf, here(current_np_dir, "output", "np_risk_ornamentals_gf.csv"))
 
-## write this as a risk layer 
-readr::write_csv(np_risk_orn, here(current_np_dir, "output", "np_risk_ornamentals.csv"))
+# write out risk gapfilling status
+readr::write_csv(np_risk_gf, here(current_np_dir, "int", "np_risk_ornamentals_gf.csv"))
+
+# write this out to int (no longer a risk layer for ohi-global)
+readr::write_csv(np_risk_orn, here(current_np_dir, "int", "np_risk_ornamentals.csv"))
 ```
 
 
 ## Calculate Sustainability
 
-1 - mean(c(exposure, risk), na.rm = TRUE)
+`1 - mean(c(exposure, risk), na.rm = TRUE)`
+
+
+```{r}
+# read in exposure
+exposure <- readr::read_csv(here(current_np_dir, "int", "np_exposure_ornamentals.csv"))
+
+# read in risk
+risk <- readr::read_csv(here(current_np_dir, "int", "np_risk_ornamentals.csv"))
+
+
+
+# ---- calculate sustainability ----
+
+# join dataframes
+orn_exposure_risk <- exposure %>% 
+  full_join(risk, by = join_by("rgn_id", "year", "product"))
+
+# calculate sustainability
+orn_sust <- orn_exposure_risk %>% 
+  ungroup() %>% 
+  group_by(rgn_id, year, product) %>% 
+  mutate(sustainability = 1 - mean(c(exposure, risk), na.rm = TRUE)) %>% 
+  ungroup()
+
+
+# exploratory data viz / data check
+check_orn_sust_plot <- ggplot(data = orn_sust, aes(x = year, y = sustainability)) +
+  geom_line(aes(color = as.character(rgn_id))) +
+  theme_bw()
+
+plotly::ggplotly(check_orn_sust_plot)
+```
+
+
 
 
 ## Calculate Sustainable Harvest
 
-tonnes * sustainability
+`tonnes * sustainability`
+
+
+```{r}
+# read in ornamentals harvest (same as earlier chunk)
+np_harvest_ornamentals <- readr::read_csv(here(current_np_dir, "int", "np_harvest_ornamentals_tonnes_usd.csv"))
+
+# join sustainability and tonnes
+sust_harvest_join <- np_harvest_ornamentals %>% 
+  full_join(orn_sust, by = join_by("rgn_id", "year", "product")) %>% 
+  filter(year >= 2004) # ensure that proper start year is set
+
+# check summary
+summary(sust_harvest_join)
+# note: 495 NAs in exposure, 0 NAs in risk 
+# (and none in sustainability, since we took the mean and set na.rm = TRUE) 
+#str(sust_tonnes) # checking datatypes
+
+# calculate sustainable harvest
+sust_harvest_orn <- sust_harvest_join %>% 
+  mutate(sust_tonnes = tonnes * sustainability)
+
+
+# check
+summary(sust_harvest_orn)
+# only 92 NAs in sust_harvest ~~ v2024
+```
 
 
 
@@ -390,16 +514,82 @@ tonnes * sustainability
 
 
 
+```{r}
+# Find max year in the summarized data table
+year_max <- max(sust_harvest_orn$year)
+
+# for each region and year, calculate rolling mean in a 5 year window (year + 4 years, right-aligned (year, look at the 4 years previous))
+sust_tonnes_rolling <- sust_harvest_orn %>%
+  arrange(rgn_id, product, year) %>%
+  group_by(rgn_id, product) %>%
+  mutate(
+      sust_tonnes_rollmean = zoo::rollapply(sust_tonnes, width = 4,
+                                            FUN = mean, align = 'right',
+                                            partial = TRUE, na.rm = FALSE)) %>%
+  rename(sust_tonnes_orig = sust_tonnes) %>% 
+  mutate(sust_tonnes = ifelse(!is.na(sust_tonnes_rollmean), sust_tonnes_rollmean, sust_tonnes_orig)) %>%
+  dplyr::select(rgn_id, rgn_name, year, product, tonnes, sustainability, sust_tonnes, sust_tonnes_orig)
+
+
+```
+
+
 ## Identify Max Sustainable Tonnes
 
-max(sustainable_tonnes)
+Find the maximum sustainable tonnes per region within the past 10 years.
+
+```{r}
+# subset to past 10 years, find max sustainable tonnes 
+
+# define 10 year range
+sust_tonnes_decade <- c((year_max - 10):year_max)
+
+# find peak sustainable tonnes 
+max_sust_tonnes <- sust_tonnes_rolling %>% 
+  filter(year %in% c(sust_tonnes_decade)) %>% 
+  ungroup() %>% 
+  group_by(rgn_id, product) %>% 
+  mutate(peak_sust_tonnes = max(sust_tonnes, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  # keep first value for each 
+  # (it's copied a few times otherwise which causes issues down the line)
+  dplyr::distinct(rgn_id, peak_sust_tonnes) %>% 
+  dplyr::select(rgn_id, peak_sust_tonnes)
+  
+
+```
 
 
 ## Relative Sustainable Tonnes
 
+Bring max sustainable tonnes value back into sustainable tonnes full dataframe. Use this value to calculate relative sustainable tonnes: if `sust_tonnes >= peak_sust_tonnes`, then set to 1. Else, `tonnes_rollmean / peak_sust_tonnes`.  
 
-tonnes_rollmean / peak_sust_tonnes
+```{r}
+# ---- Determine relative sustainable tonnes ----
+orn_relative_sust_tonnes <- 
+  # join peak sustainable tonnes with full sustainable tonnes df
+  sust_tonnes_rolling %>% 
+  ungroup() %>% 
+  ## filling in peak value per region ID across full year range
+  full_join(max_sust_tonnes, by = join_by("rgn_id")) %>% 
+  # rescale to find relative sustainable tonnes
+  mutate(rel_sust_tonnes = ifelse(sust_tonnes > peak_sust_tonnes, 1,
+                             sust_tonnes / peak_sust_tonnes))
+ 
+# check
+summary(orn_relative_sust_tonnes)
 
+
+# save full df to int folder
+readr::write_csv(orn_relative_sust_tonnes, here(current_np_dir, "int", "np_relative_sust_tonnes_ornamentals_full.csv"))
+
+
+# save selected columns to output folder
+final_orn_relative_sust_tonnes <- orn_relative_sust_tonnes %>% 
+  dplyr::select(rgn_id, product, year, rel_sust_tonnes)
+
+readr::write_csv(final_orn_relative_sust_tonnes, here(current_np_dir, "output", "np_relative_sust_tonnes_ornamentals.csv"))
+```
 
 
 

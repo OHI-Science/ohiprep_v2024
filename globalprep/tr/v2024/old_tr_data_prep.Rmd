@@ -1,0 +1,1511 @@
+---
+title: 'OHI `r format(Sys.Date(), "%Y")` - Tourism and Recreation '
+author: "*Compiled on `r date()` by `r Sys.info()['user']`*"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_depth: 1
+    toc_float: yes
+    number_sections: true
+    theme: cerulean
+    highlight: haddock
+    includes: 
+      in_header: '../../../workflow/templates/ohi_hdr.html' 
+  pdf_document:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+[REFERENCE RMD FILE](http://ohi-science.org/ohiprep_v2024/globalprep/tr/v2024/tr_data_prep.html)
+
+# Summary
+
+This document describes the steps for obtaining the data used to calculate the tourism and recreation goal for the 2024 global assessment.
+
+The general calculation is: tr = Ap \* Sr and Xtr = tr/90th quantile across regions
+
+-   Ap = Proportion of overnight tourist arrivals to total arrivals
+-   Sr = (S-1)/5; Sustainability of tourism
+
+*The following data are used:*
+
+-   Numbers of tourist arrivals, used in the calculation of the proportion of arrivals to area of coastline to population: obtained through the [UNWTO](https://www.unwto.org/tourism-statistics/key-tourism-statistics) (in the form of thousands of people). More info on tourism terms [here](https://www.unwto.org/glossary-tourism-terms). Range: 1995-2022 (only 2008-2022 is used)
+-   Tourism sustainability: World Economic Forum. The Travel & Tourism Development Index 2024 (version May 2024). 2024. [TTDI](https://www3.weforum.org/docs/WEF_Travel_and_Tourism_Development_Index_2024.pdf)
+-   Per capita GDP: (World Bank with gaps filled using CIA data), used to gapfill missing values in Tourism sustainability
+  - World Bank (brought in from AO intermediate, ~/globalprep/ao/v2024/intermediate/gdppcppp_ohi.csv)
+  - CIA (https://www.cia.gov/the-world-factbook/field/real-gdp-per-capita/country-comparison/)
+
+
+# Updates from previous assessment
+
+**We were able to update the following data:**
+
+-   Proportion of coastal tourist arrivals to area of coastline to population - UNWTO data on thousands of tourist arrivals, reported until 2022 (downloaded [here](https://www.unwto.org/tourism-statistics/key-tourism-statistics) (dataset: "Total arrivals" under Inbound Tourism; we use the "Overnights visitors (tourists)" categorization as arrivals where possible) on 8/15/2024. Additionally, Domestic data is downloaded from the "Domestic Tourism" tab, under which both "Trips" and "Accommodation" are downloaded (8/15/2024). 
+
+# v2024 updates
+
+Building upon updates made in v2023 for Tourism & Recreation. Now including Domestic Tourism data, gapfilled, for available regions.  Aggregated with International data.  Also, there was an update for the TTDI, and the scores were brought in from their 2024 pdf "Travel & Tourism Development Index 2024."
+
+### Layers
+
+-   tr_arrivals_props_tourism (arrivals to a country, staying overnight)
+-   tr_sustainability (Tourism sustainability index)
+
+### Data Sources
+
+Using a new methodology to calculate Ap (v2024):
+
+-   UNWTO data on thousands of tourist arrivals (international and domestic), reported until 2022 (downloaded here (international dataset: "Total arrivals" under Inbound Tourism; we use the "Overnights visitors (tourists)" categorization as arrivals where possible.  Domestic dataset: from the "Domestic Tourism" tab, under which both "Trips" and "Accommodation" are downloaded) on 8/15/2024. Use Overnights from this, and gapfill Overnights with Total minus Same-day if possible.
+-   Sum of inland (1 km) and offshore (3 nm) area (calculated from the csvs used in LSP)
+-   Total Population data per region from World Bank from Mazu (downloaded within eco_tour_prep.Rmd) I do not gapfill all missing populations, just ones that match with regions that don't have NAs in the arrivals data.
+
+**Citation**: 
+World Bank. (2023). *Population, total*. https://data.worldbank.org/indicator/SP.POP.TOTL
+© 2024 The World Bank Group, All Rights Reserved.
+
+**Source information**:
+Download instructions -
+1. Go to link
+2. Click “CSV” under “Download” on the right hand side
+3. Alt option: can also use API. This (in the form of the WDI() function) is what is used for tr_arrivals_props_tourism in v2023, which is why the data is not available on Mazu.
+   
+-   v2024: The (tourism sustainability index dataset)[<https://www3.weforum.org/docs/WEF_Travel_and_Tourism_Development_Index_2024.pdf>] (TTDI) has been updated!
+
+### Next Steps
+
+-   Explore updated UNWTO data. Determine if Inbound Tourism Arrivals Overnight stays can be aggregated with Domestic Arrivals Overnight stays. - See where there are gaps, what would need to be filled.
+-   If there are too many gaps, look at employment data instead.
+-   Integrate the fixed (globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv) coastal population data for a new method of calculating "Ap" (Arrival proportion):
+
+> Ap = multiply arrivals by coastal population/total population, then divide by coastal area (sum of inland (1 km) and offshore (3 nm) area)
+
+-   Rescale using the 90th quantile as the reference point, or 80th (reevaluate when we get to this step)
+-   Consider dropping low population areas, like they did in v2023
+-   Calculate `Sr = (S-1)/5`; Sustainability of tourism
+-   Finally, use the equation: `tr = Ap * Sr` for final scores before updating ohi-global
+
+## Initial set-up code
+
+```{r setup, message=FALSE, warning=FALSE, results="hide"}
+# library(devtools)
+# devtools::install_github("ohi-science/ohicore@dev") # dont worry about devtools
+library(ohicore)
+library(tidyverse)
+library(stringr)
+library(WDI)
+library(here)
+library(janitor)
+library(plotly)
+library(readxl)
+library(naniar)
+library(countrycode)
+library(pdftools)
+library(tictoc)
+
+# ---- sources! ----
+source(here("workflow", "R", "common.R")) # file creates objects to process data
+
+region_data() # for rgns_all and rgns_eez
+
+regions_shape() # returns spatial shape object named 'regions' which includes land, eez, highseas, and antarctica regions
+
+#source(here(paste0("globalprep/tr/v", version_year, "/R/tr_fxns.R"))) # not used presently
+
+# ---- set year and file path info ----
+current_year <- 2024 # Update this in the future!!
+version_year <- paste0("v",current_year)
+data_dir_version_year <- paste0("d", current_year)
+prev_ver_yr <- paste0("d", (current_year - 1))
+
+# ---- data directories ----
+
+# Raw data directory (on Mazu)
+raw_data_dir <- here::here(dir_M, "git-annex", "globalprep", "_raw_data")
+
+# UNWTO (UN World Tourism) raw data directory
+unwto_dir <- here(raw_data_dir, "UNWTO", data_dir_version_year)
+
+# intermediate data outputs dir
+int_dir <- here("globalprep","tr", version_year, "intermediate")
+
+# final output dir
+output_dir <- here("globalprep","tr", version_year, "output")
+
+# final figs dir
+figs_dir <- here("globalprep","tr", version_year, "figs")
+```
+
+# Ap: Proportion of tourist arrivals, multiplied by coastal/total population, to area of coastline to population
+
+We use international arrivals data from the [United Nations World Tourism Organization (UNWTO)](https://www.unwto.org/). Up through v2022, we accessed data from the [World Travel & Tourism Council (WTTC)](http://www.wttc.org/), but this was no longer a viable option in v2023. In v2024, we added Domestic Tourism Arrivals. International and Domestic were downloaded [here](https://www.unwto.org/tourism-statistics/key-tourism-statistics) August 16th and 19th, 2024, respectively.
+
+*International data:* Click Inbound Arrivals, scroll down to "Total arrivals", click download data.
+
+*Domestic data:* Click Domestic Tourism, scroll down to "Total trips", click download. Then download from "Accommodations".
+
+**Gapfilling:**
+
+To address missing values in international arrivals, specifically referring to "Overnight visitors (tourists)," we employ a two-step process. First, we attempt to fill the gaps by subtracting "Same-day visitors (excursionists)" from "Total arrivals" if the latter is available. If this is not feasible, we resort to interpolating or extrapolating based on historical data spanning from 1995 to 2019, employing a linear model to estimate increases or decreases on a regional level.
+
+However, in light of the Covid-19 pandemic, we have adopted a distinct approach for the years 2020 and 2021. We calculate the global average proportionate change from the preceding year, apply this percentage change to the previous year's arrivals or total values, and then add the result to the corresponding previous year's arrivals or total value. - So 2020 was gapfilled with the global average decrease proportion of \~-0.70 for both arrivals and totals. Meaning that we took the 2019 value and multiplied it by -0.7 and then addd that to the 2019 value. (2019 x -0.7) + 2019 = 2020 - 2021 was gapfilled with the global average increase proportion of \~0.2. Meaning that we took the 2020 value and multiplied it by 0.2 and then addd that to the 2020 value. (2020 x 0.2) + 2020 = 2021
+
+## International UNWTO Inbound Tourism Arrivals
+
+```{r}
+file_path_unwto_international <- here::here(unwto_dir, "unwto-inbound-arrivals-data.xlsx")
+unwto_arrivals_int <- readxl::read_xlsx(file_path_unwto_international, skip = 4) # read in the raw data
+
+unwto_clean <- unwto_arrivals_int %>% 
+  select(country = `Basic data and indicators`, total_arrivals = `...6`, subdivision_1 = `...7`, subdivision_2 = `...8`, `1995`:`2021`) %>% # select relevant columns
+  fill(country, .direction = "down") %>% # add country name to all data associated with that country
+  pivot_longer(cols = c("total_arrivals", "subdivision_1", "subdivision_2"),
+               values_to = "metric",
+               values_drop_na = TRUE) %>% # make the metrics into one column
+  select(-name) %>% # get rid of the name column since it's just the titles of the metrics which are already there
+  select(country, metric, everything()) %>% # reorder things
+  replace_with_na_all(condition = ~.x == "..") %>% # swap .. with NAs
+  pivot_longer(cols = 3:ncol(.), names_to = "year",
+               values_to = "tourism_arrivals_ct") %>% # make the years not columns anymore
+  pivot_wider(names_from = metric, values_from = tourism_arrivals_ct) %>%
+  mutate(overnights = as.numeric(`Overnights visitors (tourists)`), 
+         same_day = as.numeric(`Same-day visitors (excursionists)`), 
+         total_arrivals = as.numeric(`Total arrivals`),
+         tourism_arrivals_ct = as.numeric(NA)) %>% # rename metrics so easier to work with, make numeric, and add a new column to fill with the new calculated values later
+  select(country, year, overnights, same_day, total_arrivals, tourism_arrivals_ct) %>% # select columns needed for analysis (cruise passengers seem to be included in same-day)
+  group_by(country, year) %>% # group by county and year
+  mutate(
+    tourism_arrivals_ct = case_when(
+      !is.na(overnights) ~ overnights, # if there is a value, dont gapfill
+      is.na(overnights) & !is.na(same_day) & !is.na(total_arrivals) ~ total_arrivals - same_day, # gapfill, when there is no data on overnights, fill with total_arrivals - same day
+      TRUE ~ tourism_arrivals_ct # otherwise, NA
+    ), # there were 0 situations like this in v2024
+    # total_arrivals = case_when(
+    #   !is.na(total_arrivals) ~ total_arrivals, 
+    #   is.na(total_arrivals) & !is.na(same_day) & !is.na(overnights) ~ overnights + same_day,
+    #   TRUE ~ total_arrivals
+    # )
+  ) %>% # v2024: overnights has 1036 NAs out of 6021
+  # v2024: same_day has 3131 NAs out of 6021
+  # v2024: total_arrivals has 2363 NAs
+  mutate(arrivals_method = ifelse(is.na(overnights) & !is.na(same_day) & !is.na(total_arrivals), "UNWTO - subtraction", NA)) %>%
+  mutate(arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - subtraction", "gapfilled", NA)) %>% # prepare a "gapfilled" column to indicate "gapfilled" or NA
+  ungroup() %>% # ungroup since not needed anymore
+  select(country, year, tourism_arrivals_ct, total_arrivals, arrivals_method, arrivals_gapfilled) %>% # select only needed columns
+  mutate(country = str_to_title(country), # make countries look nice
+         tourism_arrivals_ct = round(as.numeric(tourism_arrivals_ct) * 1000),
+         total_arrivals = round(as.numeric(total_arrivals)*1000)) # since the units were in thousands
+
+# Run name_2_rgn() to ensure the UNWTO data has OHI region names
+unwto_clean_names_int <- name_2_rgn(df_in = unwto_clean, # do this just for Bonaire since it is the only region not matching above
+                                        fld_name = 'country',
+                                        # flds_unique = c('year'),
+                                        keep_fld_name = TRUE) %>%
+  dplyr::select(rgn_id, rgn_name, year, tourism_arrivals_ct, arrivals_method, arrivals_gapfilled) # v2024: not losing the USA!! Yay (compare to v2023).  Also, total_arrivals was dropped at this point because tourism_arrivals_ct has already been gapfilled using totals if same-day was present (Overnights = total - same-day), and it feels like if total was used to gapfill places that don't have any same-day data, it may be overinflating the arrivals for that region.  This can be revisited.
+
+# ---- determine if there were any duplicates due to name_2_rgn ----
+
+colSums(is.na(unwto_clean_names_int)) # v2024: 789 NAs in tourism_arrivals_ct
+length(unwto_clean_names_int$tourism_arrivals_ct) # within 4833 observations for `tourism_arrivals_ct`
+
+# this shows rows that have at least one duplicate, including both the first and subsequent occurrences of each duplicated row. using the tidyverse allows us to see all instances of duplicated data, not just the second and subsequent occurrences (which is what just a duplicated() call would give you).
+duplicates_int <- unwto_clean_names_int %>%
+  group_by(rgn_id, rgn_name, year) %>% 
+  filter(n() > 1) %>%
+  ungroup()
+unique(duplicates_int$rgn_name)
+# v2024:
+# [1] "China"                                              
+# [2] "Guadeloupe and Martinique"                          
+# [3] "Northern Mariana Islands and Guam"                  
+# [4] "Montenegro"                                         
+# [5] "Puerto Rico and Virgin Islands of the United States"
+
+## v2024: this code to fix duplicates was not working, and actually removed the duplicates from above from the data
+# unwto_dupe_fix <- unwto_clean_names_int %>%
+#   group_by(rgn_id, year, arrivals_method, arrivals_gapfilled) %>%
+#   summarize(sum_fix = ifelse(all(is.na(tourism_arrivals_ct)), NA, sum(tourism_arrivals_ct, na.rm = TRUE)),
+#             sum_fix_2 = ifelse(all(is.na(total_arrivals)), NA, sum(total_arrivals, na.rm = TRUE))) %>%
+#   mutate(arrivals_method = ifelse(is.na(arrivals_method) & !is.na(sum_fix), "UNWTO", arrivals_method)) %>%
+#   rename(tourism_arrivals_ct = sum_fix,
+#          total_arrivals = sum_fix_2)
+
+# instead, make a function to avoid losing NAs (they turn to 0s) when there are values to aggregate with
+sum_with_na <- function(x) {
+  if (all(is.na(x))) { # for x, if all of the values are NA, leave as NA.  
+    return(NA)
+  } else { 
+    return(sum(x, na.rm = TRUE)) # if there are values for that grouped dataframe, then sum them according to the grouping (in this case, by region and year)
+  }
+}
+
+# use the function within a summarize to aggregate for all regions that have duplicate years
+international_clean_names_agg <- unwto_clean_names_int %>% 
+  group_by(rgn_id, rgn_name, year) %>% 
+  summarize(
+    tourism_arrivals_ct = sum_with_na(tourism_arrivals_ct), # put each column in the function, so no NAs are lost
+    data_source = first(arrivals_method, na_rm = TRUE),
+    arrivals_gf = first(arrivals_gapfilled, na_rm = TRUE),
+    .groups = "drop" # to ungroup, fixes warning from summarise to use reframe (when it is not applicable here because we want to reduce each group down to a single row)
+  ) %>% 
+  mutate(
+    data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_ct), "UNWTO", data_source) # so that if there is data from UNWTO that was not gapfilled, the data_source is accurate
+  )
+
+# double check to test
+duplicates_int_2 <- international_clean_names_agg %>%
+  group_by(rgn_id, year) %>% 
+  filter(n() > 1) %>%
+  ungroup()
+unique(duplicates_int_2$rgn_name) # v2024: 0! yay -- and China/other duplicates are preserved here!!
+
+# check out things so far
+summary(international_clean_names_agg) 
+# v2023: 828 NAs in arrivals (before filtering the years down and gapfilling), 1708 in `total_arrivals`
+# v2024: 757 NAs in `tourism_arrivals_ct` (before filtering the years down and gapfilling), `total_arrivals` removed already
+
+international_clean_names_agg <- international_clean_names_agg %>% # year is a character, let's fix that quickly
+  mutate(year = as.numeric(year))
+summary(international_clean_names_agg) # now its numeric!
+
+# see how many regions have values
+check_international <- international_clean_names_agg %>% 
+  filter(!is.na(tourism_arrivals_ct))
+length(unique(check_international$rgn_id)) # v2024: 161 regions present!
+```
+
+### Gapfilling International Arrivals
+
+```{r}
+# gapfill for international arrivals!
+# downfill then upfill missing values using a linear model of the average increase per years across all years of data for 1995-2019
+# for 2020 and 2021, use the global average proportion increase or decrease and add to the previous years value
+
+# reminder: 
+# `tourism_arrivals_ct` is the tourism arrivals count from the INTERNATIONAL data, which consists of overnights, and was gapfilled with (total_arrivals - same_day).
+
+test_2021_int <- international_clean_names_agg %>%
+  filter(year %in% c(2020, 2021)) %>%
+  # filter(!is.na(tourism_arrivals_ct)) %>%
+  pivot_wider(names_from = year, 
+              values_from = tourism_arrivals_ct,
+              names_prefix = "int_tourism_") %>%
+  mutate(tourism_ct_diff = (int_tourism_2021 - int_tourism_2020)/int_tourism_2020)
+
+gf_2021_tourism_int <- mean(test_2021_int$tourism_ct_diff, na.rm = TRUE) # global average increase for 2021 tourism_arrivals_ct
+# v2024: 0.1290837
+
+# ok, lets use these values to gapfill 2021 if it is NA and 2020 exists. So increase by X proportion (0.129)
+
+test_2020_int <- international_clean_names_agg %>%
+  filter(year %in% c(2019, 2020)) %>%
+  filter(!is.na(tourism_arrivals_ct)) %>%
+  pivot_wider(names_from = year, 
+              values_from = tourism_arrivals_ct,
+              names_prefix = "int_tourism_") %>%
+  mutate(tourism_ct_diff = (int_tourism_2020 - int_tourism_2019)/int_tourism_2019)
+ 
+gf_2020_tourism_int <- mean(test_2020_int$tourism_ct_diff, na.rm = TRUE) # global average decrease for 2020 toursism
+# v2024: -0.7118338
+
+# ok, lets use these values to gapfill 2020 if it is NA and 2019 exists. So decrease by X proportion ~70%
+
+# upfill earlier years that do not have data with nearby year data
+unwto_int_upfill <-  international_clean_names_agg %>%
+  filter(year < 2020) %>% # change to 2005:2021?
+  group_by(rgn_id) %>%
+  arrange(rgn_id, year) %>%
+  tidyr::fill(tourism_arrivals_ct, .direction = "up") %>% # fill in any values that are empty from early years with values from the nearest year. Doing this because doesn't make sense to add earlier years based on a trend 
+  mutate(
+    arrivals_gf = ifelse(is.na(data_source) & !is.na(tourism_arrivals_ct), "gapfilled", arrivals_gf),
+    data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_ct), "UNWTO - nearby year", data_source)
+         )
+
+
+# ----------- check that lm is the best method for gf -----------
+filt_int <- international_clean_names_agg %>% 
+  filter(year %in% c(2005:2021))
+summary(filt_int) # 497 NAs for the years that will be used of `tourism_arrivals_ct`
+
+# after upfilling:
+unwto_int_upfill_yrs_usable <- unwto_int_upfill %>% 
+  filter(year %in% 2005:2019)
+summary(unwto_int_upfill_yrs_usable) # now, 349 NAs, meaning that 149 were gapfilled using upfilling
+# ----------- return to gf process -------------------------------
+
+
+## calculate regional average increase or decrease in number of tourism arrivals
+lm_coef_data_tourism_int <- international_clean_names_agg %>%
+  mutate(year = as.numeric(year)) %>% 
+  filter(!(year %in% c(2020, 2021))) %>%
+  group_by(rgn_id) %>%
+  filter(!is.na(tourism_arrivals_ct)) %>%
+  summarize(lm_coef_tourism = lm(tourism_arrivals_ct ~ year)$coefficients[2])
+
+# Initialize a flag to check if there are still NAs
+na_flag <- TRUE
+
+# filter out any regions with all nas for each year, as these can't be gapfilled
+all_nas_tourism_int <- unwto_int_upfill %>%
+  group_by(rgn_id) %>%
+  filter(all(is.na(tourism_arrivals_ct))) %>%
+  dplyr::select(rgn_id, rgn_name, year, tourism_arrivals_ct, data_source, arrivals_gf)
+# see how many regions have only 3 values, see how many are dropped at less than or equal to 3, look at 4 and 5 as well
+# this needs to happen before upfilling -- make sure at least 3 data pts between 2003-2021 or at LEAST last 5 years of data, filter in the beginning!!
+
+unwto_gapfill_lm_2019_tourism_int <- unwto_int_upfill %>%
+  mutate(year = as.numeric(year)) %>% 
+  left_join(lm_coef_data_tourism_int) %>% 
+  ungroup() %>%
+  filter(!(rgn_id %in% c(all_nas_tourism_int$rgn_id))) %>%
+  dplyr::select(rgn_id, rgn_name, year, tourism_arrivals_ct, data_source, arrivals_gf, lm_coef_tourism)
+
+# ----------- check that lm is the best method for gf -----------
+after_allNA_gone <- unwto_gapfill_lm_2019_tourism_int %>% 
+  filter(year %in% 2005:2019)
+summary(after_allNA_gone) # this means that after removing regions that have all NAs (no values to work with) there are 154 NAs to be gapfilled using a linear model
+# ----------- return to gf process -------------------------------
+
+
+## now lets fill in any values down with the linear model average increase per year for tourists
+while(na_flag) {
+  
+  unwto_gapfill_lm_2019_tourism_int <- unwto_gapfill_lm_2019_tourism_int %>%
+    group_by(rgn_id) %>%
+    arrange(year) %>%
+    mutate(
+      tourism_arrivals_ct = case_when(
+        is.na(tourism_arrivals_ct) & !is.na(lag(tourism_arrivals_ct)) ~ lag(tourism_arrivals_ct) + lm_coef_tourism, # if there is a previous value, but no current value, gapfill using the lag plus the lm_coef_tourism
+        TRUE ~ tourism_arrivals_ct
+      )
+    ) %>%
+    mutate(data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_ct), "UNWTO - linear model", data_source)) %>%
+    mutate(arrivals_gf = ifelse(data_source == "linear model", "gapfilled", arrivals_gf)) %>%
+    ungroup()
+  
+  # Check if there are still NAs left in either column
+  na_flag <- any(is.na(unwto_gapfill_lm_2019_tourism_int$tourism_arrivals_ct))
+}
+
+# combine back with any regions that had all NAs
+unwto_gapfill_lm_2019_tourism_all_int <- unwto_gapfill_lm_2019_tourism_int %>%
+  dplyr::select(-lm_coef_tourism) %>%
+  rbind(all_nas_tourism_int)
+
+# ==== gapfill for 2020 and 2021 now ==== #
+unwto_2020_2021_int <- international_clean_names_agg %>%
+  filter(year > 2019) 
+
+unwto_all_gf_int <- unwto_gapfill_lm_2019_tourism_all_int %>%
+  rbind(unwto_2020_2021_int) %>%
+  group_by(rgn_id) %>%
+  arrange(rgn_id, year) %>%
+  # apply global average proportional increase or decrease for 2020 and 2021, because of covid pandemic messing up trends...
+  mutate(tourism_arrivals_ct = ifelse(year == 2020 & is.na(tourism_arrivals_ct), lag(tourism_arrivals_ct, n = 1) + lag(tourism_arrivals_ct, n = 1)*gf_2020_tourism_int, tourism_arrivals_ct)) %>%
+  mutate(tourism_arrivals_ct = ifelse(year == 2021 & is.na(tourism_arrivals_ct), lag(tourism_arrivals_ct, n = 1) + lag(tourism_arrivals_ct, n = 1)*gf_2021_tourism_int, tourism_arrivals_ct)) %>%
+  mutate(data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_ct), "UNWTO - 2020 and 2021 gapfill method", data_source)) %>%
+  mutate(arrivals_gf = ifelse(data_source == "UNWTO - 2020 and 2021 gapfill method", "gapfilled", arrivals_gf)) %>%
+  filter(year >= 2008) %>% # get only the year we need and beyond
+  drop_na(tourism_arrivals_ct) # remove any remaining NAs (any remaining have all NAs for that region)
+
+length(unique(unwto_all_gf_int$rgn_name)) # now only 161 regions after gapfilling and removing regions with only NAs!
+```
+
+## Domestic UNWTO Inbound Tourism Arrivals
+
+```{r}
+file_path_unwto_domestic_trips <- here::here(unwto_dir, "unwto-domestic-trips-data.xlsx")
+unwto_arrivals_dom_trips <- readxl::read_xlsx(file_path_unwto_domestic_trips, skip = 4) # read in the raw domestic trips data
+
+unwto_dom_trips_clean <- unwto_arrivals_dom_trips %>% 
+  select(country = `Basic data and indicators`, total_trips = `...6`, subdivision_1 = `...7`, subdivision_2 = `...8`, `1995`:`2021`) %>% # select relevant columns
+  fill(country, .direction = "down") %>% # add country name to all data associated with that country
+  pivot_longer(cols = c("total_trips", "subdivision_1", "subdivision_2"),
+               values_to = "metric",
+               values_drop_na = TRUE) %>% # make the metrics into one column
+  select(-name) %>% # get rid of the name column since it's just the titles of the metrics which are already there
+  select(country, metric, everything()) %>% # reorder things
+  replace_with_na_all(condition = ~.x == "..") %>% # swap .. with NAs
+  pivot_longer(cols = 3:ncol(.), names_to = "year",
+               values_to = "tourism_arrivals_trips") %>% # make the years not columns anymore
+  pivot_wider(names_from = metric, values_from = tourism_arrivals_trips) %>%
+  mutate(overnights = as.numeric(`Overnights visitors (tourists)`), 
+         same_day = as.numeric(`Same-day visitors (excursionists)`), 
+         total_trips = as.numeric(`Total trips`),
+         tourism_arrivals_trips = as.numeric(NA)) %>% # rename metrics so easier to work with, make numeric, and add a new column to fill with the new calculated values later
+  select(country, year, overnights, same_day, total_trips, tourism_arrivals_trips) %>% # select columns needed for analysis (cruise passengers seem to be included in same-day)
+  group_by(country, year) %>% # group by county and year
+  mutate(
+    tourism_arrivals_trips = case_when(
+      !is.na(overnights) ~ overnights, # if there is a value, dont gapfill
+      is.na(overnights) & !is.na(same_day) & !is.na(total_trips) ~ total_trips - same_day, # gapfill, when there is no data on overnights, fill with total_trips - same day
+      TRUE ~ tourism_arrivals_trips # otherwise, NA
+    ), # there were 0 situations like this in v2024
+    total_trips = case_when(
+      !is.na(total_trips) ~ total_trips, 
+      is.na(total_trips) & !is.na(same_day) & !is.na(overnights) ~ overnights + same_day,
+      TRUE ~ total_trips
+    )
+  ) %>% # v2024: overnights has 5145 NAs out of 6021
+  # v2024: same_day has 5507 NAs out of 6021
+  # v2024: total_trips has 5294 NAs
+  # v2024: total_trips has 5145 NAs
+  mutate(arrivals_method = ifelse(is.na(overnights) & !is.na(same_day) & !is.na(total_trips), "UNWTO - subtraction", NA)) %>%
+  mutate(arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - subtraction", "gapfilled", NA)) %>% # prepare a "gapfilled" column to indicate "gapfilled" or NA
+  ungroup() %>% # ungroup since not needed anymore
+  select(country, year, tourism_arrivals_trips, total_trips, arrivals_method, arrivals_gapfilled) %>% # select only needed columns
+  mutate(country = str_to_title(country), # make countries look nice
+         tourism_arrivals_trips = round(as.numeric(tourism_arrivals_trips) * 1000),
+         total_trips = round(as.numeric(total_trips) * 1000)) # since the units were in thousands
+
+kableExtra::kable(colSums(is.na(unwto_dom_trips_clean))) # to see how many NAs are present within the data
+# because we have so many NAs here, this can be used for gapfilling the accomodations data.
+```
+
+Now we have the domestic overnight trips data, which can be used to gapfill the domestic accommodation data!
+
+```{r}
+# bring in domestic accommodation data from UNWTO
+file_path_unwto_domestic_acc <- here::here(unwto_dir, "unwto-domestic-accommodation-data.xlsx")
+unwto_arrivals_dom_acc <- readxl::read_xlsx(file_path_unwto_domestic_acc, skip = 4) # read in the raw domestic accomodations data
+
+# clean up the raw xlsx!
+unwto_clean_dom <- unwto_arrivals_dom_acc %>% 
+  select(country = `Basic data and indicators`, source_arrivals = `...6`, subdivision_1 = `...7`, subdivision_2 = `...8`, `1995`:`2021`) %>% # select relevant columns
+  fill(country, .direction = "down") %>% # add country name to all data associated with that country
+  fill(source_arrivals, .direction = "down") %>% 
+  filter(subdivision_1 %in% "Overnights" | subdivision_1 %in% "Guests") %>% 
+  select(-subdivision_2) %>% # get rid of the NA column
+  replace_with_na_all(condition = ~.x == "..") %>% # swap ".." with NAs
+  mutate(source_arrivals_all = paste(source_arrivals, subdivision_1, sep = ":")) %>% # unite the columns that define the source for easier cleaning and pivoting
+  select(country, source_arrivals_all, 4:ncol(.)) %>% # use the . to specify the whole dataframe
+  pivot_longer(cols = 3:ncol(.), names_to = "year",
+               values_to = "tourism_arrivals_ct") %>% # make the years not columns anymore
+  pivot_wider(names_from = source_arrivals_all, values_from = tourism_arrivals_ct) %>%
+  select(-c("Total:Guests","Hotels and similar establishments:Guests")) %>% # to keep it consistent with the international data, we only want number of overnights
+  mutate(hotel_overnights = as.numeric(`Hotels and similar establishments:Overnights`), 
+         total_overnights = as.numeric(`Total:Overnights`),
+         tourism_arrivals_ct = as.numeric(NA)) %>% # rename metrics so easier to work with, make numeric, and add a new column to fill with the new calculated values later
+  select(country, year, hotel_overnights, total_overnights, tourism_arrivals_ct) %>% # select columns needed for analysis
+  group_by(country, year) %>% # group by county and year
+  mutate(
+    tourism_arrivals_ct = case_when(
+      !is.na(hotel_overnights) ~ hotel_overnights, # if there is a value, dont gapfill
+      is.na(hotel_overnights) & !is.na(total_overnights) ~ total_overnights, # gapfill, when there is no data on hotel overnights, fill with total overnights ### SWITCH!!!!! gf total overnights w hotels and similar establishments
+      TRUE ~ tourism_arrivals_ct # otherwise, NA
+    )) %>% 
+  # v2024: hotel_overnights has 3835 NAs out of 6021 (colSums(is.na(unwto_clean_dom)))
+  # v2024: total_overnights has 4614 NAs out of 6021
+  # v2024: tourism_arrivals_ct has 3719 NAs out of 6021 
+  mutate(arrivals_method = ifelse(is.na(hotel_overnights) & !is.na(total_overnights), "UNWTO - total", NA)) %>%
+  mutate(arrivals_gapfilled = ifelse(arrivals_method == "UNWTO - total", "gapfilled", NA)) %>% # prepare a "gapfilled" column to indicate "gapfilled" or NA
+  ungroup() %>% # ungroup since not needed anymore
+  select(country, year, tourism_arrivals_ct, arrivals_method, arrivals_gapfilled) %>% # select only needed columns
+  mutate(country = str_to_title(country), # make countries look nice
+         tourism_arrivals_ct = round(as.numeric(tourism_arrivals_ct) * 1000)) # since the units were in thousands
+
+# ---- join with trips data to gapfill countries that do not have domestic overnight accomodations data ---
+join_dom_acc_trips <- left_join(unwto_clean_dom, unwto_dom_trips_clean, by = c("country", "year")) 
+
+## global lm using trips -- wouldnt work
+
+# lm(formula = tourism_arrivals_ct ~ tourism_arrivals_trips, data = join_dom_acc_trips) # significant, try gapfilling using trips
+# lm_coef_data_tourism_dom <- join_dom_acc_trips %>% 
+#   summarize(lm_coef_dom_trip = lm(tourism_arrivals_ct ~ tourism_arrivals_trips)$coefficients[2])
+# 
+# dom_trips_gf <- join_dom_acc_trips %>% 
+#   cross_join(lm_coef_data_tourism_dom)
+
+# gf without using lm
+
+  # mutate(
+  #   tourism_arrivals_all = case_when(
+  #     !is.na(tourism_arrivals_ct) ~ tourism_arrivals_ct, # if there is a value, dont gapfill
+  #     is.na(tourism_arrivals_ct) & !is.na(tourism_arrivals_trips) ~ tourism_arrivals_trips, # gapfill, when there is no data on hotel overnights from the accommodations data, fill with trip overnights
+  #     is.na(tourism_arrivals_ct) & is.na(tourism_arrivals_trips) & !is.na(total_trips) ~ total_trips, # if the overnight data is not present for either, use total trips to gf
+  #     TRUE ~ tourism_arrivals_ct # otherwise, keep the accommodation overnight data
+  #   )) %>%
+  # mutate(data_source = ifelse(is.na(tourism_arrivals_ct) & (!is.na(tourism_arrivals_trips) | !is.na(total_trips)), "UNWTO - trips", arrivals_method)) %>%
+  # mutate(arrivals_gf = ifelse(data_source == "UNWTO - trips", "gapfilled", arrivals_gapfilled)) %>%
+  # select(country, year, tourism_arrivals_all, data_source, arrivals_gf)
+
+# run name_2_rgn on the domestic data so it has OHI region ids
+unwto_clean_names_dom <- name_2_rgn(df_in = join_dom_acc_trips, 
+                                        fld_name = 'country',
+                                        keep_fld_name = TRUE) %>%
+  dplyr::select(rgn_id, rgn_name, year, tourism_arrivals_ct, tourism_arrivals_trips, total_trips) # lost many land locked regions, duplicates were also found so we need to look into that after gapfilling
+```
+
+
+```{r}
+# gapfilling the accommodations data using trips (and/or georegions)
+
+## quick compare to make sure the trips and accommodation data are compatible
+plot(unwto_clean_names_dom$tourism_arrivals_ct[unwto_clean_names_dom$year==2021], unwto_clean_names_dom$tourism_arrivals_trips[unwto_clean_names_dom$year==2021])
+abline(0,1, col="red") # not the best 1:1, but lets look at the correlation 
+
+cor(unwto_clean_names_dom$tourism_arrivals_ct, unwto_clean_names_dom$tourism_arrivals_trips, use="complete.obs") # v2024: 0.8730165, there would be a high correlation if the value were close to 1, indicating a strong linear relationship.
+
+arrivals_trips_model <- lm(tourism_arrivals_ct ~ tourism_arrivals_trips, data = unwto_clean_names_dom)
+summary(arrivals_trips_model) # significant
+
+# (Intercept) tourism_arrivals_trips 
+#  6.325158e+05           9.582358e-01
+# tourism_arrivals_ct = 6.325158e05 + 9.582358e-01(tourism_arrivals_trips)
+
+trips_arrivals_model <- lm(tourism_arrivals_trips ~ tourism_arrivals_ct, data = unwto_clean_names_dom)
+summary(trips_arrivals_model) # significant
+
+# (Intercept) tourism_arrivals_ct 
+#        1.126181e+07        7.953760e-01 
+# tourism_arrivals_trips = 1.126181e+07 + 7.953760e-01(tourism_arrivals_trips)
+
+# ------- see if there could be a year variable component (there is not)-----------
+arrivals_year_model <- lm(tourism_arrivals_ct ~ year, data = unwto_clean_names_dom)
+summary(arrivals_year_model) # not significant
+
+trips_year_model <- lm(tourism_arrivals_trips ~ year, data = unwto_clean_names_dom)
+summary(trips_year_model) # not significant
+
+## choose one region to compare
+arg_172 <- unwto_clean_names_dom %>% 
+  filter(rgn_id %in% 172)
+
+arrivals_year_model_172 <- lm(tourism_arrivals_ct ~ year, data = arg_172)
+summary(arrivals_year_model) # not significant
+
+trips_year_model_172 <- lm(tourism_arrivals_trips ~ year, data = arg_172)
+summary(trips_year_model) # not significant
+# ----------- move forward using trips as the predictor ------------
+
+trips_arrivals_model_172 <- lm(tourism_arrivals_trips ~ tourism_arrivals_ct, data = arg_172)
+summary(trips_arrivals_model) # significant, p < 0.05
+      #   (Intercept) tourism_arrivals_ct 
+      # -5.578333e+05        1.253896e+00 
+# tourism_arrivals_trips = -5.578333e+05 + 1.253896(tourism_arrivals_ct)
+
+arrivals_trips_model_172 <- lm(tourism_arrivals_ct ~ tourism_arrivals_trips, data = arg_172)
+summary(arrivals_trips_model_172) # not significant -- barely. model's p-value: 0.005781, however the intercept and slope is significant (< 0.05)
+          #  (Intercept) tourism_arrivals_trips 
+          # 1.408560e+07           4.702741e-01 
+    
+# tourism_arrivals_ct = 14085596 + 0.4702741(tourism_arrivals_trips)
+
+lm_dom_rgns <- unwto_clean_names_dom %>%
+  mutate(year = as.numeric(year)) %>%
+  group_by(rgn_id) %>%
+  filter(any(!is.na(tourism_arrivals_trips)) & any(!is.na(tourism_arrivals_ct))) %>% # to remove regions that have all NA values, preserving NAs/observation rows that have NAs but the region also has values associated with them
+  summarize(lm_coef_tourism = tryCatch(
+    lm(tourism_arrivals_ct ~ tourism_arrivals_trips)$coefficients[2],
+    error = function(e) NA # `tryCatch` will return NA for lm_coef_tourism in any row that the linear model fails to fit (which would happen if there aren't enough non-NA pairs to fit a model, even if both variables have some non-NA values).
+  ))
+
+regions_kept <- unique(lm_dom$rgn_id) # only 54 regions had enough values to return a coefficient
+length(setdiff(unique(unwto_clean_names_dom$rgn_id), regions_kept)) # 119 regions not able to use this method
+
+## so instead, let's look at georegions!
+georegions <- ohicore::georegions
+
+regions <- georegions %>%
+  left_join(georegion_labels, by = 'rgn_id')
+
+arrivals_georegions <- unwto_clean_names_dom %>%
+  left_join(regions, by = 'rgn_id')
+
+lm_dom_georegions_r2 <- arrivals_georegions %>%
+  mutate(year = as.numeric(year)) %>%
+  group_by(r2) %>%
+  filter(any(!is.na(tourism_arrivals_trips)) & any(!is.na(tourism_arrivals_ct))) %>% # to remove regions that have all NA values, preserving NAs/observation rows that have NAs but the region also has values associated with them
+  summarize(lm_coef_r2 = tryCatch(
+    lm(tourism_arrivals_ct ~ tourism_arrivals_trips)$coefficients[2],
+    error = function(e) NA # will return NA for lm_coef_tourism if the linear model fails to fit (which would happen if there aren't enough non-NA pairs to fit a model, even if both variables have some non-NA values).
+  ))
+
+lm_dom_georegions_r1 <- arrivals_georegions %>%
+  mutate(year = as.numeric(year)) %>%
+  group_by(r1) %>%
+  filter(any(!is.na(tourism_arrivals_trips)) & any(!is.na(tourism_arrivals_ct))) %>% # to remove regions that have all NA values, preserving NAs/observation rows that have NAs but the region also has values associated with them
+  summarize(lm_coef_r1 = tryCatch(
+    lm(tourism_arrivals_ct ~ tourism_arrivals_trips)$coefficients[2],
+    error = function(e) NA # will return NA for lm_coef_tourism if the linear model fails to fit (which would happen if there aren't enough non-NA pairs to fit a model, even if both variables have some non-NA values).
+  ))
+
+# number of r2 geoareas overall
+length(unique(arrivals_georegions$r2)) # 21
+
+# number of r2 that had a usable coefficient
+length(unique(lm_dom_georegions_r2$r2)) # 17, that is not bad! check that we have a coefficient for US and India's r2: 21 and 34, respectively.  We do!
+
+# number of r1 geoareas overall
+length(unique(arrivals_georegions$r1)) # 6
+
+# number of r1 that had a usable coefficient
+length(unique(lm_dom_georegions_r1$r1)) # all 6!
+
+# ---- move forward, implementing these coefficients to predict arrivals values
+na_flag_dom <- TRUE
+
+while(na_flag_dom) {
+  
+  arrivals_georegions_gf <- arrivals_georegions %>% 
+    left_join(lm_dom_georegions_r1, by = "r1") %>% 
+    left_join(lm_dom_georegions_r2, by = "r2") %>%
+    group_by(rgn_id) %>% 
+    mutate(
+      tourism_arrivals_r2 = case_when(
+        !is.na(lm_coef_r2) ~ tourism_arrivals_trips * lm_coef_r2,
+        is.na(lm_coef_r2) & !is.na(lm_coef_r1) ~ tourism_arrivals_trips * lm_coef_r1
+      )
+    ) %>% 
+    ungroup() %>% 
+    group_by(r1) %>% 
+    mutate( 
+      tourism_arrivals_r1 = tourism_arrivals_ct * lm_coef_r1
+    ) %>% 
+    ungroup()
+  
+  # Check if there are still NAs left in either column
+  na_flags <- any(is.na(unwto_future_gapfill_lm_2019_tourism_dom$tourism_arrivals_all))
+}
+
+
+
+gdp_georegions_gf <- gdp_means_georegions %>%
+  mutate(gdp_all = ifelse(is.na(pcgdp2), gdp_pred_r2, pcgdp2)) %>%
+  mutate(gdp_all = ifelse(is.na(gdp_all), gdp_pred_r1, gdp_all)) %>%
+  mutate(gapfilled = ifelse(is.na(pcgdp2) & !is.na(gdp_all), "gapfilled", NA)) %>%
+  mutate(method = ifelse(is.na(pcgdp2) & !is.na(gdp_pred_r2), "UN georegion (r2)", NA)) %>%
+  mutate(method = ifelse(is.na(pcgdp2) & is.na(gdp_pred_r2) & !is.na(gdp_pred_r1), "UN georegion (r1)", method)) 
+```
+
+
+```{r}
+region_data() # to get rgns_eez
+
+# see whether there are regions that were not properly converted to ohi rgns
+setdiff(unwto_clean_names_dom$rgn_name, rgns_eez$rgn_name) # v2024: Kiribati, but it is OHI region 212 and is preserved in `unwto_clean_names_dom`
+
+# ---- determine if there were any duplicates due to name_2_rgn ----
+
+colSums(is.na(unwto_clean_names_dom)) # v2024: 3114 NAs in tourism_arrivals_ct, 4182 for tourism_arrivals_trips 
+length(unwto_clean_names_dom$tourism_arrivals_ct) # within 4833 observations for `tourism_arrivals_ct` and `tourism_arrivals_trips`
+
+# this shows rows that have at least one duplicate, including both the first and subsequent occurrences of each duplicated row. using the tidyverse allows us to see all instances of duplicated data, not just the second and subsequent occurrences (which is what just a duplicated() call would give you).
+duplicates <- unwto_clean_names_dom %>%
+  group_by(rgn_id, year) %>% 
+  filter(n() > 1) %>%
+  ungroup()
+unique(duplicates$rgn_name)
+# v2024: 
+# [1] "China" # only one set of values, the duplicates are NA                                             
+# [2] "Guadeloupe and Martinique" # all NAs                         
+# [3] "Northern Mariana Islands and Guam"  # all NAs                
+# [4] "Montenegro" # values dont overlap, can aggregate                                        
+# [5] "Puerto Rico and Virgin Islands of the United States" # all NAs
+
+# therefore, move forward by aggregating by region id and year
+## make a function to avoid losing NAs (they turn to 0s) when there are values to aggregate with
+sum_with_na <- function(x) {
+  if (all(is.na(x))) {
+    return(NA)
+  } else {
+    return(sum(x, na.rm = TRUE))
+  }
+}
+
+# now use the function to aggreggate by region and year!
+domestic_clean_names_agg <- unwto_clean_names_dom %>% 
+  group_by(rgn_id, rgn_name, year) %>% 
+  summarize(
+    tourism_arrivals_all = sum_with_na(tourism_arrivals_all), # put each column in the function, so no NAs are lost
+    data_source = first(data_source, na_rm = TRUE),
+    arrivals_gf = first(arrivals_gf, na_rm = TRUE),
+    .groups = "drop" # to ungroup, fixes warning from summarise to use reframe (when it is not applicable here)
+  ) %>% 
+  mutate(
+    data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_all), "UNWTO", data_source) # so that if there is data from UNWTO that was not gapfilled, the data_source is accurate
+  )
+
+# double check to test
+duplicates_2 <- domestic_clean_names_agg %>%
+  group_by(rgn_id, year) %>% 
+  filter(n() > 1) %>%
+  ungroup()
+unique(duplicates_2$rgn_name) # v2024: 0! yay
+
+# see which/how many regions have values
+check_domestic <- domestic_clean_names_agg %>% 
+  filter(!is.na(tourism_arrivals_all))
+length(unique(check_domestic$rgn_id)) # v2024: 101 regions present
+```
+
+### Gapfilling Domestic Arrivals
+
+```{r}
+# gapfill for domestic arrivals!
+# downfill then upfill missing values using a linear model of the average increase per years across all years of data for 1995-2019
+# for 2020 and 2021, use the global average proportion increase or decrease and add to the previous years value
+
+# reminder: 
+# `tourism_arrivals_all` is the tourism arrivals count from the DOMESTIC data, which is primarily hotel overnights (accommodation) data, and was gapfilled using domestic trip data also from UNWTO.
+
+test_2021_dom <- domestic_clean_names_agg %>%
+  filter(year %in% c(2020, 2021)) %>%
+  filter(!is.na(tourism_arrivals_all)) %>%
+  pivot_wider(names_from = year, 
+              values_from = tourism_arrivals_all,
+              names_prefix = "int_tourism_") %>%
+  mutate(tourism_arrivals_all_diff = (int_tourism_2021 - int_tourism_2020)/int_tourism_2020)
+
+gf_2021_tourism_dom <- mean(test_2021_dom$tourism_arrivals_all_diff, na.rm = TRUE) # global average increase for 2021 tourism_arrivals_ct
+# v2024: 0.2941438
+
+# ok, lets use these values to gapfill 2021 if it is NA and 2020 exists. So increase by X proportion (0.294)
+
+test_2020_dom <- domestic_clean_names_agg %>%
+  filter(year %in% c(2019, 2020)) %>%
+  filter(!is.na(tourism_arrivals_all)) %>%
+  pivot_wider(names_from = year, 
+              values_from = tourism_arrivals_all,
+              names_prefix = "int_tourism_") %>%
+  mutate(tourism_arrivals_all_diff = (int_tourism_2020 - int_tourism_2019)/int_tourism_2019)
+ 
+gf_2020_tourism_dom <- mean(test_2020_dom$tourism_arrivals_all_diff, na.rm = TRUE) # global average decrease for 2020 toursism
+# v2024: -0.3473281
+
+# ok, lets use these values to gapfill 2020 if it is NA and 2019 exists. So decrease by X proportion ~35%
+
+# upfill earlier years that do not have data with nearby year data
+unwto_upfill_dom <-  domestic_clean_names_agg %>%
+  filter(year < 2020) %>%
+  group_by(rgn_id) %>%
+  arrange(rgn_id, year) %>%
+  tidyr::fill(tourism_arrivals_all, .direction = "up") %>% # fill in any values that are empty from early years with values from the nearest year. Doing this because doesn't make sense to add earlier years based on a trend 
+  mutate(
+    arrivals_gf = ifelse(is.na(data_source) & !is.na(tourism_arrivals_all), "gapfilled", arrivals_gf),
+    data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_all), "UNWTO - nearby year", data_source)
+  )
+
+## calculate regional average increase or decrease in number of tourism arrivals
+lm_coef_data_tourism_dom <- domestic_clean_names_agg %>%
+  filter(!(year %in% c(2020, 2021))) %>%
+  mutate(year = as.numeric(year)) %>%
+  group_by(rgn_id) %>%
+  filter(!is.na(tourism_arrivals_all)) %>%
+  filter(!rgn_id %in% c("136","205")) %>% # Guatemala and Myanmar only have one value, will need to be dropped!! (only_1 <- lm_coef_data_tourism_dom %>% group_by(rgn_id) %>% filter(n() == 1))
+  summarize(lm_coef_tourism = lm(tourism_arrivals_all ~ year)$coefficients[2]) # pull out the coeffiecient
+
+# Initialize a flag to check if there are still NAs
+na_flags <- TRUE
+
+# filter out any regions with all nas for each year, as these can't be gapfilled
+all_nas_tourism_dom <- unwto_upfill_dom %>%
+  group_by(rgn_id) %>%
+  filter(all(is.na(tourism_arrivals_all))) %>%
+  dplyr::select(rgn_id, rgn_name, year, tourism_arrivals_all, data_source, arrivals_gf)
+
+unwto_future_gapfill_lm_2019_tourism_dom <- unwto_upfill_dom %>%
+  left_join(lm_coef_data_tourism_dom) %>% 
+  ungroup() %>%
+  filter(!(rgn_id %in% c(all_nas_tourism_dom$rgn_id))) %>%
+  filter(!rgn_id %in% c("136","205")) %>% # once again, Guatemala and Myanmar only have one value, will need to be dropped!! (only_1 <- lm_coef_data_tourism_dom %>% group_by(rgn_id) %>% filter(n() == 1))
+  dplyr::select(rgn_id, rgn_name, year, tourism_arrivals_all, data_source, arrivals_gf, lm_coef_tourism)
+
+
+## now lets fill in any values down with the linear model average increase per year for tourists
+## v2024: issue with running!! It will complete the process but it won't finish running -- on Anna's session as well.
+while(na_flags) {
+  
+  unwto_future_gapfill_lm_2019_tourism_dom <- unwto_future_gapfill_lm_2019_tourism_dom %>%
+    group_by(rgn_id) %>%
+    arrange(year) %>%
+    mutate(
+      tourism_arrivals_all = case_when(
+        is.na(tourism_arrivals_all) & !is.na(dplyr::lag(tourism_arrivals_all)) ~ dplyr::lag(tourism_arrivals_all) + lm_coef_tourism, # if there is a previous value, but no current value, gapfill using the lag plus the lm_coef_tourism
+        TRUE ~ tourism_arrivals_all
+      )
+    ) %>%
+    mutate(data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_all), "UNWTO - linear model", data_source)) %>%
+    mutate(arrivals_gf = ifelse(data_source == "UNWTO - linear model", "gapfilled", arrivals_gf)) %>%
+    ungroup()
+  
+  # Check if there are still NAs left in either column
+  na_flags <- any(is.na(unwto_future_gapfill_lm_2019_tourism_dom$tourism_arrivals_all)) # great, the only ones left as NAs here are Guatemala and Myanmar, which each only had one original value and should be dropped.
+} ######stopped here
+
+
+# Check if there are still NAs left in either column
+na_flags <- any(is.na(unwto_future_gapfill_lm_2019_tourism_dom$tourism_arrivals_all))
+
+# combine back with any regions that had all NAs
+unwto_gapfill_lm_2019_tourism_all_dom <- unwto_future_gapfill_lm_2019_tourism_dom %>%
+  dplyr::select(-lm_coef_tourism) %>%
+  rbind(all_nas_tourism_dom)
+
+# ==== gapfill for 2020 and 2021 now ==== #
+unwto_2020_2021_dom <- domestic_clean_names_agg %>%
+  filter(year > 2019) 
+
+unwto_all_gf_dom <- unwto_gapfill_lm_2019_tourism_all_dom %>%
+  rbind(unwto_2020_2021_dom) %>%
+  group_by(rgn_id) %>%
+  arrange(rgn_id, year) %>%
+  # apply global average proportional increase or decrease for 2020 and 2021, because of covid pandemic messing up trends...
+  mutate(tourism_arrivals_all = ifelse(year == 2020 & is.na(tourism_arrivals_all), lag(tourism_arrivals_all, n = 1) + lag(tourism_arrivals_all, n = 1)*gf_2020_tourism_dom, tourism_arrivals_all)) %>%
+  mutate(tourism_arrivals_all = ifelse(year == 2021 & is.na(tourism_arrivals_all), lag(tourism_arrivals_all, n = 1) + lag(tourism_arrivals_all, n = 1)*gf_2021_tourism_dom, tourism_arrivals_all)) %>%
+  mutate(data_source = ifelse(is.na(data_source) & !is.na(tourism_arrivals_all), "UNWTO - 2020 and 2021 gapfill method", data_source)) %>%
+  mutate(arrivals_gf = ifelse(data_source == "UNWTO - 2020 and 2021 gapfill method", "gapfilled", arrivals_gf)) %>%
+  filter(year >= 2008) %>% # get only the year we need and beyond
+  drop_na(tourism_arrivals_all) # remove any remaining NAs (any remaining have all NAs for that region)
+
+length(unique(unwto_all_gf_dom$rgn_name)) # now only 99 regions after gapfilling and removing regions with only NAs! Which makes sense, since Guatemala and Myanmar had to be dropped from the original 101 
+```
+
+## Aggregating International and Domestic Values
+
+Let's use `setdiff()` and see which regions that have values overlap between the international and domestic data. If it is a reasonable amount, I am considering aggregating international and domestic and then for regions that have one or the other, leaving it as such.
+
+```{r}
+domestic_rgns <- unique(unwto_all_gf_dom$rgn_id) # domestic OHI regions with data: 99
+international_rgns <- unique(unwto_all_gf_int$rgn_id) # international OHI regions with data: 161
+
+# regions w values in domestic but not in international
+only_in_domestic <- setdiff(domestic_rgns, international_rgns) 
+# [1]  14  45  84 137 195 210
+
+# regions w values in international but not in domestic
+only_in_international <- setdiff(international_rgns, domestic_rgns)
+#  [1]   6   7   8   9  11  13  17  19  28  32  37  39  46  47  48  49  51  64  65  78  96 103
+# [23] 108 110 111 113 114 115 116 117 118 119 120 121 122 123 124 125 129 130 133 136 140 147
+# [45] 151 152 153 154 155 166 167 168 169 190 193 194 198 204 205 208 212 220 244 245 247 248
+# [67] 249 250
+
+# regions that have values in both datasets
+in_both <- intersect(domestic_rgns, international_rgns)
+#  [1]   5  15  16  18  20  24  25  31  40  41  42  43  50  52  53  54  56  59  61  62  66  67
+# [23]  68  69  70  71  72  73  74  75  76  77  79  80  81  82  98  99 100 101 102 106 112 126
+# [45] 127 131 132 134 135 138 139 143 162 163 164 171 172 173 174 175 176 177 178 179 180 181
+# [67] 182 183 184 185 186 187 188 189 191 196 197 199 200 202 203 206 207 209 214 215 216 218
+# [89] 222 223 224 231 232
+
+cat("Regions only in domestic data:", length(only_in_domestic), "\n") # Regions only in domestic data: 6 
+cat("Regions only in international data:", length(only_in_international), "\n") # Regions only in international data: 68
+cat("Regions in both datasets:", length(in_both), "\n") # Regions in both datasets: 93 
+cat("Total unique regions:", length(union(domestic_rgns, international_rgns)), "\n") # Total unique regions: 167
+```
+
+Let's move on, as we decided that it makes sense to aggregate the international and domestic data! This is because we are creating a score for each region, and only comparing across regions once that score has been calculated (versus ranking regions and comparing them to each other based on tourism density, not the rescaled score).
+
+```{r}
+# aggregating international and domestic data by region and year
+arrivals_aggregated <- left_join(unwto_all_gf_int, unwto_all_gf_dom, by = c("rgn_id","rgn_name","year")) %>% 
+  mutate(
+    tourism_arrivals_ag = case_when(
+      !is.na(tourism_arrivals_ct) & !is.na(tourism_arrivals_all) ~ tourism_arrivals_ct + tourism_arrivals_all,
+      is.na(tourism_arrivals_ct) ~ tourism_arrivals_all,
+      is.na(tourism_arrivals_all) ~ tourism_arrivals_ct,
+      TRUE ~ tourism_arrivals_ct
+    ),
+    data_source = case_when(
+      !is.na(tourism_arrivals_ct) & !is.na(tourism_arrivals_all) ~ "UNWTO - aggregated international and domestic",
+      is.na(tourism_arrivals_ct) ~ "UNWTO - international",
+      is.na(tourism_arrivals_all) ~ "UNWTO - domestic",
+      TRUE ~ data_source.x
+    ),
+    arrivals_gf = case_when(
+      arrivals_gf.x == "gapfilled" & arrivals_gf.y == "gapfilled" ~ "gapfilled - both",
+      arrivals_gf.x == "gapfilled" & is.na(arrivals_gf.y) ~ "gapfilled - international",
+      is.na(arrivals_gf.x) & arrivals_gf.y == "gapfilled" ~ "gapfilled - domestic",
+      TRUE ~ arrivals_gf.x
+    )
+  ) %>% 
+  select(rgn_id, rgn_name, year, tourism_arrivals_ag, data_source, arrivals_gf)
+
+unique(is.na(arrivals_aggregated$tourism_arrivals_ag)) #v2024: FALSE! this means all regions have been gapfilled or dropped for not having any values.
+
+length(unique(arrivals_aggregated$rgn_name)) # v2024: 161 regions that have data!
+```
+
+Now, lets bring in our tourism data and calculate the coastal proportion! The coastal proportion will then be multiplied by the arrivals value per region and year. Finally, the coastal area will be divided, giving us a density of tourism per region (individuals/km^2).
+
+```{r, eval=FALSE}
+# ------- coastal population data -----------
+# In 2024, the coastal population data was fixed! This is great.  We will now use `globalprep/mar_prs_population/v2024/output/mar_pop_25mi.csv`.
+coastal_pop_data <- read_csv(here("globalprep","mar_prs_population","v2024","output","mar_pop_25mi.csv")) ## read in coastal population data from other data layer
+
+coastal_pop_data_fill <- coastal_pop_data %>%
+  filter(year == 2020) %>%
+  mutate(year = 2021) %>%
+  rbind(coastal_pop_data) # add 2021 data year, just using year 2020
+
+length(unique(coastal_pop_data_fill$rgn_id)) # v2024: 220 regions available! Any region without data is uninhabited.
+```
+
+```{r, eval=FALSE}
+# ------- total global population data -----------
+# bring in World Bank Global population data from `/home/shares/ohi/git-annex/globalprep/_raw_data/WorldBank/d2024/WorldBank_global_country_population_1960-2023`
+total_population_wb <- read_csv(here(raw_data_dir, "WorldBank", data_dir_version_year, "WorldBank_global_country_population_1960-2023","API_SP.POP.TOTL_DS2_en_csv_v2_1584446.csv"), skip = 3) %>% 
+  pivot_longer(cols = 5:ncol(.), names_to = "year",
+               values_to = "total_pop") %>% 
+  janitor::clean_names()
+
+# give ohi rgns to world bank data
+total_population_rgns <- name_2_rgn(df_in = total_population_wb, 
+                                        fld_name = 'country_name',
+                                        keep_fld_name = TRUE)
+
+# drop Macao and Hong Kong, since we only need mainland China
+# Northern Mariana Islands and Guam, Puerto Rico and Virgin Islands of the United States: aggregate!
+total_population_final <- total_population_rgns %>%
+  filter(country_name != "Hong Kong SAR, China" & country_name != "Macao SAR, China") %>% # only keep mainland, not city specific data
+  group_by(rgn_id, rgn_name, year) %>% 
+  summarise(
+    total_pop = sum(total_pop, na.rm = TRUE), # aggregate by rgn and year
+    .groups = "drop" # ungroup
+  )
+
+length(unique(total_population_final$rgn_name)) # v2024: 166 regions available of total population data!
+length(union(arrivals_aggregated$rgn_name, total_population_final$rgn_name)) # v2024: 176, meaning that there are 10 regions that don't have total population data
+length(intersect(arrivals_aggregated$rgn_name, total_population_final$rgn_name)) # v2024: 151, which makes sense (161 - 10)
+```
+
+Now, lets bring in the $$km^2$$ of coastal area for all OHI regions by aggregating the area protected 1 kilometer inland, and 3 nautical miles out into the eez.
+
+```{r, eval=FALSE}
+# ------- coastal area data -----------
+# read in area of coastline data
+inland_filepath <- here::here("globalprep", "lsp", version_year, "int", "area_protected_1km.csv")
+inland_data <- read_csv(inland_filepath)
+offshore_filepath <- here::here("globalprep", "lsp", version_year, "int", "area_protected_3nm.csv")
+offshore_data <- read_csv(offshore_filepath)
+
+# get combined value of inland and offshore for each ohi region
+inland_offshore <- inland_data %>%
+  left_join(offshore_data, by = join_by(rgn_id, year, rgn_name)) %>%
+  select(rgn_id, year, a_tot_km2.x, a_tot_km2.y) %>%
+  group_by(rgn_id, year) %>%
+  mutate(total_inland_offshore_area = a_tot_km2.x + a_tot_km2.y,
+         year = as.numeric(year)) %>% # add the areas together, as numeric
+  select(rgn_id, year, total_inland_offshore_area)
+```
+
+Now we can join all of these data sources and conduct $$\frac{TourismArrivals * (CoastalPop/TotalPop)}{CoastalArea}$$.
+
+```{r, eval=FALSE}
+# ============= join the tourism arrival, coastal population, and total population data =================== #
+
+arrivals_prop_df <- left_join(arrivals_aggregated, total_population_final, by = c("rgn_id","rgn_name","year")) %>% 
+  mutate(year = as.numeric(year)) %>% 
+  left_join(., coastal_pop_data_fill, by = c("rgn_id","year")) %>% 
+  left_join(., inland_offshore, by = c("rgn_id","year")) %>% 
+  filter(year %in% 2000:2021) %>% # to keep consistent with the coastal pop data
+  mutate(coastal_prop = (popsum/total_pop)) %>% # values that are greater than 1 are because of inconsistencies between World Bank and the coastal population data.  However, those with a value greater than 1 are mostly islands or small regions with a large coastal area.  In that case, we could say 100% of the tourism could be coastally related.
+  mutate(coastal_prop = ifelse(coastal_prop > 1, 1, coastal_prop)) # for rgns and years in which the total_population is greater than 1, we cap it at 1 
+
+ap_final <- arrivals_prop_df %>% 
+  mutate(ap = (tourism_arrivals_ag * coastal_prop)/(total_inland_offshore_area))  %>% 
+  drop_na(ap) %>% # regions that did not have tourism arrival values but were present in the coastal population data
+  select(rgn_id, rgn_name, year, ap) # this final `Ap` (arrivals proportion) is in the units of (tourists/km2).  Aka, a higher proportion indicates that there is a larger number of tourists per km2 of coastal area, and there is therefore a higher tourism density.  This number is now ready to be divided by `Sr`, or the sustainability of tourism.
+
+# save the Ap proportions dataframe
+write_csv(ap_final, here::here(int_dir, "ap.csv"))
+
+# save which observations were gapfilled and how into output
+tr_arrivals_props_tourism_gf <- arrivals_prop_df %>% 
+  select(rgn_id, rgn_name, year, data_source, arrivals_gf)
+
+write_csv(tr_arrivals_props_tourism_gf, here::here(output_dir, "tr_arrivals_props_tourism_gf.csv"))
+```
+
+```{r}
+# interactive plot of the arrival proportions before rescaling
+ap_plot <- ap_final %>%
+  plot_ly(x = ~year, y = ~ap, color = ~rgn_name, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "Global Arrival proportions (Ap) by Region",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Arrival proportion (Ap)"))
+ap_plot
+
+# htmlwidgets::saveWidget(ap_plot, here::here(figs_dir, "ap_interactive_plot.html")) # save plot
+```
+
+## Rescale Ap proportion using the 90th quantile
+
+As according to the [OHI methods](https://ohi-science.org/ohi-methods/goals/goal-models-data.html#tourism-and-recreation), the Ap values for each year and region is rescaled using the 90th quartile for each region.
+
+$$\frac{T_r}{T_{90th}}$$
+
+```{r}
+# to make the Ap scaled between 0 and 1, we can divide the current Ap by the 90th quartile values by region.
+ap_rescaled <- ap_final %>% 
+  group_by(rgn_id, rgn_name) %>% 
+  summarize(value_90th_percentile = quantile(ap, 0.9, na.rm = TRUE))
+
+tr_arrivals_props_tourism <- left_join(ap_final, ap_rescaled, by = c("rgn_id", "rgn_name")) %>% 
+  mutate(
+    Ap = ap/value_90th_percentile,
+    Ap = if_else(Ap < 0, 0, Ap), # if less than 1, that is due to gapfilling where linear models drew the tourism arrival values less than 0.  
+    Ap = if_else(Ap > 1, 1, Ap) # if more than 1, then the Ap value for that year was above the 90th percentile.  So the value is adjusted to 1
+         ) %>% 
+  select(rgn_id, year, Ap) # keep in rgn_name when you want to plot!!!
+
+# interactive plot of the arrival proportions
+ap_final_plot <- tr_arrivals_props_tourism %>%
+  plot_ly(x = ~year, y = ~Ap, color = ~rgn_name, 
+          type = "scatter", mode = "lines") %>%
+  layout(title = "Global Arrival proportions (Ap) by Region, Rescaled",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Arrival proportion (Ap)"))
+ap_final_plot
+
+# save the final tourism arrivals csv
+write_csv(tr_arrivals_props_tourism, here::here(output_dir, "tr_arrivals_props_tourism.csv"))
+```
+
+### Look at changes vs. previous data source (v2023)
+
+```{r, eval=FALSE}
+previous_version_year <- "v2023"
+new_data <- read_csv(here::here("globalprep","tr", version_year, "output","tr_arrivals_props_tourism.csv"))
+old_data <- read_csv(here::here("globalprep","tr", previous_version_year, "output","tr_arrivals_props_tourism.csv"))
+
+compare_common_data <- new_data %>%
+  left_join(old_data, by = c("rgn_id", "year")) %>%
+  drop_na() %>% 
+  rename(
+    new_Ap = Ap.x,
+    old_Ap = Ap.y
+  )  
+  # filter(year %in% 2019)
+
+plot(compare_common_data$old_Ap, compare_common_data$new_Ap,
+     xlab = "v2023 Arrivals Proportion", ylab = "v2024 Arrivals Proportion")
+abline(0, 1) # v2024: it makes sense that this looks so different!! Not only did we aggregate with domestic tourism data this year, we also had a completely different method of calculating Ap (multiplying by the coastal pop/tourism pop, then dividing by coastal area) rather than v2023 (which took the coastal tourism/total tourism for each region).  This makes sense.
+```
+
+
+<!-- # ```{r, eval=FALSE} -->
+<!-- # compare_common_data_2022 <- new_data %>% -->
+<!-- #   left_join(old_data, by = c("rgn_id", "year")) %>% -->
+<!-- #   drop_na() %>% -->
+<!-- #   filter(year == 2021) -->
+<!-- #  -->
+<!-- # plot(compare_common_data_2021$Ap, compare_common_data_2021$Ep, -->
+<!-- #      xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion") -->
+<!-- # abline(0, 1) -->
+<!-- #  -->
+<!-- # compare_common_data_2020 <- new_data %>% -->
+<!-- #   left_join(old_data, by = c("rgn_id", "year")) %>% -->
+<!-- #   drop_na() %>% -->
+<!-- #   filter(year == 2020) -->
+<!-- #  -->
+<!-- # plot(compare_common_data_2020$Ap, compare_common_data_2020$Ep, -->
+<!-- #      xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion") -->
+<!-- # abline(0, 1) -->
+<!-- #  -->
+<!-- # compare_common_data_2019 <- new_data %>% -->
+<!-- #   left_join(old_data, by = c("rgn_id", "year")) %>% -->
+<!-- #   drop_na() %>% -->
+<!-- #   filter(year == 2019) -->
+<!-- #  -->
+<!-- # plot(compare_common_data_2019$Ap, compare_common_data_2019$Ep, -->
+<!-- #      xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion") -->
+<!-- # abline(0, 1) -->
+<!-- #  -->
+<!-- # compare_common_data_2015 <- new_data %>% -->
+<!-- #   left_join(old_data, by = c("rgn_id", "year")) %>% -->
+<!-- #   drop_na() %>% -->
+<!-- #   filter(year == 2015) -->
+<!-- #  -->
+<!-- # plot(compare_common_data_2015$Ap, compare_common_data_2015$Ep, -->
+<!-- #      xlab = "v2023 Arrivals Proportion", ylab = "v2022 Employment Proportion") -->
+<!-- # abline(0, 1) -->
+<!-- # ``` -->
+
+### Check out some specific countries (v2023) -- this was for exploring changes in methodology, can skip or use/edit parts in future years
+
+```{r, eval=FALSE}
+# check some countries that changed a lot in v2023's first push to global
+check_countries_graph <- tourism_props %>% 
+  filter(rgn_id == 24 | rgn_id == 51 | rgn_id == 189 | rgn_id == 118 | rgn_id == 31) %>%
+  mutate(rgn_id_plot = as.factor(rgn_id),
+         year_plot = year)
+
+Ap_graph <- ggplot(check_countries_graph, aes(x = year_plot, y = Ap, color = rgn_id_plot)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "",
+       color = "Region ID")
+
+
+Ap_graph
+
+countries_in_2021 <- check_countries_graph %>%
+  filter(year == "2021") %>%
+  left_join(rgns_eez, by = "rgn_id") %>%
+  select(-year_plot)
+
+library(kableExtra)
+kable(countries_in_2021) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+# Ts: Tourism sustainability
+
+These data are from the World Economic Forum's "Travel and Tourism Development Index" (<https://www.weforum.org/publications/travel-tourism-development-index-2024/>) Downloaded 08/20/2024.
+
+See mazu: \_raw_data/WEF-Economics/ for more details and the raw data.
+
+The TTDI was formerly the TTCI which was a similar index, but unfortunately not comparable. v2024's updated TTDI uses data up through 2023 to calculate their sustainability scores.
+
+These data are gapfilled using gdppcppp and UN georegion information (see next section for obtaining and preparing these data).
+
+```{r WEF processing, eval=FALSE}
+# bring in TTDI pdf! Download it to your computer, place it in Mazu
+ttdi_file <- "WEF_Travel_and_Tourism_Development_Index_2024.pdf" # the file name
+ttdi_raw <- pdf_text(here::here(raw_data_dir, "WEF-Economics", data_dir_version_year, ttdi_file)) # using the package `pdftools`, read in using pdf_text()
+
+sr_scores_table <- ttdi_raw[[11]] %>% # page number of the pdf that has the data we want (aka the sustainability scores)
+  as.data.frame() # make the page as a data frame.  Be warned, the data is all there! You just can't see it yet.
+
+columns = c("rank","economy","score","rank_change","score_change","diff_avg","rank_2","economy_2","score_2","rank_change_2","score_change_2","diff_avg_2", "rank_3","economy_3","score_3","rank_change_3","score_change_3","diff_avg_3") # mirror the pdf and create clean column names
+
+sr_scores <- sr_scores_table %>% 
+  separate_rows('.', sep = "\n") %>%  # separate the rows: \n separates by moving down to the next line without returning to the beginning of the line
+  rename(main_column = ".") %>% # rename the only column as main_column instead of just the period
+  slice(16:55) %>% # choose the rows that have the table in them (disregard the page title etc)
+  separate_wider_position(
+    main_column, # the issue here is that there is not a common delimiter, and the three columns blur together. So, we can use `separate_wider_position()`, which allows you to instead define column breaks by the number of characters, which includes spaces
+    widths = c(rank = 2, economy = 24, score = 4, rank_change = 3, score_change = 5, diff_avg = 19,
+               rank_2 = 7, economy_2 = 24, score_2 = 5, rank_change_2 = 3, score_change_2 = 7, diff_avg_2 = 19,
+               rank_3 = 9, economy_3 = 26, score_3 = 8, rank_change_3 = 1, score_change_3 = 1, diff_avg_3 = 1), # these numbers were found through trial and error, but are always at least the length of the longest character string
+    names_sep = NULL, # default, to avoid renaming the column names
+    names_repair = "check_unique", #the default), no name repair, but checks they are unique
+    too_many = "debug", # will add additional columns to the output to help you locate and resolve the underlying problem
+    too_few = "debug", # adds additional columns to the output to help you locate and resolve the underlying problem... these will not remain in final code
+    cols_remove = FALSE # always FALSE if too_few or too_many are set to "debug"
+  ) %>% 
+  select(rank, economy, score,  rank_2, economy_2, score_2, rank_3, economy_3, score_3) %>% # to get rid of debugging columns and rankings
+  mutate(
+    economy = str_trim(economy, side = "both"), # remove the whitespace before and after the string
+    rank_2 = str_trim(rank_2, side = "both"),
+    economy_3 = str_trim(economy_3, side = "both"),
+    rank_3 = str_trim(rank_3, side = "both"),
+    score_3 = str_trim(score_3, side = "both"),
+    economy_3 = str_replace(economy_3, pattern = "Trinidad and Tobago 3.5", replacement = "Trinidad and Tobago"), # this line specifically had issues with spacing, and no matter what it always had bleeding from the score.  Therefore, the economy name and score were fixed using str_replace.
+    score_3 = str_replace(score_3, pattern = "2 -5", replacement = "3.52") 
+    )
+
+# now, we have a dataframe that contains three columns we would like to make into one. let's subset and create three dfs that each have the same name (they couldnt have the same name beforehand because they were in the same df), then rbind them together to have one df of all regions and their scores.
+sr_scores_sub1 <- sr_scores %>% 
+  select(rank, economy, score)
+
+sr_scores_sub2 <- sr_scores %>% 
+  select(rank_2, economy_2, score_2) %>% 
+  rename(
+    rank = rank_2,
+    economy = economy_2,
+    score = score_2
+  )
+
+sr_scores_sub3 <- sr_scores %>% 
+  select(rank_3, economy_3, score_3) %>% 
+    rename(
+    rank = rank_3,
+    economy = economy_3,
+    score = score_3
+  )
+
+# rbind them together and clean up -- we do not need the column "rank", it was just preserved until now as an easy way to ensure a clean bind
+sr_scores_clean <- rbind(sr_scores_sub1, sr_scores_sub2, sr_scores_sub3) %>% 
+  select(-rank) %>% # remove rank
+  filter(!is.na(score)) %>%  # remove NA, leaves 119 regions, good
+  mutate(
+    score = as.numeric(score), # ensure it is numeric
+    sr = ((score - 1)/5) # rescale the score between 0 and 1
+         ) 
+
+
+# run name_2_gn so each economy receives an OHI rgn name and id  
+ttdi_rgn <- name_2_rgn(df_in = sr_scores_clean, 
+                       fld_name = 'economy',
+                       keep_fld_name = TRUE) %>% # v2024: no duplicates! looks good
+  select(rgn_id, rgn_name, score, sr)
+
+### Save TTDI data file
+write_csv(ttdi_rgn, here(int_dir,"wef_ttdi.csv")) # save to int folder
+```
+
+## Preparing the gdppcppp data:
+
+These data are used to gapfill missing values in tourism sustainability. Most of the data are from the World Bank, but CIA data fill some gaps (CIA data is available for only the most recent year).
+
+The Artisanal Opportunities goal uses gdppcppp data, so we will get the data that was processed for that goal.
+
+```{r worldbank, eval=FALSE}
+wb <- read_csv(here::here("globalprep","ao", version_year, "intermediate","gdppcppp_ohi.csv")) %>%
+  dplyr::select(rgn_id, year, value)
+```
+
+CIA data are used to fill in missing gaps in the gdppcppp data (<https://www.cia.gov/the-world-factbook/field/real-gdp-per-capita/country-comparison>)
+
+Downloaded: 09/22/2024
+
+See README on the raw folder for instructions on how to download this data. Place in Mazu.
+
+The following code is used to prepare these data for OHI:
+
+```{r cia gdp, eval=FALSE}
+
+cia_gdp <- read_csv(here::here(raw_data_dir, "CIA", data_dir_version_year, "Real_GDP_per_capita.csv")) %>% 
+  # remove dollar signs and commas and convert to numeric
+  mutate(value = as.numeric(gsub("[$,]", "", value))) %>% 
+  select(name, value) %>% 
+  rename(country = name, pcgdp_cia = value)
+
+ ## Data reported in a lower resolution than OHI regions
+splits <- data.frame(country = "Saint Helena, Ascension, and Tristan da Cunha", 
+                     country2 = c("Saint Helena", "Ascension","Tristan da Cunha"))
+
+cia_gdp <- cia_gdp %>%
+  left_join(splits, by='country') %>%
+  mutate(country2 = ifelse(is.na(country2), country, country2)) %>%
+  select(country = country2, pcgdp_cia)
+
+cia_gdp_rgn <- name_2_rgn(df_in = cia_gdp, 
+                       fld_name='country')
+
+### Duplicated regions: Collapse regions after weighting by population (regions we include as a single region) - 
+
+population_weights <- data.frame(country = c("Virgin Islands", "Puerto Rico",
+                                             "China", "Hong Kong", "Macau",
+                                             "Guam", "Northern Mariana Islands"),
+                                 # from world bank - updated v2024 using 2023 data from `total_population_wb` read in earlier during aggregation of tourism data
+                                 population = c(104917, 3205691, 1410710000,
+                                                7536100, 704149, 172952, 49796))
+
+cia_gdp_rgn <- cia_gdp_rgn %>%
+  left_join(population_weights, by="country") %>%
+  mutate(population = ifelse(is.na(population), 1, population)) %>%
+  group_by(rgn_id) %>%
+  summarize(pcgdp_cia = weighted.mean(pcgdp_cia, population)) %>%
+  ungroup() %>%
+  filter(rgn_id <= 250) %>%
+  select(rgn_id, pcgdp_cia)
+
+# save the cia data in intermediate folder 
+write_csv(cia_gdp_rgn, here::here(int_dir, "wb_rgn_cia_GDPPCPPP.csv"))
+```
+
+The following code combines the two gdp datasets and gapfills missing regions using UN georegions.
+
+If there is no World Bank gdppcppp data (pcgdp), the CIA data is used (pcgdp_cia). The pcgdp2 variable includes both the World Bank and CIA data (with CIA data only used if there is not World Bank data). The remaining data are estimated using UN geopolitical regions. Ideally, the mean gdppcppp value is calculated at the r2 scale (gdp_pred_r2) using regions within each class with gdppcppp data. If there were not enough regions with data at the r2 scale, the average at the r1 scale was used (gdp_pred_r1). The gdp_all variable combines all estimates using the following hierarchy: World Bank -\> CIA -\> estimated using mean from r2 UN geopolitical regions -\> estimated using mean from r1 UN geopolitical regions.
+
+```{r gapfill gdp, eval=FALSE}
+### world bank gdp data
+gdppcppp <- wb %>%
+  select(rgn_id, year, pcgdp = value)
+
+### cia gdp data
+gdppcppp2 <- read_csv(here(int_dir, "wb_rgn_cia_GDPPCPPP.csv"))
+
+### Use WB data, but if missing, use pcgdp_cia.
+### combine with UN georegion data
+years <- data.frame(year = min(gdppcppp$year):max(gdppcppp$year))
+
+georegions <- ohicore::georegions
+
+regions <- georegions %>%
+  left_join(georegion_labels, by = 'rgn_id')
+
+gdp_raw <- merge(years, regions, by=NULL) %>%
+  left_join(gdppcppp, by = c('rgn_id', 'year')) %>%
+  left_join(gdppcppp2, by = c("rgn_id")) 
+
+## quick compare to make sure the CIA and World Bank data are compatible
+plot(gdp_raw$pcgdp[gdp_raw$year==2022], gdp_raw$pcgdp_cia[gdp_raw$year==2022])
+abline(0,1, col="red")
+# a few minor outliers but overall looks good!
+
+gdp_replace_raw <- gdp_raw %>%
+  mutate(pcgdp2 = ifelse(is.na(pcgdp), pcgdp_cia, pcgdp)) %>% # create an object to replace WB data with CIA data if necessary
+  select(-c(pcgdp, pcgdp_cia))
+
+## Calculating the means across different geopolitical levels (e.g. r2, r1)
+gdp_means_georegions <- gdp_replace_raw %>%
+  group_by(r2, year) %>%
+  mutate(gdp_pred_r2 = mean(pcgdp2, na.rm=TRUE)) %>%
+  ungroup() %>%
+  group_by(r1, year) %>%
+  mutate(gdp_pred_r1 = mean(pcgdp2, na.rm=TRUE)) %>%
+  ungroup() 
+
+gdp_georegions_gf <- gdp_means_georegions %>%
+  mutate(gdp_all = ifelse(is.na(pcgdp2), gdp_pred_r2, pcgdp2)) %>%
+  mutate(gdp_all = ifelse(is.na(gdp_all), gdp_pred_r1, gdp_all)) %>%
+  mutate(gapfilled = ifelse(is.na(pcgdp2) & !is.na(gdp_all), "gapfilled", NA)) %>%
+  mutate(method = ifelse(is.na(pcgdp2) & !is.na(gdp_pred_r2), "UN georegion (r2)", NA)) %>%
+  mutate(method = ifelse(is.na(pcgdp2) & is.na(gdp_pred_r2) & !is.na(gdp_pred_r1), "UN georegion (r1)", method)) 
+
+write_csv(gdp_georegions_gf, here(int_dir, "gdp_raw_gf.csv"))
+
+gdp_data_gf <- gdp_georegions_gf %>%
+  select(rgn_id, year, gapfilled, method) 
+
+write_csv(gdp_data_gf, here(int_dir, "gdp_gf.csv"))
+
+gdp_data <- gdp_georegions_gf %>%
+  select(rgn_id, year, pcgdp = gdp_all)
+
+write_csv(gdp_data, here(int_dir, "gdp.csv"))
+```
+
+The final step is gapfilling the Sustainability data using a linear model with gdppcppp and UN geopolitical regions as predictor variables.
+
+```{r, eval=FALSE}
+
+sust <- read_csv(here(int_dir, "wef_ttdi.csv"))
+
+### don't need to gapfill data without tourism data:
+## Most recent tourism data is 2019.  
+
+ap_gf <- read_csv(here(int_dir, "ap.csv")) %>%
+  # filter(year == 2021) %>%
+  select(rgn_id, ap, year) %>%
+  filter(!is.na(ap)) %>% 
+  mutate(year = as.numeric(year))
+
+# gdp dataframe prepared above (World Bank, CIA, and gapfilled gdp data)
+gdp_raw_gf <- read_csv(here(int_dir, "gdp_raw_gf.csv")) %>% 
+  # filter(year == 2021) %>%
+  select(rgn_id, r0_label, r1_label, r2_label, rgn_label, pcgdp2, gdp_all, year) %>% 
+  mutate(year = as.numeric(year))
+
+tr_sust <- gdp_raw_gf %>%
+  left_join(sust, by = c("rgn_id")) %>%
+  left_join(ap_gf, by = c("rgn_id", "year")) %>%
+  rename(s_score = sr)
+  # filter(rgn_id != 213)
+
+### Add gapfill flag variable 
+## Reminder:
+## pcgdp2: includes both the World Bank and CIA data (with CIA data only used if there is not World Bank data)
+## Ap: Proportion of tourism arrivals (international and domestic when available)
+## s_score: tourism sustainability score
+
+tr_sust_gf <- tr_sust %>%
+  mutate(gapfilled = ifelse(is.na(s_score) & !is.na(ap), "gapfilled", NA)) %>%
+  mutate(method = ifelse(is.na(s_score) & !is.na(ap) & is.na(pcgdp2), "lm georegion + gdppcppp, with est. gdppcppp", NA)) %>%
+  mutate(method = ifelse(is.na(s_score) & !is.na(ap) & !is.na(pcgdp2), "lm georegion + gdppcppp", method)) %>%
+  select(rgn_id, gapfilled, method, year)
+
+write_csv(tr_sust_gf, here(output_dir, "tr_sustainability_gf.csv"))
+```
+
+### Gapfilling
+
+Linear models using gdppcppp (GDP per capita, PPP) and UN geopolitical regions as predictor variables. However if there is no gdppc data we estimate the gdppc using the UN georegions and then used in the linear model to gapfill the sustainability score.
+
+```{r, eval=FALSE}
+
+### Gapfill S using r1 and/or r2 regional data and PPP-adjusted per-capita GDP
+### Looked at models with a year variable, but wasn't significant and decided to exclude
+
+mod3 <- lm(s_score ~ as.factor(r2_label) + gdp_all, data=tr_sust, na.action = na.exclude)
+summary(mod3)
+anova(mod3)
+
+mod4 <- lm(s_score ~ as.factor(r1_label) + gdp_all, data=tr_sust, na.action = na.exclude)
+summary(mod4)
+anova(mod4)
+
+plot(predict(mod3), tr_sust$s_score)
+abline(0,1)
+plot(predict(mod4), tr_sust$s_score)
+abline(0,1)
+
+
+## Estimate missing data and gapfill
+# Some of the r1 levels do not have data and consequently causes a fail. This chunk of code drops these levels so an NA is returned
+
+# Select only r2 column
+new_data <- tr_sust %>% 
+  dplyr::select(r2_label, gdp_all)
+
+unique(tr_sust$r2_label)
+
+r2_w_data <- unique(tr_sust$r2_label[!is.na(tr_sust$s_score)]) # only the r2s that dont have NAs for the sustainability score
+  
+new_data_r2 <- new_data %>%
+  mutate(r2_label = ifelse(r2_label %in% r2_w_data, r2_label, NA))
+
+# Predict sustainability scores using linear model 3 (using r2 data)
+tr_sust <- tr_sust %>% 
+  dplyr::mutate(s_score_pred_r2 = predict(mod3, newdata = new_data_r2))
+
+
+# Select only r1 column
+new_data <- tr_sust %>% 
+  dplyr::select(r1_label, gdp_all)
+
+unique(tr_sust$r1_label)
+
+r1_w_data <- unique(tr_sust$r1_label[!is.na(tr_sust$s_score)])
+
+new_data_r1 <- new_data %>%
+  mutate(r1_label = ifelse(r1_label %in% r1_w_data, r1_label, NA))
+
+# Predict sustainability scores using linear model 4 (using r1 data)
+tr_sust <- tr_sust %>% 
+  dplyr::mutate(s_score_pred_r1 = predict(mod4, newdata = new_data_r1))
+
+
+
+## some are missing the r1 predictions, but none of these have Ap scores, so not relevant
+View(filter(tr_sust, is.na(s_score_pred_r1)))
+
+tr_sust <- tr_sust %>%
+  mutate(s_score_2 = ifelse(is.na(s_score), s_score_pred_r2, s_score)) %>%
+  mutate(s_score_2 = ifelse(is.na(s_score_2), s_score_pred_r1, s_score_2)) %>%
+  filter(year %in% c(2019, 2021)) %>%
+  select(rgn_id, year, s_score=s_score_2)
+
+summary(tr_sust)
+
+write_csv(tr_sust, here(output_dir, "tr_sustainability.csv"))
+```
+
+## Compare with previous year of data
+
+```{r, eval=FALSE}
+tr_sust <- read_csv(here(int_dir, "tr_sustainability.csv"))
+
+prev_year <- "v2023"
+
+compare <- tr_sust %>% 
+  pivot_wider(names_from = year, values_from = s_score)
+
+# current vs previous year of data
+plot(compare$"2021", compare$"2019")
+abline(0, 1, col="red")
+# looks good
+
+# v2024: comparison plot
+# comparison_plot <- ggplot(compare, aes(x = "2021", y = "2019")) +
+#   geom_point(alpha = 0.5) + 
+#   geom_abline(color = "darkred", linetype = "dashed") +  # reference line
+#   labs(
+#     title = "",
+#     x = "",
+#     y = ""
+#   ) +
+#   theme_minimal() 
+# comparison_plot
+```
+
+# Tw: Travel warnings
+
+-   Travel warnings were deleted from the v2020 assessment.

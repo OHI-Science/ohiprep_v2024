@@ -9,10 +9,10 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Compiled on Mon Sep 11 08:22:41 2023 by egg" />
+<meta name="author" content="Compiled on Wed Sep 4 17:07:06 2024 by lecuona" />
 
 
-<title>OHI 2023: Food Provision, Calculating fisheries stock status</title>
+<title>OHI 2024: Food Provision, Calculating fisheries stock status</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1378,7 +1378,7 @@ overflow: visible;
 </style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -1645,10 +1645,10 @@ border-radius: 0px;
 
 
 
-<h1 class="title toc-ignore">OHI 2023: Food Provision, Calculating
+<h1 class="title toc-ignore">OHI 2024: Food Provision, Calculating
 fisheries stock status</h1>
-<h4 class="author"><em>Compiled on Mon Sep 11 08:22:41 2023 by
-egg</em></h4>
+<h4 class="author"><em>Compiled on Wed Sep 4 17:07:06 2024 by
+lecuona</em></h4>
 
 </div>
 
@@ -1667,8 +1667,8 @@ R package, developed by Sean Anderson, is used to run CMSY.</p>
 <div id="updates-from-previous-scenario-year" class="section level1">
 <h1>Updates from previous scenario year</h1>
 <ul>
-<li>None. This script wasn’t run in v2023. Associated data files within
-the repo were copied from v2022 to v2023.</li>
+<li>None. This script wasn’t run in v2024. Associated data files within
+the repo were copied from v2023 to v2024.</li>
 </ul>
 </div>
 <div id="setup" class="section level1">
@@ -1684,10 +1684,7 @@ the repo were copied from v2022 to v2023.</li>
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">library</span>(doParallel)</span>
 <span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">library</span>(here)</span>
 <span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a></span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="fu">setwd</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;globalprep/fis/v2022&quot;</span>))</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a></span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">here</span>(<span class="st">&#39;workflow/R/common.R&#39;</span>))</span></code></pre></div>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;workflow&quot;</span>, <span class="st">&quot;R&quot;</span>, <span class="st">&quot;common.R&quot;</span>)) <span class="co"># file creates objects to process data</span></span></code></pre></div>
 </div>
 <div id="load-catch-data" class="section level1">
 <h1>Load catch data</h1>
