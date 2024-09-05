@@ -77,8 +77,16 @@ Surface ocean pH on total scale, dissolved inorganic carbon, and saturation stat
 
 7.  Calculate Zonal Statistics using the "mean" between the zones raster and the rescaled annual rasters for each region.
     Finish by saving the dataframe within `/home/lecuona/OHI_Intro/ohiprep_v2024/globalprep/prs_oa/v2024/output`.
+    
+**References:**
 
-If using these data, please see our [citation policy](http://ohi-science.org/citation-policy/).
+Chau, T. T. T., Gehlen, M., and Chevallier, F.: A seamless ensemble-based reconstruction of surface ocean pCO2 and air–sea CO2 fluxes over the global coastal and open oceans, Biogeosciences, 19, 1087–1109, <https://doi.org/10.5194/bg-19-1087-2022>, 2022.
+
+Climate Change Indicators: Ocean Acidity (2024) EPA Climate Change Indicators. Available at: <https://www.epa.gov/climate-indicators/climate-change-indicators-ocean-acidity> (Accessed: 06 August 2024). 
+
+Barker, S. & Ridgwell, A. (2012) Ocean Acidification. Nature Education Knowledge 3(10):21.
+
+**If using these data, please see our [citation policy](http://ohi-science.org/citation-policy/).**
 
 
 
