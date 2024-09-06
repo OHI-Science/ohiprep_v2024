@@ -39,16 +39,18 @@ library(tidyverse)
 Data describing commercial landings (tonnes) in 2017.
 
 ```{r}
-# Read in commercial landings data
+# ---- Read in commercial landings data ----
 fish <- terra::rast(here("Reference", "CRS", "commercial_landings_2017.tif"))
 
+# ---- preliminary data exploration -----
 # print out geospatial data info (class, dimensions, resolution, extent, CRS, etc.)
 fish # equivalent to (fish)
 
 # print out summary of value layer
 summary(fish)
 
-## Take a look
+# ---- raw plot ----
+## take a look!
 terra::plot(fish)
 # adjust margins: par(mar = c(bottom, left, top, right))
 
@@ -57,6 +59,7 @@ par(oma = c(0,0,0,0))
 terra::plot(fish, mar = c(0, 1.5, 0, 5) )#,
             #oma = c(0,0,0,0)) # outer margin area
 
+# ---- log-transformed plot ----
 # lets log so we can visualize this a little better
 terra::plot(log(fish + 1), mar = c(0,1.5,0,3.5))
 ```
@@ -136,7 +139,7 @@ terra::global(fish_moll, "sum", na.rm = TRUE)
 # 389.3 million
 ```
 
--   389 million tonnes is a much higher value than the raw data's ~87 million value. Reprojecting the data impacted the values to a significant degree. Cell sizes have been stretched and increased to be uniform across the globe. When perform our global summation after transforming, the 
+-   389 million tonnes is a much higher value than the raw data's ~87 million value. Reprojecting the data impacted the values to a significant degree. Cell sizes have been stretched and increased to be uniform across the globe. When perform our global summation after transforming, the fish landings (in tonnes per cell)   
 
 ```{r}
 # calculate cell area
