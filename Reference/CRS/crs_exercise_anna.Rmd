@@ -139,7 +139,10 @@ terra::global(fish_moll, "sum", na.rm = TRUE)
 # 389.3 million
 ```
 
--   389 million tonnes is a much higher value than the raw data's ~87 million value. Reprojecting the data impacted the values to a significant degree. Cell sizes have been stretched and increased to be uniform across the globe. When perform our global summation after transforming, the fish landings (in tonnes per cell)   
+-   389 million tonnes is a much higher value than the raw data's ~87 million value. Reprojecting the data impacted the values to a significant degree. Cell sizes have been stretched and increased to be uniform across the globe. When we performed our global summation after transforming, the commercial fish landings values were counts per cell, not density (counts per km^2, for example). This means that when we projected the data from EPSG:4326 to Mollweide, the counts in the cells were transformed to fit the cell sizes of the Mollweide template. For example, if a raster cell near the equator had a landings value of 100 and a cell area of 1 billion m^2, and that raster cell's 
+--writing on google doc [COME BACK]
+
+was stretched to fit into the corresponding Mollweide cell, which had a cell area of over 500 million m^2, that value would 
 
 ```{r}
 # calculate cell area
@@ -150,13 +153,13 @@ cell_area_moll <- terra::cellSize(fish_moll)
 #par(mar = c(1,1,1,1)) 
 terra::plot(cell_area_moll, main = "Mollweide projection cell size", mar = c(0, 2, 0, 6))
 
-terra::plot(cell_area, main = "Original projection cell size")
+terra::plot(cell_area, main = "Original CRS (EPSG:4326) cell size", mar = c(0, 1.5, 0, 6))
 ```
 
 
 
 ```{r}
-(cell_area_moll$area)
+cell_area_moll$area
 # min 0
 # max is 547 million
 cell_area$area
