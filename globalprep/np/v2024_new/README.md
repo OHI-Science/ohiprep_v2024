@@ -13,12 +13,6 @@ Please review the NP Plan document linked above before running any of the script
 
 By the end of v2024, we finished writing the new steps 1-3. Steps 4 and 5 were not completed and only contained basic YAML and setup code. Future years’ efforts should begin with reviewing the [New NP Plan document](https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit?usp=sharing), then complete steps 4 and 5. 
 
-**The `functions.R` script and multiple data layer files in ohi-global MUST be updated in order for this new approach to work, as data layer outputs have been restructured or deleted. Please read through the [NP section of `ohi-global/eez/conf/functions.R`](https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L467)**
-
-
-When future fellows move on to update step 4 (fish oil/fish meal, or FOFM) data prep, it may be helpful to adapt as much of the content from the former approach’s `STEP1c_np_fishfeed_pred.Rmd` as possible. The output of that step is a “score” (please review the NP section of `functions.R`, including the [FOFM scores section](https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L590). It may make more sense to name this “status”, as the status for each product (FOFM, ornamentals, and seaweeds) and their weights (based on the relative value of each product per region) are used to calculate the score. 
-
-The score calculation will also need to be adjusted in `functions.R`, as discussed in the NP Plan document. 
 
 
 ### Sustainability
@@ -31,10 +25,21 @@ A key element of this new NP approach is that sustainability is incorporated in 
 
 To continue to develop the new NP data prep process and methodology, please refer to the [2024 New NP Plan: outline and notes](https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit?usp=sharing) for a comprehensive outline of the approach and details on next steps. 
 
+**The `functions.R` script and multiple data layer files in ohi-global MUST be updated in order for this new approach to work, as data layer outputs have been restructured or deleted. Please read through the [NP section of `ohi-global/eez/conf/functions.R`](https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L467)**
+
+
+When future fellows move on to update step 4 (fish oil/fish meal, or FOFM) data prep, it may be helpful to adapt as much of the content from the former approach’s `STEP1c_np_fishfeed_pred.Rmd` as possible. The output of that step is a “score” (please review the NP section of `functions.R`, including the [FOFM scores section](https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L590). It may make more sense to name this “status”, as the status for each product (FOFM, ornamentals, and seaweeds) and their weights (based on the relative value of each product per region) are used to calculate the score. 
+
+The score calculation will also need to be adjusted in `functions.R`, as discussed in the NP Plan document. 
+
+
 Some key things to keep in mind as you consider updating this goal’s data prep process:
 
-You would need to change in `ohi-global`’s `functions.R` significantly to account for changes in how exposure and risk are handled (please look into this in-depth and consult Melanie Frazier).
-You would need to update the `layers_eez_base.csv` (and all layer CSV files in the ohi-global metadata folder) with updated layers (no longer using exposure and risk separately, changing how seaweeds sustainability is handled, etc.)
+*	You would need to change in `ohi-global`’s `functions.R` significantly to account for changes in how exposure and risk are handled (please look into this in-depth and consult Melanie Frazier).
+
+*	As stated earlier, the way that the NP scores are calculated would need to change significantly to account for the new approach.
+
+*	You would need to update the `layers_eez_base.csv` (and all layer CSV files in the ohi-global metadata folder) with updated layers (no longer using exposure and risk separately, changing how seaweeds sustainability is handled, etc.)
 
 
 ### Layers Created
@@ -99,7 +104,7 @@ Note that if a file’s details say “to be”, this may indicate (unless other
 	* `output/np_product_weights`: NA, did not create.
 
 
-—-------------------------------------------------------------------------------------------------------------
+—----------------------------------------------------------------------------------------------------------------------
 
 ### Additional information
 FAO Commodities data are used to determine the Natural Products goal. FAO metadata found [here](http://ref.data.fao.org/dataset?entryId=aea93578-9b01-4448-9305-917348ca00b2&tab=metadata).
@@ -125,3 +130,4 @@ FAO metadata for Mariculture data are found [here](http://www.fao.org/fishery/st
 RAM data can be found here: [RAM Legacy Stock Assessment Database](http://ramlegacy.org) v4.491
 
 Fisheries data can be found here: [IMAS portal](http://data.imas.utas.edu.au/portal/search?uuid=ff1274e1-c0ab-411b-a8a2-5a12eb27f2c0)
+
