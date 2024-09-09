@@ -61,7 +61,17 @@ terra::plot(fish, mar = c(0, 1.5, 0, 5) )#,
 
 # ---- log-transformed plot ----
 # lets log so we can visualize this a little better
-terra::plot(log(fish + 1), mar = c(0,1.5,0,3.5))
+terra::plot(log(fish + 1) , mar = c(0,1.5,0,3.5))
+
+#par(mar = c(5, 4, 4, 0))
+terra::plot(log(fish + 1), main = "Log-transformed Commercial Landings (EPSG:4326)", mar = c(1.5, 0, 2.1, 1))
+
+# library(tidyterra)
+# ggplot() +
+#   geom_spatraster(data = fish, aes(fill = commercial_landings_2017)) +
+#   coord_sf(crs = 4326) +
+#   scale_fill_grass_c(palette = "plasma")
+
 ```
 
 
@@ -81,8 +91,11 @@ Check against Sea Around Us to make sure this seems generally reasonable.
 
 ```{r}
 cell_area <- terra::cellSize(fish)
-terra::plot(cell_area, box = TRUE,
-            mar = c(2, 1.5, 1, 8)) # adjusted margins for exporting plot
+# terra::plot(cell_area, box = TRUE,
+#             mar = c(2, 1.5, 1, 8)) # adjusted margins for exporting plot
+
+terra::plot(cell_area, main = "Cell Size: Original CRS (EPSG:4326)", mar = c(0, 1.5, 0, 6))
+
 
 print(cell_area)
 ```
@@ -139,10 +152,8 @@ terra::global(fish_moll, "sum", na.rm = TRUE)
 # 389.3 million
 ```
 
--   389 million tonnes is a much higher value than the raw data's ~87 million value. Reprojecting the data impacted the values to a significant degree. Cell sizes have been stretched and increased to be uniform across the globe. When we performed our global summation after transforming, the commercial fish landings values were counts per cell, not density (counts per km^2, for example). This means that when we projected the data from EPSG:4326 to Mollweide, the counts in the cells were transformed to fit the cell sizes of the Mollweide template. For example, if a raster cell near the equator had a landings value of 100 and a cell area of 1 billion m^2, and that raster cell's 
---writing on google doc [COME BACK]
+-   389 million tonnes is a much higher value than the raw data's ~87 million value. Reprojecting the data impacted the values to a significant degree. Cell sizes have been stretched and increased to be uniform across the globe. When we performed our global summation after transforming, the commercial fish landings values were counts per cell, not density (counts per km^2, for example). This means that when we projected the data from EPSG:4326 to Mollweide, the count associated with one cell in the original raster was copied over to potentially multiple cells assigned to the same area in the Mollweide template. 
 
-was stretched to fit into the corresponding Mollweide cell, which had a cell area of over 500 million m^2, that value would 
 
 ```{r}
 # calculate cell area
@@ -151,9 +162,9 @@ cell_area_moll <- terra::cellSize(fish_moll)
 #par(mai = c(1, 1, 3, 5)) # set margins: bottom, left, top, right
 #par(oma = c(1, 1, 3, 4))
 #par(mar = c(1,1,1,1)) 
-terra::plot(cell_area_moll, main = "Mollweide projection cell size", mar = c(0, 2, 0, 6))
+terra::plot(cell_area_moll, main = "Cell Size: Mollweide Projection", mar = c(0, 2, 0, 6))
 
-terra::plot(cell_area, main = "Original CRS (EPSG:4326) cell size", mar = c(0, 1.5, 0, 6))
+terra::plot(cell_area, main = "Cell Size: Original CRS (EPSG:4326)", mar = c(0, 1.5, 0, 6))
 ```
 
 
@@ -171,7 +182,7 @@ cell_area$area
 Compare to the original tonnes? What is happening? How can you improve this?
 -   original tons: 86331119
 -   Mollweide tons: 389271065
--   the cell size area is now relatively consistent across the globe -- old cell sizes have stretched etc., to fit a standardized cell size (I tried to extend the margins to see the full scalebar label values but struggled)
+-   the cell size area is now relatively consistent across the globe -- old cell sizes have stretched etc., to fit a standardized cell size
 -     perform global calculations before reprojecting
 
 
@@ -188,24 +199,26 @@ Compare to the original tonnes? What is happening? How can you improve this?
 # get density (tonnes/area)
 fish_density <- fish / cell_area
 
-plot(log(fish_density))
+par(mar = c(4, 4, 4, 0)) # set margins: bottom, left, top, right
+
+terra::plot(log(fish_density), main = "Commercial Landings Density (original CRS: EPSG 4326)")
 
 # reproject to Mollweide
 fish_density_moll <- terra::project(fish_density, crs(moll))
 fish_density_moll
 
-plot(log(fish_density_moll))
+terra::plot(log(fish_density_moll), main = "Commercial Landings Density (projected CRS: Mollweide)")
 
 # get area of cells
 new_cell_size <- cellSize(fish_density_moll)
-plot(new_cell_size)
+terra::plot(new_cell_size)
 
 # multiply density by area to get count (tonnes)
 new_tonnes <- fish_density_moll * new_cell_size
-plot(log(new_tonnes + 1))
+terra::plot(log(new_tonnes + 1), main = "Density to Counts: Mollweide")
 
 # sum to check
-global(new_tonnes, "sum", na.rm = TRUE)
+terra::global(new_tonnes, "sum", na.rm = TRUE)
 # 85 million!
 ```
 
@@ -254,6 +267,9 @@ rob <- "+proj=robin +datum=WGS84 +units=m +no_defs"
 
 fish_moll_rob <- terra::project(fish_moll, crs(rob))
 plot(log(fish_moll_rob + 1))
+
+
+terra::global(fish_moll_rob, "sum", na.rm = TRUE)
 
 # now back to lat long:
 fish_moll_rob_latlon <- project(fish_moll_rob, fish)

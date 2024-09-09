@@ -355,13 +355,15 @@ display: none;
 <div id="new-np-methods-readme-v2024" class="section level1">
 <h1>New NP methods README (v2024)</h1>
 <p>If using these data, please see our <a href="http://ohi-science.org/citation-policy/">citation policy</a>.</p>
-<p><strong>This folder is under construction.</strong> Please refer to
-the <a href="https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit?usp=sharing">2024
+<blockquote>
+<p>⚠️ <strong>This folder is under construction.</strong> Please refer
+to the <a href="https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit?usp=sharing">2024
 New NP Plan: Outline and Notes</a> created to structure v2024’s approach
 and inform future efforts.</p>
+</blockquote>
 <div id="new-np-approach-status-at-the-end-of-v2024" class="section level2">
 <h2>New NP approach: Status at the end of v2024</h2>
-<p>We decided to change how the NP goal is processed in v2024.
+<p>We decided to overhaul how the NP goal is processed in v2024.
 Previously, there were a lot of moving parts within <code>ohiprep</code>
 and <code>ohi-global</code> that made it difficult to understand where
 each data source and layer was used and how they contributed to the
@@ -371,27 +373,31 @@ for score calculations in this directory.</p>
 <p>Please review the NP Plan document linked above before running any of
 the scripts or moving on to update any scripts in this directory or
 <code>ohi-global</code>. Primary contact for this updated methodology:
-Melanie Frazier. Secondary contact: Anna Ramji.</p>
+Melanie Frazier (<a href="mailto:frazier@nceas.ucsb.edu" class="email">frazier@nceas.ucsb.edu</a>). Secondary contact: Anna Ramji
+(<a href="mailto:aramji@bren.ucsb.edu" class="email">aramji@bren.ucsb.edu</a>).</p>
 <p>By the end of v2024, we finished writing the new steps 1-3. Steps 4
 and 5 were not completed and only contained basic YAML and setup code.
 Future years’ efforts should begin with reviewing the <a href="https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit?usp=sharing">New
 NP Plan document</a>, then complete steps 4 and 5.</p>
 <div id="sustainability" class="section level3">
 <h3>Sustainability</h3>
-<p>A key element of this new NP approach is that sustainability is
-incorporated in the model in a different way. Previously, ornamentals’
-exposure and risk and seaweed sustainability were exported separately,
-read into <code>functions.R</code> in <code>ohi-global</code> and used
-along with many other pieces and steps in and out of ohi-global to
-calculate score. In the new approach, we incorporate sustainability in
-our <code>ohiprep</code> processing to yield statuses for each product.
-For ornamentals, we use exposure and risk to calculate sustainability,
-which we then use to calculate relative sustainable harvest – all
-occurring in step 2. For seaweeds, we “calculate” (define)
-sustainability using Seafood Watch data to calculate relative
-sustainable harvest in step 3. We <em>do not</em> write out
-sustainability components separately to use them to calculate status in
-ohi-global’s functions.R.</p>
+<p>Although the workflow was changed fairly dramatically, the analyses
+were mostly unchanged, with the exception that we used a different
+approach to incorporate sustainability into the model and no longer
+log-transform certain values in the ornamentals dataprep. Previously,
+ornamentals’ exposure and risk and seaweed sustainability were exported
+separately, read into <code>functions.R</code> in
+<code>ohi-global</code>, and used along with many other pieces and steps
+in and out of <code>ohi-global</code> to calculate score. In the new
+approach, we incorporate sustainability in our <code>ohiprep</code>
+processing to yield statuses for each product. For ornamentals, we use
+exposure and risk to calculate sustainability, which we then use to
+calculate relative sustainable harvest – all occurring in step 2. For
+seaweeds, we “calculate” (define) sustainability using Seafood Watch
+data to calculate relative sustainable harvest in step 3. We <em>do
+not</em> write out sustainability components separately to use them to
+calculate status in <code>ohi-global</code>’s
+<code>functions.R</code>.</p>
 </div>
 </div>
 <div id="next-steps" class="section level2">
@@ -401,9 +407,9 @@ please refer to the <a href="https://docs.google.com/document/d/1ubCTW7ZrvvdckvY
 New NP Plan: outline and notes</a> for a comprehensive outline of the
 approach and details on next steps.</p>
 <p><strong>The <code>functions.R</code> script and multiple data layer
-files in ohi-global MUST be updated in order for this new approach to
-work, as data layer outputs have been restructured or deleted. Please
-read through the <a href="https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L467">NP
+files in <code>ohi-global</code> MUST be updated in order for this new
+approach to work, as data layer outputs have been restructured or
+deleted. Please read through the <a href="https://github.com/OHI-Science/ohi-global/blob/111bc9721d43621e7624ac911e381bff36442ebd/eez/conf/functions.R#L467">NP
 section of <code>ohi-global/eez/conf/functions.R</code></a></strong></p>
 <p>When future fellows move on to update step 4 (fish oil/fish meal, or
 FOFM) data prep, it may be helpful to adapt as much of the content from
@@ -419,20 +425,25 @@ used to calculate the score.</p>
 <p>Some key things to keep in mind as you consider updating this goal’s
 data prep process:</p>
 <ul>
-<li><p>You would need to change in <code>ohi-global</code>’s
-<code>functions.R</code> significantly to account for changes in how
-exposure and risk are handled (please look into this in-depth and
-consult Melanie Frazier).</p></li>
-<li><p>As stated earlier, the way that the NP scores are calculated
-would need to change significantly to account for the new
-approach.</p></li>
-<li><p>You would need to update the <code>layers_eez_base.csv</code>
-(and all layer CSV files in the ohi-global metadata folder) with updated
-layers (no longer using exposure and risk separately, changing how
-seaweeds sustainability is handled, etc.)</p></li>
+<li><p>You will need to change the NP function in
+<code>ohi-global</code>’s <code>functions.R</code> to account for
+changes in how exposure and risk are handled (please look into this
+in-depth and consult Melanie Frazier) and the way that the data layers
+are now formatted.</p></li>
+<li><p>You will need to update the <code>layers_eez_base.csv</code> (and
+all layer CSV files in the <code>ohi-global</code> <a href="https://github.com/OHI-Science/ohi-global/tree/111bc9721d43621e7624ac911e381bff36442ebd/metadata_documentation"><code>metadata_documentation</code>
+folder</a>) with updated layers (no longer using exposure and risk
+separately, changing how seaweeds sustainability is handled,
+etc.)</p></li>
+<li><p>If you decide not to adopt this new approach, the ornamentals
+dataprep should still be updated to fix issues with log-transforming
+exposure values. Please consult with Melanie Frazier for more
+information and refer to the <a href="https://docs.google.com/document/d/1ubCTW7ZrvvdckvY2zpBzCLHLgoIlCLW8kDMj-KWda9U/edit#heading=h.qm2oqpph6nlj">log-transforming
+section</a> of the New NP Plan document.</p></li>
 </ul>
-<div id="layers-created" class="section level3">
-<h3>Layers Created</h3>
+</div>
+<div id="layers-created" class="section level2">
+<h2>Layers Created</h2>
 <p><em>Previously:</em></p>
 <ul>
 <li>Relative harvest value (np_harvest_product_weight)</li>
@@ -456,16 +467,16 @@ seaweeds sustainability is handled, etc.)</p></li>
 <li>Relative harvest value (np_harvest_product_weight)</li>
 </ul>
 </div>
-<div id="files" class="section level3">
-<h3>Files:</h3>
+<div id="files" class="section level2">
+<h2>Files:</h2>
 <p><strong>Steps 1 and 2 must be completed in sequential order. Steps 3
 and 4 can be done in any order. Step 5 needs to be completed last. Steps
 4 and 5 are incomplete.</strong></p>
 <p>Note that if a file’s details say “to be”, this may indicate (unless
 otherwise specified) how the file was designed to be used, but we ran
-out of time and did not make all of the updates to ohi-global and more
-that would be necessary to fully implement the changes in methodology
-and structure.</p>
+out of time and did not make all of the updates to
+<code>ohi-global</code> and more that would be necessary to fully
+implement the changes in methodology and structure.</p>
 <ul>
 <li><code>step_1_np_commodities_prep.Rmd</code> – script for preparing
 data from FAO commodities sets (quantity and value), creating
@@ -496,7 +507,7 @@ used internally (within step 2) to calculate sustainability.</li>
 saving full version (all columns) of relative sustainable tonnes of
 ornamentals.</li>
 <li><code>output/np_relative_sust_tonnes_ornamentals.csv</code>: to be
-used as ornamentals status in <a href="https://github.com/OHI-Science/ohi-global/blob/draft/eez/conf/functions.R#L548-L584">ohi-global/eez/conf/functions.R</a>.</li>
+used as ornamentals status in <a href="https://github.com/OHI-Science/ohi-global/blob/draft/eez/conf/functions.R#L548-L584"><code>ohi-global/eez/conf/functions.R</code></a>.</li>
 </ul></li>
 <li><code>step_3_np_seaweeds_prep.Rmd</code> – seaweeds dataprep script,
 uses FAO Mariculture data and Seafood Watch data. MAR dataprep should be
@@ -512,15 +523,16 @@ sustainability data for seaweed species.</li>
 </ul></li>
 <li><code>step_4_np_fofm_prep.Rmd</code> – FOFM dataprep. INCOMPLETE:
 ran out of time to copy over old Step1c FOFM file and make appropriate
-changes to <a href="https://github.com/OHI-Science/ohi-global/blob/draft/eez/conf/functions.R#L548-L584">ohi-global/eez/conf/functions.R</a>,
-as well as all ohi-global files that refer to data layers and structure.
-FIS dataprep needs to be completed first.
+changes to <a href="https://github.com/OHI-Science/ohi-global/blob/draft/eez/conf/functions.R#L548-L584"><code>ohi-global/eez/conf/functions.R</code></a>,
+as well as all <code>ohi-global</code> files that refer to data layers
+and structure. FIS dataprep needs to be completed first.
 <ul>
 <li><code>int/np_fofm_tonnes_weighting.csv</code>: NA, did not
 create.</li>
 <li><code>int/____</code>: NA, did not create.</li>
 <li><code>output/np_fofm_status.csv</code>: NA, did not create. To be
-used as FOFM status in ohi-global functions.R linked earlier.</li>
+used as FOFM status in <code>ohi-global</code> <code>functions.R</code>
+linked earlier.</li>
 </ul></li>
 <li><code>step_5_np_weighting_prep.Rmd</code> – Weighting dataprep.
 INCOMPLETE: did not finish step 4, ran out of time. Intended to contain
@@ -531,8 +543,7 @@ usd/tonne values calculated in new step 1.
 <li><code>output/np_product_weights</code>: NA, did not create.</li>
 </ul></li>
 </ul>
-<p>————————————————————————————————————————-</p>
-</div>
+<p>—————————————————————————————————————-</p>
 <div id="additional-information" class="section level3">
 <h3>Additional information</h3>
 <p>FAO Commodities data are used to determine the Natural Products goal.
