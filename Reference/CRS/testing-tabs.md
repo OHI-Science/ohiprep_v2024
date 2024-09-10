@@ -70,3 +70,12 @@ function openTab(evt, tabName) {
 
 document.getElementById("defaultOpen").click();
 </script>
+
+
+
+
+> <details>
+    <summary>My Favorite Resources for Understanding Coordinate Reference Systems</summary>
+    <br>
+    <p>My favorite resources for understanding this concept are [this Vox video](https://www.youtube.com/watch?v=kIID5FDi2JQ) on how areas of the globe must be distorted in order to render the 3-D ellipsoid of Earth into a 2D map, [this ArcGIS Pro article](https://pro.arcgis.com/en/pro-app/latest/help/mapping/properties/coordinate-systems-and-projections.htm), and [Ningchuan Xiao’s interactive visualization](https://ncxiao.github.io/map-projections/index.html) of how different projections warp the area of different parts of the world using [Tissot’s indicatrix](https://en.wikipedia.org/wiki/Tissot%27s_indicatrix) and Gedymin faces. If you’re not a fan of gifs you can click “pause” on that visualization, or use [this Map Projection Playground](https://observablehq.com/@floledermann/projection-playground) by Florian Ledermann to visualize how different variables impact 2-D representations of area.</p>
+</details>
