@@ -130,10 +130,10 @@ aquaculture_value <- read_csv(file.path(fao_dir, "/FAO_GlobalAquacultureProducti
 
 ## Clean Aquaculture value data
 
-### Note: This process was done manually because instead of reading in the data with "flag" as the header for each observation's symbol, 2024's year was read in with "symbol" as the header for each observation's symbol
+**Note:** This process was done manually because instead of reading in the data with "flag" as the header for each observation's symbol, 2024's year was read in with "symbol" as the header for each observation's symbol
 
 -   As a result, the data cleaning function fao_online_portal_clean.R
-    was not able to be run. So what I did was drag components of the
+    was not applicable. We instead used components of the
     cleaning function and manually cleaned the data. See v2023
     livelihoods_economies_dataprep.Rmd to see what they did.
     -   With the data in the correct format (drawn from online FAO
